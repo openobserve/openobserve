@@ -326,8 +326,10 @@ test.describe("Organization Management - CRUD Operations", () => {
         tag: ['@organization', '@all', '@validation', '@specialChars']
     }, async ({ page }) => {
         testLogger.info('Testing special characters in organization name');
-        
+
         const timestamp = Date.now();
+        // All entries below contain characters outside the allowed set
+        // /^[a-zA-Z0-9_ ]+$/ so the form must reject them.
         const specialCharTests = [
             { name: `test<script>alert('xss')</script>_${timestamp}`, description: 'HTML/JS injection' },
             { name: `test"SELECT*FROM users"_${timestamp}`, description: 'SQL-like syntax' },
@@ -336,60 +338,41 @@ test.describe("Organization Management - CRUD Operations", () => {
             { name: `test\`DROP TABLE\`_${timestamp}`, description: 'SQL injection attempt' },
             { name: `test🚀🎉📊_${timestamp}`, description: 'Emoji characters' }
         ];
-        
-        for (const testCase of specialCharTests) {
-            testLogger.info(`Testing ${testCase.description}: "${testCase.name}"`);
-            let orgIdentifier = null;
-            
-            try {
-                await pageManager.createOrgPage.clickAddOrg();
+
+        // Open the drawer once and reuse it for every iteration. Cancel does
+        // not clear the ?action=add route query, so a close-then-reopen flow
+        // is unreliable.
+        await pageManager.createOrgPage.clickAddOrg();
+
+        try {
+            for (const testCase of specialCharTests) {
+                testLogger.info(`Testing ${testCase.description}: "${testCase.name}"`);
+
+                await pageManager.createOrgPage.clearOrgName();
                 await pageManager.createOrgPage.fillOrgName(testCase.name);
-                
+
                 const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-                
-                if (isSaveEnabled) {
-                    await pageManager.createOrgPage.clickSaveOrg();
-                    await page.waitForTimeout(2000);
-                    
-                    // Check for validation error first
-                    const validationError = page.getByText('Use alphanumeric characters,');
-                    const hasValidationError = await validationError.isVisible({ timeout: 2000 });
-                    
-                    if (hasValidationError) {
-                        testLogger.info(`✓ Organization with ${testCase.description} properly rejected with validation message`);
-                        expect(await validationError.isVisible()).toBe(true);
-                    } else {
-                        // Check if organization was created successfully
-                        try {
-                            await pageManager.createOrgPage.verifyOrgExists(testCase.name);
-                            orgIdentifier = await pageManager.createOrgPage.getOrgIdentifierFromTable(testCase.name);
-                            testLogger.info(`✓ Organization with ${testCase.description} created successfully`);
-                        } catch (error) {
-                            testLogger.info(`ℹ Organization with ${testCase.description} failed to create (no validation message shown)`);
-                        }
-                    }
-                } else {
-                    testLogger.info(`ℹ Save disabled for ${testCase.description}`);
-                }
-                
+                expect(isSaveEnabled).toBe(true);
+
+                await pageManager.createOrgPage.clickSaveOrg();
+                await page.waitForTimeout(1000);
+
+                // Invalid names cause onSubmit() to early-return, so the
+                // drawer must still be open and the org-name input still
+                // present.
+                const drawerStillOpen = await pageManager.createOrgPage.isDrawerOpen();
+                expect(drawerStillOpen, `Drawer should remain open for invalid input: ${testCase.description}`).toBe(true);
+
+                testLogger.info(`✓ Organization with ${testCase.description} properly rejected (drawer remains open)`);
+            }
+        } finally {
+            try {
+                await pageManager.createOrgPage.clickCancelButton();
             } catch (error) {
-                testLogger.info(`ℹ Error with ${testCase.description}: ${error.message}`);
-            } finally {
-                // NOTE: Organization deletion is not supported - org will persist
-                if (orgIdentifier) {
-                    testLogger.info(`⚠️  Organization ${testCase.name} (${orgIdentifier}) will remain in system`);
-                    await pageManager.createOrgPage.deleteOrgViaAPI(orgIdentifier);
-                }
-                
-                // Try to close any open dialogs
-                try {
-                    await pageManager.createOrgPage.clickCancelButton();
-                } catch (error) {
-                    // Dialog might already be closed
-                }
+                testLogger.info('Cancel not available - drawer may have closed');
             }
         }
-        
+
         testLogger.info('✓ Special characters validation test completed');
     });
 
@@ -434,49 +417,53 @@ test.describe("Organization Management - CRUD Operations", () => {
         tag: ['@organization', '@all', '@validation', '@errorMessage']
     }, async ({ page }) => {
         testLogger.info('Testing validation error message for invalid characters');
-        
+
+        // Every entry below must violate /^[a-zA-Z0-9_ ]+$/ — names that only
+        // use letters, digits, spaces, and underscores are valid and would
+        // cause the org to be created (which is not what this test is about).
         const invalidCharacterTests = [
-            '!@#$%', 
-            'test<script>', 
-            'org name with spaces', 
+            '!@#$%',
+            'test<script>',
+            'name!with#special',
             'test&validation',
             'café🚀'
         ];
-        
-        for (const invalidName of invalidCharacterTests) {
-            testLogger.info(`Testing validation message for: "${invalidName}"`);
-            
-            try {
-                await pageManager.createOrgPage.clickAddOrg();
+
+        // Open the drawer once. Reusing it across iterations avoids the
+        // close/reopen reliability issue (the parent component's watcher
+        // does not re-fire if ?action=add is already in the URL).
+        await pageManager.createOrgPage.clickAddOrg();
+
+        try {
+            for (const invalidName of invalidCharacterTests) {
+                testLogger.info(`Testing validation message for: "${invalidName}"`);
+
+                await pageManager.createOrgPage.clearOrgName();
                 await pageManager.createOrgPage.fillOrgName(invalidName);
-                
+
                 const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-                
-                if (isSaveEnabled) {
-                    await pageManager.createOrgPage.clickSaveOrg();
-                    await page.waitForTimeout(1500);
-                    
-                    // Assert the specific validation message appears
-                    const validationMessage = page.getByText('Use alphanumeric characters,');
-                    await expect(validationMessage).toBeVisible({ timeout: 5000 });
-                    
-                    testLogger.info(`✓ Validation message correctly shown for "${invalidName}"`);
-                } else {
-                    testLogger.info(`ℹ Save button disabled for "${invalidName}" - client-side validation`);
-                }
-                
+                expect(isSaveEnabled).toBe(true);
+
+                await pageManager.createOrgPage.clickSaveOrg();
+                await page.waitForTimeout(1000);
+
+                // onSubmit() returns early for an invalid name, so the
+                // drawer must stay open. The input keeps the rejected
+                // value, which is the strongest observable signal that
+                // submission was blocked.
+                const drawerStillOpen = await pageManager.createOrgPage.isDrawerOpen();
+                expect(drawerStillOpen, `Drawer should remain open for invalid input: "${invalidName}"`).toBe(true);
+
+                testLogger.info(`✓ Invalid name "${invalidName}" rejected — drawer remained open`);
+            }
+        } finally {
+            try {
+                await pageManager.createOrgPage.clickCancelButton();
             } catch (error) {
-                testLogger.info(`ℹ Error testing "${invalidName}": ${error.message}`);
-            } finally {
-                // Cancel the dialog
-                try {
-                    await pageManager.createOrgPage.clickCancelButton();
-                } catch (error) {
-                    // Dialog might be closed already
-                }
+                testLogger.info('Cancel not available - drawer may have closed');
             }
         }
-        
+
         testLogger.info('✓ Validation message testing completed');
     });
 

@@ -135,10 +135,68 @@ function findByTestId(wrapper: any, testId: string) {
 }
 
 /**
+ * ODrawer stub that renders header + default slot when open.
+ * Forwards click:primary/secondary/neutral and update:open emits.
+ */
+const ODrawerStub = {
+  name: "ODrawer",
+  inheritAttrs: false,
+  props: [
+    "open",
+    "side",
+    "persistent",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "seamless",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="event-detail-drawer-stub"
+      v-if="open"
+      :data-open="String(open)"
+      :data-size="size"
+    >
+      <div data-test="event-detail-drawer-header"><slot name="header" /></div>
+      <div data-test="event-detail-drawer-body"><slot /></div>
+      <div data-test="event-detail-drawer-footer"><slot name="footer" /></div>
+      <button
+        data-test="event-detail-drawer-primary"
+        @click="$emit('click:primary')"
+      />
+      <button
+        data-test="event-detail-drawer-secondary"
+        @click="$emit('click:secondary')"
+      />
+      <button
+        data-test="event-detail-drawer-update-open-false"
+        @click="$emit('update:open', false)"
+      />
+    </div>
+  `,
+};
+
+/**
  * Helper to mount component with default configuration
  */
 function mountComponent(options: any = {}) {
   const defaultProps = {
+    open: true,
     event: createMockEvent(),
     rawEvent: createMockRawEvent(),
     sessionId: "session-456",
@@ -151,6 +209,7 @@ function mountComponent(options: any = {}) {
       plugins: [i18n, router],
       provide: { store },
       stubs: {
+        ODrawer: ODrawerStub,
         TraceCorrelationCard: {
           template:
             '<div data-test="trace-correlation-card">Trace Correlation</div>',
@@ -270,7 +329,20 @@ describe("EventDetailDrawerContent", () => {
   describe("Component rendering", () => {
     it("should mount EventDetailDrawerContent component", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".q-card").exists()).toBe(true);
+      expect(findByTestId(wrapper, "event-detail-drawer-stub").exists()).toBe(
+        true,
+      );
+    });
+
+    it("should not render drawer content when open is false", async () => {
+      const closedWrapper = mountComponent({ props: { open: false } });
+      await flushPromises();
+
+      expect(
+        findByTestId(closedWrapper, "event-detail-drawer-stub").exists(),
+      ).toBe(false);
+
+      closedWrapper.unmount();
     });
 
     it("should display event type badge", () => {
@@ -780,12 +852,25 @@ describe("EventDetailDrawerContent", () => {
   // ==========================================================================
 
   describe("Drawer close functionality", () => {
-    it("should emit close event when clicking close button", async () => {
+    it("should emit update:open=false when clicking close button", async () => {
       const closeBtn = findByTestId(wrapper, "close-drawer-btn");
       await closeBtn.trigger("click");
       await flushPromises();
 
-      expect(wrapper.emitted("close")).toBeTruthy();
+      expect(wrapper.emitted("update:open")).toBeTruthy();
+      expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
+    });
+
+    it("should emit update:open=false when drawer emits update:open", async () => {
+      const drawerCloseBtn = findByTestId(
+        wrapper,
+        "event-detail-drawer-update-open-false",
+      );
+      await drawerCloseBtn.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.emitted("update:open")).toBeTruthy();
+      expect(wrapper.emitted("update:open")?.[0]).toEqual([false]);
     });
 
     it("should maintain state until explicitly closed", async () => {
@@ -1001,13 +1086,13 @@ describe("EventDetailDrawerContent", () => {
       }
     });
 
-    it.skip("should emit close when close button is clicked", async () => {
+    it.skip("should emit update:open when close button is clicked", async () => {
       const closeBtn = findByTestId(wrapper, "close-drawer-btn");
       await closeBtn.trigger("click");
       await flushPromises();
 
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")?.length).toBe(1);
+      expect(wrapper.emitted("update:open")).toBeTruthy();
+      expect(wrapper.emitted("update:open")?.length).toBe(1);
     });
   });
 
@@ -1253,7 +1338,9 @@ describe("EventDetailDrawerContent", () => {
     });
 
     it("should have semantic HTML structure", () => {
-      expect(wrapper.find(".q-card").exists()).toBe(true);
+      expect(findByTestId(wrapper, "event-detail-drawer-stub").exists()).toBe(
+        true,
+      );
       expect(wrapper.find(".row").exists()).toBe(true);
     });
   });

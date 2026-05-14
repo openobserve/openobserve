@@ -113,14 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
     </div>
-    <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-      <AddGroup
-        style="width: 30vw"
-        :org_identifier="store.state.selectedOrganization.identifier"
-        @cancel:hideform="hideAddGroup"
-        @added:group="setupGroups"
-      />
-    </q-dialog>
+    <AddGroup
+      v-model:open="showAddGroup"
+      :org_identifier="store.state.selectedOrganization.identifier"
+      @added:group="setupGroups"
+    />
     <ConfirmDialog
       title="Delete Group"
       :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"

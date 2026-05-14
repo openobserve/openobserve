@@ -105,10 +105,20 @@ describe("AssociatedStreamFunction", () => {
     },
   };
 
+  const ODrawerStub = {
+    name: "ODrawer",
+    inheritAttrs: false,
+    props: ["open", "size", "persistent", "title", "subTitle", "showClose", "width"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    template:
+      '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
+  };
+
   const globalStubs = {
     QTablePagination: true,
     SchemaIndex: true,
     NoData: true,
+    ODrawer: ODrawerStub,
   };
 
   beforeEach(() => {
@@ -177,6 +187,69 @@ describe("AssociatedStreamFunction", () => {
 
       await flushPromises();
       expect(wrapper.find('[data-test="log-stream-refresh-stats-btn"]').exists()).toBe(true);
+    });
+  });
+
+  describe("Schema ODrawer", () => {
+    it("should render the ODrawer with size 'lg'", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.attributes("data-size")).toBe("lg");
+    });
+
+    it("should bind ODrawer open state to showIndexSchemaDialog (closed by default)", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      expect(vm.showIndexSchemaDialog).toBe(false);
+
+      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      expect(drawer.attributes("data-open")).toBe("false");
+    });
+
+    it("should reflect open=true on ODrawer when showIndexSchemaDialog is true", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.showIndexSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
+      expect(drawer.attributes("data-open")).toBe("true");
+    });
+
+    it("should sync showIndexSchemaDialog when ODrawer emits update:open", async () => {
+      const wrapper = mount(AssociatedStreamFunction, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+      await flushPromises();
+
+      const vm = wrapper.vm as any;
+      vm.showIndexSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawerComponent = wrapper.findComponent(ODrawerStub);
+      expect(drawerComponent.exists()).toBe(true);
+
+      drawerComponent.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(vm.showIndexSchemaDialog).toBe(false);
     });
   });
 

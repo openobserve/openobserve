@@ -52,20 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add/edit tab -->
-  <q-dialog
-    v-model="showAddTabDialog"
-    position="right"
-    full-height
-    maximized
+  <AddTab
+    v-model:open="showAddTabDialog"
+    :edit-mode="false"
+    :dashboard-id="dashboardId"
+    :folder-id="folderId"
     data-test="dashboard-tab-add-dialog"
-  >
-    <AddTab
-      :edit-mode="false"
-      :dashboard-id="dashboardId"
-      :folder-id="folderId"
-      @refresh="updateTabList"
-    />
-  </q-dialog>
+    @refresh="updateTabList"
+  />
 </template>
 
 <script lang="ts">

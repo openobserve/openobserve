@@ -15,29 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="column full-height no-wrap searchdetaildialog"
+  <div
+    class="column no-wrap searchdetaildialog"
     data-test="dialog-box"
-    :style="{ borderTop: `4px solid ${statusColor}` }"
   >
-    <q-card-section class="q-px-md q-pb-sm">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold" data-test="log-detail-title-text">
-            {{ t("search.rowDetail") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-sm"
-            data-test="close-dialog"
-          ><q-icon name="cancel" size="16px" /></OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
     <!-- Single Tab Row -->
     <div class="row justify-between q-pt-sm items-center">
       <div class="col tw:flex tw:items-center tw:gap-2">
@@ -97,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
-    <div :class="['tab-panels-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
+    <div :class="['tab-panels-container tw:h-screen tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
@@ -371,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />
-    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:flex-shrink-0">
+    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
           <OButton
@@ -421,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">
@@ -473,7 +454,7 @@ export default defineComponent({
     "sendToAiChat",
     "closeTable",
     "show-correlation",
-    "load-correlation" // New event for lazy loading correlation data
+    "load-correlation", // New event for lazy loading correlation data
   ],
   props: {
     modelValue: {
