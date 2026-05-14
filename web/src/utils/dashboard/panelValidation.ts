@@ -33,7 +33,7 @@ export const findFirstValidMappedValue = (
     }
 
     // If a match is found, check if the required field (color or text) is valid
-    if (isMatch && v[fieldToCheck] != null) {
+    if (isMatch && v[fieldToCheck] != null && v[fieldToCheck] !== "") {
       return true;
     }
 

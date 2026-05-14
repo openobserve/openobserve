@@ -55,7 +55,7 @@ export const buildValueMappingCache = (
   const cache = new Map<any, string>();
 
   mappings.forEach((mapping: any) => {
-    if (mapping && mapping.text != null) {
+    if (mapping && mapping.text != null && mapping.text !== "") {
       if (mapping.type === "regex") {
         // Regex mapping – stored with a special prefix; pattern tested during lookup
         cache.set(`__regex_${mapping.pattern ?? ""}`, mapping.text);
