@@ -375,9 +375,7 @@ pub async fn get_latest_sessions(
                 gen_ai_usage_cost: json::get_float_value(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
-                error_count: json::get_int_value(
-                    item.get("error_count").unwrap_or_default(),
-                ),
+                error_count: json::get_int_value(item.get("error_count").unwrap_or_default()),
             },
         );
     }

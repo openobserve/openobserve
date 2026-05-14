@@ -284,10 +284,7 @@ impl OtelIngestionProcessor {
                 // Model is emitted separately via the model extractor.
                 continue;
             }
-            span_attributes.insert(
-                format!("gen_ai.request.{key}"),
-                json::json!(value),
-            );
+            span_attributes.insert(format!("gen_ai.request.{key}"), json::json!(value));
         }
 
         // Token usage: emit individual scalar attributes per Gen-AI spec so they
@@ -601,7 +598,9 @@ mod tests {
         // Tool call arguments should be extracted and added
         assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ARGUMENTS));
         assert_eq!(
-            span_attrs.get(GenAiAttributes::TOOL_CALL_ARGUMENTS).unwrap(),
+            span_attrs
+                .get(GenAiAttributes::TOOL_CALL_ARGUMENTS)
+                .unwrap(),
             &json::json!({"city": "San Francisco"})
         );
 
