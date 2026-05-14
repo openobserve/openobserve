@@ -278,12 +278,15 @@ impl OtelIngestionProcessor {
             span_attributes.insert(GenAiAttributes::OUTPUT_MESSAGES.to_string(), output_val);
         }
 
-        // Model parameters JSON: kept as OO extension (no Gen-AI spec equivalent for
-        // an aggregated parameters blob).
-        if !model_params.is_empty() {
+        // Model parameters: emit as individual gen_ai.request.* scalars for queryability.
+        for (key, value) in &model_params {
+            if key == "model" {
+                // Model is emitted separately via the model extractor.
+                continue;
+            }
             span_attributes.insert(
-                O2Attributes::MODEL_PARAMETERS.to_string(),
-                json::json!(model_params),
+                format!("gen_ai.request.{key}"),
+                json::json!(value),
             );
         }
 
@@ -354,19 +357,19 @@ impl OtelIngestionProcessor {
         }
 
         if let Some(tname) = tool_name {
-            span_attributes.insert(O2Attributes::TOOL_NAME.to_string(), json::json!(tname));
+            span_attributes.insert(GenAiAttributes::TOOL_NAME.to_string(), json::json!(tname));
         }
 
         if let Some(tcid) = tool_call_id {
-            span_attributes.insert(O2Attributes::TOOL_CALL_ID.to_string(), json::json!(tcid));
+            span_attributes.insert(GenAiAttributes::TOOL_CALL_ID.to_string(), json::json!(tcid));
         }
 
         if let Some(targs) = tool_call_arguments {
-            span_attributes.insert(O2Attributes::TOOL_CALL_ARGUMENTS.to_string(), targs);
+            span_attributes.insert(GenAiAttributes::TOOL_CALL_ARGUMENTS.to_string(), targs);
         }
 
         if let Some(tresult) = tool_call_result {
-            span_attributes.insert(O2Attributes::TOOL_CALL_RESULT.to_string(), tresult);
+            span_attributes.insert(GenAiAttributes::TOOL_CALL_RESULT.to_string(), tresult);
         }
 
         // Add evaluation scores and metadata if present
@@ -530,9 +533,9 @@ mod tests {
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // Provider name should be extracted from gen_ai.system
-        assert!(span_attrs.contains_key(O2Attributes::PROVIDER_NAME));
+        assert!(span_attrs.contains_key(GenAiAttributes::SYSTEM));
         assert_eq!(
-            span_attrs.get(O2Attributes::PROVIDER_NAME).unwrap(),
+            span_attrs.get(GenAiAttributes::SYSTEM).unwrap(),
             &json::json!("anthropic")
         );
     }
@@ -582,30 +585,30 @@ mod tests {
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // Tool name should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_NAME));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_NAME));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_NAME).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_NAME).unwrap(),
             &json::json!("get_weather")
         );
 
         // Tool call ID should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ID));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ID));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_ID).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_ID).unwrap(),
             &json::json!("call_12345")
         );
 
         // Tool call arguments should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ARGUMENTS));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ARGUMENTS));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_ARGUMENTS).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_ARGUMENTS).unwrap(),
             &json::json!({"city": "San Francisco"})
         );
 
         // Tool call result should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_RESULT));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_RESULT));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_RESULT).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_RESULT).unwrap(),
             &json::json!({"temperature": 72})
         );
 
@@ -658,15 +661,15 @@ mod tests {
         );
 
         // Tool name and ID should be extracted
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_NAME));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_NAME));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_NAME).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_NAME).unwrap(),
             &json::json!("Read")
         );
 
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ID));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ID));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_ID).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_ID).unwrap(),
             &json::json!("toolu_01T1Mfo98ePBYgoRXG3yPkWt")
         );
 
