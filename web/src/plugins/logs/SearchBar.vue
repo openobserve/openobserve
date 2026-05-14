@@ -3236,7 +3236,8 @@ export default defineComponent({
 
       if (
         searchObj.loading == false &&
-        store.state.zoConfig.query_on_stream_selection == false
+        store.state.zoConfig.query_on_stream_selection == false &&
+        searchObj.meta.logsVisualizeToggle === "logs"
       ) {
         searchObj.loading = true;
         searchObj.runQuery = true;
@@ -3256,7 +3257,8 @@ export default defineComponent({
 
       if (
         value.valueType === "relative" &&
-        store.state.zoConfig.query_on_stream_selection == false
+        store.state.zoConfig.query_on_stream_selection == false &&
+        searchObj.meta.logsVisualizeToggle === "logs"
       ) {
         emit("searchdata");
       }
