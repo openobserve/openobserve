@@ -14,18 +14,13 @@ async function ingestForQueryBuilderTest(request, streamName = "e2e_automate") {
         ? process.env.INGESTION_URL.slice(0, -1)
         : process.env.INGESTION_URL;
 
-    try {
-        const response = await request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
-            headers: headers,
-            data: logsdata
-        });
-        const responseData = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
-        testLogger.debug('Test data ingestion response', { response: responseData, streamName });
-        return responseData;
-    } catch (e) {
-        testLogger.debug('Test data ingestion error', { error: e.message, streamName });
-        return { error: e.message };
-    }
+    const response = await request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+        headers: headers,
+        data: logsdata
+    });
+    const responseData = await response.json();
+    testLogger.debug('Test data ingestion response', { response: responseData, streamName });
+    return responseData;
 }
 
 async function applyQueryButton(pm) {
