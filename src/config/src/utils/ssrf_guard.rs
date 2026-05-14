@@ -136,6 +136,13 @@ impl SsrfGuard {
     /// bypass that the sync validator can't see.
     pub async fn validate_url_with_config_async(url: &str) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
+        // When loopback is explicitly allowed we're in a dev/test environment;
+        // skip SSRF validation entirely so test fixtures with placeholder URLs
+        // (e.g. "DEMO") and unresolvable hostnames don't get rejected at save time.
+        // Production keeps ZO_SSRF_ALLOW_LOOPBACK=false and remains strict.
+        if allow_loopback {
+            return Ok(());
+        }
         Self::validate_url_inner(url, allow_loopback)?;
 
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;

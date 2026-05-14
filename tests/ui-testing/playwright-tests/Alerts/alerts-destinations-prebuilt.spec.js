@@ -241,8 +241,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     // ----- SERVICENOW -----
     testLogger.info('===== Testing ServiceNow Destination =====');
     const servicenowName = `auto_dest_servicenow_${sharedRandomValue}`;
-    const instanceUrl = 'https://example.com/api/now/table/incident';
-    const instanceUrlUpdated = 'https://www.example.com/api/now/table/incident';
+    const instanceUrl = 'https://dev12345.service-now.com/api/now/table/incident';
+    const instanceUrlUpdated = 'https://dev67890.service-now.com/api/now/table/incident';
     const username = 'test_user';
     const password = 'test_password';
 
