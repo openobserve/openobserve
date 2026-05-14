@@ -6107,8 +6107,11 @@ export class LogsPage {
      * This opens the utilities menu (replaces old dropdown arrow)
      */
     async clickSavedViewsDropdownArrow() {
-        const dropdownArrow = this.page.locator('[data-test="logs-search-saved-views-expand-btn"]');
-        await dropdownArrow.waitFor({ state: 'visible', timeout: 10000 });
+        // Saved views are now a split dropdown button on the toolbar.
+        // Click the dropdown arrow (second button) to expand the saved views list.
+        const savedViewsGroup = this.page.locator(this.savedViewsDropdownBtn);
+        await savedViewsGroup.waitFor({ state: 'visible', timeout: 10000 });
+        const dropdownArrow = savedViewsGroup.locator('button[aria-label="Expand"], button[aria-haspopup="true"]').first();
         await dropdownArrow.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked saved views dropdown arrow');
