@@ -35,6 +35,7 @@ import {
   provide,
   ref,
   useAttrs,
+  useId,
   useSlots,
   watch,
   watchEffect,
@@ -81,6 +82,9 @@ const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
 
 defineSlots<SelectSlots>();
+
+const _fallbackId = useId();
+const inputId = computed(() => props.id ?? _fallbackId);
 
 // Dev-time warning: slot-based options with multiple/searchable require listbox
 // mode, but listboxModeEnabled requires options prop. Guide the developer early.
@@ -568,7 +572,7 @@ const fieldWidthClass = computed(() => {
     <!-- Label -->
     <label
       v-if="label || $slots.tooltip"
-      :for="id"
+      :for="inputId"
       class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
@@ -592,7 +596,7 @@ const fieldWidthClass = computed(() => {
         >
           <PopoverTrigger
             type="button"
-            :id="id"
+            :id="inputId"
             :name="name"
             :disabled="disabled"
             :class="[
@@ -855,7 +859,7 @@ const fieldWidthClass = computed(() => {
                     <!-- Regular item -->
                     <ListboxItem
                       v-else
-                      :value="String(filteredOptions[vRow.index].value)"
+                      :value="toRekaString(filteredOptions[vRow.index].value)"
                       :disabled="filteredOptions[vRow.index].disabled"
                       :class="[
                         'tw:relative tw:flex tw:items-center tw:w-full tw:h-full tw:gap-2',
@@ -951,7 +955,7 @@ const fieldWidthClass = computed(() => {
     >
       <div class="tw:relative tw:flex tw:items-center">
         <SelectTrigger
-          :id="id"
+          :id="inputId"
           :class="[
             'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:ps-3',
             'tw:bg-select-bg',
