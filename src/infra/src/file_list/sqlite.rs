@@ -1427,7 +1427,7 @@ GROUP BY stream;
 SUM(original_size) AS original_size,
 SUM(index_size) AS index_size
 FROM file_list
-WHERE org_id = $1 AND account = $2;"#;
+WHERE org = $1 AND account = $2;"#;
         let pool = CLIENT_RO.clone();
         let ret: Option<(i64, i64)> = sqlx::query_as(sql)
             .bind(org_id)
