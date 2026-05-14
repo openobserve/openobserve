@@ -922,6 +922,7 @@ export default defineComponent({
         light_mode_theme_color: undefined,
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
+        org_storage_enabled: false,
       };
 
       try {
@@ -964,6 +965,9 @@ export default defineComponent({
             orgSettings?.data?.data?.claim_parser_function ??
             defaultSettings.claim_parser_function,
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
+          org_storage_enabled:
+            orgSettings?.data?.data?.org_storage_enabled ??
+            defaultSettings.org_storage_enabled,
         });
 
         if (

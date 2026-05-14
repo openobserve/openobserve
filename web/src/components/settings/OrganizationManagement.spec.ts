@@ -38,7 +38,10 @@ vi.mock("@/utils/zincutils", () => ({
     }
     return `2023-12-01`; // Fallback for any invalid timestamps
   }),
-  getImageURL: vi.fn(() => "http://test.com/image.png")
+  getImageURL: vi.fn(() => "http://test.com/image.png"),
+  useLocalOrganization: vi.fn(() => null),
+  useLocalCurrentUser: vi.fn(() => null),
+  useLocalTimezone: vi.fn(() => null),
 }));
 
 vi.mock("@/components/shared/grid/NoData.vue", () => ({
@@ -430,7 +433,8 @@ describe("OrganizationManagement.vue", () => {
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
-        contract_end_date_display: "-"
+        contract_end_date_display: "-",
+        org_storage_enabled: false,
       });
     });
 

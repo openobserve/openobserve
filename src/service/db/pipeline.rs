@@ -27,7 +27,8 @@ use infra::{
 
 use crate::{
     common::infra::config::{
-        PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES, STREAM_EXECUTABLE_PIPELINES,
+        PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES,
+        STREAM_EXECUTABLE_PIPELINES,
     },
     service::pipeline::batch_execution::ExecutablePipeline,
 };
@@ -115,6 +116,44 @@ pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
     Ok(infra_pipeline::get_by_id(pipeline_id).await?)
 }
 
+/// Returns the owning org for a pipeline id from the in-memory `PIPELINE_ID_TO_ORG` cache.
+///
+/// On a cache miss this falls back to a DB read so callers do not see false negatives during
+/// startup or briefly after a pipeline is created. The cache is populated for every pipeline
+/// (enabled or disabled, realtime or scheduled) by `cache_id_to_org()` and kept in sync by the
+/// `watch()` loop.
+pub async fn get_org_by_id(pipeline_id: &str) -> Option<String> {
+    if let Some(org) = PIPELINE_ID_TO_ORG.read().await.get(pipeline_id).cloned() {
+        return Some(org);
+    }
+    match infra_pipeline::get_by_id(pipeline_id).await {
+        Ok(p) => {
+            PIPELINE_ID_TO_ORG
+                .write()
+                .await
+                .insert(p.id.clone(), p.org.clone());
+            Some(p.org)
+        }
+        Err(_) => None,
+    }
+}
+
+/// Populates `PIPELINE_ID_TO_ORG` from the DB. Lightweight — does not initialize any
+/// `ExecutablePipeline` and is safe to call on every node type (routers included).
+pub async fn cache_id_to_org() -> Result<(), anyhow::Error> {
+    let pipelines = list().await?;
+    let mut id_to_org = PIPELINE_ID_TO_ORG.write().await;
+    id_to_org.clear();
+    for pl in pipelines.iter() {
+        id_to_org.insert(pl.id.clone(), pl.org.clone());
+    }
+    log::info!(
+        "[Pipeline] Cached id->org mapping for {} pipelines",
+        id_to_org.len()
+    );
+    Ok(())
+}
+
 /// Returns the cached scheduled pipeline by id, or fetches from DB if not cached.
 pub async fn get_scheduled_pipeline_from_cache(pipeline_id: &str) -> Option<Pipeline> {
     SCHEDULED_PIPELINES.read().await.get(pipeline_id).cloned()
@@ -185,6 +224,10 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
+    // The id->org map is needed on every node type (including routers) for cross-org
+    // IDOR checks in HTTP handlers, so populate it before the heavy-cache early-return.
+    cache_id_to_org().await?;
+
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
         return Ok(());
     }
@@ -303,6 +346,50 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
     }
 }
 
+/// Lightweight watcher that only maintains the `PIPELINE_ID_TO_ORG` cache.
+///
+/// Runs on every node type (including dedicated routers) so HTTP handlers can perform
+/// O(1) cross-org ownership checks without a DB round trip. The heavy `watch()` below
+/// (which also initializes `ExecutablePipeline` objects) remains gated to ingester /
+/// querier / alert_manager nodes.
+pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("[Pipeline::watch_id_to_org] started");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("[Pipeline::watch_id_to_org] event channel closed");
+                break;
+            }
+        };
+        match ev {
+            db::Event::Put(ev) => {
+                let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+                let Ok(pipeline) = get_by_id(pipeline_id).await else {
+                    log::error!(
+                        "[Pipeline::watch_id_to_org] error getting pipeline {pipeline_id} from db"
+                    );
+                    continue;
+                };
+                PIPELINE_ID_TO_ORG
+                    .write()
+                    .await
+                    .insert(pipeline.id, pipeline.org);
+            }
+            db::Event::Delete(ev) => {
+                let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+                PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
+            }
+            db::Event::Empty => {}
+        }
+    }
+    log::info!("[Pipeline::watch_id_to_org] ended");
+    Ok(())
+}
+
 pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;
@@ -323,6 +410,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("[Pipeline::watch] error getting pipeline by id from db");
                     continue;
                 };
+                PIPELINE_ID_TO_ORG
+                    .write()
+                    .await
+                    .insert(pipeline.id.clone(), pipeline.org.clone());
                 match &pipeline.source {
                     config::meta::pipeline::components::PipelineSource::Realtime(stream_params) => {
                         let mut pipeline_stream_mapping_cache =
@@ -379,6 +470,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
+                PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
                 if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
                     && STREAM_EXECUTABLE_PIPELINES
                         .write()

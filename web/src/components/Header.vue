@@ -193,7 +193,7 @@ size="xs" class="warning" />{{
       <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
         variant="ghost"
-        size="icon-circle-sm"
+        size="icon-toolbar"
         @click="toggleAIChat"
         data-test="menu-link-ai-item"
         class="ai-hover-btn"
@@ -201,7 +201,7 @@ size="xs" class="warning" />{{
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
       >
-        <img :src="getBtnLogo" class="header-icon ai-icon" />
+        <img :src="getBtnLogo" class="header-icon ai-icon" style="width: 18px; height: 18px;" />
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->

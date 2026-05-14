@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="selectedDashboards.length === 0"
             @click="handleNext"
             data-test="add-dashboard-github-next"
-            >`Next ({{ selectedDashboards.length }})`</OButton
+            >Next ({{ selectedDashboards.length }})</OButton
           >
         </div>
       </q-card-section>

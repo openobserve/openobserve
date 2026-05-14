@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
-    <div :class="['tab-panels-container', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
+    <div :class="['tab-panels-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />
-    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md">
+    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:flex-shrink-0">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
           <OButton

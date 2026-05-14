@@ -111,6 +111,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </ORouteTab>
                 <ORouteTab
+                  v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.organizationData.organizationSettings.org_storage_enabled === true)"
+                  data-test="storage-settings-tab"
+                  name="storageSettings"
+                  :to="{
+                    name: 'storageSettings',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  content-class="tab_content"
+                  icon="cloud"
+                  :label="t('storage_settings.tabLabel')"
+                >
+                </ORouteTab>
+                <ORouteTab
                   data-test="alert-templates-tab"
                   name="templates"
                   :to="{
@@ -292,7 +307,25 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const settingsTab = ref("general");
+    const routeToSettingsTab: Record<string, string> = {
+      general:               "general",
+      organization:          "organization",
+      nodes:                 "nodes",
+      queryManagement:       "queryManagement",
+      domainManagement:      "domain_management",
+      alertDestinations:     "alert_destinations",
+      pipelineDestinations:  "pipeline_destinations",
+      alertTemplates:        "templates",
+      modelPricing:          "model_pricing",
+      cipherKeys:            "cipher-keys",
+      license:               "license",
+      orgnizationManagement: "organization_management",
+      regexPatterns:         "regex_patterns",
+      correlationSettings:   "correlation_settings",
+    };
+    const settingsTab = ref(
+      routeToSettingsTab[router.currentRoute.value.name as string] ?? "general"
+    );
     const { isMetaOrg } = useIsMetaOrg();
     const splitterModel = ref(250);
     const storePreviousStoreModel  = ref(250);

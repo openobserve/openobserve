@@ -367,11 +367,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="profileData?.sql"
               variant="ghost"
               size="icon-sm"
-              :class="copiedSql ? 'tw:text-green-600' : ''"
+              :class="[
+                'tw:border',
+                copiedSql ? 'tw:text-green-600 tw:border-green-400' : 'tw:border-gray-300'
+              ]"
               @click="copySql"
               data-test="inspector-copy-sql-btn"
             >
-              <component :is="copiedSql ? Check : Copy" :size="14" />
+              <Copy v-if="!copiedSql" :size="16" />
+              <Check v-else :size="16" />
               <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
             </OButton>
             <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>

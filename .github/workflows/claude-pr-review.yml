@@ -118,4 +118,5 @@ jobs:
             - **Respect human reverts** - if a human reverted any bot-authored change, never re-raise or re-fix it
 
           claude_args: |
+            --model claude-sonnet-4-6
             --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Read,Grep,Glob"

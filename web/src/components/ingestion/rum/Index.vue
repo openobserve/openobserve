@@ -72,9 +72,7 @@ export default defineComponent({
   components: {
     OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      rumtabs: "rumWebTab",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -89,6 +87,10 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const routeToRumTab: Record<string, string> = {
+      frontendMonitoring: "rumWebTab",
+    };
+    const rumtabs = ref(routeToRumTab[router.currentRoute.value.name as string] ?? "rumWebTab");
 
     onMounted(() => {
       const ingestRoutes = ["frontendMonitoring"];
@@ -154,6 +156,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      rumtabs,
       getImageURL,
       verifyOrganizationStatus,
     };

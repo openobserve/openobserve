@@ -90,6 +90,30 @@ export function extractSemanticDimensions(
 }
 
 /**
+ * Build a reverse mapping from field name (lowercase) to schematic group ID.
+ * Uses definition-order priority: first FieldAlias that includes the field wins.
+ * This is the inverse of extractSemanticDimensions.
+ *
+ * Use this to deduplicate fields by their semantic group when building queries
+ * from multiple correlated streams that may use different field names for the
+ * same conceptual dimension.
+ */
+export function buildFieldToGroupIdMap(
+  semanticGroups: FieldAlias[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const group of semanticGroups) {
+    for (const field of group.fields) {
+      const lower = field.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, group.id);
+      }
+    }
+  }
+  return map;
+}
+
+/**
  * Filter dimensions to only include fields that are actually used for disambiguation
  *
  * This implements the same logic as the backend to determine which dimensions are relevant

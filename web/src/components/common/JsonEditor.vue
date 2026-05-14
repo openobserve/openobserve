@@ -30,7 +30,7 @@
         <q-icon
           v-close-popup
           name="cancel"
-          class="cursor-pointer tw:mr-3"
+          class="cursor-pointer tw:mr-3 tw:ml-2"
           size="20px"
           data-test="json-editor-close"
         />

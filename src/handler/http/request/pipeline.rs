@@ -270,7 +270,15 @@ pub async fn list_pipelines(
         ("x-o2-mcp" = json!({"description": "Get pipeline details by ID", "category": "pipelines"}))
     )
 )]
-pub async fn get_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
+pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    }
+
     let meta_pipeline = match crate::service::db::pipeline::get_by_id(&pipeline_id).await {
         Ok(pipeline) => pipeline,
         Err(e) => return e.into(),
@@ -369,7 +377,15 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
         ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines", "requires_confirmation": true}))
     )
 )]
-pub async fn delete_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
+pub async fn delete_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    }
+
     match pipeline::delete_pipeline(&pipeline_id).await {
         Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
