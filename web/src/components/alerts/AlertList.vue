@@ -738,127 +738,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm"
-persistent>
-        <q-card class="clone-alert-popup tw:pt-2">
-          <div class="row items-center no-wrap q-mx-md q-my-sm">
-            <div class="flex items-center">
-              <div
-                data-test="add-alert-back-btn"
-                class="flex justify-center items-center q-mr-md cursor-pointer"
-                style="
-                  border: 1.5px solid;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                "
-                title="Go Back"
-                @click="showForm = false"
-              >
-                <q-icon name="arrow_back_ios_new" size="14px" />
-              </div>
-              <div class="text-h6" data-test="clone-alert-title">
-                {{ t("alerts.cloneTitle") }}
-              </div>
-            </div>
-          </div>
-          <q-card-section>
-            <q-form @submit="submitForm">
-              <q-input
-                data-test="to-be-clone-alert-name"
-                v-model="toBeCloneAlertName"
-                label="Alert Name"
-                class="showLabelOnTop"
-                stack-label
-                hide-bottom-space
-                borderless
-                dense
-              />
-              <q-select
-                data-test="to-be-clone-stream-type"
-                v-model="toBeClonestreamType"
-                label="Stream Type"
-                :options="streamTypes"
-                @update:model-value="updateStreams()"
-                borderless
-                dense
-                class="showLabelOnTop no-case tw:mt-[1px]"
-              />
-              <q-select
-                data-test="to-be-clone-stream-name"
-                v-model="toBeClonestreamName"
-                :loading="isFetchingStreams"
-                :disable="!toBeClonestreamType"
-                label="Stream Name"
-                :options="streamNames"
-                @change="updateStreamName"
-                @filter="filterStreams"
-                use-input
-                fill-input
-                hide-selected
-                :input-debounce="400"
-                borderless
-                dense
-                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
-              />
-              <div class="q-mb-lg">
-                <SelectFolderDropDown
-                  :type="'alerts'"
-                  @folder-selected="updateFolderIdToBeCloned"
-                  :activeFolderId="folderIdToBeCloned"
-                />
-              </div>
-              <div class="flex justify-end tw:gap-2 q-mt-sm">
-                <OButton
-                  data-test="clone-alert-cancel-btn"
-                  v-close-popup="true"
-                  variant="outline"
-                  size="sm-action"
-                >{{ t('alerts.cancel') }}</OButton>
-                <OButton
-                  data-test="clone-alert-submit-btn"
-                  variant="primary"
-                  size="sm-action"
-                  type="submit"
-                  :disabled="isSubmitting"
-                >{{ t('alerts.save') }}</OButton>
-              </div>
-            </q-form>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
-      <q-dialog
-        v-model="showMoveAlertDialog"
-        position="right"
-        full-height
-        maximized
-        data-test="dashboard-move-to-another-folder-dialog"
+      <ODialog data-test="alert-list-form-dialog"
+        v-model:open="showForm"
+        persistent
+        size="sm"
+        :title="t('alerts.cloneTitle')"
+        :secondary-button-label="t('alerts.cancel')"
+        :primary-button-label="t('alerts.save')"
+        :primary-button-disabled="isSubmitting"
+        @click:secondary="showForm = false"
+        @click:primary="submitForm"
       >
-        <MoveAcrossFolders
-          :activeFolderId="activeFolderToMove"
-          :moduleId="selectedAlertToMove"
-          :anomalyConfigIds="selectedAnomalyConfigsToMove"
-          type="alerts"
-          @updated="updateAcrossFolders"
-        />
-      </q-dialog>
+        <template #header-left>
+          <div
+            data-test="add-alert-back-btn"
+            class="flex justify-center items-center cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="showForm = false"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
+        </template>
+        <q-form @submit="submitForm">
+          <q-input
+            data-test="to-be-clone-alert-name"
+            v-model="toBeCloneAlertName"
+            label="Alert Name"
+            class="showLabelOnTop"
+            stack-label
+            hide-bottom-space
+            borderless
+            dense
+          />
+          <q-select
+            data-test="to-be-clone-stream-type"
+            v-model="toBeClonestreamType"
+            label="Stream Type"
+            :options="streamTypes"
+            @update:model-value="updateStreams()"
+            borderless
+            dense
+            class="showLabelOnTop no-case tw:mt-[1px]"
+          />
+          <q-select
+            data-test="to-be-clone-stream-name"
+            v-model="toBeClonestreamName"
+            :loading="isFetchingStreams"
+            :disable="!toBeClonestreamType"
+            label="Stream Name"
+            :options="streamNames"
+            @change="updateStreamName"
+            @filter="filterStreams"
+            use-input
+            fill-input
+            hide-selected
+            :input-debounce="400"
+            borderless
+            dense
+            class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
+          />
+          <div class="q-mb-lg">
+            <SelectFolderDropDown
+              :type="'alerts'"
+              @folder-selected="updateFolderIdToBeCloned"
+              :activeFolderId="folderIdToBeCloned"
+            />
+          </div>
+        </q-form>
+      </ODialog>
+      <MoveAcrossFolders
+        v-model:open="showMoveAlertDialog"
+        :activeFolderId="activeFolderToMove"
+        :moduleId="selectedAlertToMove"
+        :anomalyConfigIds="selectedAnomalyConfigsToMove"
+        type="alerts"
+        @updated="updateAcrossFolders"
+        data-test="dashboard-move-to-another-folder-dialog"
+      />
 
       <!-- Alert Details Dialog -->
-      <q-dialog
-        v-model="showAlertDetailsDrawer"
-        position="right"
-        full-height
-        maximized
+      <AlertHistoryDrawer
+        v-model:open="showAlertDetailsDrawer"
+        :alert-details="selectedAlertDetails"
+        :alert-id="selectedAlertDetails?.alert_id || ''"
+        :alert-type="selectedAlertDetails?.alert_type"
+        @edit="editAlertFromDrawer"
         data-test="alert-details-dialog"
-      >
-        <AlertHistoryDrawer
-          :alert-details="selectedAlertDetails"
-          :alert-id="selectedAlertDetails?.alert_id || ''"
-          :alert-type="selectedAlertDetails?.alert_type"
-          @close="showAlertDetailsDrawer = false"
-          @edit="editAlertFromDrawer"
-        />
-      </q-dialog>
+      />
     </template>
   </div>
 </template>
@@ -922,6 +894,7 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 // import alertList from "./alerts";
@@ -949,6 +922,7 @@ export default defineComponent({
     AlertHistoryDrawer,
     O2AIContextAddBtn,
     OButton,
+    ODialog,
   },
   emits: [
     "updated:fields",

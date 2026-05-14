@@ -336,21 +336,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Move to folder dialog -->
-    <q-dialog
-      v-model="showMoveDialog"
-      position="right"
-      full-height
-      maximized
+    <MoveAcrossFolders
+      v-model:open="showMoveDialog"
+      :activeFolderId="activeFolderToMove"
+      :moduleId="reportIdsToMove"
+      type="reports"
+      @updated="onMoveUpdated"
       data-test="report-move-to-another-folder-dialog"
-    >
-      <MoveAcrossFolders
-        v-if="showMoveDialog"
-        :activeFolderId="activeFolderToMove"
-        :moduleId="reportIdsToMove"
-        type="reports"
-        @updated="onMoveUpdated"
-      />
-    </q-dialog>
+    />
   </div>
 </template>
 

@@ -295,27 +295,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <q-dialog v-model="detailsDialog" position="standard">
-      <q-card
-        style="width: 700px; max-width: 80vw; max-height: 90vh"
-        class="pipeline-details-dialog"
+    <ODialog data-test="pipeline-history-details-dialog" v-model:open="detailsDialog" size="lg" title="Pipeline Execution Details" primary-button-label="Close" @click:primary="detailsDialog = false">
+      <div
+        class="scroll"
+        style="max-height: 70vh"
+        v-if="selectedRow"
       >
-        <q-card-section class="row items-center q-pb-xs bg-primary text-white">
-          <div class="text-h6">Pipeline Execution Details</div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section
-          class="scroll"
-          style="max-height: 70vh"
-          v-if="selectedRow"
-        >
-          <div class="q-gutter-sm">
+        <div class="q-gutter-sm">
             <!-- Basic Information -->
             <div class="detail-section">
               <div class="row q-col-gutter-md">
@@ -495,19 +481,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                <div class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-negative/5">
                   <pre
                     class="text-body2"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
+                      font-family: 'Courier New', monospace;
                       font-size: 12px;
                     "
                     >{{ selectedRow.error }}</pre
                   >
-                </q-card>
+                </div>
               </div>
             </template>
 
@@ -524,87 +510,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                <div class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-positive/5">
                   <pre
                     class="text-body2"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
+                      font-family: 'Courier New', monospace;
                       font-size: 12px;
                     "
                     >{{ selectedRow.success_response }}</pre
                   >
-                </q-card>
+                </div>
               </div>
             </template>
           </div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right" class="q-pa-md">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+    </ODialog>
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialog">
-      <q-card style="min-width: 500px">
-        <q-card-section
-          class="pipeline-error-header row items-center q-pb-none"
-        >
-          <div class="tw:flex-1">
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
-              <span class="pipeline-name">{{
-                errorMessage.pipeline_name
-              }}</span>
-            </div>
-            <div class="error-timestamp">
-              <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{
-                errorMessage.last_error_timestamp &&
-                new Date(
-                  errorMessage.last_error_timestamp / 1000,
-                ).toLocaleString()
-              }}
-            </div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            @click="closeErrorDialog"
-            class="close-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section>
-          <div class="tw:mb-4">
-            <div class="section-label tw:mb-2">Error Summary</div>
-            <div class="error-summary-box">
-              {{ errorMessage.error }}
-            </div>
-          </div>
-        </q-card-section>
-        <q-card-actions class="pipeline-error-actions">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="closeErrorDialog"
-          >Close</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="pipeline-history-error-dialog"
+      v-model:open="errorDialog"
+      size="sm"
+      :title="errorMessage?.pipeline_name"
+      :sub-title="errorMessage?.last_error_timestamp ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}` : undefined"
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="closeErrorDialog"
+    >
+      <template #header-left>
+        <q-icon name="error" size="24px" class="error-icon" />
+      </template>
+      <div class="tw:mb-4">
+        <div class="section-label tw:mb-2">Error Summary</div>
+        <div class="error-summary-box">
+          {{ errorMessage?.error }}
+        </div>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -616,6 +560,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { ChevronLeft, Search, RefreshCw, X } from "lucide-vue-next";
 import pipelinesService from "@/services/pipelines";
@@ -672,7 +617,7 @@ const dateTimeValues = ref({
 const detailsDialog = ref(false);
 const errorDialog = ref(false);
 const selectedRow = ref<any>(null);
-const errorMessage = ref("");
+const errorMessage = ref<any>(null);
 
 // Table columns
 const columns = ref([
@@ -1007,7 +952,7 @@ const showDetailsDialog = (row: any) => {
   detailsDialog.value = true;
 };
 
-const showErrorDialog = (error: string) => {
+const showErrorDialog = (error: any) => {
   errorMessage.value = error;
   errorDialog.value = true;
 };

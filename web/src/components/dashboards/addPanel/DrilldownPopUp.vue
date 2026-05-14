@@ -15,33 +15,27 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div
-    style="padding: 0px 10px; min-width: 30%"
-    class="scroll o2-input"
+  <ODialog
+    :open="open"
+    :title="isEditMode ? t('dashboard.editDrilldown') : t('dashboard.createDrilldown')"
+    :primary-button-label="isEditMode ? t('dashboard.update') : t('common.add')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-disabled="isFormValid"
+    size="md"
     data-test="dashboard-drilldown-popup"
+    @update:open="(v) => { if (!v) $emit('close') }"
+    @click:primary="saveDrilldown"
+    @click:secondary="$emit('close')"
   >
-    <div
-      class="flex justify-between items-center q-pa-md"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span data-test="dashboard-drilldown-title" v-if="isEditMode"
-          >{{ t("dashboard.editDrilldown") }}
-        </span>
-        <span data-test="dashboard-drilldown-title" v-else>{{
-          t("dashboard.createDrilldown")
-        }}</span>
-      </div>
-      <div class="flex q-gutter-sm items-center">
-        <DrilldownUserGuide />
-      </div>
-    </div>
+    <template #header-right>
+      <DrilldownUserGuide />
+    </template>
     <q-input
       v-model="drilldownData.name"
       :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
       color="input-border"
       bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
+      class="q-py-md q-mb-lg showLabelOnTop"
       stack-label
       borderless
       data-test="dashboard-config-panel-drilldown-name"
@@ -53,59 +47,48 @@
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
     >
       {{ t("dashboard.goTo") }}
-      <OButtonGroup>
-        <OButton
-          :active="drilldownData.type == 'byDashboard'"
-          variant="outline"
+      <OToggleGroup
+        :model-value="drilldownData.type"
+        @update:model-value="(v) => v && changeTypeOfDrilldown(String(v))"
+      >
+        <OToggleGroupItem
+          value="byDashboard"
           size="sm"
-          @click="changeTypeOfDrilldown('byDashboard')"
           data-test="dashboard-drilldown-by-dashboard-btn"
         >
           <template #icon-left><q-icon :name="outlinedDashboard" /></template>
           {{ t("menu.dashboard") }}
-        </OButton>
-        <OButton
-          :active="drilldownData.type === 'byUrl'"
-          variant="outline"
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          value="byUrl"
           size="sm"
-          @click="changeTypeOfDrilldown('byUrl')"
           data-test="dashboard-drilldown-by-url-btn"
         >
           <template #icon-left><q-icon name="link" /></template>
           {{ t("common.url") }}
-        </OButton>
-        <OButton
-          :active="drilldownData.type === 'logs'"
-          variant="outline"
+        </OToggleGroupItem>
+        <OToggleGroupItem
+          value="logs"
           size="sm"
-          @click="changeTypeOfDrilldown('logs')"
           data-test="dashboard-drilldown-by-logs-btn"
         >
           <template #icon-left><q-icon name="search" /></template>
           {{ t("common.logs") }}
-        </OButton>
-      </OButtonGroup>
+        </OToggleGroupItem>
+      </OToggleGroup>
     </div>
 
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
         <label>{{ t("dashboard.selectLogsMode") }}</label>
-        <OButtonGroup class="q-ml-sm">
-          <OButton
-            :active="drilldownData.data.logsMode === 'auto'"
-            variant="outline"
-            size="sm"
-            @click="drilldownData.data.logsMode = 'auto'"
-            >{{ t("common.auto") }}</OButton
-          >
-          <OButton
-            :active="drilldownData.data.logsMode === 'custom'"
-            variant="outline"
-            size="sm"
-            @click="drilldownData.data.logsMode = 'custom'"
-            >{{ t("common.custom") }}</OButton
-          >
-        </OButtonGroup>
+        <OToggleGroup
+          class="q-ml-sm"
+          :model-value="drilldownData.data.logsMode"
+          @update:model-value="drilldownData.data.logsMode = $event"
+        >
+          <OToggleGroupItem value="auto" size="sm">{{ t("common.auto") }}</OToggleGroupItem>
+          <OToggleGroupItem value="custom" size="sm">{{ t("common.custom") }}</OToggleGroupItem>
+        </OToggleGroup>
       </div>
       <div
         v-if="drilldownData.data.logsMode === 'custom'"
@@ -338,29 +321,13 @@
       />
     </div>
 
-    <q-card-actions class="confirmActions tw:gap-2">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="$emit('close')"
-        data-test="cancel-button"
-        >{{ t("confirmDialog.cancel") }}</OButton
-      >
-      <OButton
-        variant="primary"
-        size="sm-action"
-        @click="saveDrilldown"
-        data-test="confirm-button"
-        :disabled="isFormValid"
-        >{{ isEditMode ? t("dashboard.update") : t("common.add") }}</OButton
-      >
-    </q-card-actions>
-  </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineAsyncComponent, inject, reactive, ref } from "vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -382,6 +349,7 @@ import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGu
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import { useLoading } from "@/composables/useLoading";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
@@ -389,13 +357,19 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "DrilldownPopUp",
   components: {
-    OButtonGroup,
+    ODialog,
+    OToggleGroup,
+    OToggleGroupItem,
     DrilldownUserGuide,
     CommonAutoComplete,
     QueryEditor,
     OButton,
   },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     isEditMode: {
       type: Boolean,
       default: false,
@@ -833,13 +807,34 @@ export default defineComponent({
       }
     };
 
-    watch(drilldownData.value, async (newData) => {
+    watch(drilldownData, async (newData) => {
       if (newData.data.folder && newData.data.dashboard) {
         await getvariableNames();
       } else {
         variableNamesFn.value = [];
       }
-    });
+    }, { deep: true });
+
+    watch(
+      () => props.open,
+      async (isOpen) => {
+        if (!isOpen) return;
+
+        // Re-initialize form data from the current props each time the dialog opens
+        drilldownData.value = props.isEditMode
+          ? JSON.parse(
+              JSON.stringify(
+                dashboardPanelData.data.config.drilldown[props.drilldownDataIndex],
+              ),
+            )
+          : getDefaultDrilldownData();
+
+        // Refresh dependent lists so they reflect the (possibly new) data
+        await getDashboardListLoading.execute();
+        await getTabListLoading.execute();
+        await getvariableNames();
+      },
+    );
 
     const updateQueryValue = (value: string) => {
       drilldownData.value.data.logsQuery = value;

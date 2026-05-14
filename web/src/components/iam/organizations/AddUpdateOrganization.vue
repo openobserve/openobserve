@@ -15,35 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div
-            v-if="beingUpdated"
-            data-test="update-org"
-            style="font-size: 18px"
-          >
-            {{ t("organization.updateOrganization") }}
-          </div>
-          <div v-else style="font-size: 18px" data-test="create-org">
-            {{ t("organization.createOrganization") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-org-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="$emit('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div>
-        <q-form ref="addOrganizationForm" @submit="onSubmit">
+  <ODrawer data-test="add-update-organization-dialog"
+    :open="open"
+    :width="30"
+    :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
+    :primaryButtonLabel="t('organization.save')"
+    :secondaryButtonLabel="t('organization.cancel')"
+    :primaryButtonDisabled="organizationData.name === '' && !proPlanRequired"
+    @click:primary="onSubmit"
+    @click:secondary="$emit('update:open', false)"
+    @update:open="$emit('update:open', $event)"
+  >
+    <div class="tw:p-4">
+      <q-form ref="addOrganizationForm" @submit="onSubmit" lazy-rules="ondemand">
           <q-input
             v-if="beingUpdated"
             v-model="organizationData.id"
@@ -82,26 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
 
-          <div class="flex justify-start tw:mt-6 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="router.replace({ name: 'organizations' })"
-              data-test="cancel-organizations-modal"
-            >
-              {{ t('organization.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              :disabled="organizationData.name === '' && !proPlanRequired"
-              data-test="add-org"
-            >
-              {{ t('organization.save') }}
-            </OButton>
-          </div>
-
           <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
             <OButton
               variant="secondary"
@@ -113,14 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </q-form>
-      </div>
-    </q-card-section>
-  </q-card>
+    </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -140,8 +104,12 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton },
+  components: { OButton, ODrawer },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -154,8 +122,8 @@ export default defineComponent({
       newOrgIdentifier: "",
     };
   },
-  emits: ["update:modelValue", "updated", "finish", "cancel:hideform"],
-  setup() {
+  emits: ["update:modelValue", "updated", "finish", "update:open"],
+  setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
     const beingUpdated: any = ref(false);
@@ -172,6 +140,24 @@ export default defineComponent({
       return orgNameRegex.test(organizationData.value.name);
     });
 
+    watch(
+      () => props.modelValue,
+      (newVal) => {
+        if (newVal && newVal.id) {
+          beingUpdated.value = true;
+          disableColor.value = "grey-5";
+          organizationData.value = {
+            id: newVal.id,
+            name: newVal.name,
+          };
+        } else {
+          beingUpdated.value = false;
+          disableColor.value = "";
+          organizationData.value = defaultValue();
+        }
+      },
+      { deep: true, immediate: true },
+    );
 
     return {
       t,
@@ -187,27 +173,7 @@ export default defineComponent({
       isValidOrgName,
     };
   },
-  created() {
-    if (this.modelValue && this.modelValue.id) {
-      this.beingUpdated = true;
-      this.disableColor = "grey-5";
-      this.organizationData = {
-        id: this.modelValue.id,
-        name: this.modelValue.name,
-      };
-    }
 
-    // this.store.state.organizations.forEach((organization: any) => {
-    //   if (
-    //     (organization.hasOwnProperty("CustomerBillingObj") &&
-    //       organization.CustomerBillingObj.subscription_type ==
-    //         config.freePlan) ||
-    //     !organization.hasOwnProperty("CustomerBillingObj")
-    //   ) {
-    //     this.proPlanRequired = true;
-    //   }
-    // });
-  },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
       this.$q.notify({
@@ -261,6 +227,7 @@ export default defineComponent({
 
               // this.$emit("update:modelValue", data);
               this.$emit("updated");
+              this.$emit("update:open", false);
               this.addOrganizationForm.resetValidation();
               dismiss();
             } else {

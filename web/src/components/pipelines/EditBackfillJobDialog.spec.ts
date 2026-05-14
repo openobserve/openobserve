@@ -72,6 +72,47 @@ const mockJob: BackfillJob = {
   delete_before_backfill: false,
 };
 
+// ODrawer stub: renders default slot inline and re-emits the events the
+// component wires up (update:open, click:primary, click:secondary). The
+// title/buttons live on the drawer itself in the real component, so we expose
+// them via attrs so the test suite can assert on them.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "primaryButtonLoading",
+    "primaryButtonDisabled",
+    "secondaryButtonLabel",
+    "secondaryButtonDisabled",
+    "neutralButtonLabel",
+    "showClose",
+    "persistent",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test-stub="o-drawer"
+      :data-test="$attrs['data-test']"
+      :data-open="open"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-loading="primaryButtonLoading ? 'true' : 'false'"
+      :data-primary-disabled="primaryButtonDisabled ? 'true' : 'false'"
+    >
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+  inheritAttrs: false,
+};
+
 function createWrapper(props: Record<string, unknown> = {}) {
   return mount(EditBackfillJobDialog, {
     props: {
@@ -82,12 +123,7 @@ function createWrapper(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        // Render dialog content inline so data-test selectors work in jsdom
-        QDialog: {
-          template: '<div><slot /></div>',
-          props: ["modelValue", "position", "fullHeight", "maximized"],
-          emits: ["update:modelValue"],
-        },
+        ODrawer: ODrawerStub,
       },
     },
   });
@@ -108,28 +144,32 @@ describe("EditBackfillJobDialog", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders data-test='edit-backfill-job-dialog'", () => {
+    it("renders ODrawer with data-test='edit-backfill-job-dialog'", () => {
       const wrapper = createWrapper();
       expect(
         wrapper.find('[data-test="edit-backfill-job-dialog"]').exists(),
       ).toBe(true);
     });
 
-    it("renders data-test='dialog-title' with text 'Edit Backfill Job'", () => {
+    it("passes title 'Edit Backfill Job' to ODrawer", () => {
       const wrapper = createWrapper();
-      const title = wrapper.find('[data-test="dialog-title"]');
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toContain("Edit Backfill Job");
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-title")).toBe("Edit Backfill Job");
     });
 
-    it("renders data-test='close-dialog-btn'", () => {
+    it("passes primary button label 'Update Job' to ODrawer", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="close-dialog-btn"]').exists()).toBe(
-        true,
-      );
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-primary-label")).toBe("Update Job");
     });
 
-    it("renders data-test='time-range-picker'", () => {
+    it("passes secondary button label 'Cancel' to ODrawer", () => {
+      const wrapper = createWrapper();
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-secondary-label")).toBe("Cancel");
+    });
+
+    it("renders data-test='time-range-picker' inside drawer body", () => {
       const wrapper = createWrapper();
       expect(wrapper.find('[data-test="time-range-picker"]').exists()).toBe(
         true,
@@ -145,19 +185,21 @@ describe("EditBackfillJobDialog", () => {
 
     it("renders data-test='chunk-period-input'", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="chunk-period-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="chunk-period-input"]').exists()).toBe(
+        true,
+      );
     });
 
-    it("renders cancel button with data-test='cancel-btn'", () => {
-      const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="cancel-btn"]').exists()).toBe(true);
+    it("renders ODrawer with open=true when modelValue is true", () => {
+      const wrapper = createWrapper({ modelValue: true });
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-open")).toBe("true");
     });
 
-    it("renders submit button with data-test='update-btn'", () => {
-      const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="update-btn"]').exists()).toBe(true);
+    it("renders ODrawer with open=false when modelValue is false", () => {
+      const wrapper = createWrapper({ modelValue: false });
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-open")).toBe("false");
     });
   });
 
@@ -222,7 +264,7 @@ describe("EditBackfillJobDialog", () => {
     });
   });
 
-  describe("onSubmit", () => {
+  describe("onSubmit (via ODrawer click:primary)", () => {
     it("calls backfillService.updateBackfillJob with correct parameters on submit", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
@@ -234,7 +276,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.delayBetweenChunks = 5;
       vm.formData.deleteBeforeBackfill = false;
 
-      await vm.onSubmit();
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(backfillService.updateBackfillJob).toHaveBeenCalledWith({
@@ -260,7 +302,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await vm.onSubmit();
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(wrapper.emitted("job-updated")).toBeTruthy();
@@ -276,7 +318,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await vm.onSubmit();
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
       await flushPromises();
 
       const emitted = wrapper.emitted("update:modelValue");
@@ -298,7 +340,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await vm.onSubmit();
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(vm.errorMessage).toBe("Network Error");
@@ -321,7 +363,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.endTimeMicros = 1700003600000000;
       vm.formData.deleteBeforeBackfill = false;
 
-      await vm.onSubmit();
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:primary");
       await flushPromises();
 
       expect(vm.errorMessage).toBe("Job not found");
@@ -364,12 +406,12 @@ describe("EditBackfillJobDialog", () => {
     });
   });
 
-  describe("onCancel", () => {
-    it("emits 'update:modelValue' with false when cancel is clicked", async () => {
+  describe("onCancel (via ODrawer click:secondary)", () => {
+    it("emits 'update:modelValue' with false when secondary (cancel) is clicked", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:secondary");
       await nextTick();
 
       const emitted = wrapper.emitted("update:modelValue");
@@ -386,7 +428,7 @@ describe("EditBackfillJobDialog", () => {
       vm.formData.chunkPeriodMinutes = 999;
       vm.errorMessage = "some error";
 
-      vm.onCancel();
+      await wrapper.findComponent(ODrawerStub).vm.$emit("click:secondary");
       await nextTick();
 
       expect(vm.formData.startTimeMicros).toBe(0);
@@ -397,7 +439,7 @@ describe("EditBackfillJobDialog", () => {
       expect(vm.errorMessage).toBe("");
     });
 
-    it("closes dialog by setting show to false via onCancel()", async () => {
+    it("closes drawer by setting show to false via onCancel()", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
@@ -412,7 +454,7 @@ describe("EditBackfillJobDialog", () => {
     });
   });
 
-  describe("show computed", () => {
+  describe("show computed (v-model:open <-> modelValue)", () => {
     it("show getter returns modelValue prop (true)", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       const vm = wrapper.vm as any;
@@ -435,14 +477,22 @@ describe("EditBackfillJobDialog", () => {
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1][0]).toBe(false);
     });
+
+    it("ODrawer update:open event flows back into v-model (sets show)", async () => {
+      const wrapper = createWrapper({ modelValue: true, job: mockJob });
+      await flushPromises();
+
+      await wrapper.findComponent(ODrawerStub).vm.$emit("update:open", false);
+      await nextTick();
+
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1][0]).toBe(false);
+    });
   });
 
   describe("validation rules", () => {
     it("chunk period rule: returns true for empty/null value (optional field)", () => {
-      const wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      // The rule from the template: (val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440'
-      // When val is null/0, !val is true so rule passes
       const rule = (val: number | null) =>
         !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
       expect(rule(null)).toBe(true);
@@ -461,14 +511,13 @@ describe("EditBackfillJobDialog", () => {
       expect(rule(1440)).toBe(true);
     });
 
-    it("chunk period rule: returns error string for value 0 < val < 1 is n/a (non-integer edge)", () => {
-      // negative value
+    it("chunk period rule: returns error for value exceeding 1440", () => {
       const rule = (val: number | null) =>
         !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
       expect(rule(1441)).toBe("Must be between 1 and 1440");
     });
 
-    it("chunk period rule: returns error for value exceeding 1440", () => {
+    it("chunk period rule: returns error for value 2000 (well above max)", () => {
       const rule = (val: number | null) =>
         !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
       expect(rule(2000)).toBe("Must be between 1 and 1440");
@@ -532,7 +581,13 @@ describe("EditBackfillJobDialog", () => {
       expect(vm.loading).toBe(false);
     });
 
-    it("update-btn is disabled while loading", async () => {
+    it("passes loading=false to ODrawer initially via primaryButtonLoading", () => {
+      const wrapper = createWrapper({ modelValue: true, job: mockJob });
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-primary-loading")).toBe("false");
+    });
+
+    it("ODrawer receives primaryButtonLoading=true when loading is true", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
       const vm = wrapper.vm as any;
@@ -540,11 +595,8 @@ describe("EditBackfillJobDialog", () => {
       vm.loading = true;
       await nextTick();
 
-      const updateBtn = wrapper.find('[data-test="update-btn"]');
-      expect(
-        updateBtn.attributes("disabled") !== undefined ||
-          updateBtn.attributes("aria-disabled") === "true",
-      ).toBe(true);
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-primary-loading")).toBe("true");
     });
   });
 });

@@ -239,6 +239,7 @@
                 :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
+                :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
               />
@@ -250,36 +251,22 @@
   </q-card>
 
   <!-- Enhanced Settings Dialog -->
-  <q-dialog v-model="showSettings">
-    <q-card style="min-width: 450px">
-      <q-card-section>
-        <div class="text-h6">Service Graph Settings</div>
-      </q-card-section>
-      <q-separator />
-      <q-card-section>
-        <div class="q-gutter-md">
-          <div class="text-caption text-grey-7">
-            Stream-based topology - all data persisted to storage
-            <q-tooltip
-              >Service graph uses stream-only architecture with zero in-memory
-              state</q-tooltip
-            >
-          </div>
-        </div>
-      </q-card-section>
-      <q-separator />
-      <q-card-actions align="right">
-        <div class="tw:flex tw:gap-2">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-          <OButton variant="primary" size="sm-action" @click="resetSettings">
-            Reset
-          </OButton>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog data-test="service-graph-settings-dialog"
+    v-model:open="showSettings"
+    size="sm"
+    title="Service Graph Settings"
+    secondary-button-label="Close"
+    primary-button-label="Reset"
+    @click:secondary="showSettings = false"
+    @click:primary="resetSettings"
+  >
+    <div class="q-gutter-md">
+      <div class="text-caption text-grey-7">
+        Stream-based topology - all data persisted to storage
+        <q-tooltip>Service graph uses stream-only architecture with zero in-memory state</q-tooltip>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -315,6 +302,7 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -322,6 +310,7 @@ export default defineComponent({
     ChartRenderer,
     ServiceGraphSidePanel,
     OButton,
+    ODialog,
   },
   emits: ["view-traces"],
   setup(props, { emit }) {
@@ -1700,7 +1689,7 @@ export default defineComponent({
 
 .graph-with-panel-container {
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 code {

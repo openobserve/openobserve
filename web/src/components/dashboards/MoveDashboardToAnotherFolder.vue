@@ -15,34 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section
-      class="q-px-md q-py-md"
-      data-test="dashboard-folder-move-header"
-    >
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold">
-            Move Dashboard To Another Folder
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-folder-move-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section
-      class="q-w-md q-mx-lg"
-      data-test="dashboard-folder-move-body"
-    >
+  <ODrawer data-test="move-dashboard-to-another-folder-dialog"
+    :open="open"
+    :width="30"
+    title="Move Dashboard"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('common.move')"
+    :primary-button-loading="onSubmit.isLoading.value"
+    :primary-button-disabled="activeFolderId === selectedFolder.value"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="onSubmit.execute()"
+  >
+  <div class="q-px-md q-py-sm" data-test="dashboard-folder-move-body">
       <q-form
         ref="moveFolderForm"
         @submit.stop="onSubmit.execute()"
@@ -51,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-input
           v-model="
             store.state.organizationData.folders.find(
-              (item: any) => item.folderId === activeFolderId,
+              (item) => item.folderId === activeFolderId,
             ).name
           "
           :label="t('dashboard.currentFolderLabel')"
@@ -70,28 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
           :activeFolderId="activeFolderId"
         />
-
-        <div class="flex justify-start q-mt-sm tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-folder-move-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            data-test="dashboard-folder-move"
-            :disabled="activeFolderId === selectedFolder.value"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            >{{ t("common.move") }}</OButton
-          >
-        </div>
+        <span>&nbsp;</span>
       </q-form>
-    </q-card-section>
-  </q-card>
+  </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -103,11 +70,11 @@ import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown, OButton },
+  components: { SelectFolderDropdown, ODrawer },
   props: {
     activeFolderId: {
       type: String,
@@ -117,8 +84,12 @@ export default defineComponent({
       type: Array,
       default: [],
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["updated"],
+  emits: ["updated", "close", "update:open"],
   setup(props, { emit }) {
     const store: any = useStore();
     const moveFolderForm: any = ref(null);
@@ -126,7 +97,7 @@ export default defineComponent({
     const selectedFolder = ref({
       label: store.state.organizationData.folders.find(
         (item: any) => item.folderId === props.activeFolderId,
-      ).name,
+      )?.name,
       value: props.activeFolderId,
     });
     const { t } = useI18n();

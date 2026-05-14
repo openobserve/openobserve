@@ -5,6 +5,7 @@ export const useLoading = (asyncFunction: any) => {
   const error: Ref<any> = ref(null);
 
   const execute = async (...params: any[]) => {
+    if (isLoading.value) return;
     isLoading.value = true;
     error.value = null;
 
