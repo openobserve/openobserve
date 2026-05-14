@@ -739,7 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.buildModeQueryEditorDisabled
                 "
                 @update:query="updateQueryValue"
-                @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
+                @update:nlp-mode="handleNlpModeChange"
                 @run-query="handleRunQueryFn"
                 @keydown="handleKeyDown"
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
@@ -1575,6 +1575,12 @@ export default defineComponent({
     const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
     const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
 
+    const handleNlpModeChange = (val: boolean) => {
+      searchObj.meta.nlpMode = val;
+      isNaturalLanguageDetected.value = false;
+      if (!val) hasInteractedWithAI.value = false;
+    };
+
     // Track window width for responsive toolbar layout
     const windowWidth = ref(window.innerWidth);
     const onWindowResize = () => {
@@ -1692,21 +1698,6 @@ export default defineComponent({
         if (funs.length) updateFunctionKeywords(funs);
       },
       { immediate: true, deep: true },
-    );
-
-    // Watch NLP mode toggle - AI mode is independent of SQL mode
-    watch(
-      () => searchObj.meta.nlpMode,
-      (newNlpMode, oldNlpMode) => {
-        if (newNlpMode === true && oldNlpMode === false) {
-          // NLP mode turned ON - reset detection flag
-          isNaturalLanguageDetected.value = false;
-        } else if (newNlpMode === false && oldNlpMode === true) {
-          // NLP mode turned OFF - reset flags
-          isNaturalLanguageDetected.value = false;
-          hasInteractedWithAI.value = false;
-        }
-      },
     );
 
     onBeforeUnmount(() => {
@@ -3754,13 +3745,11 @@ export default defineComponent({
       cancelVisualizeQuery();
     };
 
-    const disable = ref(false);
-
-    watch(variablesAndPanelsDataLoadingState, () => {
+    const disable = computed(() => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState?.panels,
+        variablesAndPanelsDataLoadingState?.panels ?? {},
       );
-      disable.value = panelsValues.some((item: any) => item === true);
+      return panelsValues.some((item: any) => item === true);
     });
 
     const iconRight = computed(() => {
