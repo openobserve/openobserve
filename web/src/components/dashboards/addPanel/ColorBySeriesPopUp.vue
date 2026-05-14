@@ -198,15 +198,20 @@ export default defineComponent({
       return { minHeight: `${minH}px` };
     });
 
-    // Initialize with colorBySeries (edited data) if available, otherwise default empty
-    const editColorBySeries = ref(
-      props.colorBySeries?.length
-        ? props.colorBySeries.map((m: any) => ({
-            ...m,
-            value: typeof m.value === "string" ? m.value : "",
-            color: m.color || null,
-          }))
-        : [{ type: "value", value: "", color: null }],
+    // editColorBySeries is populated by the watch below (on every open)
+    const editColorBySeries = ref<any[]>([]);
+
+    // Deep-clone prop on every open so edits never leak back to the chart
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          editColorBySeries.value = props.colorBySeries?.length
+            ? JSON.parse(JSON.stringify(props.colorBySeries))
+            : [{ type: "value", value: "", color: null }];
+        }
+      },
+      { immediate: true },
     );
 
     // Validate for save button click
@@ -302,7 +307,10 @@ export default defineComponent({
     };
 
     const cancelEdit = () => {
-      resetColorBySeries();
+      // Reset to last saved state so unsaved edits are discarded
+      editColorBySeries.value = props.colorBySeries?.length
+        ? JSON.parse(JSON.stringify(props.colorBySeries))
+        : [{ type: "value", value: "", color: null }];
       emit("close");
     };
 
