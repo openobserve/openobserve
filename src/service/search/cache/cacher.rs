@@ -46,6 +46,7 @@ use crate::{
 pub async fn invalidate_cached_response_by_stream_min_ts(
     file_path: &str,
     responses: &[CachedQueryResponse],
+    histogram_interval: i64, // microseconds; 0 for non-histogram queries
 ) -> Result<Vec<CachedQueryResponse>, String> {
     let components: Vec<&str> = file_path.split('/').collect();
     if components.len() < 3 {
@@ -60,13 +61,24 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     let stream_min_ts =
         infra::cache::stats::get_stream_stats(org_id, stream_name, stream_type).doc_time_min;
 
+    // For histogram queries, align stream_min_ts down to the bucket boundary.
+    // stream_min_ts is the first real document timestamp and may fall mid-bucket
+    // (e.g. 11:47 into a 1-day bucket). Using it raw pushes response_start_time
+    // past the bucket key, stranding the bucket inside the delta and causing
+    // sub-partitions to return the same cache hit as the main cache response.
+    let effective_min_ts = if histogram_interval > 0 {
+        (stream_min_ts / histogram_interval) * histogram_interval
+    } else {
+        stream_min_ts
+    };
+
     let filtered_responses = responses
         .iter()
         .filter(|meta| meta.response_end_time >= stream_min_ts)
         .cloned()
         .map(|mut meta| {
-            if meta.response_start_time < stream_min_ts {
-                meta.response_start_time = stream_min_ts;
+            if meta.response_start_time < effective_min_ts {
+                meta.response_start_time = effective_min_ts;
             }
             meta
         })
@@ -198,7 +210,13 @@ pub async fn check_cache(
         }
 
         // remove the cached response older than stream min ts
-        match invalidate_cached_response_by_stream_min_ts(file_path, &cached_responses).await {
+        match invalidate_cached_response_by_stream_min_ts(
+            file_path,
+            &cached_responses,
+            histogram_interval,
+        )
+        .await
+        {
             Ok(responses) => {
                 cached_responses = responses;
             }
@@ -274,8 +292,12 @@ pub async fn check_cache(
         {
             Some(mut cached_resp) => {
                 // remove the cached response older than stream min ts
-                match invalidate_cached_response_by_stream_min_ts(file_path, &[cached_resp.clone()])
-                    .await
+                match invalidate_cached_response_by_stream_min_ts(
+                    file_path,
+                    &[cached_resp.clone()],
+                    histogram_interval,
+                )
+                .await
                 {
                     Ok(responses) => {
                         // single cached query response is expected
@@ -1197,7 +1219,7 @@ mod tests {
         ];
 
         let file_path = "test_org/logs/test_stream";
-        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses).await;
+        let result = invalidate_cached_response_by_stream_min_ts(file_path, &responses, 0).await;
         assert!(result.is_ok());
         let filtered_responses = result.unwrap();
         assert_eq!(filtered_responses.len(), 2);
