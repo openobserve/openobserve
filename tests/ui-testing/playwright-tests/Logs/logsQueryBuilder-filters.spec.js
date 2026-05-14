@@ -10,10 +10,16 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { setupQueryAndSwitchToBuild, initQueryBuilderTest } = require('../utils/queryBuilder-helpers.js');
+const {
+    ingestForQueryBuilderTest,
+    setupQueryAndSwitchToBuild,
+    initQueryBuilderTestLite,
+    initQueryBuilderTest,
+} = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
-// Test Suite: Builder Filter Operators - All supported WHERE clause operators
+// Test Suite: Builder Filter Operators (query-based, lite init)
+// Tests that run their own query via setupQueryAndSwitchToBuild.
 // Ref: designs/dashboards/builder-tab-impr/builder-query-cases.md (Q1–Q15, Q28–Q55)
 // ============================================================================
 
@@ -21,11 +27,15 @@ test.describe("Logs Query Builder - Filter Operators", () => {
     test.describe.configure({ mode: 'parallel' });
     let pm;
 
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTest(page, pm);
+        await initQueryBuilderTestLite(page, pm);
         testLogger.info('Filter Operators test setup completed');
     });
 
@@ -484,7 +494,7 @@ test.describe("Logs Query Builder - Filter Operators", () => {
         testLogger.info('Grouped filter (OR) AND - PASSED');
     });
 
-    // --- Deeply nested grouped filter: A AND (B OR (C AND D)) ---
+    // --- Deeply nested grouped filter: A AND (B OR C) ---
     test("Filter: deeply nested groups A AND (B OR C) preserve structure", {
         tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
     }, async ({ page }) => {
@@ -522,6 +532,49 @@ test.describe("Logs Query Builder - Filter Operators", () => {
         expect(filterCount).toBeGreaterThanOrEqual(4);
 
         testLogger.info('Complex grouped filter - PASSED');
+    });
+
+    // --- >= and < operators ---
+    test("Filter: >= and < comparison operators", {
+        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
+    }, async ({ page }) => {
+        testLogger.info('Testing filter operators: >= and <');
+
+        const query = `SELECT * FROM "e2e_automate" WHERE FloatValue >= 20 AND FloatValue < 100`;
+        await setupQueryAndSwitchToBuild(pm, page, query);
+
+        await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.verifyChartTypeSelected('bar');
+
+        const filterCount = await pm.logsPage.getFilterConditionCount();
+        expect(filterCount).toBe(2);
+
+        const editorText = await pm.logsPage.getQueryEditorText();
+        expect(editorText).toContain('FloatValue');
+
+        testLogger.info('Filter >= and < operators - PASSED');
+    });
+});
+
+// ============================================================================
+// Test Suite: Builder Filter Operators — SQL OFF mode (full init needed)
+// These tests don't run their own query — they rely on the initial match_all.
+// ============================================================================
+
+test.describe("Logs Query Builder - Filter Operators (SQL OFF)", () => {
+    test.describe.configure({ mode: 'parallel' });
+    let pm;
+
+    test.beforeAll(async ({ request }) => {
+        await ingestForQueryBuilderTest(request);
+    });
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await initQueryBuilderTest(page, pm);
+        testLogger.info('Filter Operators (SQL OFF) test setup completed');
     });
 
     // --- SQL OFF mode: WHERE clause parsed into filter ---
@@ -574,26 +627,5 @@ test.describe("Logs Query Builder - Filter Operators", () => {
         expect(sqlModeOn).toBe(false);
 
         testLogger.info('SQL OFF multiple AND → 2 filters - PASSED');
-    });
-
-    // --- >= and < operators ---
-    test("Filter: >= and < comparison operators", {
-        tag: ['@queryBuilder', '@functional', '@P1', '@all', '@logs']
-    }, async ({ page }) => {
-        testLogger.info('Testing filter operators: >= and <');
-
-        const query = `SELECT * FROM "e2e_automate" WHERE FloatValue >= 20 AND FloatValue < 100`;
-        await setupQueryAndSwitchToBuild(pm, page, query);
-
-        await pm.logsPage.expectBuilderModeActive();
-        await pm.logsPage.verifyChartTypeSelected('bar');
-
-        const filterCount = await pm.logsPage.getFilterConditionCount();
-        expect(filterCount).toBe(2);
-
-        const editorText = await pm.logsPage.getQueryEditorText();
-        expect(editorText).toContain('FloatValue');
-
-        testLogger.info('Filter >= and < operators - PASSED');
     });
 });
