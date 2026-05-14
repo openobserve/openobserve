@@ -193,8 +193,40 @@
   --spacing-dialog-content-py: var(--spacing-3);
   --spacing-dialog-footer-px: var(--spacing-5);
   --spacing-dialog-footer-py: var(--spacing-3);
-}
 
+  /* Badge — default (neutral grey) */
+  --color-badge-default-solid-bg: var(--color-grey-200);
+  --color-badge-default-solid-text: var(--color-grey-700);
+  --color-badge-default-ol-border: var(--color-grey-400);
+  --color-badge-default-ol-text: var(--color-grey-600);
+
+  /* Badge — primary */
+  --color-badge-primary-solid-bg: var(--color-primary-600);
+  --color-badge-primary-solid-text: var(--color-white);
+  --color-badge-primary-ol-border: var(--color-primary-400);
+  --color-badge-primary-ol-text: var(--color-primary-700);
+
+  /* Badge — success */
+  --color-badge-success-solid-bg: var(--color-success-500);
+  --color-badge-success-solid-text: var(--color-white);
+  --color-badge-success-ol-border: var(--color-success-500);
+  --color-badge-success-ol-text: var(--color-success-700);
+
+  /* Badge — warning (dark text on yellow — never white) */
+  --color-badge-warning-solid-bg: var(--color-warning-400);
+  --color-badge-warning-solid-text: var(--color-grey-900);
+  --color-badge-warning-ol-border: var(--color-warning-600);
+  --color-badge-warning-ol-text: var(--color-warning-700);
+
+  /* Badge — error */
+  --color-badge-error-solid-bg: var(--color-error-600);
+  --color-badge-error-solid-text: var(--color-white);
+  --color-badge-error-ol-border: var(--color-error-500);
+  --color-badge-error-ol-text: var(--color-error-600);
+
+  /* Badge — shared */
+  --color-badge-focus-ring: var(--color-primary-400);
+}
 
 /* ToggleGroup — primary variant (colored tray) */
 [data-variant="primary"] {
@@ -348,7 +380,6 @@
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
 
-
   /* Dialog */
   --color-dialog-overlay: var(--color-dialog-overlay);
   --color-dialog-bg: var(--color-dialog-bg);
@@ -370,4 +401,37 @@
   --spacing-dialog-content-py: var(--spacing-dialog-content-py);
   --spacing-dialog-footer-px: var(--spacing-dialog-footer-px);
   --spacing-dialog-footer-py: var(--spacing-dialog-footer-py);
+
+  /* Badge — default */
+  --color-badge-default-solid-bg: var(--color-badge-default-solid-bg);
+  --color-badge-default-solid-text: var(--color-badge-default-solid-text);
+  --color-badge-default-ol-border: var(--color-badge-default-ol-border);
+  --color-badge-default-ol-text: var(--color-badge-default-ol-text);
+
+  /* Badge — primary */
+  --color-badge-primary-solid-bg: var(--color-badge-primary-solid-bg);
+  --color-badge-primary-solid-text: var(--color-badge-primary-solid-text);
+  --color-badge-primary-ol-border: var(--color-badge-primary-ol-border);
+  --color-badge-primary-ol-text: var(--color-badge-primary-ol-text);
+
+  /* Badge — success */
+  --color-badge-success-solid-bg: var(--color-badge-success-solid-bg);
+  --color-badge-success-solid-text: var(--color-badge-success-solid-text);
+  --color-badge-success-ol-border: var(--color-badge-success-ol-border);
+  --color-badge-success-ol-text: var(--color-badge-success-ol-text);
+
+  /* Badge — warning */
+  --color-badge-warning-solid-bg: var(--color-badge-warning-solid-bg);
+  --color-badge-warning-solid-text: var(--color-badge-warning-solid-text);
+  --color-badge-warning-ol-border: var(--color-badge-warning-ol-border);
+  --color-badge-warning-ol-text: var(--color-badge-warning-ol-text);
+
+  /* Badge — error */
+  --color-badge-error-solid-bg: var(--color-badge-error-solid-bg);
+  --color-badge-error-solid-text: var(--color-badge-error-solid-text);
+  --color-badge-error-ol-border: var(--color-badge-error-ol-border);
+  --color-badge-error-ol-text: var(--color-badge-error-ol-text);
+
+  /* Badge — shared */
+  --color-badge-focus-ring: var(--color-badge-focus-ring);
 }
