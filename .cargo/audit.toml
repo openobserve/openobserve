@@ -11,5 +11,6 @@ ignore = [
   "RUSTSEC-2025-0020", # from poy3, transitive dep of datafusion-functions-json
   "RUSTSEC-2026-0001", # from rkyv, dep of rust_decimal
   "RUSTSEC-2026-0049", # from rustls-webpki 0.101.7/0.102.8, transitive dep of aws-smithy-http-client and async-nats (upstream not yet migrated to rustls 0.23)
+  "RUSTSEC-2026-0105", # from core2 0.4.0 (yanked + unmaintained), transitive via pyroscope -> libflate; no upgrade path until libflate publishes a release that drops the core2 dependency
 ]
 informational_warnings = ["unmaintained"] # warn for categories of informational advisories
