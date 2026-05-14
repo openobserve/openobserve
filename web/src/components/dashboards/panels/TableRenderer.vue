@@ -207,7 +207,7 @@ export default defineComponent({
         ...rows.map((row: any) =>
           cols
             .map((c: any) => {
-              const val = row[c.name ?? c.field];
+              const val = row[c.field ?? c.name];
               return `"${String(val ?? "").replace(/"/g, '""')}"`;
             })
             .join(","),

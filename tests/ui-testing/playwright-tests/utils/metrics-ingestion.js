@@ -10,7 +10,8 @@ class MetricsIngestion {
     constructor() {
         // Configuration for local OpenObserve instance
         // Normalize base URL to avoid double slashes
-        const baseUrl = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, ''); // Remove trailing slash if present
+        // Prefer INGESTION_URL (backend API) over ZO_BASE_URL (may be a frontend dev server)
+        const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
         const orgName = getOrgIdentifier();
 
         // If METRICS_ENDPOINT is provided, normalize it too
