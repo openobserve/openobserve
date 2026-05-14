@@ -61,28 +61,52 @@ pub async fn invalidate_cached_response_by_stream_min_ts(
     let stream_min_ts =
         infra::cache::stats::get_stream_stats(org_id, stream_name, stream_type).doc_time_min;
 
-    // For histogram queries, align stream_min_ts down to the bucket boundary.
-    // stream_min_ts is the first real document timestamp and may fall mid-bucket
-    // (e.g. 11:47 into a 1-day bucket). Using it raw pushes response_start_time
-    // past the bucket key, stranding the bucket inside the delta and causing
-    // sub-partitions to return the same cache hit as the main cache response.
-    let effective_min_ts = if histogram_interval > 0 {
-        (stream_min_ts / histogram_interval) * histogram_interval
+    let filtered_responses = if histogram_interval > 0 {
+        // For histogram queries, a bucket is only stale when its ENTIRE interval
+        // is before stream_min_ts — i.e. (bucket_key + interval) <= stream_min_ts.
+        //
+        // Example (1-day interval):
+        //   stream_min_ts  = Apr 16 11:47  (first live document)
+        //   bucket "Apr 16" covers Apr 16 00:00 → Apr 17 00:00
+        //   Apr 17 00:00 > Apr 16 11:47  →  bucket still has live data → KEEP
+        //   bucket "Jan 16" covers Jan 16 00:00 → Jan 17 00:00
+        //   Jan 17 00:00 > Apr 16 11:47  →  NO → fully expired → DROP
+        //
+        // Trimming response_start_time to stream_min_ts is wrong here because
+        // stream_min_ts can fall mid-bucket, pushing the effective cache start
+        // past the bucket key and corrupting delta computation.
+        // Instead: drop individual stale buckets and leave response_start_time
+        // untouched so deltas are computed from the real cache boundary.
+        responses
+            .iter()
+            .cloned()
+            .filter_map(|mut meta| {
+                meta.cached_response.hits.retain(|hit| {
+                    let hit_ts = get_ts_value(&meta.ts_column, hit);
+                    hit_ts + histogram_interval > stream_min_ts
+                });
+                if meta.cached_response.hits.is_empty() {
+                    None
+                } else {
+                    meta.cached_response.total = meta.cached_response.hits.len();
+                    Some(meta)
+                }
+            })
+            .collect()
     } else {
-        stream_min_ts
+        // For non-histogram queries, trim to stream_min_ts at the response level.
+        responses
+            .iter()
+            .filter(|meta| meta.response_end_time >= stream_min_ts)
+            .cloned()
+            .map(|mut meta| {
+                if meta.response_start_time < stream_min_ts {
+                    meta.response_start_time = stream_min_ts;
+                }
+                meta
+            })
+            .collect()
     };
-
-    let filtered_responses = responses
-        .iter()
-        .filter(|meta| meta.response_end_time >= stream_min_ts)
-        .cloned()
-        .map(|mut meta| {
-            if meta.response_start_time < effective_min_ts {
-                meta.response_start_time = effective_min_ts;
-            }
-            meta
-        })
-        .collect();
 
     Ok(filtered_responses)
 }
