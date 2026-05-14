@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <q-page class="logPage" id="logPage">
+    <LogsPageSkeleton v-if="searchObj.meta.isInitialLoad" data-test="logs-page-skeleton" />
+    <template v-else>
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -417,8 +419,8 @@ size="20px" />
         :isClicked="showSearchScheduler"
       />
     </div>
+    </template>
   </q-page>
-</template>
 
 <script lang="ts">
 // TODO: Remove ts-ignore from the code
@@ -497,6 +499,7 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
+import LogsPageSkeleton from "@/plugins/logs/components/LogsPageSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { ChevronRight, ChevronLeft } from "lucide-vue-next";
 import {
@@ -511,6 +514,7 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
+    LogsPageSkeleton,
     OButton,
     ChevronRight,
     ChevronLeft,
