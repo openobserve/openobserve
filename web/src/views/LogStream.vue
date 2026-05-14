@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="q-pa-none flex flex-col">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-      <div class="card-container tw:mb-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem] log-stream-topbar">
         <div
-          class="flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]"
+          class="log-stream-topbar__row flex items-center justify-between full-width tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div
             class="q-table__title tw:font-[600]"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("logStream.header") }}
           </div>
-          <div class="flex items-start">
+          <div class="log-stream-topbar__actions flex items-start">
             <div class="flex justify-between items-end">
               <OToggleGroup
                 :model-value="streamActiveTab"
@@ -99,7 +99,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-[calc(100vh-126px)]">
+        <div
+          v-if="useCardLayout"
+          class="card-container mobile-stream-list-wrap"
+        >
+          <PullToRefreshWrapper
+            class="mobile-stream-list-scroll"
+            @refresh="onMobileRefresh"
+          >
+            <div
+              v-if="!loadingState && logStream.length === 0"
+              class="mobile-stream-list-empty"
+            >
+              <span>{{ t("logStream.noStreamsYet") || "No streams yet" }}</span>
+            </div>
+            <div v-else-if="loadingState" class="mobile-stream-list-loading">
+              <q-spinner-hourglass color="primary" size="lg" />
+            </div>
+            <div v-else class="mobile-stream-list">
+              <MobileStreamCard
+                v-for="row in logStream"
+                :key="`${row.name}-${row.stream_type}`"
+                :row="row"
+                :show-doc-count="!!store.state.zoConfig.show_stream_stats_doc_num"
+                @click="(r: any) => exploreStream({ row: r })"
+                @explore="(r: any) => exploreStream({ row: r })"
+                @schema="(r: any) => listSchema({ row: r })"
+                @delete="(r: any) => confirmDeleteAction({ row: r })"
+              />
+            </div>
+          </PullToRefreshWrapper>
+        </div>
+        <div v-else class="card-container tw:h-[calc(100vh-126px)]">
           <q-table
             data-test="log-stream-table"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
@@ -290,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
-      <q-card style="width: 420px">
+      <q-card style="width: 420px; max-width: 95vw">
         <q-card-section class="confirmBodyLogStream">
           <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
@@ -331,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="confirmBatchDelete">
-      <q-card style="width: 420px">
+      <q-card style="width: 420px; max-width: 95vw">
         <q-card-section class="confirmBodyLogStream">
           <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
           <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
@@ -385,6 +416,7 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
+import { useScreen } from "@/composables/useScreen";
 import { useI18n } from "vue-i18n";
 
 import QTablePagination from "../components/shared/grid/Pagination.vue";
@@ -414,6 +446,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { ScrollText, BarChart2, GitFork, Info } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
+import PullToRefreshWrapper from "@/components/shared/PullToRefreshWrapper.vue";
+import MobileStreamCard from "@/components/logstream/MobileStreamCard.vue";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -421,6 +455,8 @@ export default defineComponent({
     SchemaIndex,
     NoData,
     AddStream,
+    PullToRefreshWrapper,
+    MobileStreamCard,
     OButton,
     OToggleGroup,
     OToggleGroupItem,
@@ -610,22 +646,23 @@ export default defineComponent({
     // );
 
     const getLogStream = (refresh: boolean = false) => {
-      if (store.state.selectedOrganization != null) {
-        loadingState.value = true;
-        previousOrgIdentifier.value =
-          store.state.selectedOrganization.identifier;
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading streams...",
-        });
-        logStream.value = [];
+      if (store.state.selectedOrganization == null) return Promise.resolve();
 
-        let counter = 1 + pageOffset.value;
-        let streamResponse;
-        // if(selectedStreamType.value == "all") {
-        //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
-        // } else {
-        streamResponse = getPaginatedStreams(
+      loadingState.value = true;
+      previousOrgIdentifier.value =
+        store.state.selectedOrganization.identifier;
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading streams...",
+      });
+      logStream.value = [];
+
+      let counter = 1 + pageOffset.value;
+      let streamResponse;
+      // if(selectedStreamType.value == "all") {
+      //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
+      // } else {
+      streamResponse = getPaginatedStreams(
           selectedStreamType.value || "",
           false,
           false,
@@ -637,8 +674,8 @@ export default defineComponent({
         );
         // }
 
-        streamResponse
-          .then((res: any) => {
+      const streamPromise = streamResponse
+        .then((res: any) => {
             logStream.value = [];
             let doc_num = "";
             let storage_size = "";
@@ -684,24 +721,23 @@ export default defineComponent({
 
             dismiss();
           })
-          .catch((err) => {
-            if (err.response?.status != 403) {
-              $q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.message ||
-                  "Error while fetching streams.",
-                timeout: 2000,
-              });
-            }
-            loadingState.value = false;
-            dismiss();
-          })
-          .finally(() => {
-            loadingState.value = false;
-            dismiss();
-          });
-      }
+        .catch((err: any) => {
+          if (err.response?.status != 403) {
+            $q.notify({
+              type: "negative",
+              message:
+                err.response?.data?.message ||
+                "Error while fetching streams.",
+              timeout: 2000,
+            });
+          }
+          loadingState.value = false;
+          dismiss();
+        })
+        .finally(() => {
+          loadingState.value = false;
+          dismiss();
+        });
 
       segment.track("Button Click", {
         button: "Refresh Streams",
@@ -709,6 +745,8 @@ export default defineComponent({
         user_id: store.state.userInfo.email,
         page: "Streams",
       });
+
+      return streamPromise;
     };
 
     getLogStream();
@@ -1015,6 +1053,17 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+
+    // Use cards up to the md breakpoint so tablets get the mobile layout too.
+    const { isMobileOrTablet: useCardLayout } = useScreen();
+    const onMobileRefresh = async (ack: () => void) => {
+      try {
+        await getLogStream(true);
+      } finally {
+        ack();
+      }
+    };
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.hasOwnProperty("value") ? val.value : val;
       pagination.value.rowsPerPage = val.hasOwnProperty("value")
@@ -1072,12 +1121,70 @@ export default defineComponent({
       filterLogStreamByTab,
       streamActiveTab,
       changePagination,
+      useCardLayout,
+      onMobileRefresh,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+@media (max-width: 1023px) {
+  // Let the action row wrap onto a second line and let the search field
+  // own the full remaining width; the "New stream" button no longer
+  // overlaps row 01 when the screen gets narrow (<600 px was the worst
+  // case, but the header still felt cramped up to the md breakpoint).
+  .log-stream-topbar__row {
+    flex-wrap: wrap;
+    height: auto !important;
+    row-gap: 8px;
+  }
+
+  .log-stream-topbar__actions {
+    flex-wrap: wrap;
+    width: 100%;
+    align-items: stretch;
+    gap: 8px;
+
+    > * {
+      flex: 0 0 auto;
+    }
+
+    [data-test="streams-search-stream-input"] {
+      flex: 1 1 180px;
+      min-width: 0;
+    }
+  }
+
+  .mobile-stream-list-wrap {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .mobile-stream-list-scroll {
+    height: calc(100vh - var(--navbar-height) - 126px - var(--o2-mobile-nav-height, 0px));
+  }
+
+  .mobile-stream-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 12px;
+  }
+
+  .mobile-stream-list-empty {
+    padding: 48px 16px;
+    text-align: center;
+    color: var(--o2-text-secondary);
+  }
+
+  .mobile-stream-list-loading {
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+}
+</style>
 
 <style lang="scss">
 .bottom-bar {

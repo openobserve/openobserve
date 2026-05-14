@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+  <q-page class="tw:px-[0.625rem] q-pt-xs home-page mobile-content-clearance" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
 
     <div class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto" style="max-height: calc(100vh - var(--navbar-height) - 18px)">
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
