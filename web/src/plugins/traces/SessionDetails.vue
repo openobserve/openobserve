@@ -429,6 +429,8 @@ import {
   type TurnDetail,
 } from "./composables/useSessions";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import useTraces from "@/composables/useTraces";
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -439,6 +441,7 @@ const router = useRouter();
 const store = useStore();
 const $q = useQuasar();
 const { fetchSession, fetchTurnDetail } = useSessions();
+const { searchObj } = useTraces();
 
 const detail = ref<SessionDetail | null>(null);
 const traces = ref<SessionTraceRow[]>([]);
@@ -608,17 +611,28 @@ function openTrace(traceId: string) {
 }
 
 function openInTraceExplorer() {
-  // Lands on the Traces sub-tab (not Sessions) pre-filtered by this
-  // session's conversation id, so the user sees every trace that
-  // belongs to the session as rows in the trace explorer.
+  // The traces page is kept-alive — its onMounted/query-param parser
+  // doesn't re-run on a regular route change, so a `tab=traces`
+  // query param alone wouldn't update `searchMode` (it'd stay on
+  // `"sessions"`, where we came from). Set it directly here so the
+  // page picks up the Traces sub-tab synchronously.
+  searchObj.meta.searchMode = "traces";
+
+  // Match the traces page's URL contract:
+  //   query → base64-encoded `session_id='<id>'` (no spaces, single
+  //           quotes). `b64EncodeUnicode` produces the `.`-padded
+  //           URL-safe form the traces page expects.
+  //   from / to → absolute window we were navigated with — preserves
+  //           the exact time scope of the session.
+  const encodedQuery =
+    b64EncodeUnicode(`session_id='${sessionId.value}'`) ?? "";
   router.push({
     name: "traces",
     query: {
-      tab: "traces",
       stream: streamName.value,
-      query: `gen_ai_conversation_id = '${sessionId.value}'`,
       from: startTime.value,
       to: endTime.value,
+      query: encodedQuery,
       org_identifier: store.state.selectedOrganization?.identifier,
     },
   });
