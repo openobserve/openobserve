@@ -22,6 +22,7 @@ use std::{
 
 use byteorder::ByteOrder;
 use bytes::Bytes;
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tantivy::{Directory, ReloadPolicy, directory::OwnedBytes};
@@ -174,12 +175,18 @@ impl FooterCache {
             config::metrics::FOOTER_CACHE_REQUESTS_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
+            let start = std::time::Instant::now();
             if let Some(cached_bytes) = GLOBAL_FOOTER_CACHE.get(key) {
+                let time = start.elapsed().as_millis();
                 config::metrics::FOOTER_CACHE_HITS_TOTAL
                     .with_label_values::<&str>(&[])
                     .inc();
                 let data = OwnedBytes::new(cached_bytes.to_vec());
-                return Ok(Arc::new(Self::from_bytes(data)?));
+                let start = std::time::Instant::now();
+                let result = Ok(Arc::new(Self::from_bytes(data)?));
+                let parse_time = start.elapsed().as_millis();
+                log::info!("file: {key}, lock time {time} ms, parse time {parse_time} ms",);
+                return result;
             }
             let file = source.get_file_handle(Path::new(FOOTER_CACHE))?;
             let data = file.read_bytes_async(0..file.len()).await?;
@@ -199,7 +206,7 @@ impl FooterCache {
 }
 
 pub struct GlobalFooterCache {
-    readers: parking_lot::RwLock<HashMap<String, Bytes>>,
+    readers: DashMap<String, Bytes>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
     max_entries: usize,
 }
@@ -210,15 +217,14 @@ pub static GLOBAL_FOOTER_CACHE: LazyLock<Arc<GlobalFooterCache>> =
 impl GlobalFooterCache {
     pub fn new(max_entries: usize) -> Self {
         Self {
-            readers: parking_lot::RwLock::new(HashMap::new()),
+            readers: DashMap::new(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
             max_entries,
         }
     }
 
     pub fn get(&self, key: &str) -> Option<Bytes> {
-        let r = self.readers.read();
-        r.get(key).cloned()
+        self.readers.get(key).map(|r| r.clone())
     }
 
     pub fn put(&self, key: String, value: Bytes) {
@@ -226,7 +232,7 @@ impl GlobalFooterCache {
         if w.len() >= self.max_entries {
             for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
                 if let Some(k) = w.pop_front() {
-                    self.readers.write().remove(&k);
+                    self.readers.remove(&k);
                 } else {
                     break;
                 }
@@ -234,7 +240,7 @@ impl GlobalFooterCache {
         }
         w.push_back(key.clone());
         drop(w);
-        self.readers.write().insert(key, value);
+        self.readers.insert(key, value);
     }
 }
 

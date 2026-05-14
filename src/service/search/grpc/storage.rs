@@ -842,23 +842,21 @@ async fn search_tantivy_index(
         need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
     }
     let ops = recording.ops();
-    if !ops.is_empty() {
-        let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
-        for op in &ops {
-            let entry = per_file.entry(op.path.clone()).or_default();
-            entry.0 += 1;
-            entry.1 += op.num_bytes;
-        }
-        let mut files: Vec<_> = per_file.iter().collect();
-        files.sort_by_key(|(p, _)| p.to_owned());
-        log::info!(
-            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, before warmup fetched {} KB across {} ops / {} files, took: {} ms",
-            ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
-            ops.len(),
-            files.len(),
-            start.elapsed().as_millis()
-        );
+    let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
+    for op in &ops {
+        let entry = per_file.entry(op.path.clone()).or_default();
+        entry.0 += 1;
+        entry.1 += op.num_bytes;
     }
+    let mut files: Vec<_> = per_file.iter().collect();
+    files.sort_by_key(|(p, _)| p.to_owned());
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, before warmup fetched {} KB across {} ops / {} files, took: {} ms",
+        ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
+        ops.len(),
+        files.len(),
+        start.elapsed().as_millis()
+    );
 
     let start = std::time::Instant::now();
     warm_up_terms(

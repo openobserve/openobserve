@@ -10638,6 +10638,7 @@ dependencies = [
  "bytes",
  "chrono",
  "config",
+ "dashmap",
  "futures",
  "hashbrown 0.16.1",
  "infra",
