@@ -315,10 +315,11 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import useLogs from "@/composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 const { t } = useI18n();
-const { searchObj } = useLogs();
+const { searchObj } = searchState();
 
 defineProps<{
   localSavedViews: any[];

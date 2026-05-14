@@ -222,12 +222,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import useLogs from "@/composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import SyntaxGuide from "../SyntaxGuide.vue";
 
 const { t } = useI18n();
 const store = useStore();
-const { searchObj } = useLogs();
+const { searchObj } = searchState();
 
 defineProps<{
   shouldMoveSqlToggleToMenu: boolean;
