@@ -569,7 +569,18 @@ export default defineComponent({
     );
     const refreshData = () => {
       if (!disable.value) {
-        // Apply any pending histogram interval changes
+        // Apply histogram interval to ALL queries before copying to chartData
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(
+            originalQuery,
+            histogramInterval.value,
+          );
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
+        });
+
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
         Object.assign(

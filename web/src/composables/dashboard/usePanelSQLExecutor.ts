@@ -741,6 +741,15 @@ export const usePanelSQLExecutor = (ctx: {
       return;
     }
 
+    // Reset state before building new queries (same as executeSQL)
+    state.data = [];
+    state.metadata = {
+      queries: [],
+    };
+    state.resultMetaData = [];
+    state.annotations = [];
+    state.isOperationCancelled = false;
+
     // Phase 1: Process all queries and build flat arrays
     const allSearchRequests: any[] = [];
     const allMetadata: any[] = [];
