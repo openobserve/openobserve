@@ -2272,7 +2272,8 @@
       "addNewDestination": "Agregar nuevo destino",
       "destinationRequired": "¡Se requiere al menos un destino!",
       "disabledNotificationsInfo": "La detección de anomalías seguirá ejecutándose y escribirá los resultados en la secuencia _anomalies. Habilite las notificaciones para recibir alertas cuando se detecten anomalías."
-    }
+    },
+    "anomalyName": "Nombre de la anomalía"
   },
   "alert_templates": {
     "header": "Plantillas",

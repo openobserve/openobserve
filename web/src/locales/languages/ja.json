@@ -2289,7 +2289,8 @@
       "addNewDestination": "新しい目的地を追加",
       "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "disabledNotificationsInfo": "異常検出は引き続き実行され、結果が _anomalies ストリームに書き込まれます。異常が検出されたときにアラートを受け取るように通知を有効にします。"
-    }
+    },
+    "anomalyName": "アノマリー名"
   },
   "alert_templates": {
     "header": "テンプレート",
