@@ -256,6 +256,7 @@ test.describe("Logs Query Builder - Filter Operators (SQL OFF)", () => {
         await page.waitForLoadState('domcontentloaded');
 
         await pm.logsPage.setQueryEditorContent("stream = 'stderr'");
+        await pm.logsPage.runQueryAndWaitForResults();
 
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
@@ -277,6 +278,7 @@ test.describe("Logs Query Builder - Filter Operators (SQL OFF)", () => {
         await page.waitForLoadState('domcontentloaded');
 
         await pm.logsPage.setQueryEditorContent("stream = 'stderr' AND code = '200'");
+        await pm.logsPage.runQueryAndWaitForResults();
 
         await pm.logsPage.clickBuildToggle();
         await pm.logsPage.waitForBuildTabLoaded();
