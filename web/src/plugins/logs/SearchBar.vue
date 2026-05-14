@@ -862,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pa-sm saved-view-item"
                 clickable
                 v-close-popup
-                @click="openSearchInspectDialog"
+                @click="searchInspectDialog = true"
               >
                 <q-item-section v-close-popup>
                   <q-item-label
@@ -1788,47 +1788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @submitted="getJobData()"
     />
 
-    <!-- Search Inspect Dialog -->
-    <q-dialog v-model="searchInspectDialog">
-      <q-card style="width: 500px; max-width: 90vw">
-        <q-card-section>
-          <div class="text-h6">Search Inspect</div>
-        </q-card-section>
-        <q-card-section class="q-pt-none">
-          <div class="text-left q-mb-xs">Trace ID:</div>
-          <q-input
-            v-model="searchInspectTraceId"
-            placeholder="Enter trace ID"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            autofocus
-            data-test="search-inspect-trace-id-input"
-          />
-        </q-card-section>
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            @click="searchInspectDialog = false"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!searchInspectTraceId.trim()"
-            @click="navigateToSearchInspect"
-            v-close-popup
-            data-test="search-inspect-submit-btn"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <SearchInspectDialog v-model="searchInspectDialog" />
 
     <ConfirmDialog
       title="Change Query Mode"
@@ -2163,10 +2123,11 @@ const UnifiedQueryEditor = defineAsyncComponent(
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { json2csv } from "json-2-csv";
+import downloadLogsUtil from "@/utils/logs/downloadLogs";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import CustomDownloadDialog from "./components/CustomDownloadDialog.vue";
 import SearchSchedulerDialog from "./components/SearchSchedulerDialog.vue";
+import SearchInspectDialog from "./components/SearchInspectDialog.vue";
 import {
   mergeDeep,
   b64DecodeUnicode,
@@ -2312,6 +2273,7 @@ export default defineComponent({
     QueryPlanDialog,
     CustomDownloadDialog,
     SearchSchedulerDialog,
+    SearchInspectDialog,
     ScanSearch,
     ChartLine,
     ChartNoAxesColumn,
@@ -2472,7 +2434,6 @@ export default defineComponent({
     const searchSchedulerJob = ref(false);
     const autoSearchSchedulerJob = ref(false);
     const searchInspectDialog = ref(false);
-    const searchInspectTraceId = ref("");
     let confirmCallback;
     let streamName = "";
 
@@ -3096,63 +3057,9 @@ export default defineComponent({
         queryEditorRef.value.setValue(searchObj.data.query);
     };
 
-    const downloadLogs = async (data, format) => {
-      //here we are using a package json2csv which converts json to csv data
-      //why package because we faced one issue where user has , in some of the fields so
-      //it is treating it as seperate fields
-      //eg: {body:"hey this is the email body , with some info in it "}
-      //after converting it will treat hey this is the email body this as the body and remaining will be the next column
-      //to solve this issue we are using json2csv package
-
-      if (!data || data.length === 0) {
-        $q.notify({
-          message: "No data found to download.",
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
-
-      try {
-        let filename = "logs-data";
-        let dataobj;
-        const options = {
-          emptyFieldValue: "",
-        };
-
-        if (format === "csv") {
-          filename += ".csv";
-          dataobj = await json2csv(data, options);
-        } else {
-          filename += ".json";
-          dataobj = JSON.stringify(data, null, 2);
-        }
-        if (format === "csv") {
-          dataobj = new Blob([dataobj], { type: "text/csv" });
-        } else {
-          dataobj = new Blob([dataobj], { type: "application/json" });
-        }
-        const file = new File([dataobj], filename, {
-          type: format === "csv" ? "text/csv" : "application/json",
-        });
-        const url = URL.createObjectURL(file);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        showDownloadMenu.value = false;
-      } catch (error) {
-        showDownloadMenu.value = false;
-        $q.notify({
-          type: "negative",
-          message: "Error downloading logs",
-          timeout: 2000,
-        });
-      }
+    const downloadLogs = async (data: any[], format: "csv" | "json") => {
+      await downloadLogsUtil(data, format);
+      showDownloadMenu.value = false;
     };
 
     onMounted(async () => {
@@ -4843,23 +4750,6 @@ export default defineComponent({
       searchObj.meta.jobRecords = 100;
     };
 
-    const openSearchInspectDialog = () => {
-      searchInspectTraceId.value = "";
-      searchInspectDialog.value = true;
-    };
-
-    const navigateToSearchInspect = () => {
-      const traceId = searchInspectTraceId.value.trim();
-      if (!traceId) return;
-      router.push({
-        name: "searchJobInspector",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          trace_id: traceId,
-        },
-      });
-    };
-
     const checkQuery = (query) => {
       const jobQuery = router.currentRoute.value.query.query;
       if (jobQuery == b64EncodeUnicode(query)) {
@@ -5075,9 +4965,6 @@ export default defineComponent({
       routeToSearchSchedule,
       createScheduleJob,
       searchInspectDialog,
-      searchInspectTraceId,
-      openSearchInspectDialog,
-      navigateToSearchInspect,
       searchTerm,
       filteredActionOptions,
       filteredFunctionOptions,
