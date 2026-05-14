@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Trace ID Dialog -->
     <q-dialog v-model="showTraceIdDialog">
-      <q-card style="min-width: 500px;">
+      <q-card style="min-width: min(500px, 95vw);">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">Full Trace ID</div>
           <q-space />

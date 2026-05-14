@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error Dialog -->
     <q-dialog v-model="errorDialogVisible" @hide="closeErrorDialog">
-      <q-card class="backfill-error-dialog" style="min-width: 500px">
+      <q-card class="backfill-error-dialog" style="min-width: min(500px, 95vw)">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">
             <q-icon name="error" color="negative" size="24px" class="q-mr-sm" />

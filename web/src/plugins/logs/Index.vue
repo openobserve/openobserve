@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.meta.logsVisualizeToggle == 'patterns'
             "
           >
-            <!-- Note: Splitter max-height to be dynamically calculated with JS -->
+            <!-- Splitter with fields sidebar (sidebar auto-collapsed on mobile) -->
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
@@ -108,6 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #after>
                 <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
+                  <PullToRefreshWrapper
+                    class="tw:h-full tw:w-full"
+                    @refresh="onMobileLogsRefresh"
+                  >
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -318,9 +322,55 @@ size="md" />
                       </h5>
                     </div>
                   </div>
+                  </PullToRefreshWrapper>
                 </div>
               </template>
             </q-splitter>
+
+            <!-- Mobile: FAB to open fields sidebar + slide-over dialog -->
+            <q-btn
+              v-if="isMobile"
+              icon="filter_list"
+              round
+              color="primary"
+              class="touch-target"
+              style="
+                position: fixed;
+                bottom: calc(var(--o2-mobile-nav-height) + 12px);
+                left: 12px;
+                z-index: 1999;
+              "
+              @click="showMobileFields = true"
+              aria-label="Open fields filter"
+            />
+            <q-dialog
+              v-if="isMobile"
+              v-model="showMobileFields"
+              position="left"
+              full-height
+              transition-show="slide-right"
+              transition-hide="slide-left"
+              aria-label="Filter fields"
+            >
+              <q-card
+                style="width: 85vw; max-width: 320px"
+                class="full-height"
+              >
+                <q-card-section class="row items-center q-pb-none">
+                  <div class="text-subtitle1 text-weight-medium">Fields</div>
+                  <q-space />
+                  <q-btn icon="close" flat round dense v-close-popup />
+                </q-card-section>
+                <q-card-section class="q-pt-sm" style="height: calc(100% - 52px); overflow: auto">
+                  <index-list
+                    class="card-container"
+                    @setInterestingFieldInSQLQuery="
+                      setInterestingFieldInSQLQuery
+                    "
+                  />
+                </q-card-section>
+              </q-card>
+            </q-dialog>
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
@@ -443,6 +493,7 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { useScreen } from "@/composables/useScreen";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -505,12 +556,14 @@ import {
   saveLogsStreamType,
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
+import PullToRefreshWrapper from "@/components/shared/PullToRefreshWrapper.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
     IndexList,
+    PullToRefreshWrapper,
     OButton,
     ChevronRight,
     ChevronLeft,
@@ -536,6 +589,30 @@ export default defineComponent({
   methods: {
     setHistogramDate(date: any) {
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
+    },
+    // Mobile pull-to-refresh: re-run the current query once without
+    // disturbing the live-mode polling timer. We deliberately call
+    // getQueryData/handleRunQueryFn directly rather than refreshData(), so
+    // a manual pull never resets refreshInterval or the polling cadence.
+    // Ack() runs in a finally block so the wrapper spinner always dismisses,
+    // including the loading short-circuit and the no-stream / no-mode no-ops.
+    async onMobileLogsRefresh(ack: () => void) {
+      try {
+        if (this.searchObj.loading) return;
+        const streamsSelected =
+          this.searchObj.data?.stream?.selectedStream?.length > 0;
+        const mode = this.searchObj.meta?.logsVisualizeToggle;
+        if (mode === "logs" && streamsSelected && this.searchObj.meta?.searchApplied) {
+          await this.getQueryData(false);
+          this.refreshHistogramChart();
+          return;
+        }
+        if (mode && mode !== "logs" && streamsSelected) {
+          await this.handleRunQueryFn(false);
+        }
+      } finally {
+        ack();
+      }
     },
     searchData() {
       if (this.searchObj.loading == false) {
@@ -795,7 +872,15 @@ export default defineComponent({
       handleBeforeMount();
     });
 
+    const { isMobile } = useScreen();
+    const showMobileFields = ref(false);
+
     onMounted(() => {
+      // Auto-collapse fields sidebar on mobile for usable results area
+      if (isMobile.value && searchObj.meta.showFields) {
+        searchObj.meta.showFields = false;
+      }
+
       if (
         router.currentRoute.value.query.hasOwnProperty("action") &&
         router.currentRoute.value.query.action == "history"
@@ -3234,6 +3319,8 @@ export default defineComponent({
       onBuildInitialized,
       selectedDateTime,
       isFirstBuildToggle,
+      isMobile,
+      showMobileFields,
     };
   },
   computed: {

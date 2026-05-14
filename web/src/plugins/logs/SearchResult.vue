@@ -379,7 +379,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
+          <!-- Desktop: full table view -->
           <tenstack-table
+            v-if="!isMobile"
             ref="searchTableRef"
             :columns="getColumns || []"
             :rows="searchObj.data.queryResults?.hits || []"
@@ -416,6 +418,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @view-trace="redirectToTraces"
             @show-correlation="openLogDetailsWithCorrelation"
           />
+          <!-- Mobile: card-per-row view -->
+          <q-virtual-scroll
+            v-else
+            :items="searchObj.data.queryResults?.hits || []"
+            :virtual-scroll-item-size="52"
+            :virtual-scroll-slice-size="30"
+            class="col-12 tw:mt-[0.375rem]"
+            :class="[
+              !searchObj.meta.showHistogram ||
+              (searchObj.meta.showHistogram &&
+                searchObj.data.histogram.errorCode == -1)
+                ? 'table-container--without-histogram'
+                : 'table-container--with-histogram',
+            ]"
+            style="overflow-y: auto"
+          >
+            <template v-slot="{ item: row, index }">
+              <MobileLogCard
+                :key="'log_' + index"
+                :row="row"
+                :index="index"
+                @click="openLogDetails"
+              />
+            </template>
+          </q-virtual-scroll>
         </template>
 
         <!-- Patterns View -->
@@ -451,8 +478,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-dialog
         data-test="logs-search-result-detail-dialog"
         v-model="searchObj.meta.showDetailTab"
-        position="right"
+        :position="isMobile ? undefined : 'right'"
         full-height
+        :full-width="isMobile"
         maximized
         allow-focus-outside
         @escap.stop="reDrawChart"
@@ -580,6 +608,8 @@ import {
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { useRouter } from "vue-router";
 import { useSearchAround } from "@/composables/useLogs/searchAround";
+import { useScreen } from "@/composables/useScreen";
+import MobileLogCard from "./MobileLogCard.vue";
 import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -607,6 +637,7 @@ export default defineComponent({
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     EqualIcon,
     NotEqualIcon,
+    MobileLogCard,
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(
       () => import("./patterns/PatternList.vue"),
@@ -842,6 +873,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const $q = useQuasar();
+    const { isMobile } = useScreen();
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
     const patternSummaryText = ref("");
@@ -1747,6 +1779,7 @@ export default defineComponent({
       openCorrelationPanel,
       openCorrelationFromLog,
       openLogDetailsWithCorrelation,
+      isMobile,
     };
   },
   computed: {

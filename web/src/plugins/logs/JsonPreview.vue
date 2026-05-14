@@ -265,7 +265,7 @@
       </div>
     </div>
     <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
-      <q-card style="width: 700px; max-width: 80vw">
+      <q-card style="width: 700px; max-width: 95vw">
         <q-card-section>
           <div class="text-h6">
             What is the type of regex pattern you want to create?

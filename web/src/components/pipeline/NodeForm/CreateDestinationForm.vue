@@ -99,6 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               flat
               stack-label
+              autocomplete="off"
+              enterkeyhint="next"
               :rules="[
                 (val: any) =>
                   !!val
@@ -118,6 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               flat
               stack-label
+              type="url"
+              inputmode="url"
+              autocomplete="off"
+              enterkeyhint="next"
               :rules="[
                 (val: any) => !!val.trim() || 'Field is required!',
                 (val: any) =>
@@ -150,6 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   stack-label
+                  autocomplete="organization"
+                  enterkeyhint="next"
                   :rules="[
                     (val: any) =>
                       !!val?.trim() ||
@@ -175,6 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   stack-label
+                  autocomplete="off"
+                  enterkeyhint="next"
                   :rules="[
                     (val: any) =>
                       !!val?.trim() ||
@@ -204,6 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               flat
               stack-label
               bottom-slots
+              autocomplete="off"
+              enterkeyhint="next"
               :disable="formData.destination_type !== 'custom'"
               :rules="[
                 ...(formData.destination_type === 'custom'
@@ -269,6 +281,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               flat
               stack-label
+              autocomplete="off"
+              enterkeyhint="next"
               :rules="[
                 (val: any) =>
                   !!val?.trim() || 'Index name is required for ESBulk format',
@@ -292,6 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               flat
               stack-label
+              autocomplete="off"
+              enterkeyhint="next"
               :rules="[
                 (val: any) =>
                   (val !== null && val !== undefined && val !== '') ||
@@ -323,6 +339,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 tabindex="0"
               >
                 <template v-slot:hint>
@@ -340,6 +358,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 tabindex="0"
               >
                 <template v-slot:hint>
@@ -357,6 +377,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 tabindex="0"
               >
                 <template v-slot:hint>
@@ -377,6 +399,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 :rules="[
                   (val: any) =>
                     !!val?.trim() || 'DD Source is required for Datadog',
@@ -398,6 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 :rules="[
                   (val: any) =>
                     !!val?.trim() || 'DD Tags are required for Datadog',
@@ -419,6 +445,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 tabindex="0"
               >
                 <template v-slot:hint> Service name for Datadog logs </template>
@@ -434,6 +462,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 flat
                 stack-label
+                autocomplete="off"
+                enterkeyhint="next"
                 tabindex="0"
               >
                 <template v-slot:hint> Hostname for Datadog logs </template>
@@ -462,6 +492,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   :placeholder="t('alert_destinations.api_header')"
                   dense
+                  autocomplete="off"
+                  enterkeyhint="next"
                   tabindex="0"
                 />
               </div>
@@ -476,6 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   outlined
                   filled
                   dense
+                  autocomplete="off"
+                  enterkeyhint="next"
                   tabindex="0"
                 />
               </div>
