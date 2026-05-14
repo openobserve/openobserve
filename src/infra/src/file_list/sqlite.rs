@@ -800,19 +800,23 @@ GROUP BY stream;
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if let Some(stream_type) = stream_type
+        // SECURITY: bind parameters to prevent SQL injection when any of the
+        // inputs contain quotes or SQL metacharacters (GHSA-5x2v-jg9q-g8qc).
+        let pool = CLIENT_RO.clone();
+        let ret = if let Some(stream_type) = stream_type
             && let Some(stream_name) = stream_name
         {
-            format!(
-                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
-            )
+            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE stream = ?;")
+                .bind(&stream_key)
+                .fetch_all(&pool)
+                .await?
         } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE org = ?;")
+                .bind(org_id)
+                .fetch_all(&pool)
+                .await?
         };
-        let pool = CLIENT_RO.clone();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
         let mut stats: HashMap<String, StreamStats> = HashMap::with_capacity(ret.len() / 2);
         for r in ret {
             match stats.get_mut(&r.stream) {
