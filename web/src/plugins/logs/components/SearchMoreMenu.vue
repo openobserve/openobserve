@@ -261,13 +261,13 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import useLogs from "@/composables/useLogs";
+import { searchState } from "@/composables/useLogs/searchState";
 import downloadLogsUtil from "@/utils/logs/downloadLogs";
 import config from "@/aws-exports";
 
 const { t } = useI18n();
 const store = useStore();
-const { searchObj } = useLogs();
+const { searchObj } = searchState();
 
 const props = defineProps<{
   shouldMoveShareToMenu: boolean;
