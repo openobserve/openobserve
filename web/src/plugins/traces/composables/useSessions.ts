@@ -16,6 +16,8 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import { generateTraceContext } from "@/utils/zincutils";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 
 export interface SessionDetail {
@@ -111,10 +113,18 @@ export interface SessionRow {
  */
 export function useSessions() {
   const store = useStore();
-  // useLLMStreamQuery is still used by `fetchSession` / `fetchTurnDetail`
-  // for the detail page, which needs richer per-trace SQL than the
-  // sessions endpoint exposes.
+  // `fetchTurnDetail` still uses the raw SQL streaming search to grab
+  // the messages of a single trace when its row is expanded — the
+  // session-list endpoint and the trace `latest_stream` endpoint
+  // don't expose final assistant text or per-span output.
   const { executeQuery, cancelAll } = useLLMStreamQuery();
+  // The trace `latest_stream` endpoint (server-side aggregation per
+  // trace, LLM-aware fields) drives the per-turn list inside a
+  // session. Lifted out of `useLLMStreamQuery` because the URL +
+  // payload shape differs (GET with query params, not a POST SQL).
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+    useHttpStreaming();
+  const activeLatestStreamTraceIds = new Set<string>();
 
   const sessions = ref<SessionRow[]>([]);
   const total = ref(0);
@@ -210,116 +220,178 @@ export function useSessions() {
     if (!streamName || !sessionId || !startTime || !endTime) {
       return { detail: null, traces: [] };
     }
-    // Escape single quotes so a malformed session id can't break the SQL.
+    // Escape single quotes so a malformed session id can't break the
+    // server's filter-to-WHERE expansion.
     const safeId = sessionId.replace(/'/g, "''");
+    const filter = `gen_ai_conversation_id='${safeId}'`;
 
-    const tracesSql = `
-      SELECT
-        trace_id                                                                 AS trace_id,
-        MIN(start_time)                                                          AS start_time,
-        MAX(end_time)                                                            AS end_time,
-        MAX(end_time) - MIN(start_time)                                          AS duration_ns,
-        COUNT(*)                                                                 AS span_count,
-        COUNT(*) FILTER (WHERE gen_ai_operation_name IS NOT NULL)                AS llm_call_count,
-        COUNT(*) FILTER (WHERE gen_ai_operation_name = 'execute_tool')           AS tool_call_count,
-        COALESCE(SUM(gen_ai_usage_input_tokens), 0)                              AS input_tokens,
-        COALESCE(SUM(gen_ai_usage_output_tokens), 0)                             AS output_tokens,
-        COALESCE(SUM(gen_ai_usage_total_tokens), 0)                              AS tokens,
-        COALESCE(SUM(gen_ai_usage_cost), 0)                                      AS cost,
-        COUNT(*) FILTER (WHERE span_status = 'ERROR')                            AS error_count,
-        COUNT(*) FILTER (WHERE span_status = 'WARN' OR span_status = 'WARNING')  AS warn_count,
-        MAX(gen_ai_response_model)                                               AS model,
-        MAX(user_id)                                                             AS user_id,
-        MAX(service_name)                                                        AS service_name
-      FROM "${streamName}"
-      WHERE gen_ai_conversation_id = '${safeId}'
-      GROUP BY trace_id
-      ORDER BY start_time ASC
-      LIMIT 1000
-    `;
+    // Hit the existing per-stream traces endpoint instead of running
+    // a one-off GROUP BY ourselves. Server-side it's the same shape
+    // OpenObserve already uses for the Traces tab, and on LLM
+    // streams it adds gen_ai_usage_* totals + the first chat span's
+    // input messages — exactly what the session-detail page needs.
+    const accumulated: any[] = await streamLatestTraces(
+      streamName,
+      filter,
+      startTime,
+      endTime,
+    );
 
-    const traceHits = await executeQuery(tracesSql, startTime, endTime);
-
-    // Map per-trace rows first; we'll need to walk them once for the
-    // session-level rollup anyway.
-    const traces: SessionTraceRow[] = (traceHits || []).map((r: any) => {
-      const ec = Number(r.error_count) || 0;
-      const wc = Number(r.warn_count) || 0;
-      return {
-        traceId: String(r.trace_id ?? ""),
-        startTimeMicros: Number(r.start_time) || 0,
-        durationNanos: Number(r.duration_ns) || 0,
-        spanCount: Number(r.span_count) || 0,
-        llmCallCount: Number(r.llm_call_count) || 0,
-        toolCallCount: Number(r.tool_call_count) || 0,
-        inputTokens: Number(r.input_tokens) || 0,
-        outputTokens: Number(r.output_tokens) || 0,
-        tokens: Number(r.tokens) || 0,
-        cost: Number(r.cost) || 0,
-        errorCount: ec,
-        status: ec > 0 ? "error" : wc > 0 ? "warn" : "ok",
-        model: r.model ? String(r.model) : null,
-      };
-    });
-
-    if (traces.length === 0) {
+    if (accumulated.length === 0) {
       return { detail: null, traces: [] };
     }
 
-    // Roll the per-trace rows up into the session-level detail. user_id
-    // / service_name are constant within a session, so first non-null
-    // wins — saves emitting a second GROUP BY session_id query that
-    // would produce the same numbers.
-    let firstSeenMicros = Infinity;
-    let lastSeenMicros = 0;
+    // Sort chronologically so the conversation list reads in turn
+    // order. The endpoint returns DESC by default to surface "most
+    // recent" first; for a session we want oldest-first.
+    accumulated.sort(
+      (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
+    );
+
+    // Map each trace summary to SessionTraceRow.
+    //
+    // Field-name + unit notes from the live response:
+    //   start_time / end_time → nanoseconds (UInt64 on the span)
+    //   duration              → microseconds (server returns ns/1000)
+    //   spans                 → [total_spans, error_spans] tuple
+    //   service_name          → [{ service_name, count, duration }]
+    //   gen_ai_usage_*        → cumulative across all spans
+    //   gen_ai_input_messages → FIRST_VALUE — the user question
+    //
+    // `startTimeMicros` / `durationNanos` on the row type are
+    // misnomers — both formatters in SessionDetails.vue divide by
+    // 1_000_000 / 1_000 respectively, i.e. they expect nanoseconds.
+    // We keep the unit convention (nanos) so the existing template
+    // keeps formatting correctly without touching the UI layer.
+    const traces: SessionTraceRow[] = accumulated.map((r: any) => {
+      const spansArr = Array.isArray(r.spans) ? r.spans : [];
+      const spanCount = Number(spansArr[0]) || 0;
+      const errorCount = Number(spansArr[1]) || 0;
+      const svcArr = Array.isArray(r.service_name) ? r.service_name : [];
+      const model =
+        r.gen_ai_response_model || r.gen_ai_request_model || null;
+      const startNanos = Number(r.start_time) || 0;
+      const endNanos = Number(r.end_time) || 0;
+      return {
+        traceId: String(r.trace_id ?? ""),
+        startTimeMicros: startNanos,
+        // Prefer the computed (end - start) so we stay in nanos —
+        // the server's `duration` is already divided to micros and
+        // would 1000× under-render through formatDuration.
+        durationNanos: endNanos > startNanos ? endNanos - startNanos : 0,
+        spanCount,
+        llmCallCount: 0,
+        toolCallCount: 0,
+        inputTokens: Number(r.gen_ai_usage_input_tokens) || 0,
+        outputTokens: Number(r.gen_ai_usage_output_tokens) || 0,
+        tokens: Number(r.gen_ai_usage_total_tokens) || 0,
+        cost: Number(r.gen_ai_usage_cost) || 0,
+        errorCount,
+        status: errorCount > 0 ? "error" : "ok",
+        model: model ? String(model) : null,
+        serviceName: svcArr[0]?.service_name
+          ? String(svcArr[0].service_name)
+          : null,
+      } as SessionTraceRow & { serviceName: string | null };
+    });
+
+    // Roll the per-trace rows up into the session-level detail.
+    let firstSeenNanos = Infinity;
+    let lastSeenNanos = 0;
     let totalTokens = 0;
     let totalCost = 0;
     let totalErrors = 0;
-    let totalWarns = 0;
-    let userId: string | null = null;
     let serviceName: string | null = null;
-    for (let i = 0; i < (traceHits || []).length; i++) {
-      const r = traceHits[i];
-      const t = traces[i];
-      if (t.startTimeMicros && t.startTimeMicros < firstSeenMicros) {
-        firstSeenMicros = t.startTimeMicros;
-      }
-      const traceEnd = Number(r.end_time) || 0;
-      if (traceEnd > lastSeenMicros) lastSeenMicros = traceEnd;
+    for (let i = 0; i < accumulated.length; i++) {
+      const r = accumulated[i];
+      const t = traces[i] as SessionTraceRow & { serviceName?: string | null };
+      const sn = Number(r.start_time) || 0;
+      const en = Number(r.end_time) || 0;
+      if (sn && sn < firstSeenNanos) firstSeenNanos = sn;
+      if (en > lastSeenNanos) lastSeenNanos = en;
       totalTokens += t.tokens;
       totalCost += t.cost;
       totalErrors += t.errorCount;
-      // The trace row's `warn_count` isn't carried on SessionTraceRow,
-      // so read it directly off the raw row.
-      totalWarns += Number(r.warn_count) || 0;
-      if (!userId && r.user_id) userId = String(r.user_id);
-      if (!serviceName && r.service_name)
-        serviceName = String(r.service_name);
+      if (!serviceName && t.serviceName) serviceName = t.serviceName;
     }
-    if (firstSeenMicros === Infinity) firstSeenMicros = 0;
+    if (firstSeenNanos === Infinity) firstSeenNanos = 0;
 
     const detail: SessionDetail = {
       sessionId,
-      userId,
+      userId: null,
       serviceName,
-      firstSeenMicros,
-      // SessionDetail's duration field is named `durationNanos` for
-      // historical reasons but the wire data is microseconds — we
-      // convert at the formatter level (same as SessionsList).
+      firstSeenMicros: firstSeenNanos,
       durationNanos:
-        lastSeenMicros > firstSeenMicros
-          ? lastSeenMicros - firstSeenMicros
-          : 0,
+        lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
       turns: traces.length,
       tokens: totalTokens,
       cost: totalCost,
       errorCount: totalErrors,
-      warnCount: totalWarns,
-      status:
-        totalErrors > 0 ? "error" : totalWarns > 0 ? "warn" : "ok",
+      warnCount: 0,
+      status: totalErrors > 0 ? "error" : "ok",
     };
 
     return { detail, traces };
+  }
+
+  /**
+   * Drive the `/api/{org}/{stream}/traces/latest_stream` HTTP/2
+   * streaming GET via the shared streaming-search composable. Accumulates
+   * hits across all SSE chunks and resolves once the server signals
+   * `complete`. Tracks the trace_id so `cancelAll` can abort an
+   * in-flight session-detail fetch on tab switch / unmount.
+   */
+  function streamLatestTraces(
+    streamName: string,
+    filter: string,
+    startTime: number,
+    endTime: number,
+  ): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      const traceId = generateTraceContext().traceId;
+      activeLatestStreamTraceIds.add(traceId);
+      const hits: any[] = [];
+
+      fetchQueryDataWithHttpStream(
+        {
+          queryReq: {
+            stream_name: streamName,
+            filter,
+            start_time: startTime,
+            end_time: endTime,
+            from: 0,
+            size: 1000,
+          },
+          type: "traces",
+          traceId,
+          org_id: store.state.selectedOrganization?.identifier,
+        },
+        {
+          data: (_payload: any, response: any) => {
+            const chunkHits: any[] = response.content?.results?.hits || [];
+            if (chunkHits.length > 0) hits.push(...chunkHits);
+          },
+          error: (response: any) => {
+            activeLatestStreamTraceIds.delete(traceId);
+            const body = response?.content ?? response ?? {};
+            const message =
+              body.message ||
+              body.error ||
+              body.error_detail ||
+              "Failed to fetch session traces";
+            const err: any = new Error(message);
+            err.status = body.status;
+            err.raw = response;
+            reject(err);
+          },
+          complete: () => {
+            activeLatestStreamTraceIds.delete(traceId);
+            resolve(hits);
+          },
+          reset: () => {},
+        },
+      );
+    });
   }
 
   /**
@@ -371,17 +443,17 @@ export function useSessions() {
     let assistantMessage: TurnMessage | null = null;
     let model: string | null = null;
 
+    // First pass — forward — pick model and the user question for THIS
+    // turn. `gen_ai.input.messages` carries the FULL prompt sent to
+    // the model (system + every prior turn + the current question),
+    // so the *last* user-role entry of the *first* span is the
+    // current turn's question, not turn 1's.
     for (const span of hits || []) {
       if (!model) {
         const m = getModel(span);
         if (m) model = m;
       }
       if (!userMessage) {
-        // `gen_ai.input.messages` carries the FULL prompt sent to the
-        // model — system + every prior turn + the current question. The
-        // first user-role entry is therefore turn 1's question, not the
-        // current turn's. Walk from the end to grab the actual question
-        // for *this* turn.
         const inputMsgs = messagesFromInput(span.gen_ai_input_messages);
         let u: any = null;
         for (let i = inputMsgs.length - 1; i >= 0; i--) {
@@ -392,24 +464,51 @@ export function useSessions() {
         }
         if (u) userMessage = { role: "user", content: u.content };
       }
-      if (!assistantMessage) {
-        // Output payloads typically carry just the model's reply for
-        // this turn, but defensively prefer the last assistant entry
-        // (Vertex / ADK responses occasionally bundle a system echo).
-        const outputMsgs = messagesFromOutput(span.gen_ai_output_messages);
-        let a: any = null;
-        for (let i = outputMsgs.length - 1; i >= 0; i--) {
-          if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
-            a = outputMsgs[i];
-            break;
-          }
+      if (userMessage && model) break;
+    }
+
+    // Second pass — reverse — pick the FINAL assistant reply for this
+    // turn. An agent may make multiple LLM calls (LLM → tool → LLM
+    // → tool → … → final answer). The first chat span's output is
+    // usually an intermediate "I should call tool X" reply; the user
+    // wants the answer at the end, not the planning step. Walking
+    // from the latest span back gives us the final non-empty
+    // assistant message.
+    for (let s = (hits || []).length - 1; s >= 0; s--) {
+      const span = hits[s];
+      const outputMsgs = messagesFromOutput(span.gen_ai_output_messages);
+      let a: any = null;
+      for (let i = outputMsgs.length - 1; i >= 0; i--) {
+        if (outputMsgs[i].role === "assistant" && outputMsgs[i].content) {
+          a = outputMsgs[i];
+          break;
         }
-        if (a) assistantMessage = { role: "assistant", content: a.content };
       }
-      if (userMessage && assistantMessage && model) break;
+      if (a) {
+        assistantMessage = { role: "assistant", content: a.content };
+        break;
+      }
     }
 
     return { traceId, userMessage, assistantMessage, model };
+  }
+
+  /**
+   * Cancel every in-flight stream this composable owns: SQL streams
+   * from `useLLMStreamQuery` AND any `latest_stream` GET requests we
+   * started for the session-detail page. Called from the parent on
+   * unmount so server-side work isn't kept around after the tab goes
+   * away.
+   */
+  function cancelAllSessionStreams() {
+    cancelAll();
+    activeLatestStreamTraceIds.forEach((id) => {
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: id,
+        org_id: store.state.selectedOrganization?.identifier,
+      });
+    });
+    activeLatestStreamTraceIds.clear();
   }
 
   return {
@@ -421,6 +520,6 @@ export function useSessions() {
     fetchPage,
     fetchSession,
     fetchTurnDetail,
-    cancelAll,
+    cancelAll: cancelAllSessionStreams,
   };
 }
