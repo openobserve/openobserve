@@ -610,7 +610,18 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queries[0].fields.stream_type =
       props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.config.mark_line = [];
+    dashboardPanelData.data.config.mark_line = props.formData
+      .trigger_condition?.threshold
+      ? [
+          {
+            name: "Threshold",
+            type: "yAxis",
+            value: String(
+              props.formData.trigger_condition.threshold,
+            ),
+          },
+        ]
+      : [];
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -1121,9 +1132,20 @@ const refreshData = () => {
       props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type =
       props.formData.stream_type;
+    const thresholdValue =
+      props.formData.trigger_condition?.threshold;
+
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    dashboardPanelData.data.config.mark_line = [];
+    dashboardPanelData.data.config.mark_line = thresholdValue
+      ? [
+          {
+            name: "Threshold",
+            type: "yAxis",
+            value: String(thresholdValue),
+          },
+        ]
+      : [];
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
