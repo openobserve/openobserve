@@ -15,19 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="dimension-filter-editor-dialog"
-    :open="modelValue"
-    @update:open="(v) => { $emit('update:modelValue', v); if (!v) handleClose(); }"
-    size="md"
-    :title="t('correlation.logs.filters.title')"
-    :secondary-button-label="t('common.cancel')"
-    :neutral-button-label="t('common.reset')"
-    :primary-button-label="t('common.apply')"
-    :primary-button-disabled="!hasChanges"
-    @click:secondary="handleCancel"
-    @click:neutral="handleReset"
-    @click:primary="handleApply"
+  <q-dialog
+    :model-value="modelValue"
+    @update:model-value="$emit('update:modelValue', $event)"
+    @hide="handleClose"
+    data-test="dimension-filter-editor-dialog"
   >
+    <q-card style="min-width: 600px; max-width: 800px">
+      <!-- Header -->
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">{{ t('correlation.logs.filters.title') }}</div>
+        <q-space />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          v-close-popup
+          :aria-label="t('common.close')"
+          data-test="close-dialog-btn"
+        >
+          <X :size="14" />
+        </OButton>
+      </q-card-section>
+
+      <q-separator class="q-mt-md" />
+
+      <!-- Content -->
+      <q-card-section class="q-pt-md">
         <!-- Description -->
         <div class="tw:mb-4 tw:text-sm tw:text-gray-600">
           {{ t('correlation.logs.filters.description') }}
@@ -143,8 +156,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t('correlation.logs.filters.noAdditionalDimensions') }}
         </div>
+      </q-card-section>
 
-  </ODialog>
+      <q-separator />
+
+      <!-- Actions -->
+      <q-card-actions align="right" class="q-pa-md">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="handleCancel"
+          data-test="cancel-btn"
+        >
+          {{ t('common.cancel') }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="sm-action"
+          @click="handleReset"
+          data-test="reset-btn"
+        >
+          <RotateCcw :size="14" class="tw:mr-1" />
+          {{ t('common.reset') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="handleApply"
+          :disabled="!hasChanges"
+          data-test="apply-btn"
+        >
+          {{ t('common.apply') }}
+        </OButton>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
@@ -152,7 +198,6 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
 import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { X, Infinity, RotateCcw } from 'lucide-vue-next';
 
 interface Props {

@@ -21,7 +21,7 @@ vi.mock("@/components/dashboards/AddFolder.vue", () => ({
   default: {
     name: "AddFolder",
     template: '<div class="add-folder-mock"></div>',
-    emits: ["update:modelValue", "close"],
+    emits: ["update:modelValue"],
   },
 }));
 
@@ -31,104 +31,6 @@ const mockFetch = vi.fn();
 installQuasar({ plugins: [Notify] });
 
 import dashboardsService from "@/services/dashboards";
-
-// ── ODialog / ODrawer / OButton stubs ────────────────────────────────────────
-// Each renders the slots the component relies on so children remain queryable
-// in tests, and re-emits the events the test suite drives state through.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: [
-    "open",
-    "side",
-    "size",
-    "width",
-    "title",
-    "subTitle",
-    "showClose",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral", "close"],
-  template: `
-    <div
-      data-test-stub="o-drawer"
-      :data-open="open"
-      :data-title="title"
-      :data-size="size"
-      :data-side="side"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="primaryButtonDisabled"
-      :data-primary-loading="primaryButtonLoading"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-    </div>
-  `,
-};
-
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "width",
-    "title",
-    "subTitle",
-    "showClose",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test-stub="o-dialog"
-      :data-open="open"
-      :data-title="title"
-      :data-size="size"
-      :data-persistent="persistent"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="primaryButtonDisabled"
-      :data-primary-loading="primaryButtonLoading"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-    </div>
-  `,
-};
-
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  inheritAttrs: false,
-  template: `<button data-test-stub="o-button" :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot name="icon-left" /><slot /></button>`,
-};
 
 describe("AddDashboardFromGitHub Component", () => {
   let wrapper: any;
@@ -158,9 +60,27 @@ describe("AddDashboardFromGitHub Component", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
-          ODrawer: ODrawerStub,
-          ODialog: ODialogStub,
-          OButton: OButtonStub,
+          "q-dialog": {
+            template: '<div class="q-dialog"><slot /></div>',
+            props: ["modelValue"],
+          },
+          "q-card": {
+            template: '<div class="q-card"><slot /></div>',
+          },
+          "q-card-section": {
+            template: '<div class="q-card-section"><slot /></div>',
+          },
+          "q-card-actions": {
+            template: '<div class="q-card-actions"><slot /></div>',
+          },
+          "q-separator": {
+            template: '<hr class="q-separator" />',
+          },
+          "q-btn": {
+            template:
+              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
+            emits: ["click"],
+          },
           "q-spinner": {
             template: '<div class="q-spinner"></div>',
           },
@@ -200,7 +120,7 @@ describe("AddDashboardFromGitHub Component", () => {
           },
           AddFolder: {
             template: '<div class="add-folder-mock"></div>',
-            emits: ["update:modelValue", "close"],
+            emits: ["update:modelValue"],
           },
         },
       },
@@ -713,12 +633,10 @@ describe("AddDashboardFromGitHub Component", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render the ODrawer wrapper with the gallery title", async () => {
+    it("should render close button", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("Add Dashboard from Gallery");
+      expect(wrapper.find('[data-test="add-dashboard-github-close"]').exists()).toBe(true);
     });
 
     it("should render search input", async () => {
@@ -727,47 +645,23 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(wrapper.find('[data-test="add-dashboard-github-search"]').exists()).toBe(true);
     });
 
-    it("should expose the Cancel label on the ODrawer secondary button", async () => {
+    it("should render cancel button", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-secondary-label")).toBe("Cancel");
+      expect(wrapper.find('[data-test="add-dashboard-github-cancel"]').exists()).toBe(true);
     });
 
-    it("should expose the Next label with selection count on the ODrawer primary button", async () => {
+    it("should render next button", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Next (0)");
+      expect(wrapper.find('[data-test="add-dashboard-github-next"]').exists()).toBe(true);
     });
 
-    it("should reflect updated selection count in the ODrawer primary label", async () => {
+    it("should disable next button when no dashboards selected", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
-      wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] },
-      ];
-      await wrapper.vm.$nextTick();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Next (1)");
-    });
-
-    it("should disable the ODrawer primary button when no dashboards selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-disabled")).toBe("true");
-    });
-
-    it("should enable the ODrawer primary button once a dashboard is selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: [] },
-      ];
-      await wrapper.vm.$nextTick();
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-disabled")).toBe("false");
+      const nextBtn = wrapper.find('[data-test="add-dashboard-github-next"]');
+      expect(nextBtn.element.disabled).toBe(true);
     });
 
     it("should show dashboard items when dashboards are loaded", async () => {
@@ -777,178 +671,6 @@ describe("AddDashboardFromGitHub Component", () => {
       ];
       await wrapper.vm.$nextTick();
       expect(wrapper.find('[data-test="add-dashboard-github-item"]').exists()).toBe(true);
-    });
-  });
-
-  describe("ODrawer event wiring", () => {
-    it("should close the drawer when secondary (Cancel) is emitted", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      await drawer.vm.$emit("click:secondary");
-
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      // Last emitted value should be false (drawer closed)
-      const emits = wrapper.emitted("update:modelValue") as any[];
-      expect(emits[emits.length - 1][0]).toBe(false);
-    });
-
-    it("should invoke handleNext when primary (Next) is emitted", async () => {
-      vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
-        mockFolderList as any
-      );
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: ["dash.json"] },
-      ];
-      await wrapper.vm.$nextTick();
-
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      await drawer.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(wrapper.vm.showFolderSelection).toBe(true);
-    });
-  });
-
-  describe("Folder Selection ODialog", () => {
-    it("should render the folder selection dialog when showFolderSelection is true", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      wrapper.vm.showFolderSelection = true;
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("Select Destination Folder");
-      expect(dialog.attributes("data-primary-label")).toBe("Add Dashboard");
-      expect(dialog.attributes("data-secondary-label")).toBe("Back");
-    });
-
-    it("should disable the dialog primary button when no folder is selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showFolderSelection = true;
-      wrapper.vm.selectedFolderObj = null;
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-primary-disabled")).toBe("true");
-    });
-
-    it("should enable the dialog primary button once a folder is selected", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showFolderSelection = true;
-      wrapper.vm.selectedFolderObj = { label: "default", value: "default" };
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-primary-disabled")).toBe("false");
-    });
-
-    it("should reflect importing loading state on the dialog primary button", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showFolderSelection = true;
-      wrapper.vm.importing = true;
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-primary-loading")).toBe("true");
-    });
-
-    it("should close the dialog when secondary (Back) is emitted", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showFolderSelection = true;
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:secondary");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showFolderSelection).toBe(false);
-    });
-
-    it("should invoke confirmAdd when primary (Add Dashboard) is emitted", async () => {
-      // Set up a successful import flow.
-      vi.mocked(dashboardsService.list).mockResolvedValue({
-        data: { dashboards: [] },
-      } as any);
-      vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
-
-      const cacheKey = "aws_ec2/dash.json";
-      (store.state as any).githubDashboardGallery = {
-        dashboards: [],
-        lastFetched: null,
-        cacheExpiry: 300000,
-        dashboardJsonCache: {
-          [cacheKey]: { title: "AWS EC2 Dash" },
-        },
-      };
-
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      wrapper.vm.selectedDashboards = [
-        { name: "aws_ec2", displayName: "AWS EC2", folderPath: "aws_ec2", jsonFiles: ["dash.json"] },
-      ];
-      wrapper.vm.selectedFolderObj = { label: "default", value: "default" };
-      wrapper.vm.showFolderSelection = true;
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      await dialog.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(dashboardsService.create).toHaveBeenCalled();
-      // confirmAdd should emit "added" on success
-      expect(wrapper.emitted("added")).toBeTruthy();
-    });
-  });
-
-  describe("Add Folder ODrawer (nested)", () => {
-    it("should not render the AddFolder drawer by default", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-
-      // There is only the outer ODrawer (gallery) when showAddFolderDialog is false.
-      const drawers = wrapper.findAllComponents({ name: "ODrawer" });
-      expect(drawers).toHaveLength(2); // outer + nested AddFolder drawer always mounted
-      // The nested drawer's open state should be false.
-      const nested = drawers[1];
-      expect(nested.props("open")).toBe(false);
-    });
-
-    it("should open the AddFolder drawer when showAddFolderDialog is true", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showAddFolderDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const drawers = wrapper.findAllComponents({ name: "ODrawer" });
-      const nested = drawers[1];
-      expect(nested.props("open")).toBe(true);
-    });
-
-    it("should close the AddFolder drawer when its close event is emitted", async () => {
-      wrapper = createWrapper({ modelValue: true });
-      await flushPromises();
-      wrapper.vm.showAddFolderDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const drawers = wrapper.findAllComponents({ name: "ODrawer" });
-      const nested = drawers[1];
-      // The nested ODrawer uses v-model:open, so closing it emits update:open with false.
-      await nested.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
     });
   });
 });

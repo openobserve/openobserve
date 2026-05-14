@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
         <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>
-        <div class="import-button-container" style="font-size: 1rem">
-            <OButton variant="outline" size="xs" class="tw:mt-2" @click="importRegexPattern">
+        <div class="import-button-container">
+            <OButton variant="outline" size="sm" class="tw:mt-2" @click="importRegexPattern">
               {{ t("regex_patterns.import_title") }}
             </OButton>
         </div>    

@@ -725,8 +725,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Reopen settings and navigate to variables tab
     await pm.dashboardSetting.openSetting();
-    // Wait for the settings ODrawer to be visible (replaced legacy .q-dialog selector)
-    await page.locator('[data-test="dashboard-settings-drawer"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator(SELECTORS.DIALOG).waitFor({ state: "visible", timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
 
@@ -1034,15 +1033,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
       }).last()
     ).toBeVisible();
 
-    // Close Query Inspector dialog — QueryInspector uses ODialog (Reka UI), whose
-    // escape-key-down only fires when focus is inside the dialog. Auto-focus is
-    // suppressed by handleOpenAutoFocus, so a page-level `keyboard.press('Escape')`
-    // does nothing and the overlay stays mounted, intercepting later clicks
-    // (e.g. dashboard-back-btn during cleanup). Click the dialog's explicit
-    // close button instead — matches the pattern used by other dashboard specs.
-    await page
-      .locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]')
-      .click();
+    // Close Query Inspector dialog
+    await page.keyboard.press('Escape');
     await scopedVars.waitForDialogHidden({ timeout: 5000 });
 
     // Clean up using consolidated helper

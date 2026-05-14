@@ -15,38 +15,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
-    :open="open"
-    @update:open="$emit('update:open', $event)"
-    :title=" t('dashboard.legendsOfCharts') "
-    size="lg"
-    data-test="dashboard-show-legends-dialog"
+  <q-card
+    class="show-legends-popup"
+    data-test="dashboard-show-legends-popup"
+    style="min-width: 700px"
   >
-    <template #header-right>
-      <div class="flex items-center">
-        <span class="legend-count q-mr-md" style="font-size: 14px" data-test="dashboard-show-legends-count">
-          {{ t("dashboard.totalLegends", { count: legends.length }) }}
-        </span>
-        <OButton
-          variant="outline"
-          size="sm"
-          @click.stop="copyAllLegends"
-          data-test="dashboard-show-legends-copy-all"
-        >
-          <template #icon-left
-            ><q-icon :name="isAllCopied ? 'check' : 'content_copy'"
-          /></template>
-          {{ isAllCopied ? "Copied" : "Copy all" }}
-        </OButton>
+    <q-card-section>
+      <!-- Header -->
+      <div
+        class="flex justify-between items-center q-px-md q-py-sm header tw:top-0 tw:sticky"
+        style="margin-bottom: 5px"
+      >
+        <div class="flex items-center q-table__title q-mr-md">
+          <span>{{ t("dashboard.legendsOfCharts") }}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="legend-count q-mr-md" style="font-size: 14px">
+            {{ t("dashboard.totalLegends", { count: legends.length }) }}
+          </span>
+          <OButton
+            variant="outline"
+            size="sm"
+            @click.stop="copyAllLegends"
+            data-test="dashboard-show-legends-copy-all"
+          >
+            <template #icon-left
+              ><q-icon :name="isAllCopied ? 'check' : 'content_copy'"
+            /></template>
+            {{ isAllCopied ? "Copied" : "Copy all" }}
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon"
+            class="tw:ml-1"
+            :title="t('common.close')"
+            @click.stop="closePopup"
+            data-test="dashboard-show-legends-close"
+          >
+            <template #icon-left><q-icon name="close" /></template>
+          </OButton>
+        </div>
       </div>
-    </template>
 
-    <!-- Legends List -->
-    <div
-      class="show-legends-popup"
-      data-test="dashboard-show-legends-popup"
-    >
-      <div class="legends-content scroll">
+      <!-- Legends List -->
+      <q-card-section class="legends-content scroll">
         <div v-if="legends.length === 0" class="no-legends q-pa-md text-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
@@ -83,9 +95,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  </ODialog>
+      </q-card-section>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">
@@ -98,22 +110,17 @@ import {
   getColorPalette,
 } from "@/utils/dashboard/colorPalette";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ShowLegendsPopup",
-  components: { OButton, ODialog },
+  components: { OButton },
   props: {
-    open: {
-      type: Boolean,
-      default: false,
-    },
     panelData: {
       type: Object,
       default: () => ({}),
     },
   },
-  emits: ["update:open"],
+  emits: ["close"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -236,7 +243,7 @@ export default defineComponent({
     });
 
     const closePopup = () => {
-      emit("update:open", false);
+      emit("close");
     };
 
     const isLegendCopied = (index: number) => {

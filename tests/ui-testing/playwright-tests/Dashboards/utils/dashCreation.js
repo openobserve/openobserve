@@ -98,11 +98,11 @@ export async function deleteDashboard(page, dashboardName) {
   // Wait for button to be truly stable using waitForFunction
   await page.waitForFunction(
     () => {
-      const dialog = document.querySelector('[data-test="dashboard-confirm-dialog"]');
+      const dialog = document.querySelector('[data-test="dialog-box"]');
       if (!dialog) return false;
 
       // Find the confirm button with data-test attribute inside dialog
-      const button = dialog.querySelector('[data-test="o-dialog-primary-btn"]');
+      const button = dialog.querySelector('[data-test="confirm-button"]');
       if (!button) return false;
 
       // Check if button is stable (has computed style and is not animating)
@@ -158,8 +158,8 @@ export async function deleteDashboard(page, dashboardName) {
 
   // Click the button using evaluate to avoid detachment issues
   await page.evaluate(() => {
-    const dialog = document.querySelector('[data-test="dashboard-confirm-dialog"]');
-    const button = dialog?.querySelector('[data-test="o-dialog-primary-btn"]');
+    const dialog = document.querySelector('[data-test="dialog-box"]');
+    const button = dialog?.querySelector('[data-test="confirm-button"]');
     if (button) {
       button.click();
     }

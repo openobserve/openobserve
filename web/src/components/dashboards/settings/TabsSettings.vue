@@ -126,14 +126,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </draggable>
     </div>
 
-    <AddTab
-      v-model:open="showAddTabDialog"
-      :edit-mode="isTabEditMode"
-      :tabId="selectedTabIdToEdit"
-      :dashboard-id="currentDashboardData.data.dashboardId"
+    <q-dialog
+      v-model="showAddTabDialog"
+      position="right"
+      full-height
+      maximized
       data-test="dashboard-tab-settings-add-tab-dialog"
-      @refresh="refreshRequired"
-    />
+    >
+      <AddTab
+        :edit-mode="isTabEditMode"
+        :tabId="selectedTabIdToEdit"
+        :dashboard-id="currentDashboardData.data.dashboardId"
+        @refresh="refreshRequired"
+      />
+    </q-dialog>
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"

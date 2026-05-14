@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
-    <div class="enterprise-dialog-v3">
+  <q-dialog v-model="showDialog" @hide="onDialogHide">
+    <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
       <!-- Close Button -->
       <div class="close-btn-top-right">
         <OButton
           variant="ghost"
           size="icon"
-          @click="showDialog = false"
+          v-close-popup
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          <q-icon name="cancel" size="16px" />
         </OButton>
       </div>
 
@@ -223,8 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </div>
-  </ODialog>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -236,7 +236,6 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -287,7 +286,6 @@ export default defineComponent({
   components: {
     ChartRenderer,
     OButton,
-    ODialog,
   },
   props: {
     modelValue: {
@@ -1044,7 +1042,6 @@ export default defineComponent({
 .enterprise-dialog-v3 {
   overflow: hidden;
   position: relative;
-  margin: calc(-1 * var(--spacing-dialog-content-py, 1.25rem)) calc(-1 * var(--spacing-dialog-content-px, 1.25rem));
 }
 
 .close-btn-top-right {

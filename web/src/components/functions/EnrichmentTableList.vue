@@ -298,21 +298,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-    <EnrichmentSchema
-      v-model:open="showEnrichmentSchema"
-      :selectedEnrichmentTable="selectedEnrichmentTable"
-    />
+    <q-dialog
+      v-model="showEnrichmentSchema"
+      position="right"
+      full-height
+      maximized
+    >
+      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
+    </q-dialog>
 
     <!-- URL Jobs Dialog -->
-    <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
-      v-model:open="showUrlJobsDialogState"
-      size="lg"
+    <q-dialog
+      v-model="showUrlJobsDialogState"
+      position="right"
+      full-height
+      maximized
     >
-      <div class="tw:p-4">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
+      <q-card style="width: 600px; max-width: 80vw;">
+        <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
-        </div>
-        <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
+          <q-space />
+          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="14" /></OButton>
+        </q-card-section>
+
+        <q-card-section>
+          <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
             <q-list separator>
               <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="q-pa-md">
                 <q-item-section>
@@ -337,8 +347,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="text-center q-pa-md text-grey-7">
             No URL jobs found
           </div>
-      </div>
-    </ODrawer>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -368,7 +379,6 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
@@ -381,7 +391,6 @@ export default defineComponent({
     EnrichmentSchema,
     AppTabs,
     OButton,
-    ODrawer,
     Search,
     List,
     Pencil,

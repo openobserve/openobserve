@@ -356,40 +356,25 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
         testLogger.info('Ran SQL query');
 
-        // Close SQL Editor dialog.
-        // The SQL Editor is now an ODrawer (reka-ui), opened via v-model:open="isOpen".
-        // We first try clicking the back button (which calls closeDialog()), then press
-        // Escape (reka-ui's standard way to close non-persistent dialogs).
+        // Close SQL editor dialog — force-click bypasses any backdrop interception
         try {
-            const closeButton = this.page.locator('[data-test="query-editor-dialog"] [data-test="add-alert-back-btn"]').first();
-            await closeButton.waitFor({ state: 'visible', timeout: 5000 });
-            await closeButton.click({ timeout: 5000 });
-            testLogger.info('Clicked SQL Editor back button');
+            const closeButton = this.page.locator('[data-test="add-alert-back-btn"]').first();
+            await closeButton.click({ force: true, timeout: 10000 });
         } catch (error) {
-            testLogger.warn('Back button click failed, using keyboard escape', { error: error.message });
+            testLogger.warn('Close button force-click failed, using keyboard escape', { error: error.message });
+            await this.page.keyboard.press('Escape');
+            await this.page.waitForTimeout(500);
         }
-        // Press Escape regardless — reka-ui DialogRoot closes on Escape for non-persistent dialogs.
-        // This is the most reliable way to close ODrawer / ODialog components.
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(500);
-
-        // Wait for the ODrawer panel (data-test="query-editor-dialog") to fully unmount
-        await this.page.locator('[data-test="query-editor-dialog"]').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {
-            testLogger.warn('Query editor dialog did not hide — pressing Escape again');
-            this.page.keyboard.press('Escape');
-        });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(2000);
+        await this.page.waitForTimeout(1000);
 
-        // Aggressively clean up any portal overlays that may intercept pointer events.
-        // Both Quasar (q-portal--dialog) and reka-ui (data-reka-dialog-overlay) portals
-        // can linger after the dialog state is toggled off.
+        // Clean up any residual q-portal dialog overlays from the closed SQL Editor.
+        // The VRL Editor dialog portal often remains without aria-hidden and intercepts
+        // pointer events. Target only dialog portals (not menus/tooltips) and remove all.
         await this.page.evaluate(() => {
             document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => { el.style.display = 'none'; });
-            document.querySelectorAll('div[data-reka-dialog-overlay]').forEach(el => { el.style.display = 'none'; });
-            document.querySelectorAll('div[data-reka-portalled]').forEach(el => { el.style.display = 'none'; });
-        }).catch(e => testLogger.warn('Failed to remove portal overlays', { error: e.message }));
-        await this.page.waitForTimeout(500);
+        }).catch(e => testLogger.warn('Failed to remove dialog portals', { error: e.message }));
+        await this.page.waitForTimeout(300);
         testLogger.info('Closed SQL Editor dialog — portal cleaned up');
 
         // ==================== ALERT SETTINGS ====================
@@ -400,23 +385,17 @@ export class AlertCreationWizard {
 
         const thresholdOperator = thresholdSection.locator('.alert-v3-select, .q-select').first();
         await thresholdOperator.waitFor({ state: 'visible', timeout: 5000 });
-        // Focus the operator and use keyboard to open the dropdown (more reliable
-        // than clicking when overlays may interfere).
-        await thresholdOperator.focus();
-        await this.page.waitForTimeout(300);
-        await this.page.keyboard.press('Enter');
+        // Click the q-field__control area to open the dropdown (more reliable than clicking the whole component)
+        await thresholdOperator.locator('.q-field__control, .q-field').first().click({ timeout: 5000 }).catch(async () => {
+            testLogger.info('q-field click failed, clicking main element with force');
+            await thresholdOperator.click({ force: true });
+        });
         await this.page.waitForTimeout(1000);
-        // Find the ">=" option in the visible dropdown.
-        const dropdownOption = this.page.locator('.q-menu:visible, [role="listbox"]:visible')
-            .getByText('>=', { exact: true }).first();
-        try {
-            await dropdownOption.click({ timeout: 5000 });
-        } catch {
-            testLogger.warn('q-menu/listbox text not found, trying broader selector');
-            await this.page.locator('[role="listbox"]:visible, .q-menu:visible, .o-select-dropdown:visible')
-                .locator('text=">="').first()
-                .click({ timeout: 3000 });
-        }
+        // Use role-based option selection (bypasses q-portal visibility issues)
+        await this.page.getByRole('option', { name: '>=', exact: true }).click({ timeout: 5000 }).catch(async () => {
+            testLogger.warn('Role option not found, trying q-menu fallback');
+            await this.page.locator('.q-menu:visible').getByText('>=', { exact: true }).click({ timeout: 3000 });
+        });
         testLogger.info('Set threshold operator: >=');
 
         const thresholdInput = thresholdSection.locator('input[type="number"]').first();

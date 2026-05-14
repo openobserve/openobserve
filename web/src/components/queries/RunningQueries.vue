@@ -151,15 +151,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteQuery"
       @update:cancel="deleteDialog.show = false"
     />
-    <ODrawer
-      v-model:open="showListSchemaDialog"
-      size="xl"
-      :show-close="false"
+    <q-dialog
+      v-model="showListSchemaDialog"
+      position="right"
+      full-height
+      maximized
       data-test="list-schema-dialog"
-      @close="showListSchemaDialog = false"
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
-    </ODrawer>
+    </q-dialog>
   </div>
 </template>
 
@@ -184,7 +184,6 @@ import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
@@ -192,7 +191,7 @@ import { getDuration } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer },
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem },
   setup() {
     const store = useStore();
     const schemaData = ref({});

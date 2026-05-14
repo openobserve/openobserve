@@ -15,22 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    :open="internalOpen"
-    @update:open="handleDrawerClose"
-    :title="t('pipeline.conditionTitle')"
-    :width="45"
-    :show-close="true"
-    @keydown.stop
+  <div
+    data-test="add-condition-section"
+    class="stream-routing-section full-width"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div
-      data-test="add-condition-section"
-      class="stream-routing-section full-width"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
     >
+      {{ t("pipeline.conditionTitle") }}
+      <div>
+        <OButton variant="ghost" size="icon" @click="openCancelDialog">
+          <q-icon name="cancel" size="14px" />
+        </OButton>
+      </div>
+    </div>
+    <q-separator />
 
-
-    <div class="stream-routing-container q-px-md q-pt-md">
+    <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="routeFormRef" @submit.prevent="saveCondition">
         <div
           class="q-pt-sm showLabelOnTop text-bold text-h7"
@@ -130,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
     </div>
   </div>
-  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -151,7 +152,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   getTimezoneOffset,
   getUUID,
@@ -220,17 +220,6 @@ const { getStream, getStreams } = useStreams();
 const { buildQueryPayload } = useQuery();
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
-
-const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
-const internalOpen = ref(!!props.open);
-watch(() => props.open, (v) => { internalOpen.value = !!v; });
-
-function handleDrawerClose(v: boolean) {
-  internalOpen.value = v;
-  if (!v) {
-    setTimeout(() => emit("cancel:hideform"), 300);
-  }
-}
 
 const isUpdating = ref(false);
 

@@ -15,19 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="time-range-editor-dialog"
-    :open="modelValue"
-    @update:open="(v) => { $emit('update:modelValue', v); if (!v) handleClose(); }"
-    size="sm"
-    :title="t('correlation.logs.timeRange.title')"
-    :secondary-button-label="t('common.cancel')"
-    :neutral-button-label="t('common.reset')"
-    :primary-button-label="t('common.apply')"
-    :primary-button-disabled="!isValid"
-    @click:secondary="handleCancel"
-    @click:neutral="handleReset"
-    @click:primary="handleApply"
+  <q-dialog
+    :model-value="modelValue"
+    @update:model-value="$emit('update:modelValue', $event)"
+    @hide="handleClose"
+    data-test="time-range-editor-dialog"
   >
+    <q-card style="min-width: 500px; max-width: 600px">
+      <!-- Header -->
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">{{ t('correlation.logs.timeRange.title') }}</div>
+        <q-space />
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          v-close-popup
+          :aria-label="t('common.close')"
+          data-test="close-dialog-btn"
+        >
+          <X :size="14" />
+        </OButton>
+      </q-card-section>
+
+      <q-separator class="q-mt-md" />
+
+      <!-- Content -->
+      <q-card-section class="q-pt-md">
         <!-- Source Log Time -->
         <div class="tw:mb-6">
           <div class="tw:text-sm tw:font-semibold tw:mb-2">
@@ -146,15 +159,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+      </q-card-section>
 
-  </ODialog>
+      <q-separator />
+
+      <!-- Actions -->
+      <q-card-actions align="right" class="q-pa-md">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="handleCancel"
+          data-test="cancel-btn"
+        >
+          {{ t('common.cancel') }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="sm-action"
+          @click="handleReset"
+          data-test="reset-btn"
+        >
+          <RotateCcw :size="14" class="tw:mr-1" />
+          {{ t('common.reset') }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="handleApply"
+          :disabled="!isValid"
+          data-test="apply-btn"
+        >
+          {{ t('common.apply') }}
+        </OButton>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { date } from 'quasar';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OButton from '@/lib/core/Button/OButton.vue';
 import { X, RotateCcw } from 'lucide-vue-next';
 
 interface Props {

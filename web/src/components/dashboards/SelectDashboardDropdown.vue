@@ -52,24 +52,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add dashboard -->
-  <ODrawer
-    v-model:open="showAddDashboardDialog"
-    :width="20"
-    title="New dashboard"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('dashboard.save')"
+  <q-dialog
+    v-model="showAddDashboardDialog"
+    position="right"
+    full-height
+    maximized
     data-test="dashboard-dashboard-add-dialog"
-    @update:open="showAddDashboardDialog = $event"
-    @click:secondary="showAddDashboardDialog = false"
-    @click:primary="addDashboardRef?.submit()"
   >
     <AddDashboard
-      ref="addDashboardRef"
       :active-folder-id="folderId as any"
       @updated="updateDashboardList"
       :show-folder-selection="false"
     />
-  </ODrawer>
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -78,14 +73,13 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard, OButton, ODrawer },
+  components: { AddDashboard, OButton },
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {
@@ -98,7 +92,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const showAddDashboardDialog: any = ref(false);
-    const addDashboardRef = ref<InstanceType<typeof AddDashboard> | null>(null);
     const dashboardList: any = ref([]);
 
     //dropdown selected dashboard
@@ -176,7 +169,6 @@ export default defineComponent({
       selectedDashboard,
       updateDashboardList,
       showAddDashboardDialog,
-      addDashboardRef,
       dashboardList,
       getDashboardList,
     };

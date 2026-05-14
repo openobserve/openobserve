@@ -267,62 +267,109 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <SchemaIndex v-if="showIndexSchemaDialog" v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />
-
-    <AddStream
-      v-model:open="addStreamDialog.show"
-      :is-in-pipeline="false"
-      @close="addStreamDialog.show = false"
-      @streamAdded="getLogStream"
-    />
-
-    <ODialog data-test="log-stream-delete-dialog"
-      v-model:open="confirmDelete"
-      size="sm"
-      :title="t('logStream.confirmDeleteHead')"
-      :secondary-button-label="t('logStream.cancel')"
-      :primary-button-label="t('logStream.ok')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmDelete = false"
-      @click:primary="() => { deleteStream(); confirmDelete = false; }"
+    <q-dialog
+      v-model="showIndexSchemaDialog"
+      position="right"
+      full-height
+      maximized
     >
-      <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
-      <div
-        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
-      >
-        <q-checkbox
-          class="checkbox-delete-associated-alerts-pipelines"
-          v-model="deleteAssociatedAlertsPipelines"
-        />
-        <span class="delete-associated-alerts-pipelines-text">
-          Delete all pipelines and alerts associated with the stream
-        </span>
-      </div>
-    </ODialog>
+      <SchemaIndex v-model="schemaData" />
+    </q-dialog>
 
-    <ODialog data-test="log-stream-batch-delete-dialog"
-      v-model:open="confirmBatchDelete"
-      size="sm"
-      :title="t('logStream.confirmBatchDeleteHead')"
-      :secondary-button-label="t('logStream.cancel')"
-      :primary-button-label="t('logStream.ok')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmBatchDelete = false"
-      @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
+    <q-dialog
+      v-model="addStreamDialog.show"
+      position="right"
+      full-height
+      maximized
     >
-      <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
-      <div
-        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
-      >
-        <q-checkbox
-          class="checkbox-delete-associated-alerts-pipelines"
-          v-model="deleteAssociatedAlertsPipelines"
-        />
-        <span class="delete-associated-alerts-pipelines-text">
-          Delete all pipelines and alerts associated with the selected streams
-        </span>
-      </div>
-    </ODialog>
+      <AddStream
+        :is-in-pipeline="false"
+        @close="addStreamDialog.show = false"
+        @streamAdded="getLogStream"
+      />
+    </q-dialog>
+
+    <q-dialog v-model="confirmDelete">
+      <q-card style="width: 420px">
+        <q-card-section class="confirmBodyLogStream">
+          <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
+          <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
+        </q-card-section>
+        <div
+          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
+        >
+          <q-checkbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
+          <span class="delete-associated-alerts-pipelines-text">
+            Delete all pipelines and alerts associated with the stream
+          </span>
+        </div>
+        <q-card-actions class="confirmActionsLogStream tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="confirmDelete = false"
+          >
+            {{ t("logStream.cancel") }}
+          </OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            @click="
+              () => {
+                deleteStream();
+                confirmDelete = false;
+              }
+            "
+          >
+            {{ t("logStream.ok") }}
+          </OButton>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="confirmBatchDelete">
+      <q-card style="width: 420px">
+        <q-card-section class="confirmBodyLogStream">
+          <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
+          <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
+        </q-card-section>
+        <div
+          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
+        >
+          <q-checkbox
+            class="checkbox-delete-associated-alerts-pipelines"
+            v-model="deleteAssociatedAlertsPipelines"
+          />
+          <span class="delete-associated-alerts-pipelines-text">
+            Delete all pipelines and alerts associated with the selected streams
+          </span>
+        </div>
+        <q-card-actions class="confirmActionsLogStream tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="confirmBatchDelete = false"
+          >
+            {{ t("logStream.cancel") }}
+          </OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            @click="
+              () => {
+                deleteBatchStream();
+                confirmBatchDelete = false;
+              }
+            "
+          >
+            {{ t("logStream.ok") }}
+          </OButton>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -356,7 +403,6 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import {
   Search,
   FileText,
@@ -376,7 +422,6 @@ export default defineComponent({
     NoData,
     AddStream,
     OButton,
-    ODialog,
     OToggleGroup,
     OToggleGroupItem,
     ScrollText,

@@ -110,7 +110,6 @@ const createWrapper = (props = {}, options = {}) => {
     props: {
       data: {},
       isEdit: false,
-      open: true,
       ...props,
     },
     global: {
@@ -123,44 +122,6 @@ const createWrapper = (props = {}, options = {}) => {
         store: store,
       },
       stubs: {
-        ODrawer: {
-          name: "ODrawer",
-          inheritAttrs: false,
-          props: [
-            "open",
-            "width",
-            "title",
-            "subTitle",
-            "size",
-            "persistent",
-            "showClose",
-            "primaryButtonLabel",
-            "secondaryButtonLabel",
-            "neutralButtonLabel",
-            "primaryButtonVariant",
-            "secondaryButtonVariant",
-            "neutralButtonVariant",
-            "primaryButtonDisabled",
-            "secondaryButtonDisabled",
-            "neutralButtonDisabled",
-            "primaryButtonLoading",
-            "secondaryButtonLoading",
-            "neutralButtonLoading",
-          ],
-          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-          template: `
-            <div
-              data-test="o-drawer-stub"
-              :data-open="String(open)"
-              :data-title="title"
-              :data-width="String(width)"
-            >
-              <slot name="header-right" />
-              <slot />
-              <slot name="footer" />
-            </div>
-          `,
-        },
         QBtn: {
           template: `<button 
             data-test-stub='q-btn'
@@ -235,16 +196,14 @@ describe("AddRegexPattern", () => {
 
     it("should render the component title for creating regex pattern", () => {
       const wrapper = createWrapper();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("New pattern");
+      const title = wrapper.find('[data-test="add-regex-pattern-title"]');
+      expect(title.exists()).toBe(true);
     });
 
     it("should render the component title for editing regex pattern", () => {
       const wrapper = createWrapper({ isEdit: true, data: { name: "", pattern: "", description: "" } });
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("Edit Pattern");
+      const title = wrapper.find('[data-test="add-regex-pattern-title"]');
+      expect(title.exists()).toBe(true);
       wrapper.unmount();
     });
   });
@@ -353,17 +312,10 @@ describe("AddRegexPattern", () => {
 
     it("should emit close event when cancel button is clicked", async () => {
       const wrapper = createWrapper();
-
-      // Click the cancel button — it now emits "close" via @click handler
-      // (previously used v-close-popup directive)
-      const cancelBtn = wrapper.find('[data-test="add-regex-pattern-cancel-btn"]');
-      if (cancelBtn.exists()) {
-        await cancelBtn.trigger("click");
-        expect(wrapper.emitted("close")).toBeTruthy();
-      } else {
-        wrapper.vm.$emit("close");
-        expect(wrapper.emitted("close")).toBeTruthy();
-      }
+      
+      // Test the component method directly
+      wrapper.vm.$emit("close");
+      expect(wrapper.emitted("close")).toBeTruthy();
     });
 
     it("should toggle full screen mode when fullscreen button is clicked", async () => {
@@ -615,16 +567,22 @@ describe("AddRegexPattern", () => {
   });
 
   describe("Theme support", () => {
-    it("should reflect dark theme in the store when set", () => {
+    it("should apply dark theme classes when theme is dark", async () => {
       mockStore.state.theme = "dark";
       const wrapper = createWrapper();
-      expect(wrapper.vm.store.state.theme).toBe("dark");
+      
+      const container = wrapper.find(".q-pt-md");
+      expect(container.classes()).toContain("bg-dark");
+      expect(container.classes()).toContain("add-regex-pattern-dark");
     });
 
-    it("should reflect light theme in the store when set", () => {
+    it("should apply light theme classes when theme is light", async () => {
       mockStore.state.theme = "light";
       const wrapper = createWrapper();
-      expect(wrapper.vm.store.state.theme).toBe("light");
+      
+      const container = wrapper.find(".q-pt-md");
+      expect(container.classes()).toContain("bg-white");
+      expect(container.classes()).toContain("add-regex-pattern-light");
     });
   });
 
@@ -686,8 +644,10 @@ describe("AddRegexPattern", () => {
     it("should handle component width calculations based on AI chat state", async () => {
       mockStore.state.isAiChatEnabled = true;
       const wrapper = createWrapper();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.attributes("data-width")).toBe("70");
+      
+      // Component should adjust width when AI chat is enabled
+      const container = wrapper.find(".q-pt-md");
+      expect(container.attributes("style")).toContain("70vw");
     });
 
     it("should handle full screen mode width calculations", async () => {

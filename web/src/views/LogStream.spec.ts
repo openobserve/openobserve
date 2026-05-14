@@ -124,62 +124,6 @@ vi.mock("quasar", async () => {
   };
 });
 
-// ODialog stub — preserves v-model:open behavior and emits primary/secondary/neutral
-// so we can drive dialog buttons via emits in tests.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "modelValue",
-    "size",
-    "title",
-    "subTitle",
-    "showClose",
-    "width",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div data-test="o-dialog-stub" v-if="open">
-      <div data-test="o-dialog-title">{{ title }}</div>
-      <slot />
-      <button data-test="o-dialog-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button data-test="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
-};
-
-const defaultStubs = {
-  QTablePagination: true,
-  SchemaIndex: true,
-  NoData: true,
-  AddStream: true,
-  AppTabs: true,
-  ODialog: ODialogStub,
-};
-
-function mountLogStream() {
-  return mount(LogStream, {
-    global: {
-      provide: { store: store },
-      plugins: [i18n, router],
-      stubs: defaultStubs,
-    },
-  });
-}
-
 describe("LogStream Component", () => {
   let wrapper: any;
   let mockUseStreams: any;
@@ -248,8 +192,22 @@ describe("LogStream Component", () => {
     // Wait a bit before mounting to ensure mocks are set
     await new Promise(resolve => setTimeout(resolve, 10));
     
-    wrapper = mountLogStream();
-
+    wrapper = mount(LogStream, {
+      global: {
+        provide: {
+          store: store,
+        },
+        plugins: [i18n, router],
+        stubs: {
+          QTablePagination: true,
+          SchemaIndex: true,
+          NoData: true,
+          AddStream: true,
+          AppTabs: true,
+        }
+      },
+    });
+    
     // Wait for component to settle
     await wrapper.vm.$nextTick();
 
@@ -536,126 +494,6 @@ describe("LogStream Component", () => {
     });
   });
 
-  describe("ODialog — Confirm Delete (single)", () => {
-    beforeEach(async () => {
-      await wrapper.vm.confirmDeleteAction({
-        row: { name: "test_stream", stream_type: "logs" },
-      });
-      await wrapper.vm.$nextTick();
-    });
-
-    it("should open the confirm-delete ODialog when confirmDeleteAction is invoked", () => {
-      expect(wrapper.vm.confirmDelete).toBe(true);
-      const dialogs = wrapper.findAllComponents({ name: "ODialog" });
-      // First ODialog in template is the single-delete dialog
-      const openDialog = dialogs.find((d: any) => d.props("open") === true);
-      expect(openDialog).toBeTruthy();
-      expect(openDialog!.props("title")).toBe("Delete Stream");
-      expect(openDialog!.props("primaryButtonVariant")).toBe("destructive");
-    });
-
-    it("should close ODialog and not call delete when secondary (cancel) is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-
-      await dialog.vm.$emit("click:secondary");
-      await flushPromises();
-
-      expect(wrapper.vm.confirmDelete).toBe(false);
-      expect(mockStreamService.delete).not.toHaveBeenCalled();
-    });
-
-    it("should call deleteStream and close ODialog when primary (ok) is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-
-      await dialog.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(mockStreamService.delete).toHaveBeenCalledWith(
-        "default",
-        "test_stream",
-        "logs",
-        true,
-      );
-      expect(wrapper.vm.confirmDelete).toBe(false);
-    });
-
-    it("should propagate v-model:open update from ODialog to confirmDelete state", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-
-      await dialog.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.confirmDelete).toBe(false);
-    });
-  });
-
-  describe("ODialog — Confirm Batch Delete", () => {
-    beforeEach(async () => {
-      wrapper.vm.selected = [
-        { name: "stream1", stream_type: "logs" },
-        { name: "stream2", stream_type: "metrics" },
-      ];
-      await wrapper.vm.confirmBatchDeleteAction();
-      await wrapper.vm.$nextTick();
-    });
-
-    it("should open the batch-delete ODialog with destructive primary variant", () => {
-      expect(wrapper.vm.confirmBatchDelete).toBe(true);
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-      expect(dialog).toBeTruthy();
-      expect(dialog.props("title")).toBe("Delete Streams");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-    });
-
-    it("should close batch-delete ODialog without deleting when secondary is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-
-      await dialog.vm.$emit("click:secondary");
-      await flushPromises();
-
-      expect(wrapper.vm.confirmBatchDelete).toBe(false);
-      expect(mockStreamService.delete).not.toHaveBeenCalled();
-    });
-
-    it("should call deleteBatchStream for each selected stream when primary is emitted", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-
-      await dialog.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(mockStreamService.delete).toHaveBeenCalledTimes(2);
-      expect(mockStreamService.delete).toHaveBeenCalledWith(
-        "default",
-        "stream1",
-        "logs",
-        true,
-      );
-      expect(mockStreamService.delete).toHaveBeenCalledWith(
-        "default",
-        "stream2",
-        "metrics",
-        true,
-      );
-      expect(wrapper.vm.confirmBatchDelete).toBe(false);
-    });
-
-    it("should propagate v-model:open update to confirmBatchDelete state", async () => {
-      const dialog = wrapper.findAllComponents({ name: "ODialog" })
-        .find((d: any) => d.props("open") === true)!;
-
-      await dialog.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.confirmBatchDelete).toBe(false);
-    });
-  });
-
   describe("Error Handling", () => {
     it("should handle stream loading errors", async () => {
       mockUseStreams.getPaginatedStreams.mockRejectedValue({
@@ -705,7 +543,21 @@ describe("LogStream Component", () => {
       mockNotify.mockClear();
       
       // Create a fresh wrapper to test 403 handling in isolation
-      const testWrapper = mountLogStream();
+      const testWrapper = mount(LogStream, {
+        global: {
+          provide: {
+            store: store,
+          },
+          plugins: [i18n, router],
+          stubs: {
+            QTablePagination: true,
+            SchemaIndex: true,
+            NoData: true,
+            AddStream: true,
+            AppTabs: true,
+          }
+        },
+      });
       
       // Mock 403 response after component is mounted
       mockUseStreams.getPaginatedStreams.mockRejectedValue({
@@ -905,7 +757,21 @@ describe("LogStream Component", () => {
       wrapper.unmount();
       
       // Remount for subsequent tests
-      wrapper = mountLogStream();
+      wrapper = mount(LogStream, {
+        global: {
+          provide: {
+            store: store,
+          },
+          plugins: [i18n, router],
+          stubs: {
+            QTablePagination: true,
+            SchemaIndex: true,
+            NoData: true,
+            AddStream: true,
+            AppTabs: true,
+          }
+        },
+      });
       
       await wrapper.vm.$nextTick();
       expect(wrapper.exists()).toBe(true);

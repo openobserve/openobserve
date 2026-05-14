@@ -244,86 +244,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </base-import>
 
   <!-- Group Details Dialog -->
-  <ODialog data-test="import-semantic-groups-group-dialog"
-    v-model:open="showGroupDialog"
-    size="md"
-    :title="selectedGroup?.display"
-    :sub-title="`ID: ${selectedGroup?.id}`"
-    primary-button-label="Close"
-    @click:primary="showGroupDialog = false"
-  >
-    <div>
-      <div class="text-subtitle2 q-mb-sm">Fields ({{ selectedGroup?.fields.length }})</div>
-      <q-chip
-        v-for="field in selectedGroup?.fields"
-        :key="field"
-        dense
-        color="primary"
-        text-color="white"
-        class="q-ma-xs"
-      >
-        {{ field }}
-      </q-chip>
-      <div class="q-mt-md">
-        <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
-        <q-badge v-else color="grey" label="Not Normalized" />
-      </div>
-    </div>
-  </ODialog>
+  <q-dialog v-model="showGroupDialog">
+    <q-card style="min-width: 500px">
+      <q-card-section>
+        <div class="text-h6">{{ selectedGroup?.display }}</div>
+        <div class="text-caption text-grey-7">ID: {{ selectedGroup?.id }}</div>
+      </q-card-section>
+
+      <q-separator />
+
+      <q-card-section>
+        <div class="text-subtitle2 q-mb-sm">Fields ({{ selectedGroup?.fields.length }})</div>
+        <q-chip
+          v-for="field in selectedGroup?.fields"
+          :key="field"
+          dense
+          color="primary"
+          text-color="white"
+          class="q-ma-xs"
+        >
+          {{ field }}
+        </q-chip>
+        <div class="q-mt-md">
+          <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
+          <q-badge v-else color="grey" label="Not Normalized" />
+        </div>
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog data-test="import-semantic-groups-modification-dialog"
-    v-model:open="showModificationDialog"
-    size="lg"
-    :title="selectedModification?.proposed.display"
-    sub-title="Compare Changes"
-    primary-button-label="Close"
-    @click:primary="showModificationDialog = false"
-  >
-    <div class="row q-col-gutter-md">
-      <div class="col-6">
-        <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-        <div class="text-caption q-mb-xs">{{ selectedModification?.current.fields.length }} fields</div>
-        <div class="field-chips-container">
-          <q-chip
-            v-for="field in selectedModification?.current.fields"
-            :key="`current-${field}`"
-            dense
-            color="grey-4"
-            size="sm"
-            class="q-ma-xs"
-          >
-            {{ field }}
-          </q-chip>
+  <q-dialog v-model="showModificationDialog">
+    <q-card style="min-width: 700px">
+      <q-card-section>
+        <div class="text-h6">{{ selectedModification?.proposed.display }}</div>
+        <div class="text-caption text-grey-7">Compare Changes</div>
+      </q-card-section>
+
+      <q-separator />
+
+      <q-card-section>
+        <div class="row q-col-gutter-md">
+          <div class="col-6">
+            <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
+            <div class="text-caption q-mb-xs">{{ selectedModification?.current.fields.length }} fields</div>
+            <div class="field-chips-container">
+              <q-chip
+                v-for="field in selectedModification?.current.fields"
+                :key="`current-${field}`"
+                dense
+                color="grey-4"
+                size="sm"
+                class="q-ma-xs"
+              >
+                {{ field }}
+              </q-chip>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
+            <div class="text-caption q-mb-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
+            <div class="field-chips-container">
+              <q-chip
+                v-for="field in selectedModification?.proposed.fields"
+                :key="`proposed-${field}`"
+                dense
+                :color="isNewField(field) ? 'positive' : 'grey-4'"
+                :text-color="isNewField(field) ? 'white' : 'black'"
+                size="sm"
+                class="q-ma-xs"
+              >
+                {{ field }}
+                <q-icon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
+              </q-chip>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="col-6">
-        <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-        <div class="text-caption q-mb-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
-        <div class="field-chips-container">
-          <q-chip
-            v-for="field in selectedModification?.proposed.fields"
-            :key="`proposed-${field}`"
-            dense
-            :color="isNewField(field) ? 'positive' : 'grey-4'"
-            :text-color="isNewField(field) ? 'white' : 'black'"
-            size="sm"
-            class="q-ma-xs"
-          >
-            {{ field }}
-            <q-icon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
-          </q-chip>
-        </div>
-      </div>
-    </div>
-  </ODialog>
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";

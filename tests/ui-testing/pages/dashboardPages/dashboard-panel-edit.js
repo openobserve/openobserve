@@ -27,9 +27,7 @@ export default class DashboardPanel {
     this.moveTab = page.locator(
       '[data-test="dashboard-move-to-another-panel"]'
     );
-    this.deleteConfirmBtn = page.locator(
-      '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]'
-    );
+    this.deleteConfirmBtn = page.locator('[data-test="confirm-button"]');
     this.fullscreen = page.locator(
       '[data-test="dashboard-panel-fullscreen-btn"]'
     );

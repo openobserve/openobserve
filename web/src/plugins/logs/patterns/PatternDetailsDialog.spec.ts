@@ -25,60 +25,6 @@ installQuasar({
   plugins: [quasar.Dialog, quasar.Notify],
 });
 
-// Stub ODrawer so its slots render inline (no portal) and we can drive its
-// emits directly. Mirrors the same shape used by other migrated specs.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: [
-    "open",
-    "width",
-    "showClose",
-    "persistent",
-    "size",
-    "title",
-    "subTitle",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div data-test-stub="o-drawer" :data-open="open">
-      <div data-test-stub="o-drawer-title">{{ title }}</div>
-      <div data-test-stub="o-drawer-subtitle">{{ subTitle }}</div>
-      <template v-if="open">
-        <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-        <div data-test-stub="o-drawer-body"><slot /></div>
-        <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
-      </template>
-    </div>
-  `,
-};
-
-// Stub OButton so we can read the disabled prop directly (the underlying
-// reka-ui button does not always project a DOM `disabled` attribute), and
-// click events still fire the bound @click handler.
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  inheritAttrs: false,
-  template: `
-    <button
-      data-test-stub="o-button"
-      :data-test="$attrs['data-test']"
-      :disabled="disabled || null"
-      @click="$emit('click', $event)"
-    ><slot name="icon-left" /><slot /><slot name="icon-right" /></button>
-  `,
-};
-
-const globalConfig = {
-  plugins: [i18n],
-  provide: { store },
-  stubs: {
-    ODrawer: ODrawerStub,
-    OButton: OButtonStub,
-  },
-};
-
 describe("PatternDetailsDialog", () => {
   let wrapper: any;
   const mockSelectedPattern = {
@@ -116,7 +62,16 @@ describe("PatternDetailsDialog", () => {
         selectedPattern: mockSelectedPattern,
         totalPatterns: totalPatterns,
       },
-      global: globalConfig,
+      global: {
+        plugins: [i18n],
+        provide: { store },
+        stubs: {
+          "q-dialog": {
+            template: '<div class="q-dialog"><slot></slot></div>',
+            props: ["modelValue"],
+          },
+        },
+      },
     });
   });
 
@@ -124,63 +79,23 @@ describe("PatternDetailsDialog", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  describe("ODrawer wrapper", () => {
-    it("should render the ODrawer wrapper", () => {
-      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
+  describe("Dialog Header", () => {
+    it("should display dialog title", () => {
+      const title = wrapper.find('[data-test="close-pattern-dialog"]');
+      expect(title.exists()).toBe(true);
     });
 
-    it("should pass open=true to ODrawer when modelValue is true", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("open")).toBe(true);
+    it("should display pattern count in subtitle", () => {
+      const text = wrapper.text();
+      expect(text).toContain("Pattern 1 of 10");
     });
 
-    it("should pass width=90 to ODrawer", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("width")).toBe(90);
-    });
-
-    it("should pass the localized title to ODrawer", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("title")).toBe("Pattern Details");
-    });
-
-    it("should pass the localized subTitle to ODrawer", () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBe("Pattern 1 of 10");
-    });
-
-    it("should pass undefined subTitle when selectedPattern is null", () => {
-      // Drawer is mounted closed so the footer slot (which dereferences
-      // selectedPattern.index) is not evaluated.
-      const w = mount(PatternDetailsDialog, {
-        props: {
-          modelValue: false,
-          selectedPattern: null,
-          totalPatterns: 10,
-        },
-        global: globalConfig,
-      });
-      const drawer = w.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBeUndefined();
-    });
-
-    it("should emit update:modelValue when ODrawer emits update:open", async () => {
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      await drawer.vm.$emit("update:open", false);
-      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
-    });
-  });
-
-  describe("Header (title / subtitle)", () => {
-    it("should display the drawer title in the rendered header stub", () => {
-      const title = wrapper.find('[data-test-stub="o-drawer-title"]');
-      expect(title.text()).toBe("Pattern Details");
-    });
-
-    it("should display pattern count in the subtitle stub", () => {
-      const subtitle = wrapper.find('[data-test-stub="o-drawer-subtitle"]');
-      expect(subtitle.text()).toBe("Pattern 1 of 10");
+    it("should have close button that can close dialog", async () => {
+      const closeBtn = wrapper.find('[data-test="close-pattern-dialog"]');
+      expect(closeBtn.exists()).toBe(true);
+      // The close button has v-close-popup directive which will be handled by Quasar
+      // In real usage, this button will close the dialog
+      expect(closeBtn.element.tagName).toBe("BUTTON");
     });
   });
 
@@ -304,16 +219,11 @@ describe("PatternDetailsDialog", () => {
     });
   });
 
-  describe("Navigation Buttons (footer slot)", () => {
-    it("should render the footer slot content", () => {
-      const footer = wrapper.find('[data-test-stub="o-drawer-footer"]');
-      expect(footer.exists()).toBe(true);
-      expect(footer.find('[data-test="pattern-detail-previous-btn"]').exists()).toBe(true);
-      expect(footer.find('[data-test="pattern-detail-next-btn"]').exists()).toBe(true);
-    });
-
+  describe("Navigation Buttons", () => {
     it("should display previous button", () => {
-      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
+      const prevBtn = wrapper.find(
+        '[data-test="pattern-detail-previous-btn"]',
+      );
       expect(prevBtn.exists()).toBe(true);
     });
 
@@ -323,22 +233,32 @@ describe("PatternDetailsDialog", () => {
     });
 
     it("should disable previous button on first pattern", () => {
-      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
+      const prevBtn = wrapper.find(
+        '[data-test="pattern-detail-previous-btn"]',
+      );
       expect(prevBtn.attributes("disabled")).toBeDefined();
     });
 
     it("should enable previous button when not on first pattern", async () => {
       await wrapper.setProps({
-        selectedPattern: { ...mockSelectedPattern, index: 5 },
+        selectedPattern: {
+          ...mockSelectedPattern,
+          index: 5,
+        },
       });
 
-      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
+      const prevBtn = wrapper.find(
+        '[data-test="pattern-detail-previous-btn"]',
+      );
       expect(prevBtn.attributes("disabled")).toBeUndefined();
     });
 
     it("should disable next button on last pattern", async () => {
       await wrapper.setProps({
-        selectedPattern: { ...mockSelectedPattern, index: 9 },
+        selectedPattern: {
+          ...mockSelectedPattern,
+          index: 9,
+        },
         totalPatterns: 10,
       });
 
@@ -348,10 +268,15 @@ describe("PatternDetailsDialog", () => {
 
     it("should emit navigate event with (false, true) when previous button clicked", async () => {
       await wrapper.setProps({
-        selectedPattern: { ...mockSelectedPattern, index: 5 },
+        selectedPattern: {
+          ...mockSelectedPattern,
+          index: 5,
+        },
       });
 
-      const prevBtn = wrapper.find('[data-test="pattern-detail-previous-btn"]');
+      const prevBtn = wrapper.find(
+        '[data-test="pattern-detail-previous-btn"]',
+      );
       await prevBtn.trigger("click");
 
       expect(wrapper.emitted("navigate")).toBeTruthy();
@@ -367,8 +292,9 @@ describe("PatternDetailsDialog", () => {
     });
 
     it("should display current position in footer", () => {
-      const footer = wrapper.find('[data-test-stub="o-drawer-footer"]');
-      expect(footer.text()).toMatch(/1\s+of\s+10/);
+      const text = wrapper.text();
+      // Check for the pattern position
+      expect(text).toMatch(/1\s+of\s+10/);
     });
   });
 
@@ -377,28 +303,32 @@ describe("PatternDetailsDialog", () => {
       expect(wrapper.props("modelValue")).toBe(true);
     });
 
-    it("should render the drawer body content when selectedPattern exists", () => {
-      const body = wrapper.find('[data-test-stub="o-drawer-body"]');
-      expect(body.exists()).toBe(true);
-      expect(body.text()).toContain("Pattern Template");
+    it("should render content when modelValue is true and selectedPattern exists", () => {
+      const card = wrapper.find(".detail-table-dialog");
+      expect(card.exists()).toBe(true);
     });
 
-    it("should not render selected-pattern content when modelValue=false and selectedPattern is null", () => {
+    it("should not render content when selectedPattern is null", async () => {
       const wrapperWithoutPattern = mount(PatternDetailsDialog, {
         props: {
-          modelValue: false,
+          modelValue: true,
           selectedPattern: null,
           totalPatterns: 10,
         },
-        global: globalConfig,
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "q-dialog": {
+              template: '<div class="q-dialog"><slot></slot></div>',
+              props: ["modelValue"],
+            },
+          },
+        },
       });
 
-      // When the drawer is closed, no body / footer slot is mounted, so no
-      // pattern content should be visible.
-      expect(wrapperWithoutPattern.find('[data-test-stub="o-drawer-body"]').exists()).toBe(false);
-      expect(wrapperWithoutPattern.find('[data-test-stub="o-drawer-footer"]').exists()).toBe(false);
-      expect(wrapperWithoutPattern.text()).not.toContain("Pattern Template");
-      expect(wrapperWithoutPattern.text()).not.toContain("Occurrences");
+      const card = wrapperWithoutPattern.find(".detail-table-dialog");
+      expect(card.exists()).toBe(false);
     });
   });
 
@@ -416,6 +346,7 @@ describe("PatternDetailsDialog", () => {
     });
 
     it("should display var_type chips for each variable row", () => {
+      // string and ip are the var_type values in mockSelectedPattern
       const text = wrapper.text();
       expect(text).toContain("string");
       expect(text).toContain("ip");
@@ -467,22 +398,26 @@ describe("PatternDetailsDialog", () => {
   });
 
   describe("update:modelValue emit", () => {
-    it("should forward modelValue=false through to ODrawer's open prop", () => {
+    it("should pass modelValue prop correctly when false", async () => {
       const wrapperClosed = mount(PatternDetailsDialog, {
         props: {
           modelValue: false,
           selectedPattern: mockSelectedPattern,
           totalPatterns: 10,
         },
-        global: globalConfig,
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "q-dialog": {
+              template: '<div class="q-dialog"><slot></slot></div>',
+              props: ["modelValue"],
+              emits: ["update:modelValue"],
+            },
+          },
+        },
       });
       expect(wrapperClosed.props("modelValue")).toBe(false);
-      const drawer = wrapperClosed.findComponent({ name: "ODrawer" });
-      expect(drawer.props("open")).toBe(false);
-      // No body content rendered while closed.
-      expect(
-        wrapperClosed.find('[data-test-stub="o-drawer-body"]').exists(),
-      ).toBe(false);
     });
   });
 
@@ -499,20 +434,20 @@ describe("PatternDetailsDialog", () => {
   });
 
   describe("Pattern index edge cases", () => {
-    it("should show 'Pattern 6 of 10' in the drawer subtitle when index is 5", async () => {
+    it("should show 'Pattern 6 of 10' when index is 5", async () => {
       await wrapper.setProps({
         selectedPattern: { ...mockSelectedPattern, index: 5 },
       });
-      const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBe("Pattern 6 of 10");
+      const text = wrapper.text();
+      expect(text).toContain("Pattern 6 of 10");
     });
 
     it("should show '6 of 10' counter in footer when index is 5", async () => {
       await wrapper.setProps({
         selectedPattern: { ...mockSelectedPattern, index: 5 },
       });
-      const footer = wrapper.find('[data-test-stub="o-drawer-footer"]');
-      expect(footer.text()).toMatch(/6\s+of\s+10/);
+      const text = wrapper.text();
+      expect(text).toMatch(/6\s+of\s+10/);
     });
 
     it("should enable next button when not on last pattern", async () => {
@@ -536,10 +471,7 @@ describe("PatternDetailsDialog", () => {
       expect(popover.exists()).toBe(true);
       await popover.vm.$emit("filter-value", "192.168.1.1", "include");
       expect(wrapper.emitted("filter-value")).toBeTruthy();
-      expect(wrapper.emitted("filter-value")![0]).toEqual([
-        "192.168.1.1",
-        "include",
-      ]);
+      expect(wrapper.emitted("filter-value")![0]).toEqual(["192.168.1.1", "include"]);
     });
   });
 });

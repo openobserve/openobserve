@@ -45,14 +45,6 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-// ODrawer stub — renders slot content so inner elements are accessible in tests.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "width", "persistent"],
-  emits: ["update:open"],
-  template: '<div class="o-drawer-stub"><slot /></div>',
-};
-
 // ---------------------------------------------------------------------------
 // Factory helpers
 // ---------------------------------------------------------------------------
@@ -95,7 +87,6 @@ function createWrapper(props = {}, pipelineObjOverrides = {}) {
           emits: ["update:list", "cancel:hideform"],
         },
         ConfirmDialog: true,
-        ODrawer: ODrawerStub,
       },
     },
     props: {
@@ -222,20 +213,6 @@ describe("AssociateFunction Component", () => {
       await flushPromises();
       const deleteBtn = wrapper.find('[data-test="associate-function-delete-btn"]');
       expect(deleteBtn.exists()).toBe(false);
-    });
-
-    it("emits cancel:hideform when the header close icon button is clicked", async () => {
-      vi.useFakeTimers();
-      const wrapper = createWrapper();
-      await flushPromises();
-      // The close button is inside ODrawer's header — simulate via update:open event
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.exists()).toBe(true);
-      drawer.vm.$emit("update:open", false);
-      vi.advanceTimersByTime(400);
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      vi.useRealTimers();
     });
   });
 

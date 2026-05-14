@@ -15,34 +15,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
-    v-model:open="show"
-    :width="47"
-    title="Create Backfill Job for"
-    secondary-button-label="Cancel"
-    primary-button-label="Create Backfill Job"
-    :primary-button-loading="loading"
-    @click:secondary="onCancel"
-    @click:primary="onSubmit"
+  <q-dialog
+    v-model="show"
+    position="right"
+    full-height
+    maximized
     data-test="create-backfill-job-dialog"
   >
-    <template #header-right>
-      <span
-        :class="[
-          'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
-          $q.dark.isActive
-            ? 'tw:text-blue-400 tw:bg-blue-900/50'
-            : 'tw:text-blue-600 tw:bg-blue-50'
-        ]"
-      >
-        {{ pipelineName }}
-        <q-tooltip v-if="pipelineName && pipelineName.length > 25" class="tw:text-xs">
-          {{ pipelineName }}
-        </q-tooltip>
-      </span>
-    </template>
+    <q-card class="tw-w-full tw:flex tw:flex-col" style="width: 600px; height: 100%;">
+      <q-card-section class="q-pa-md tw:flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <div class="tw:flex tw:items-center tw:gap-2" data-test="dialog-title">
+            <span class="text-h6">Create Backfill Job for</span>
+            <span
+              :class="[
+                'text-h6 tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                $q.dark.isActive
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50'
+              ]"
+            >
+              {{ pipelineName }}
+              <q-tooltip v-if="pipelineName && pipelineName.length > 25" class="tw:text-xs">
+                {{ pipelineName }}
+              </q-tooltip>
+            </span>
+          </div>
+          <OButton
+            variant="ghost"
+            size="icon"
+            v-close-popup
+            data-test="close-dialog-btn"
+          >
+            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
+          </OButton>
+        </div>
+      </q-card-section>
 
-    <div class="tw:mx-6 tw:my-3 tw:space-y-3">
+      <q-separator />
+
+      <q-card-section class="q-pa-md tw:flex-1 tw:overflow-y-auto">
+        <div class="tw:space-y-6">
           <!-- Time Range Section -->
           <div>
             <div class="tw:flex tw:items-center tw:gap-4">
@@ -215,26 +228,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ errorMessage }}
           </div>
         </div>
+      </q-card-section>
 
-        </ODrawer>
+      <q-separator />
+
+      <!-- Form Actions -->
+      <q-card-actions class="q-pa-md tw:flex-shrink-0">
+        <q-form @submit="onSubmit" class="tw:w-full">
+          <div class="tw:flex tw:justify-end tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              @click="onCancel"
+              data-test="cancel-btn"
+            >Cancel</OButton>
+            <OButton
+              type="submit"
+              variant="primary"
+              size="sm-action"
+              :loading="loading"
+              :disabled="loading"
+              data-test="create-btn"
+            >Create Backfill Job</OButton>
+          </div>
+        </q-form>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 
   <!-- Confirmation Dialog for Delete Before Backfill -->
-  <ODialog data-test="create-backfill-job-delete-confirmation-dialog" v-model:open="showDeleteConfirmation" persistent size="sm"
-    title="Confirm Data Deletion"
-    secondary-button-label="Cancel"
-    primary-button-label="Yes, Delete and Backfill"
-    primary-button-variant="destructive"
-    @click:secondary="showDeleteConfirmation = false"
-    @click:primary="confirmDelete"
-  >
-    <p class="tw:mb-4">
-      You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
-    </p>
-    <p class="tw:font-semibold tw:text-red-600">
-      This action CANNOT be undone or cancelled once the job is created.
-    </p>
-    <p class="tw:mt-4">Are you sure you want to proceed?</p>
-  </ODialog>
+  <q-dialog v-model="showDeleteConfirmation" persistent>
+    <q-card style="min-width: 400px">
+      <q-card-section class="tw:pb-2">
+        <div class="text-h6">Confirm Data Deletion</div>
+      </q-card-section>
+
+      <q-card-section class="q-pt-none">
+        <p class="tw:mb-4">
+          You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
+        </p>
+        <p class="tw:font-semibold tw:text-red-600">
+          This action CANNOT be undone or cancelled once the job is created.
+        </p>
+        <p class="tw:mt-4">Are you sure you want to proceed?</p>
+      </q-card-section>
+
+        <q-card-actions align="right" class="q-px-md q-pb-md">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="showDeleteConfirmation = false"
+            data-test="delete-confirm-cancel-btn"
+            autofocus
+          >Cancel</OButton>
+          <OButton
+            variant="destructive"
+            size="sm-action"
+            @click="confirmDelete"
+            data-test="delete-confirm-yes-btn"
+          >Yes, Delete and Backfill</OButton>
+        </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup lang="ts">
@@ -242,8 +297,6 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { X, ChevronsUpDown } from "lucide-vue-next";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";

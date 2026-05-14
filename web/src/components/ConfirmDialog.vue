@@ -15,84 +15,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
-    v-model:open="open"
-    data-test="confirm-dialog"
-    :size="warningMessage?.length ? 'md' : 'sm'"
-    :title="title"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
-    @click:secondary="onCancel"
-    @click:primary="onConfirm"
-  >
-    <div data-test="dialog-box" class="tw:text-center">
-      <div class="para">{{ message }}</div>
-      <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4 tw:text-left">
-        <q-banner :class="[
-          'tw:border-l-4 tw:p-4 tw:rounded',
-          store.state.theme === 'dark'
-            ? 'tw:bg-gray-800/60 tw:border-yellow-600/70'
-            : 'tw:bg-orange-50 tw:border-orange-400'
-        ]">
-          <template v-slot:avatar>
-            <q-icon
-              name="warning"
-              :class="store.state.theme === 'dark' ? 'tw:text-yellow-500/80' : 'tw:text-orange-500'"
-              size="24px"
-            />
-          </template>
-          <div :class="[
-            'tw:font-medium tw:text-sm tw:leading-relaxed tw:text-left',
-            store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-orange-800'
+  <q-dialog>
+    <q-card
+      data-test="dialog-box"
+      :class="warningMessage && warningMessage.length > 0 ? 'tw:w-[500px]' : 'tw:w-[240px]'"
+    >
+      <q-card-section class="confirmBody">
+        <div class="head">{{ title }}</div>
+        <div class="para">{{ message }}</div>
+        <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4">
+          <q-banner :class="[
+            'tw:border-l-4 tw:p-4 tw:rounded',
+            store.state.theme === 'dark' 
+              ? 'tw:bg-gray-800/60 tw:border-yellow-600/70' 
+              : 'tw:bg-orange-50 tw:border-orange-400'
           ]">
-            {{ warningMessage }}
-          </div>
-        </q-banner>
-      </div>
-    </div>
-  </ODialog>
+            <template v-slot:avatar>
+              <q-icon 
+                name="warning" 
+                :class="store.state.theme === 'dark' ? 'tw:text-yellow-500/80' : 'tw:text-orange-500'" 
+                size="24px" 
+              />
+            </template>
+            <div :class="[
+              'tw:font-medium tw:text-sm tw:leading-relaxed tw:text-left',
+              store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-orange-800'
+            ]">
+              {{ warningMessage }}
+            </div>
+          </q-banner>
+        </div>
+      </q-card-section>
+
+      <q-card-actions class="confirmActions">
+        <div class="tw:flex tw:gap-2">
+          <OButton
+            v-close-popup
+            variant="outline"
+            size="sm-action"
+            @click="onCancel"
+            data-test="cancel-button"
+          >
+            {{ t("confirmDialog.cancel") }}
+          </OButton>
+          <OButton
+            v-close-popup
+            variant="primary"
+            size="sm-action"
+            @click="onConfirm"
+            data-test="confirm-button"
+          >
+            {{ t("confirmDialog.ok") }}
+          </OButton>
+        </div>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, computed } from "vue";
+import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { ODialog },
-  emits: ["update:ok", "update:cancel", "update:modelValue"],
-  props: {
-    title: { type: String },
-    message: { type: String },
-    warningMessage: { type: String },
-    modelValue: { type: Boolean, default: false },
-  },
+  emits: ["update:ok", "update:cancel"],
+  props: ["title", "message", "warningMessage"],
+  components: { OButton },
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
 
-    const open = computed({
-      get: () => props.modelValue ?? false,
-      set: (v: boolean) => emit("update:modelValue", v),
-    });
-
     const onCancel = () => {
-      open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
-      open.value = false;
       emit("update:ok");
     };
-
     return {
       t,
       store,
-      open,
       onCancel,
       onConfirm,
     };

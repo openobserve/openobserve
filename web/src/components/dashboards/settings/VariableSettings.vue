@@ -187,17 +187,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
-          <div style="height: 60vh">
-            <VariablesDependenciesGraph
-              :variablesList="dashboardVariablesList"
-              :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-              @closePopUp="
-                () => (showVariablesDependenciesGraphPopUp = false)
-              "
-            />
-          </div>
-        </ODialog>
+        <q-dialog v-model="showVariablesDependenciesGraphPopUp">
+          <q-card
+            style="width: 60vw; min-width: 60vw; height: 70vh; min-height: 70vh"
+          >
+            <q-toolbar>
+              <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
+              <OButton variant="ghost" size="icon" v-close-popup="true">
+                <template #icon-left><q-icon name="close" /></template>
+              </OButton>
+            </q-toolbar>
+            <q-card-section style="width: 100%; height: calc(100% - 50px)">
+              <VariablesDependenciesGraph
+                :variablesList="dashboardVariablesList"
+                :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+                @closePopUp="
+                  () => (showVariablesDependenciesGraphPopUp = false)
+                "
+              />
+            </q-card-section>
+          </q-card>
+        </q-dialog>
       </div>
     </div>
   </div>
@@ -230,7 +240,6 @@ import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -242,7 +251,6 @@ export default defineComponent({
     DashboardHeader,
     VariablesDependenciesGraph,
     OButton,
-    ODialog,
   },
   emits: ["save"],
   setup(props, { emit }) {

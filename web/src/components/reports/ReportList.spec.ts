@@ -108,42 +108,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-// ODrawer stub: mirrors the props/events of the real component so tests can
-// drive open/close via v-model:open and the @close emit.
-// Note: we expose props via `data-*` attrs prefixed with `_stub-` to avoid
-// collision with the parent template's own `data-test` attribute, which
-// fallthroughs to the stub's root element.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent"],
-  emits: ["update:open", "close"],
-  inheritAttrs: false,
-  template: `
-    <div
-      v-if="open"
-      class="o-drawer-stub"
-      :data-stub-size="size"
-      :data-stub-show-close="String(showClose)"
-      v-bind="$attrs"
-    >
-      <slot />
-    </div>
-  `,
-};
-
-// MoveAcrossFolders stub: emits @updated / @close to drive ReportList handlers.
-const MoveAcrossFoldersStub = {
-  name: "MoveAcrossFolders",
-  props: ["open", "activeFolderId", "moduleId", "type"],
-  emits: ["updated", "close", "update:open"],
-  inheritAttrs: false,
-  template: `
-    <div v-if="open" v-bind="$attrs">
-      <div data-test="move-across-folders-stub" />
-    </div>
-  `,
-};
-
 function mountComponent() {
   const mockRouter = {
     push: vi.fn(),
@@ -157,10 +121,6 @@ function mountComponent() {
       plugins: [[Quasar, { platform }], i18n],
       provide: { store, platform, router: mockRouter },
       mocks: { $router: mockRouter },
-      stubs: {
-        ODrawer: ODrawerStub,
-        MoveAcrossFolders: MoveAcrossFoldersStub,
-      },
     },
     attachTo: document.body,
   });
@@ -742,125 +702,6 @@ describe("ReportList", () => {
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
-    });
-  });
-
-  // ── Move to folder (ODrawer migration) ───────────────────────────────────
-  // q-dialog → ODrawer: v-model:open, size="lg", show-close="false",
-  // @close=showMoveDialog=false. Drawer hosts <MoveAcrossFolders /> which
-  // emits @updated (-> onMoveUpdated) and @close (-> closes drawer).
-
-  describe("move-to-folder ODrawer", () => {
-    it("should keep showMoveDialog false on initial render", () => {
-      expect(wrapper.vm.showMoveDialog).toBe(false);
-    });
-
-    it("should not render the drawer when showMoveDialog is false", () => {
-      expect(
-        wrapper.find(
-          '[data-test="report-move-to-another-folder-dialog"]',
-        ).exists(),
-      ).toBe(false); // MoveAcrossFolders renders nothing when open=false
-    });
-
-    it("should open the drawer when openMoveDialog is called for a single row", async () => {
-      const row = { ...REPORT_SCHEDULED, folder_id: "folder-A" };
-      wrapper.vm.openMoveDialog(row);
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(true);
-      expect(wrapper.vm.activeFolderToMove).toBe("folder-A");
-      expect(wrapper.vm.reportIdsToMove).toEqual([REPORT_SCHEDULED.report_id]);
-    });
-
-    it("should fall back to activeFolderId when row has no folder_id", async () => {
-      const row = { ...REPORT_SCHEDULED, folder_id: undefined };
-      wrapper.vm.openMoveDialog(row);
-      await nextTick();
-      expect(wrapper.vm.activeFolderToMove).toBe(
-        wrapper.vm.activeFolderId,
-      );
-    });
-
-    it("should render the element once showMoveDialog flips to true", async () => {
-      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
-      await nextTick();
-      const drawer = wrapper.find(
-        '[data-test="report-move-to-another-folder-dialog"]',
-      );
-      expect(drawer.exists()).toBe(true);
-    });
-
-    it("should render MoveAcrossFolders inside the drawer when open", async () => {
-      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
-      await nextTick();
-      expect(
-        wrapper.findComponent(MoveAcrossFoldersStub).exists(),
-      ).toBe(true);
-    });
-
-    it("should open drawer for bulk move via moveMultipleReports", async () => {
-      wrapper.vm.selectedReports = [REPORT_SCHEDULED, REPORT_CACHED];
-      wrapper.vm.moveMultipleReports();
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(true);
-      expect(wrapper.vm.reportIdsToMove).toEqual([
-        REPORT_SCHEDULED.report_id,
-        REPORT_CACHED.report_id,
-      ]);
-      expect(wrapper.vm.activeFolderToMove).toBe(
-        wrapper.vm.activeFolderId,
-      );
-    });
-
-    it("should close drawer when MoveAcrossFolders emits update:open false", async () => {
-      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
-      await nextTick();
-      const child = wrapper.findComponent(MoveAcrossFoldersStub);
-      expect(child.exists()).toBe(true);
-      await child.vm.$emit("update:open", false);
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(false);
-    });
-
-    it("should close drawer when showMoveDialog is set to false", async () => {
-      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "f1" });
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(true);
-      wrapper.vm.showMoveDialog = false;
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(false);
-    });
-
-    it("should run onMoveUpdated when MoveAcrossFolders emits @updated", async () => {
-      wrapper.vm.openMoveDialog({ ...REPORT_SCHEDULED, folder_id: "from-f" });
-      await nextTick();
-      const child = wrapper.findComponent(MoveAcrossFoldersStub);
-      expect(child.exists()).toBe(true);
-      // Reset the API spy to assert reload happens
-      vi.mocked(reports.listByFolderId).mockClear();
-      vi.mocked(reports.listByFolderId).mockResolvedValue({
-        data: [REPORT_SCHEDULED],
-      } as any);
-      // Pass the active folder ("default") as the source folder so its cache
-      // is invalidated and loadReports() goes back to the API instead of cache.
-      await child.vm.$emit("updated", "default", "to-f");
-      await flushPromises();
-      // Drawer closes, selection clears, ids reset, and reports reload
-      expect(wrapper.vm.showMoveDialog).toBe(false);
-      expect(wrapper.vm.selectedReports).toEqual([]);
-      expect(wrapper.vm.reportIdsToMove).toEqual([]);
-      expect(vi.mocked(reports.listByFolderId)).toHaveBeenCalled();
-    });
-
-    it("should open drawer when single-row move button is clicked", async () => {
-      const btn = wrapper.find(
-        `[data-test="report-list-${REPORT_SCHEDULED.name}-move-report"]`,
-      );
-      expect(btn.exists()).toBe(true);
-      await btn.trigger("click");
-      await nextTick();
-      expect(wrapper.vm.showMoveDialog).toBe(true);
-      expect(wrapper.vm.reportIdsToMove).toEqual([REPORT_SCHEDULED.report_id]);
     });
   });
 });

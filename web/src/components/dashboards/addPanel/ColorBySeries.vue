@@ -49,15 +49,17 @@
           : t("dashboard.applyColorBySeries")
       }}
     </OButton>
-    <ColorBySeriesPopUp
-      :open="showColorBySeriesPopUp"
-      :seriesOptions="seriesOptions?.series"
-      :colorBySeries="
-        dashboardPanelData?.data?.config?.color?.colorBySeries || []
-      "
-      @close="showColorBySeriesPopUp = false"
-      @save="saveColorBySeriesconfig"
-    />
+    <q-dialog v-model="showColorBySeriesPopUp">
+      <ColorBySeriesPopUp
+        :seriesOptions="seriesOptions?.series"
+        :colorBySeries="
+          dashboardPanelData?.data?.config?.color?.colorBySeries || []
+        "
+        @close="showColorBySeriesPopUp = false"
+        @save="saveColorBySeriesconfig"
+        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+      />
+    </q-dialog>
   </div>
 </template>
 

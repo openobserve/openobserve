@@ -51,64 +51,7 @@ vi.mock("vuex", () => ({
 
 const mockAddTab = {
   name: "AddTab",
-  props: ["editMode", "tabId", "dashboardId", "open"],
-  emits: ["refresh", "update:open"],
-  template: "<div data-test='mock-add-tab' :data-open='String(open)'></div>",
-};
-
-// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
-// can assert on the props the component forwards + emit the click events
-// the component listens to.
-const ODialogStub = {
-  name: "ODialog",
-  inheritAttrs: false,
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
-    >
-      <span data-test="o-dialog-stub-title">{{ title }}</span>
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
+  template: "<div data-test='mock-add-tab'></div>",
 };
 
 describe("SinglePanelMove", () => {
@@ -128,7 +71,6 @@ describe("SinglePanelMove", () => {
     const defaultProps = {
       title: "Move Panel",
       message: "Select a tab to move the panel to",
-      modelValue: true,
     };
 
     return mount(SinglePanelMove, {
@@ -139,8 +81,9 @@ describe("SinglePanelMove", () => {
           AddTab: mockAddTab,
         },
         stubs: {
-          ODialog: ODialogStub,
-          AddTab: mockAddTab,
+          QDialog: {
+            template: "<div data-test='q-dialog-stub'><slot /></div>",
+          },
         },
       },
     });
@@ -159,12 +102,12 @@ describe("SinglePanelMove", () => {
   });
 
   describe("Component Initialization", () => {
-    it("should render the ODialog wrapper", async () => {
+    it("should render correctly with default props", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dialog-box"]').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
@@ -184,7 +127,7 @@ describe("SinglePanelMove", () => {
       expect(wrapper.props("message")).toBe("Custom move message");
     });
 
-    it("should declare the expected emits", () => {
+    it("should emit correct events in emits array", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$options.emits).toEqual([
         "update:ok",
@@ -194,61 +137,22 @@ describe("SinglePanelMove", () => {
     });
   });
 
-  describe("ODialog Prop Forwarding", () => {
-    it("forwards the title prop to ODialog", () => {
-      wrapper = createWrapper({ title: "Move Panel Dialog" });
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Move Panel Dialog");
-    });
-
-    it("uses size 'sm' on ODialog", () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("size")).toBe("sm");
-    });
-
-    it("forwards the open state from modelValue to ODialog", () => {
-      wrapper = createWrapper({ modelValue: true });
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("renders i18n label on the secondary (cancel) button", () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("confirmDialog.cancel");
-    });
-
-    it("renders the literal 'Move' label on the primary (confirm) button", () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Move");
-    });
-
-    it("defaults open to false when modelValue is not provided", () => {
-      wrapper = createWrapper({ modelValue: undefined });
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(false);
-    });
-  });
-
   describe("Dashboard Data Loading", () => {
     it("should call getDashboard on mount with correct parameters", async () => {
       const { getDashboard } = await import("../../../utils/commons");
-
+      
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
       expect(vi.mocked(getDashboard)).toHaveBeenCalledWith(
         expect.any(Object), // store
-        "test-dashboard", // dashboard query param
-        "test-folder", // folder query param
+        "test-dashboard",   // dashboard query param
+        "test-folder"      // folder query param
       );
     });
 
     it("should populate currentDashboardData after successful fetch", async () => {
       wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.currentDashboardData.data).toEqual(mockDashboardData);
@@ -256,34 +160,54 @@ describe("SinglePanelMove", () => {
 
     it("should handle empty dashboard response gracefully", async () => {
       const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockResolvedValueOnce({} as any);
+      
+      // Mock getDashboard to return empty data (simulates API returning empty response)
+      vi.mocked(getDashboard).mockResolvedValueOnce({});
 
       wrapper = createWrapper();
+      
+      // Should not throw error and component should still exist
       await wrapper.vm.$nextTick();
-      await wrapper.vm.$nextTick();
-
+      // Allow time for async operations to complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       expect(wrapper.exists()).toBe(true);
+      // Should have empty tab options when no dashboard data
       expect(wrapper.vm.moveTabOptions).toEqual([]);
       expect(wrapper.vm.selectedMoveTabId).toBeNull();
     });
+
   });
 
-  describe("Message Display", () => {
-    it("should render the provided message inside the dialog body", () => {
-      wrapper = createWrapper({ message: "Please select target tab" });
-      expect(wrapper.text()).toContain("Please select target tab");
+  describe("Title and Message Display", () => {
+    it("should display provided title", () => {
+      wrapper = createWrapper({ title: "Move Panel Dialog" });
+      
+      const titleElement = wrapper.find('[data-test="dashboard-tab-move-title"]');
+      expect(titleElement.exists()).toBe(true);
+      expect(titleElement.text()).toBe("Move Panel Dialog");
     });
 
-    it("should handle empty message", () => {
-      wrapper = createWrapper({ message: "" });
-      // Should not throw, dialog still rendered
-      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
+    it("should display provided message", () => {
+      wrapper = createWrapper({ message: "Please select target tab" });
+      
+      const messageElement = wrapper.find('[data-test="dashboard-tab-move-message"]');
+      expect(messageElement.exists()).toBe(true);
+      expect(messageElement.text()).toBe("Please select target tab");
     });
 
     it("should handle empty title", () => {
       wrapper = createWrapper({ title: "" });
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("");
+      
+      const titleElement = wrapper.find('[data-test="dashboard-tab-move-title"]');
+      expect(titleElement.text()).toBe("");
+    });
+
+    it("should handle empty message", () => {
+      wrapper = createWrapper({ message: "" });
+      
+      const messageElement = wrapper.find('[data-test="dashboard-tab-move-message"]');
+      expect(messageElement.text()).toBe("");
     });
   });
 
@@ -292,16 +216,15 @@ describe("SinglePanelMove", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const selectElement = wrapper.find(
-        '[data-test="dashboard-tab-move-select"]',
-      );
+      const selectElement = wrapper.find('[data-test="dashboard-tab-move-select"]');
       expect(selectElement.exists()).toBe(true);
     });
 
     it("should populate move tab options excluding current tab", async () => {
       wrapper = createWrapper();
+      // Wait for the component to mount and complete async operations
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10)); // Allow async operations to complete
 
       const expectedOptions = [
         { label: "Tab 1", value: "tab1" },
@@ -314,8 +237,9 @@ describe("SinglePanelMove", () => {
 
     it("should set first available tab as default selection", async () => {
       wrapper = createWrapper();
+      // Wait for the component to mount and complete async operations
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10)); // Allow async operations to complete
 
       expect(wrapper.vm.selectedMoveTabId).toEqual({
         label: "Tab 1",
@@ -323,7 +247,7 @@ describe("SinglePanelMove", () => {
       });
     });
 
-    it("should handle empty tab options when only current tab exists", async () => {
+    it("should handle empty tab options", async () => {
       const { getDashboard } = await import("../../../utils/commons");
       vi.mocked(getDashboard).mockResolvedValueOnce({
         ...mockDashboardData,
@@ -332,13 +256,12 @@ describe("SinglePanelMove", () => {
 
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(wrapper.vm.moveTabOptions).toEqual([]);
       expect(wrapper.vm.selectedMoveTabId).toBeNull();
     });
 
-    it("should still render the select when no tabs are available", async () => {
+    it("should show no options message when no tabs available", async () => {
       const { getDashboard } = await import("../../../utils/commons");
       vi.mocked(getDashboard).mockResolvedValueOnce({
         ...mockDashboardData,
@@ -347,139 +270,130 @@ describe("SinglePanelMove", () => {
 
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10)); // Allow async operations to complete
 
+      // The no-option slot will only show when the select is opened and empty
       expect(wrapper.vm.moveTabOptions).toHaveLength(0);
-
-      const selectElement = wrapper.find(
-        '[data-test="dashboard-tab-move-select"]',
-      );
+      
+      // Check if the select component has no options
+      const selectElement = wrapper.find('[data-test="dashboard-tab-move-select"]');
       expect(selectElement.exists()).toBe(true);
     });
   });
 
-  describe("Add Tab Button and Drawer", () => {
+  describe("Add Tab Button and Dialog", () => {
     it("should render add tab button", () => {
       wrapper = createWrapper();
-
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       expect(addTabBtn.exists()).toBe(true);
     });
 
-    it("should show add tab drawer when add button is clicked", async () => {
+    it("should have correct add tab button attributes", () => {
       wrapper = createWrapper();
 
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
+      expect(addTabBtn.exists()).toBe(true);
+    });
+
+    it("should show add tab dialog when add button is clicked", async () => {
+      wrapper = createWrapper();
+      
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       await addTabBtn.trigger("click");
 
       expect(wrapper.vm.showAddTabDialog).toBe(true);
       expect(wrapper.vm.isTabEditMode).toBe(false);
     });
 
-    it("should render the AddTab dialog", async () => {
+    it("should pass correct props to AddTab component", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-
-      const addTab = wrapper.findComponent(mockAddTab);
-      expect(addTab.exists()).toBe(true);
-    });
-
-    it("should pass correct state when add tab button is clicked", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       await addTabBtn.trigger("click");
 
+      const addTabDialog = wrapper.find('[data-test="dashboard-tab-move-add-tab-dialog"]');
+      expect(addTabDialog.exists()).toBe(true);
+      
       expect(wrapper.vm.isTabEditMode).toBe(false);
-      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe(
-        "test-dashboard-id",
-      );
+      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe("test-dashboard-id");
     });
 
-    it("closes the add-tab dialog when AddTab emits update:open false", async () => {
+    it("should handle add tab tooltip", () => {
       wrapper = createWrapper();
-      wrapper.vm.showAddTabDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const addTab = wrapper.findComponent(mockAddTab);
-      await addTab.vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
+      
+      const tooltip = wrapper.findComponent({ name: "QTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      // QTooltip content might not be directly accessible in tests
+      expect(tooltip.props()).toBeDefined();
     });
   });
 
-  describe("Confirm Button Disabled State", () => {
-    it("should mark primaryButtonDisabled true when no tab is selected", async () => {
+  describe("Move Confirmation Buttons", () => {
+    it("should render cancel button", () => {
+      wrapper = createWrapper();
+      
+      const cancelBtn = wrapper.find('[data-test="cancel-button"]');
+      expect(cancelBtn.exists()).toBe(true);
+      expect(cancelBtn.text()).toBe("confirmDialog.cancel");
+    });
+
+    it("should render confirm button", () => {
+      wrapper = createWrapper();
+      
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      expect(confirmBtn.exists()).toBe(true);
+      expect(confirmBtn.text()).toBe("Move");
+    });
+
+    it("should disable confirm button when no tab is selected", async () => {
       wrapper = createWrapper();
       wrapper.vm.selectedMoveTabId = null;
       await wrapper.vm.$nextTick();
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      expect(confirmBtn.attributes("disabled")).toBeDefined();
     });
 
-    it("should mark primaryButtonDisabled false when a tab is selected", async () => {
+    it("should enable confirm button when tab is selected", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10)); // Allow async operations to complete
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      // When a tab is selected, disabled should not be present
+      expect(confirmBtn.attributes("disabled")).toBeFalsy();
     });
   });
 
   describe("Event Emissions", () => {
-    it("should emit update:cancel when ODialog emits click:secondary", async () => {
+    it("should emit update:cancel when cancel button is clicked", async () => {
       wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:secondary");
+      
+      const cancelBtn = wrapper.find('[data-test="cancel-button"]');
+      await cancelBtn.trigger("click");
 
       expect(wrapper.emitted("update:cancel")).toBeTruthy();
       expect(wrapper.emitted("update:cancel")).toHaveLength(1);
     });
 
-    it("should emit update:ok with selected tab value when ODialog emits click:primary", async () => {
+    it("should emit update:ok with selected tab value when confirm is clicked", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10)); // Allow async operations to complete
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:primary");
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      await confirmBtn.trigger("click");
 
       expect(wrapper.emitted("update:ok")).toBeTruthy();
       expect(wrapper.emitted("update:ok")).toHaveLength(1);
       expect(wrapper.emitted("update:ok")?.[0]).toEqual(["tab1"]);
     });
 
-    it("should not emit update:ok when secondary (cancel) is clicked", async () => {
-      wrapper = createWrapper();
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:secondary");
-      expect(wrapper.emitted("update:ok")).toBeFalsy();
-    });
-
-    it("should not emit update:cancel when primary (confirm) is clicked", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:primary");
-      expect(wrapper.emitted("update:cancel")).toBeFalsy();
-    });
-
     it("should emit refresh event when refreshRequired is called", async () => {
       wrapper = createWrapper();
-
+      
       const newTabData = { name: "New Tab", tabId: "new-tab-id" };
       await wrapper.vm.refreshRequired(newTabData);
 
@@ -490,13 +404,13 @@ describe("SinglePanelMove", () => {
     it("should emit multiple events when buttons are clicked multiple times", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const dialog = wrapper.findComponent(ODialogStub);
+      const cancelBtn = wrapper.find('[data-test="cancel-button"]');
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
 
-      await dialog.vm.$emit("click:secondary");
-      await dialog.vm.$emit("click:primary");
-      await dialog.vm.$emit("click:secondary");
+      await cancelBtn.trigger("click");
+      await confirmBtn.trigger("click");
+      await cancelBtn.trigger("click");
 
       expect(wrapper.emitted("update:cancel")).toHaveLength(2);
       expect(wrapper.emitted("update:ok")).toHaveLength(1);
@@ -506,17 +420,21 @@ describe("SinglePanelMove", () => {
   describe("Refresh Functionality", () => {
     it("should update tab options after refresh", async () => {
       const { getDashboard } = await import("../../../utils/commons");
-
+      
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
+      // Mock new dashboard data for subsequent call
       const newDashboardData = {
         ...mockDashboardData,
-        tabs: [...mockDashboardData.tabs, { tabId: "new-tab", name: "New Tab" }],
+        tabs: [
+          ...mockDashboardData.tabs,
+          { tabId: "new-tab", name: "New Tab" },
+        ],
       };
 
       vi.mocked(getDashboard).mockResolvedValueOnce(newDashboardData);
-
+      
       const newTabData = { name: "New Tab", tabId: "new-tab" };
       await wrapper.vm.refreshRequired(newTabData);
 
@@ -527,10 +445,10 @@ describe("SinglePanelMove", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(false);
     });
 
-    it("should close add tab drawer after refresh", async () => {
+    it("should close add tab dialog after refresh", async () => {
       wrapper = createWrapper();
       wrapper.vm.showAddTabDialog = true;
-
+      
       const newTabData = { name: "Test Tab", tabId: "test-tab" };
       await wrapper.vm.refreshRequired(newTabData);
 
@@ -559,10 +477,10 @@ describe("SinglePanelMove", () => {
   describe("Error Handling", () => {
     it("should handle empty dashboard data", async () => {
       const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockResolvedValueOnce({} as any);
+      // Mock with empty object instead of null to avoid template errors
+      vi.mocked(getDashboard).mockResolvedValueOnce({});
 
       wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.moveTabOptions).toEqual([]);
@@ -570,10 +488,9 @@ describe("SinglePanelMove", () => {
 
     it("should handle dashboard data without tabs", async () => {
       const { getDashboard } = await import("../../../utils/commons");
-      vi.mocked(getDashboard).mockResolvedValueOnce({ dashboardId: "test" } as any);
+      vi.mocked(getDashboard).mockResolvedValueOnce({ dashboardId: "test" });
 
       wrapper = createWrapper();
-      await wrapper.vm.$nextTick();
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.moveTabOptions).toEqual([]);
@@ -584,7 +501,7 @@ describe("SinglePanelMove", () => {
     it("should initialize with correct default state", () => {
       wrapper = createWrapper();
 
-      // selectedMoveTabId begins null synchronously, before async mount finishes.
+      expect(wrapper.vm.selectedMoveTabId).toBeNull();
       expect(wrapper.vm.showAddTabDialog).toBe(false);
       expect(wrapper.vm.isTabEditMode).toBe(false);
       expect(wrapper.vm.selectedTabIdToEdit).toBeNull();
@@ -594,12 +511,9 @@ describe("SinglePanelMove", () => {
     it("should maintain reactive state for currentDashboardData", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.currentDashboardData.data).toBeDefined();
-      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe(
-        "test-dashboard-id",
-      );
+      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe("test-dashboard-id");
     });
 
     it("should update selectedMoveTabId when tab options change", async () => {
@@ -614,18 +528,17 @@ describe("SinglePanelMove", () => {
   });
 
   describe("Edge Cases and Integration", () => {
-    it("should handle rapid add-tab-drawer toggles", async () => {
+    it("should handle rapid state changes", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      // Simulate rapid interactions
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       await addTabBtn.trigger("click");
-
+      
       wrapper.vm.showAddTabDialog = false;
       await wrapper.vm.$nextTick();
-
+      
       await addTabBtn.trigger("click");
       expect(wrapper.vm.showAddTabDialog).toBe(true);
     });
@@ -633,18 +546,17 @@ describe("SinglePanelMove", () => {
     it("should maintain component integrity after multiple operations", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      await new Promise((resolve) => setTimeout(resolve, 10));
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      // Perform multiple operations
+      const cancelBtn = wrapper.find('[data-test="cancel-button"]');
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
 
       for (let i = 0; i < 5; i++) {
         await addTabBtn.trigger("click");
-        await dialog.vm.$emit("click:secondary");
+        await cancelBtn.trigger("click");
         if (wrapper.vm.selectedMoveTabId) {
-          await dialog.vm.$emit("click:primary");
+          await confirmBtn.trigger("click");
         }
       }
 

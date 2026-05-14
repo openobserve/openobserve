@@ -3,7 +3,6 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
-const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
@@ -125,7 +124,7 @@ test.describe("dashboard filter testcases", () => {
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
     );
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Change operator to OR and verify
     await page.locator('[data-test="dashboard-add-condition-logical-operator-1"]').click();
@@ -148,7 +147,7 @@ test.describe("dashboard filter testcases", () => {
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
     );
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -238,7 +237,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -343,7 +342,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
 
@@ -432,7 +431,7 @@ test.describe("dashboard filter testcases", () => {
       'SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_container_image) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN (\'ingress-nginx\', \'kube-system\') GROUP BY x_axis_1'
     );
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
 
@@ -670,7 +669,7 @@ test.describe("dashboard filter testcases", () => {
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -899,7 +898,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -997,7 +996,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1097,7 +1096,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1194,7 +1193,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1291,7 +1290,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1381,20 +1380,22 @@ test.describe("dashboard filter testcases", () => {
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
-    // Verify that the SQL query contains the match_all clause
+    // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('[data-test="query-inspector-original-query-0"]')
-    ).toContainText("match_all('$variablename')");
+      page.locator('.inspector-query-editor').filter({
+        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE match_all(\'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+      }).last()
+    ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
 
     // Delete the dashboard
-    await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    // await pm.dashboardCreate.backToDashboardList();
+    // await pm.dashboardCreate.searchDashboard(randomDashboardName);
+    // await pm.dashboardCreate.deleteDashboard(randomDashboardName);
   });
   test("Should apply str_match_ignore_case operator and verify SQL query", async ({
     page,
@@ -1476,12 +1477,14 @@ test.describe("dashboard filter testcases", () => {
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
-    // Verify that the SQL query contains the str_match_ignore_case clause
+    // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('[data-test="query-inspector-original-query-0"]')
-    ).toContainText("str_match_ignore_case(kubernetes_container_name, '$variablename')");
+      page.locator('.inspector-query-editor').filter({
+        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE str_match_ignore_case(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+      }).last()
+    ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1578,7 +1581,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1675,7 +1678,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1772,7 +1775,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();
@@ -1869,7 +1872,7 @@ test.describe("dashboard filter testcases", () => {
       }).last()
     ).toBeVisible();
 
-    await pm.logsVisualise.closeQueryInspector();
+    await page.locator('[data-test="query-inspector-close-btn"]').click();
 
     // Save the dashboard panel
     await pm.dashboardPanelActions.savePanel();

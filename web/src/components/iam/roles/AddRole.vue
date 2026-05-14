@@ -14,63 +14,77 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODrawer data-test="add-role-dialog"
-    :open="open"
-    :width="30"
-    :title="t('iam.addRole')"
-    @update:open="emits('update:open', $event)"
-  >
-    <div data-test="add-role-section" class="tw:p-4">
-      <q-input
-        v-model.trim="name"
-        :label="t('common.name') + ' *'"
-        class="showLabelOnTop tw:mt-2"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: any, rules: any) =>
-            !!val
-              ? isValidRoleName ||
-                `Use alphanumeric and '_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-        maxlength="100"
-        data-test="add-role-rolename-input-btn"
-        hide-bottom-space
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '_' characters only, without spaces.
-        </template>
-      </q-input>
-
-      <div class="flex justify-start tw:mt-6 tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="emits('update:open', false)"
-          data-test="add-alert-cancel-btn"
-        >
-          {{ t('alerts.cancel') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!name || !isValidRoleName"
-          @click="saveRole"
-          data-test="add-alert-submit-btn"
-        >
-          {{ t('alerts.save') }}
-        </OButton>
+  <q-card class="o2-side-dialog column full-height">
+    <q-card-section class="q-py-md tw:w-full">
+      <div class="row items-center no-wrap q-py-sm">
+        <div class="col">
+          <div data-test="add-role-section-title" style="font-size: 18px">
+            {{ t("iam.addRole") }}
+          </div>
+        </div>
+        <div class="col-auto">
+          <q-icon
+            data-test="add-role-close-dialog-btn"
+            name="cancel"
+            class="cursor-pointer"
+            size="20px"
+            @click="emits('cancel:hideform')"
+          />
+        </div>
       </div>
-    </div>
-  </ODrawer>
+
+      <q-separator />
+      <div data-test="add-role-section">
+        <q-input
+          v-model.trim="name"
+          :label="t('common.name') + ' *'"
+          class="showLabelOnTop tw:mt-2"
+          stack-label
+          borderless
+          dense
+          :rules="[
+            (val: any, rules: any) =>
+              !!val
+                ? isValidRoleName ||
+                  `Use alphanumeric and '_' characters only, without spaces.`
+                : t('common.nameRequired'),
+          ]"
+          maxlength="100"
+          data-test="add-role-rolename-input-btn"
+          hide-bottom-space
+        >
+          <template v-slot:hint>
+            Use alphanumeric and '_' characters only, without spaces.
+          </template>
+        </q-input>
+
+        <div class="flex justify-start tw:mt-6 tw:gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="emits('cancel:hideform')"
+            data-test="add-alert-cancel-btn"
+          >
+            {{ t('alerts.cancel') }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!name || !isValidRoleName"
+            @click="saveRole"
+            data-test="add-alert-submit-btn"
+          >
+            {{ t('alerts.save') }}
+          </OButton>
+        </div>
+      </div>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script setup lang="ts">
 import { createRole, updateRole } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -79,10 +93,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
 const props = defineProps({
-  open: {
-    type: Boolean,
-    default: false,
-  },
   role: {
     type: Object,
     default: () => null,
@@ -93,7 +103,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["update:open", "added:role"]);
+const emits = defineEmits(["cancel:hideform", "added:role"]);
 
 const { track } = useReo();
 
@@ -113,7 +123,7 @@ const saveRole = () => {
   if (!name.value || !isValidRoleName.value) return;
   createRole(name.value, store.state.selectedOrganization.identifier)
     .then(() => {
-      emits("update:open", false);
+      emits("cancel:hideform");
       emits("added:role");
       q.notify({
         message: `Role "${name.value}" Created Successfully!`,

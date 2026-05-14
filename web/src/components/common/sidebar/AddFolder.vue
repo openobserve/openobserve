@@ -15,19 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <ODrawer
-      :open="open"
-      :width="20"
-      :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
-      secondary-button-label="Cancel"
-      primary-button-label="Save"
-      :primary-button-loading="onSubmit.isLoading.value"
-      data-test="dashboard-folder-dialog"
-      @update:open="$emit('update:open', $event)"
-      @click:secondary="$emit('update:open', false)"
-      @click:primary="submit()"
-    >
-      <div class="tw:p-4">
+    <q-card class="column full-height">
+      <q-card-section class="q-px-md q-py-sm">
+        <div class="row items-center no-wrap">
+          <div class="col">
+            <div v-if="editMode" class="text-body1 text-bold">
+              {{ t("dashboard.updateFolder") }}
+            </div>
+            <div v-else class="text-body1 text-bold">
+              {{ t("common.addFolder") }}
+            </div>
+          </div>
+          <div class="col-auto">
+            <OButton
+              v-close-popup="true"
+              variant="ghost"
+              size="icon-circle-sm"
+              data-test="dashboard-folder-cancel"
+            >
+              <q-icon name="cancel" />
+            </OButton>
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator />
+      <q-card-section>
         <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
           <q-input
             v-model="folderData.name"
@@ -52,15 +64,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
           />
+  
+          <div class="tw:flex tw:gap-2 q-mt-sm">
+            <OButton
+              v-close-popup="true"
+              variant="outline"
+              size="sm-action"
+              data-test="dashboard-folder-add-cancel"
+            >
+              {{ t('dashboard.cancel') }}
+            </OButton>
+            <OButton
+              data-test="dashboard-folder-add-save"
+              :disabled="folderData.name.trim() === ''"
+              :loading="onSubmit.isLoading.value"
+              variant="primary"
+              size="sm-action"
+              type="submit"
+            >
+              {{ t('common.save') }}
+            </OButton>
+          </div>
         </q-form>
-      </div>
-    </ODrawer>
+      </q-card-section>
+    </q-card>
   </template>
   
   <script lang="ts">
   import { defineComponent, ref } from "vue";
   import OButton from '@/lib/core/Button/OButton.vue';
-  import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
   import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
@@ -79,12 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   export default defineComponent({
     name: "CommonAddFolder",
-    components: { ODrawer },
+    components: { OButton },
     props: {
-      open: {
-        type: Boolean,
-        default: false,
-      },
       folderId: {
         type: String,
         default: "default",
@@ -98,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         default: "alerts",
       },
     },
-    emits: ["update:modelValue", "update:open"],
+    emits: ["update:modelValue"],
     setup(props, { emit }) {
       const store: any = useStore();
       const addFolderForm: any = ref(null);
@@ -139,7 +167,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 timeout: 2000,
               });
               emit("update:modelValue", folderData.value);
-              emit("update:open", false);
             }
             //else new folder
             else {
@@ -147,7 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               folderData.value.name = folderData.value.name.trim();
               const newFolder: any = await createFolderByType(store, folderData.value, props.type);
               emit("update:modelValue", newFolder);
-              emit("update:open", false);
               showPositiveNotification("Folder added successfully", {
                 timeout: 2000,
               });
@@ -174,8 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         });
       });
   
-      const submit = () => onSubmit.execute();
-
       return {
         t,
         disableColor,
@@ -188,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         getImageURL,
         onSubmit,
         defaultValue,
-        submit,
       };
     },
   });

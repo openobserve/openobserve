@@ -15,30 +15,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="custom-confirm-dialog"
-    v-model:open="isVisible"
-    size="sm"
-    :title="title"
-    persistent
-    :show-close="false"
-    secondary-button-label="Cancel"
-    primary-button-label="Clear & Continue"
-    @click:secondary="onCancel"
-    @click:primary="onConfirm"
-  >
-    <div data-test="custom-confirm-card">
-      <p data-test="dialog-message" class="tw:text-sm tw:leading-relaxed">{{ message }}</p>
-    </div>
-  </ODialog>
+  <q-dialog data-test="custom-confirm-dialog" v-model="isVisible" persistent>
+    <q-card
+      data-test="custom-confirm-card"
+      class="custom-confirm-dialog"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+    >
+      <!-- Header -->
+      <q-card-section data-test="dialog-header" class="dialog-header tw:pb-3">
+        <div data-test="dialog-title" class="dialog-title">{{ title }}</div>
+      </q-card-section>
+
+      <!-- Content -->
+      <q-card-section data-test="dialog-content" class="dialog-content tw:py-4">
+        <div data-test="dialog-message" class="message-text">{{ message }}</div>
+      </q-card-section>
+
+      <!-- Actions -->
+      <q-card-actions data-test="dialog-actions" class="dialog-actions tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:pb-4">
+        <OButton
+          data-test="custom-cancel-button"
+          variant="outline"
+          size="sm-action"
+          @click="onCancel"
+        >Cancel</OButton>
+        <OButton
+          data-test="custom-confirm-button"
+          variant="primary"
+          size="sm-action"
+          @click="onConfirm"
+        >Clear &amp; Continue</OButton>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useStore } from "vuex";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export default defineComponent({
   name: "CustomConfirmDialog",
-  components: { ODialog },
+  components: { OButton },
   props: {
     modelValue: {
       type: Boolean,
@@ -55,8 +74,10 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "confirm", "cancel"],
   setup(props, { emit }) {
+    const store = useStore();
     const isVisible = ref(props.modelValue);
 
+    // Watch for prop changes
     watch(
       () => props.modelValue,
       (newVal) => {
@@ -64,6 +85,7 @@ export default defineComponent({
       }
     );
 
+    // Watch for internal visibility changes
     watch(isVisible, (newVal) => {
       emit("update:modelValue", newVal);
     });
@@ -79,6 +101,7 @@ export default defineComponent({
     };
 
     return {
+      store,
       isVisible,
       onCancel,
       onConfirm,
@@ -86,3 +109,70 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped lang="scss">
+.custom-confirm-dialog {
+  min-width: 420px;
+  max-width: 480px;
+  border-radius: 8px;
+  overflow: hidden;
+
+  &.dark-mode {
+    background-color: #1a1a1a;
+    border: 1px solid #343434;
+
+    .dialog-header {
+      border-bottom: 1px solid #343434;
+
+      .dialog-title {
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 16px;
+      }
+    }
+
+    .dialog-content {
+      .message-text {
+        color: #d0d0d0;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+    }
+  }
+
+  &.light-mode {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+
+    .dialog-header {
+      border-bottom: 1px solid #e0e0e0;
+
+      .dialog-title {
+        color: #1a1a1a;
+        font-weight: 600;
+        font-size: 16px;
+      }
+    }
+
+    .dialog-content {
+      .message-text {
+        color: #424242;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+    }
+  }
+}
+
+.dialog-header {
+  padding: 16px 20px;
+}
+
+.dialog-content {
+  padding: 12px 20px;
+}
+
+.dialog-actions {
+  padding-top: 8px;
+}
+</style>

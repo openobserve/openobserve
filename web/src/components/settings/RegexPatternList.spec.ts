@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, nextTick } from 'vue';
-import { mount, flushPromises } from '@vue/test-utils';
-import { createStore } from 'vuex';
+import { ref } from 'vue';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat } from '@/utils/zincutils';
 import config from '@/aws-exports';
@@ -29,45 +27,15 @@ vi.mock('@/services/regex_pattern', () => ({
   }
 }));
 
-vi.mock('@/utils/zincutils', async (importOriginal) => {
-  // Preserve all real exports (the mounted component pulls in modules that
-  // reference other zincutils helpers like useLocalOrganization) while still
-  // letting the existing setup-style tests stub convertUnixToQuasarFormat.
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    convertUnixToQuasarFormat: vi.fn(),
-  };
-});
+vi.mock('@/utils/zincutils', () => ({
+  convertUnixToQuasarFormat: vi.fn()
+}));
 
 vi.mock('@/aws-exports', () => ({
   default: {
     isEnterprise: 'true'
   }
 }));
-
-// Mock vue-router so that RegexPatternList's useRouter() resolves without
-// requiring a real router instance for the mounted ODrawer-migration tests.
-vi.mock('vue-router', async () => {
-  const actual = await vi.importActual<any>('vue-router');
-  return {
-    ...actual,
-    useRouter: () => ({
-      currentRoute: { value: { query: {} } },
-      push: vi.fn(),
-    }),
-  };
-});
-
-// Mock vue-i18n's useI18n so that t() returns the key (avoids needing a full
-// i18n plugin to be installed for the mounted ODrawer-migration tests).
-vi.mock('vue-i18n', async () => {
-  const actual = await vi.importActual<any>('vue-i18n');
-  return {
-    ...actual,
-    useI18n: () => ({ t: (k: string) => k }),
-  };
-});
 
 // Mock Blob
 class MockBlob {
@@ -1048,231 +1016,5 @@ describe('RegexPatternList.vue Component Logic', () => {
     expect(typeof setup.importRegexPattern).toBe('function');
     expect(typeof setup.exportRegexPattern).toBe('function');
     expect(typeof setup.closeAddRegexPatternDialog).toBe('function');
-  });
-});
-
-// -----------------------------------------------------------------------------
-// ODrawer Migration tests
-//
-// The AddRegexPattern dialog was migrated from <q-dialog> to <ODrawer>. The
-// rest of the spec exercises the setup() function in isolation, so a focused
-// describe block here mounts the real component with a minimal stub surface
-// to assert the new ODrawer contract (open binding, width based on
-// isAiChatEnabled, show-close=false, AddRegexPattern rendered inside).
-// -----------------------------------------------------------------------------
-describe('RegexPatternList.vue - ODrawer Migration', () => {
-  // Lightweight stub mirroring the ODrawer prop surface — renders slots
-  // unconditionally so the AddRegexPattern child can always be inspected,
-  // and exposes `open`, `width`, and `showClose` so the migration contract
-  // can be asserted directly via props.
-  const ODrawerStub = {
-    name: 'ODrawer',
-    inheritAttrs: false,
-    props: {
-      open: { type: Boolean, default: false },
-      width: { type: [String, Number], default: undefined },
-      showClose: { type: Boolean, default: true },
-      size: { type: String, default: undefined },
-      persistent: { type: Boolean, default: false },
-      title: { type: String, default: '' },
-      subTitle: { type: String, default: '' },
-      primaryButtonLabel: { type: String, default: '' },
-      secondaryButtonLabel: { type: String, default: '' },
-      neutralButtonLabel: { type: String, default: '' },
-      primaryButtonVariant: { type: String, default: 'primary' },
-      secondaryButtonVariant: { type: String, default: 'outline' },
-      neutralButtonVariant: { type: String, default: 'ghost' },
-      primaryButtonDisabled: { type: Boolean, default: false },
-      secondaryButtonDisabled: { type: Boolean, default: false },
-      neutralButtonDisabled: { type: Boolean, default: false },
-      primaryButtonLoading: { type: Boolean, default: false },
-      secondaryButtonLoading: { type: Boolean, default: false },
-      neutralButtonLoading: { type: Boolean, default: false },
-    },
-    emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
-    template: `
-      <div
-        data-test="o-drawer-stub"
-        :data-open="String(open)"
-        :data-width="width"
-        :data-show-close="String(!!showClose)"
-      >
-        <slot name="header" />
-        <slot />
-        <slot name="footer" />
-      </div>
-    `,
-  };
-
-  // Stub AddRegexPattern so the tests don't pull in the full implementation
-  // (heavy q-input/q-table/AI chat dependencies). The component now owns the
-  // ODrawer internally, so the host passes v-model:open and the drawer
-  // mechanics are encapsulated here.
-  const AddRegexPatternStub = {
-    name: 'AddRegexPattern',
-    inheritAttrs: false,
-    props: {
-      data: { type: Object, default: () => ({}) },
-      isEdit: { type: Boolean, default: false },
-      open: { type: Boolean, default: false },
-    },
-    emits: ['update:list', 'close', 'update:open'],
-    template: `
-      <div
-        data-test="add-regex-pattern-stub"
-        :data-is-edit="String(isEdit)"
-        :data-open="String(open)"
-      >AddRegexPattern</div>
-    `,
-  };
-
-  const buildStore = (overrides: { isAiChatEnabled?: boolean } = {}) =>
-    createStore({
-      state: {
-        isAiChatEnabled: overrides.isAiChatEnabled ?? false,
-        theme: 'light',
-        selectedOrganization: { identifier: 'default' },
-        organizationData: {
-          regexPatterns: [
-            // Pre-seed with one entry so onMounted's `length == 0` branch
-            // does NOT invoke getRegexPatterns and we keep the test focused
-            // on the ODrawer contract.
-            {
-              id: 'seed',
-              name: 'seed',
-              pattern: '.*',
-              created_at: '2022-01-01',
-              updated_at: '2022-01-01',
-              '#': '01',
-            },
-          ],
-          regexPatternPrompt: '',
-          regexPatternTestValue: '',
-        },
-      },
-      actions: {
-        setRegexPatterns: vi.fn(),
-      },
-    });
-
-  const mountComponent = async (
-    overrides: { isAiChatEnabled?: boolean } = {},
-  ) => {
-    // Import lazily so the vue-router / vue-i18n mocks defined above are
-    // applied before the component module is evaluated.
-    const { default: RegexPatternList } = await import(
-      '@/components/settings/RegexPatternList.vue'
-    );
-
-    const store = buildStore(overrides);
-
-    const wrapper = mount(RegexPatternList as any, {
-      global: {
-        provide: { store },
-        plugins: [store],
-        stubs: {
-          ODrawer: ODrawerStub,
-          AddRegexPattern: AddRegexPatternStub,
-          ImportRegexPattern: true,
-          ConfirmDialog: true,
-          NoRegexPatterns: true,
-          NoData: true,
-          QTablePagination: true,
-          OButton: true,
-          Pencil: true,
-          Trash2: true,
-          Download: true,
-          // Quasar layout primitives are stubbed so the page renders without
-          // needing a Layout context (q-page normally requires a QLayout
-          // ancestor; without one it silently fails to render its slot,
-          // which would hide the ODrawer that lives inside).
-          QPage: { template: '<div><slot /></div>' },
-          QTable: { template: '<div><slot name="no-data" /></div>' },
-          QInput: { template: '<input />' },
-          QIcon: { template: '<span />' },
-          QSpinnerHourglass: { template: '<span />' },
-          QTr: { template: '<tr><slot /></tr>' },
-          QTd: { template: '<td><slot /></td>' },
-          QTh: { template: '<th><slot /></th>' },
-          QCheckbox: { template: '<input type="checkbox" />' },
-        },
-      },
-    });
-    await flushPromises();
-    return { wrapper, store };
-  };
-
-  let w: any;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    // Provide a deterministic resolution for `regexPatternsService.list` even
-    // though the seeded store should short-circuit the onMounted fetch — this
-    // protects against any future refactor that always calls the service.
-    (regexPatternsService.list as any).mockResolvedValue({
-      data: { patterns: [] },
-    });
-    const mounted = await mountComponent({ isAiChatEnabled: false });
-    w = mounted.wrapper;
-  });
-
-  afterEach(() => {
-    w?.unmount();
-    vi.clearAllMocks();
-  });
-
-  it('renders exactly one AddRegexPattern instance for the dialog', () => {
-    const children = w.findAllComponents(AddRegexPatternStub);
-    expect(children.length).toBe(1);
-  });
-
-  it('forwards showAddRegexPatternDialog.show to AddRegexPattern open prop (closed by default)', () => {
-    const child = w.findComponent(AddRegexPatternStub);
-    expect(child.props('open')).toBe(false);
-    expect(child.attributes('data-open')).toBe('false');
-  });
-
-  it('opens AddRegexPattern when showAddRegexPatternDialog.show becomes true', async () => {
-    w.vm.showAddRegexPatternDialog.show = true;
-    await nextTick();
-    const child = w.findComponent(AddRegexPatternStub);
-    expect(child.props('open')).toBe(true);
-    expect(child.attributes('data-open')).toBe('true');
-  });
-
-  it('forwards isEdit and data props from showAddRegexPatternDialog to AddRegexPattern', async () => {
-    const row = { id: '99', name: 'editing', pattern: 'p' };
-    w.vm.showAddRegexPatternDialog.show = true;
-    w.vm.showAddRegexPatternDialog.isEdit = true;
-    w.vm.showAddRegexPatternDialog.data = row;
-    await nextTick();
-
-    const child = w.findComponent(AddRegexPatternStub);
-    expect(child.props('isEdit')).toBe(true);
-    expect(child.props('data')).toEqual(row);
-  });
-
-  it('closes showAddRegexPatternDialog.show when AddRegexPattern emits close', async () => {
-    w.vm.showAddRegexPatternDialog.show = true;
-    await nextTick();
-    expect(w.findComponent(AddRegexPatternStub).props('open')).toBe(true);
-
-    const child = w.findComponent(AddRegexPatternStub);
-    await child.vm.$emit('close');
-    await flushPromises();
-
-    expect(w.vm.showAddRegexPatternDialog.show).toBe(false);
-    expect(w.findComponent(AddRegexPatternStub).props('open')).toBe(false);
-  });
-
-  it('closes showAddRegexPatternDialog.show when AddRegexPattern emits update:open=false', async () => {
-    w.vm.showAddRegexPatternDialog.show = true;
-    await nextTick();
-    const child = w.findComponent(AddRegexPatternStub);
-    expect(child.props('open')).toBe(true);
-
-    await child.vm.$emit('update:open', false);
-    await flushPromises();
-    expect(w.vm.showAddRegexPatternDialog.show).toBe(false);
   });
 });

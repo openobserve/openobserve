@@ -448,13 +448,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end combined scroll area -->
 
-      <ODrawer
-        lazy
+      <q-dialog
         data-test="logs-search-result-detail-dialog"
-        v-model:open="searchObj.meta.showDetailTab"
-        :width="85"
-        :title="t('search.rowDetail')"
-        @update:open="(v) => !v && reDrawChart()"
+        v-model="searchObj.meta.showDetailTab"
+        position="right"
+        full-height
+        maximized
+        allow-focus-outside
+        @escap.stop="reDrawChart"
+        @hide="reDrawChart"
+        @before-hide="reDrawChart"
       >
         <DetailTable
           v-if="searchObj.data.queryResults?.hits?.length"
@@ -481,7 +484,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
-          @close="searchObj.meta.showDetailTab = false"
           @view-trace="
             redirectToTraces(
               searchObj.data.queryResults.hits[
@@ -493,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
-      </ODrawer>
+      </q-dialog>
 
       <!-- Pattern Details Drawer -->
       <PatternDetailsDialog
@@ -590,14 +592,12 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
     OButton,
-    ODrawer,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),

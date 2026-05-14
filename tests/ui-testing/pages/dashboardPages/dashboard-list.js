@@ -20,9 +20,7 @@ export default class DashboardListPage {
     await deleteButton.click();
 
     // Wait for the confirmation popup and confirm deletion
-    const confirmButton = page.locator(
-      '[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]'
-    );
+    const confirmButton = page.locator('[data-test="confirm-button"]');
     await expect(confirmButton).toBeVisible();
     await confirmButton.click();
 
@@ -41,9 +39,7 @@ export default class DashboardListPage {
     await deleteButton.click();
 
     // Wait for the confirmation popup and confirm deletion
-    const confirmButton = this.page.locator(
-      '[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]'
-    );
+    const confirmButton = this.page.locator('[data-test="confirm-button"]');
     await expect(confirmButton).toBeVisible();
     await confirmButton.click();
 

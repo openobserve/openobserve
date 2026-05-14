@@ -21,12 +21,8 @@ export class IamPage {
 
         this.deleteButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td//button[@data-test='service-accounts-delete']`;
 
-        // After ODialog migration, ServiceAccountsList delete/refresh dialogs
-        // use ODialog's built-in primary/secondary buttons. Only one dialog is
-        // open at a time, so we target by the common slug rather than the
-        // (different) parent slugs of delete vs. refresh dialogs.
-        this.confirmOkButton = '[data-test="o-dialog-primary-btn"]';
-        this.cancelButton = '[data-test="o-dialog-secondary-btn"]';
+        this.confirmOkButton = '[data-test="confirm-button"]';
+        this.cancelButton = '[data-test="cancel-button"]';
 
         this.refreshButton = emailName => `//td[contains(.,'${emailName}')]/following-sibling::td//button[@data-test='service-accounts-refresh']`;
 
@@ -126,14 +122,14 @@ export class IamPage {
 
 
     async verifySuccessMessage(expectedMessage) {
-        // Match both Quasar notification toasts (.q-notification__message) and
-        // q-input form validation messages ([role="alert"] inside q-field__bottom).
-        // getByRole('alert') alone can miss notifications when accessibility tree
-        // resolution races against Quasar's notify queue / dialog portals.
-        const specificAlert = this.page
-            .locator('.q-notification__message, [role="alert"]')
-            .filter({ hasText: expectedMessage });
-        await expect(specificAlert.first()).toBeVisible({ timeout: 15000 });
+        // Wait for alert to appear and verify the message
+        await this.page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 10000 });
+        
+        // Find the alert that contains the expected message (instead of just checking the first one)
+        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
+        
+        // Verify the specific alert with our expected message is visible
+        await expect(specificAlert).toBeVisible({ timeout: 5000 });
     }
 
     async validateServiceAccountToken() {
@@ -154,10 +150,8 @@ export class IamPage {
 
     async clickCopyToken() {
 
-        // ODialog renders via reka-ui's DialogPortal, not a Quasar
-        // #q-portal--dialog--N container, so scope by the token dialog's
-        // own data-test attribute instead.
-        await this.page.locator('[data-test="service-accounts-list-token-dialog"]').getByRole('button', { name: 'Copy Token' }).click();
+        await this.page.locator('#q-portal--dialog--2').getByRole('button', { name: 'Copy Token' }).click();
+        // await this.page.locator('#q-portal--dialog--3').getByRole('button', { name: 'Copy Token' }).click();
 
     }
 
@@ -167,23 +161,21 @@ export class IamPage {
 
         const downloadPromise = this.page.waitForEvent('download');
 
-        await this.page.locator('[data-test="service-accounts-list-token-dialog"]').getByRole('button', { name: 'Download Token' }).click();
+        await this.page.getByRole('button', { name: 'Download Token' }).click();
 
     }
 
     async clickServiceAccountPopUpClosed() {
 
-        // The post-creation token popup is an ODialog. Close it via the
-        // built-in × button scoped to the token dialog instance.
-        await this.page.locator('[data-test="service-accounts-list-token-dialog"] [data-test="o-dialog-close-btn"]').click();
+        await this.page.locator('[data-test="sa-cancel-button"]').click();
 
     }
 
     async reloadServiceAccountPage(emailName) {
         await this.page.reload();
-        // Avoid waitForLoadState('networkidle') — deployed envs continuously poll
-        // RUM/analytics so the network never idles. Use a known element instead.
-        await this.page.waitForSelector('[data-test="iam-service-accounts-tab"]', { timeout: 10000 });
+        // Wait for the page to fully load including any system accounts
+        await this.page.waitForLoadState('networkidle');
+        // Allow time for service accounts table to populate
         await this.page.waitForTimeout(1000);
     }
 

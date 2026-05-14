@@ -28,31 +28,6 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
 
 installQuasar();
 
-// Stub ODialog so its slot content renders inline (not teleported to document.body).
-const ODialogStub = {
-  name: "ODialog",
-  inheritAttrs: false,
-  props: ["open", "size", "title", "showClose", "persistent"],
-  emits: ["update:open"],
-  template: `
-    <div data-test="o-dialog-stub" :data-open="String(open)">
-      <slot name="header" />
-      <slot name="header-right" />
-      <slot />
-      <slot name="footer" />
-    </div>
-  `,
-};
-
-// Stub OButton to forward data-test attributes to the rendered button element.
-const OButtonStub = {
-  name: "OButton",
-  inheritAttrs: false,
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  template: `<button @click="$emit('click', $event)" v-bind="$attrs"><slot name="icon-left" /><slot /></button>`,
-};
-
 describe("ShowLegendsPopup Component", () => {
   let wrapper: any;
 
@@ -89,8 +64,6 @@ describe("ShowLegendsPopup Component", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
-          ODialog: ODialogStub,
-          OButton: OButtonStub,
           "q-card": {
             template: '<div class="q-card" :data-test="$attrs[\'data-test\']"><slot /></div>',
           },
@@ -254,20 +227,17 @@ describe("ShowLegendsPopup Component", () => {
   });
 
   describe("closePopup", () => {
-    it("should emit update:open=false when closePopup is called", () => {
+    it("should emit close event when closePopup is called", () => {
       wrapper = createWrapper();
       wrapper.vm.closePopup();
-      expect(wrapper.emitted("update:open")).toBeTruthy();
-      expect(wrapper.emitted("update:open")[0]).toEqual([false]);
+      expect(wrapper.emitted("close")).toBeTruthy();
     });
 
-    it("should emit update:open=false when ODialog emits update:open=false", async () => {
+    it("should emit close on close button click", async () => {
       wrapper = createWrapper({ panelData: simplePanelData });
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.exists()).toBe(true);
-      await dialog.vm.$emit("update:open", false);
-      expect(wrapper.emitted("update:open")).toBeTruthy();
-      expect(wrapper.emitted("update:open")[0]).toEqual([false]);
+      const closeBtn = wrapper.find('[data-test="dashboard-show-legends-close"]');
+      await closeBtn.trigger("click");
+      expect(wrapper.emitted("close")).toBeTruthy();
     });
   });
 
@@ -344,7 +314,6 @@ describe("ShowLegendsPopup Component", () => {
       const { copyToClipboard } = await import("quasar");
       wrapper = createWrapper({ panelData: simplePanelData });
       const copyAllBtn = wrapper.find('[data-test="dashboard-show-legends-copy-all"]');
-      expect(copyAllBtn.exists()).toBe(true);
       await copyAllBtn.trigger("click");
       await flushPromises();
       expect(copyToClipboard).toHaveBeenCalled();
@@ -362,12 +331,9 @@ describe("ShowLegendsPopup Component", () => {
       expect(wrapper.find('[data-test="dashboard-show-legends-copy-all"]').exists()).toBe(true);
     });
 
-    it("should render ODialog and propagate close via update:open emit", async () => {
+    it("should render close button", () => {
       wrapper = createWrapper({ panelData: simplePanelData });
-      const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.exists()).toBe(true);
-      await dialog.vm.$emit("update:open", false);
-      expect(wrapper.emitted("update:open")).toBeTruthy();
+      expect(wrapper.find('[data-test="dashboard-show-legends-close"]').exists()).toBe(true);
     });
 
     it("should render each legend item with correct data-test attribute", () => {

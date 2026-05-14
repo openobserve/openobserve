@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar, Notify, Dialog } from 'quasar';
+import { Quasar } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -48,57 +48,6 @@ vi.mock('./WindowsConfig.vue', () => ({
 vi.mock('./LinuxConfig.vue', () => ({
   default: { name: 'LinuxConfig', template: '<div>Linux Config</div>', props: ['currOrgIdentifier', 'currUserEmail'] },
 }));
-
-// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
-// and so we can assert on the props the component forwards + emit
-// the click events the component listens to.
-const ODialogStub = {
-  name: 'ODialog',
-  props: [
-    'open',
-    'size',
-    'title',
-    'subTitle',
-    'persistent',
-    'showClose',
-    'width',
-    'primaryButtonLabel',
-    'secondaryButtonLabel',
-    'neutralButtonLabel',
-    'primaryButtonVariant',
-    'secondaryButtonVariant',
-    'neutralButtonVariant',
-    'primaryButtonDisabled',
-    'secondaryButtonDisabled',
-    'neutralButtonDisabled',
-    'primaryButtonLoading',
-    'secondaryButtonLoading',
-    'neutralButtonLoading',
-  ],
-  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-secondary-label="secondaryButtonLabel"
-    >
-      <span data-test="o-dialog-stub-title">{{ title }}</span>
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
-};
 
 const mockStore = createStore({
   state: {
@@ -151,11 +100,8 @@ describe('AWSIntegrationTile.vue', () => {
     return mount(AWSIntegrationTile, {
       props: { integration: createMockIntegration(integrationOverrides) },
       global: {
-        plugins: [[Quasar, { plugins: { Notify, Dialog } }], mockI18n, mockRouter],
+        plugins: [Quasar, mockI18n, mockRouter],
         provide: { store: mockStore },
-        stubs: {
-          ODialog: ODialogStub,
-        },
       },
     });
   };
@@ -331,158 +277,6 @@ describe('AWSIntegrationTile.vue', () => {
       wrapper = createWrapper({ documentationUrl: undefined });
       const docsBtn = wrapper.find('[data-test="aws-cloudwatch-logs-docs-btn"]');
       expect(docsBtn.exists()).toBe(false);
-    });
-  });
-
-  describe('ODialog migration', () => {
-    it('renders the template selection ODialog stub', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      // Two ODialogs: template selection + component content
-      expect(dialogs.length).toBe(2);
-    });
-
-    it('passes title "Choose Integration Method" to the template selection ODialog', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props('title') === 'Choose Integration Method');
-      expect(templateDialog).toBeTruthy();
-    });
-
-    it('passes size "sm" to the template selection ODialog', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props('title') === 'Choose Integration Method');
-      expect(templateDialog!.props('size')).toBe('sm');
-    });
-
-    it('passes secondaryButtonLabel "Cancel" to the template selection ODialog', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props('title') === 'Choose Integration Method');
-      expect(templateDialog!.props('secondaryButtonLabel')).toBe('Cancel');
-    });
-
-    it('passes size "xl" to the component-content ODialog', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      // The component content dialog title is dynamic; size identifies it.
-      const componentDialog = dialogs.find((d) => d.props('size') === 'xl');
-      expect(componentDialog).toBeTruthy();
-    });
-
-    it('forwards open=false to the template selection ODialog initially', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props('title') === 'Choose Integration Method');
-      expect(templateDialog!.props('open')).toBe(false);
-    });
-
-    it('forwards open=false to the component-content ODialog initially', () => {
-      wrapper = createWrapper();
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const componentDialog = dialogs.find((d) => d.props('size') === 'xl');
-      expect(componentDialog!.props('open')).toBe(false);
-    });
-
-    it('opens the template selection ODialog when handleAddSource triggers multi-option flow', async () => {
-      wrapper = createWrapper({
-        cloudFormationTemplate: undefined,
-        cloudFormationTemplates: [
-          { name: 'Template A', url: 'https://example.com/a.yaml', description: 'A' },
-          { name: 'Template B', url: 'https://example.com/b.yaml', description: 'B' },
-        ],
-      });
-      const addSourceBtn = wrapper.find('[data-test="aws-cloudwatch-logs-add-source-btn"]');
-      await addSourceBtn.trigger('click');
-
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props('title') === 'Choose Integration Method');
-      expect(templateDialog!.props('open')).toBe(true);
-    });
-
-    it('closes the template selection ODialog when its click:secondary fires (Cancel)', async () => {
-      wrapper = createWrapper({
-        cloudFormationTemplate: undefined,
-        cloudFormationTemplates: [
-          { name: 'Template A', url: 'https://example.com/a.yaml', description: 'A' },
-          { name: 'Template B', url: 'https://example.com/b.yaml', description: 'B' },
-        ],
-      });
-      const vm = wrapper.vm as any;
-      // Open dialog first
-      const addSourceBtn = wrapper.find('[data-test="aws-cloudwatch-logs-add-source-btn"]');
-      await addSourceBtn.trigger('click');
-      expect(vm.showTemplateDialog).toBe(true);
-
-      // Drive Cancel button via click:secondary emit
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props('title') === 'Choose Integration Method');
-      await templateDialog!.vm.$emit('click:secondary');
-
-      expect(vm.showTemplateDialog).toBe(false);
-    });
-
-    it('closes the template selection ODialog after selecting a template', async () => {
-      wrapper = createWrapper({
-        cloudFormationTemplate: undefined,
-        cloudFormationTemplates: [
-          { name: 'Template A', url: 'https://example.com/a.yaml', description: 'A' },
-          { name: 'Template B', url: 'https://example.com/b.yaml', description: 'B' },
-        ],
-      });
-      const vm = wrapper.vm as any;
-      vm.showTemplateDialog = true;
-      await wrapper.vm.$nextTick();
-
-      vm.handleTemplateSelection({ name: 'Template A', url: 'https://example.com/a.yaml', description: 'A' });
-      await wrapper.vm.$nextTick();
-
-      expect(vm.showTemplateDialog).toBe(false);
-      expect(window.open).toHaveBeenCalled();
-    });
-
-    it('opens the component-content ODialog after handleComponentSelection', async () => {
-      wrapper = createWrapper({
-        cloudFormationTemplate: undefined,
-        componentOptions: [
-          { name: 'Linux', component: 'LinuxConfig', description: 'Linux setup' },
-        ],
-      });
-      const vm = wrapper.vm as any;
-
-      vm.handleComponentSelection({ name: 'Linux', component: 'LinuxConfig', description: 'Linux setup' });
-      await wrapper.vm.$nextTick();
-
-      expect(vm.showComponentContent).toBe(true);
-      expect(vm.selectedComponentTitle).toBe('CloudWatch Logs - Linux');
-
-      const dialogs = wrapper.findAllComponents(ODialogStub);
-      const componentDialog = dialogs.find((d) => d.props('size') === 'xl');
-      expect(componentDialog!.props('open')).toBe(true);
-      // Title is dynamically bound
-      expect(componentDialog!.props('title')).toBe('CloudWatch Logs - Linux');
-    });
-
-    it('closes the template selection ODialog when handleComponentSelection is invoked', async () => {
-      wrapper = createWrapper({
-        cloudFormationTemplate: undefined,
-        cloudFormationTemplates: [
-          { name: 'Template A', url: 'https://example.com/a.yaml', description: 'A' },
-        ],
-        componentOptions: [
-          { name: 'Linux', component: 'LinuxConfig', description: 'Linux setup' },
-        ],
-      });
-      const vm = wrapper.vm as any;
-      vm.showTemplateDialog = true;
-      await wrapper.vm.$nextTick();
-
-      vm.handleComponentSelection({ name: 'Linux', component: 'LinuxConfig', description: 'Linux setup' });
-      await wrapper.vm.$nextTick();
-
-      expect(vm.showTemplateDialog).toBe(false);
-      expect(vm.showComponentContent).toBe(true);
     });
   });
 });

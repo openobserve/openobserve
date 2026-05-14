@@ -22,60 +22,6 @@ import store from "@/test/unit/helpers/store";
 
 installQuasar({ plugins: [Dialog, Notify] });
 
-// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
-// and so we can assert on the props the component forwards + emit
-// the click events the component listens to.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-variant="primaryButtonVariant"
-      :data-primary-loading="String(primaryButtonLoading)"
-      :data-persistent="String(persistent)"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
-};
-
 const mockConfigs = vi.hoisted(() => [
   {
     anomaly_id: "id-1",
@@ -148,12 +94,7 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 async function mountComp(props: Record<string, any> = {}) {
   return mount(AnomalyDetectionList, {
     props: { org_identifier: "default", ...props },
-    global: {
-      plugins: [i18n, store],
-      stubs: {
-        ODialog: ODialogStub,
-      },
-    },
+    global: { plugins: [i18n, store] },
   });
 }
 
@@ -176,32 +117,6 @@ describe("AnomalyDetectionList - rendering", () => {
     await mountComp();
     await flushPromises();
     expect(anomalyDetectionService.list).toHaveBeenCalledWith("default");
-  });
-
-  it("renders three ODialog instances (delete, cancel training, retrain)", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs.length).toBe(3);
-  });
-
-  it("dialogs are closed initially", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    dialogs.forEach((d) => {
-      expect(d.props("open")).toBe(false);
-    });
-  });
-
-  it("forwards persistent to all dialogs (truthy)", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    dialogs.forEach((d) => {
-      // persistent is bound without value in template => empty string (truthy presence)
-      expect(d.props("persistent")).not.toBeUndefined();
-    });
   });
 });
 
@@ -306,41 +221,6 @@ describe("AnomalyDetectionList - confirmDelete & deleteConfig", () => {
     expect((w.vm as any).pendingDeleteRow).toEqual(row);
   });
 
-  it("delete ODialog reflects open=true after confirmDelete", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmDelete(mockConfigs[0]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    // First dialog is the delete dialog
-    expect(dialogs[0].props("open")).toBe(true);
-    expect(dialogs[0].props("primaryButtonVariant")).toBe("destructive");
-    expect(dialogs[0].props("size")).toBe("xs");
-  });
-
-  it("clicking primary on delete dialog triggers deleteConfig", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmDelete(mockConfigs[0]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    await dialogs[0].vm.$emit("click:primary");
-    await flushPromises();
-    expect(anomalyDetectionService.delete).toHaveBeenCalledWith("default", "id-1");
-  });
-
-  it("clicking secondary on delete dialog closes the dialog", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmDelete(mockConfigs[0]);
-    await flushPromises();
-    expect((w.vm as any).showDeleteDialog).toBe(true);
-    const dialogs = w.findAllComponents(ODialogStub);
-    await dialogs[0].vm.$emit("click:secondary");
-    await flushPromises();
-    expect((w.vm as any).showDeleteDialog).toBe(false);
-  });
-
   it("deleteConfig calls anomalyDetectionService.delete", async () => {
     const w = await mountComp();
     await flushPromises();
@@ -369,24 +249,6 @@ describe("AnomalyDetectionList - confirmDelete & deleteConfig", () => {
     await flushPromises();
     expect((w.vm as any).showDeleteDialog).toBe(false);
   });
-
-  it("deleteConfig does nothing when pendingDeleteRow is null", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).pendingDeleteRow = null;
-    await (w.vm as any).deleteConfig();
-    await flushPromises();
-    expect(anomalyDetectionService.delete).not.toHaveBeenCalled();
-  });
-
-  it("delete dialog forwards loading state via primaryButtonLoading prop", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).deleting = true;
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[0].props("primaryButtonLoading")).toBe(true);
-  });
 });
 
 describe("AnomalyDetectionList - confirmRetrain & retrain", () => {
@@ -398,57 +260,6 @@ describe("AnomalyDetectionList - confirmRetrain & retrain", () => {
     (w.vm as any).confirmRetrain(mockConfigs[0]);
     expect((w.vm as any).showRetrainDialog).toBe(true);
     expect((w.vm as any).pendingRetrainRow).toEqual(mockConfigs[0]);
-  });
-
-  it("retrain ODialog reflects open=true after confirmRetrain", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmRetrain(mockConfigs[0]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    // Third dialog is the retrain dialog (delete=0, cancel=1, retrain=2)
-    expect(dialogs[2].props("open")).toBe(true);
-    expect(dialogs[2].props("size")).toBe("sm");
-  });
-
-  it("retrain dialog uses 'destructive' variant when row status is failed", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmRetrain(mockConfigs[2]); // failed row
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[2].props("primaryButtonVariant")).toBe("destructive");
-  });
-
-  it("retrain dialog uses 'primary' variant when row is not failed", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmRetrain(mockConfigs[0]); // ready row
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[2].props("primaryButtonVariant")).toBe("primary");
-  });
-
-  it("clicking primary on retrain dialog triggers retrain service", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmRetrain(mockConfigs[0]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    await dialogs[2].vm.$emit("click:primary");
-    await flushPromises();
-    expect(anomalyDetectionService.triggerTraining).toHaveBeenCalledWith("default", "id-1");
-  });
-
-  it("clicking secondary on retrain dialog closes the dialog", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmRetrain(mockConfigs[0]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    await dialogs[2].vm.$emit("click:secondary");
-    await flushPromises();
-    expect((w.vm as any).showRetrainDialog).toBe(false);
   });
 
   it("retrain calls triggerTraining service", async () => {
@@ -469,15 +280,6 @@ describe("AnomalyDetectionList - confirmRetrain & retrain", () => {
     await flushPromises();
     expect((w.vm as any).showRetrainDialog).toBe(false);
   });
-
-  it("retrain does nothing when pendingRetrainRow is null", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).pendingRetrainRow = null;
-    await (w.vm as any).retrain();
-    await flushPromises();
-    expect(anomalyDetectionService.triggerTraining).not.toHaveBeenCalled();
-  });
 });
 
 describe("AnomalyDetectionList - confirmCancelTraining & cancelTraining", () => {
@@ -489,40 +291,6 @@ describe("AnomalyDetectionList - confirmCancelTraining & cancelTraining", () => 
     (w.vm as any).confirmCancelTraining(mockConfigs[1]);
     expect((w.vm as any).showCancelTrainingDialog).toBe(true);
     expect((w.vm as any).pendingCancelRow).toEqual(mockConfigs[1]);
-  });
-
-  it("cancel training ODialog reflects open=true after confirmCancelTraining", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmCancelTraining(mockConfigs[1]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    // Second dialog is the cancel training dialog
-    expect(dialogs[1].props("open")).toBe(true);
-    expect(dialogs[1].props("primaryButtonVariant")).toBe("ghost-warning");
-    expect(dialogs[1].props("size")).toBe("xs");
-  });
-
-  it("clicking primary on cancel training dialog triggers cancelTraining", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmCancelTraining(mockConfigs[1]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    await dialogs[1].vm.$emit("click:primary");
-    await flushPromises();
-    expect(anomalyDetectionService.cancelTraining).toHaveBeenCalledWith("default", "id-2");
-  });
-
-  it("clicking secondary on cancel training dialog closes the dialog", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).confirmCancelTraining(mockConfigs[1]);
-    await flushPromises();
-    const dialogs = w.findAllComponents(ODialogStub);
-    await dialogs[1].vm.$emit("click:secondary");
-    await flushPromises();
-    expect((w.vm as any).showCancelTrainingDialog).toBe(false);
   });
 
   it("cancelTraining calls cancelTraining service", async () => {
@@ -542,15 +310,6 @@ describe("AnomalyDetectionList - confirmCancelTraining & cancelTraining", () => 
     await (w.vm as any).cancelTraining();
     await flushPromises();
     expect((w.vm as any).showCancelTrainingDialog).toBe(false);
-  });
-
-  it("cancelTraining does nothing when pendingCancelRow is null", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).pendingCancelRow = null;
-    await (w.vm as any).cancelTraining();
-    await flushPromises();
-    expect(anomalyDetectionService.cancelTraining).not.toHaveBeenCalled();
   });
 });
 

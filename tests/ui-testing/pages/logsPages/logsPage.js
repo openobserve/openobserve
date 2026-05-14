@@ -64,15 +64,10 @@ export class LogsPage {
         this.savedViewsExpand = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.saveViewButton = 'button'; // filter by text in method
         this.savedViewNameInput = '[data-test="add-alert-name-input"]';
-        // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were both migrated
-        // from q-dialog to ODialog. Tests historically shared a single save-button selector because the legacy
-        // q-dialog used the same data-test on both. With ODialog each dialog has its own primary button, so the
-        // selector matches whichever dialog is currently open (they are mutually exclusive).
-        this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
-        // ConfirmDialog migrated to ODialog — primary button is now scoped inside the dialog panel
-        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmButton = '[data-test="confirm-button"]';
         this.streamsMenuItem = '[data-test="menu-link-\\/streams-item"]';
         this.searchStreamInput = '[data-test="streams-search-stream-input"] input';
         this.exploreButtonSelector = '[data-test="log-stream-explore-btn"]';
@@ -81,8 +76,8 @@ export class LogsPage {
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
         this.includeFieldButton = '[data-test="log-details-include-field-btn"]';
-        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
-        this.savedViewDialogSaveContent = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.closeDialog = '[data-test="close-dialog"]';
+        this.savedViewDialogSaveContent = '[data-test="saved-view-dialog-save-btn"]';
         this.savedViewByLabel = '.q-item__label';
         this.notificationMessage = '.q-notification__message';
         this.indexFieldSearchInput = '[data-cy="index-field-search-input"]';
@@ -216,7 +211,7 @@ export class LogsPage {
         this.logDetailJsonContent = '[data-test="log-detail-json-content"]';
         this.logDetailTableContent = '[data-test="log-detail-table-content"]';
         this.logDetailTabContainer = '[data-test="log-detail-tab-container"]';
-        this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
+        this.logDetailCloseButton = '[data-test="close-dialog"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
@@ -236,18 +231,16 @@ export class LogsPage {
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
-        // TracesAnalysisDashboard.vue now renders inside <ODrawer data-test="traces-analysis-dashboard-drawer">
-        // The drawer's panel exposes that data-test on the root element; close button is from ODrawer's slot.
         this.logsAnalyzeDimensionsButton = '[data-test="logs-analyze-dimensions-button"]';
-        this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
-        this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
+        this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
         // Dimension sidebar (visible by default in analysis dashboard, not a dialog)
         this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
         this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
         this.dimensionSearchInput = '[data-test="dimension-search-input"]';
+        this.analysisDashboardCard = '.analysis-dashboard-card';
         // Analysis dashboard states
-        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] .q-spinner-hourglass, [data-test="traces-analysis-dashboard-drawer"] .q-spinner';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
+        this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
+        this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -3722,11 +3715,7 @@ export class LogsPage {
     }
 
     async clickConfirmDialogOkButton() {
-        // Custom download dialog is now an ODialog scoped by `search-bar-custom-download-dialog`;
-        // the OK action is the ODialog primary footer button.
-        return await this.page
-            .locator('[data-test="search-bar-custom-download-dialog"] [data-test="o-dialog-primary-btn"]')
-            .click();
+        return await this.page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]').click();
     }
 
     async expectCustomDownloadDialogVisible() {
@@ -5127,7 +5116,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async hasAnalysisDashboardCharts() {
-        const chartPanel = this.page.locator('[data-test="traces-analysis-dashboard-drawer"] canvas, [data-test="traces-analysis-dashboard-drawer"] [data-test*="chart"]');
+        const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
         return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
     }
 
@@ -7329,14 +7318,7 @@ export class LogsPage {
     async getFilterConditionCount() {
         // Filter conditions are rendered with data-test="dashboard-add-condition-label-{index}-{label}"
         const filterItems = this.page.locator('[data-test^="dashboard-add-condition-label-"]');
-        // Retry for up to 10s to allow builder filter parsing to complete (CI may be slower)
-        const deadline = Date.now() + 10000;
-        let count = 0;
-        while (Date.now() < deadline) {
-            count = await filterItems.count();
-            if (count > 0) break;
-            await this.page.waitForTimeout(200);
-        }
+        const count = await filterItems.count();
         testLogger.info(`Filter has ${count} condition(s)`);
         return count;
     }

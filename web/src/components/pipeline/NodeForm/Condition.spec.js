@@ -73,14 +73,6 @@ vi.mock("@/utils/alerts/alertDataTransforms", async (importOriginal) => {
   return { ...actual };
 });
 
-// ODrawer stub — renders slot content so inner elements are accessible in tests.
-const ODrawerStub = {
-  name: "ODrawer",
-  props: ["open", "size", "showClose", "title", "width", "persistent"],
-  emits: ["update:open"],
-  template: '<div class="o-drawer-stub"><slot /></div>',
-};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -145,7 +137,6 @@ function createWrapper(pipelineObjOverrides = {}) {
       stubs: {
         FilterGroup:   true,
         ConfirmDialog: true,
-        ODrawer:       ODrawerStub,
       },
     },
   });

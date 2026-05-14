@@ -18,7 +18,7 @@
         <div class="col-auto">
           <OButton
             data-test="associated-regex-patterns-close-btn"
-            @click="$emit('closeDialog')"
+            v-close-popup="true"
             variant="ghost"
             size="icon-sm"
           >
@@ -371,7 +371,7 @@
           <q-separator />
           <div v-if="userClickedPattern" :class="store.state.theme === 'dark' ? 'dark-regex-patterns-footer' : 'light-regex-patterns-footer'" class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-2">
             <OButton
-              @click="$emit('closeDialog')"
+              v-close-popup="true"
               variant="outline"
               size="sm-action"
               data-test="associated-regex-patterns-cancel-btn"

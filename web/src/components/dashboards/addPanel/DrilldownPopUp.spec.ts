@@ -24,67 +24,6 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
-// Stub ODialog so tests are deterministic (no Portal/Teleport) and so we can
-// drive primary/secondary button clicks via the emits the component listens to.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-size="size"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
-    >
-      <span data-test="o-dialog-stub-title">{{ title }}</span>
-      <slot name="header-right" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-close"
-        @click="$emit('update:open', false)"
-      >close</button>
-    </div>
-  `,
-};
-
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
-
 const mockStore = {
   state: {
     theme: "light",
@@ -167,7 +106,6 @@ describe("DrilldownPopUp", () => {
   let wrapper: any;
 
   const defaultProps = {
-    open: true,
     isEditMode: false,
     drilldownDataIndex: -1,
     variablesData: {
@@ -177,22 +115,6 @@ describe("DrilldownPopUp", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // restore mockStore folders that some edge-case tests mutate
-    mockStore.state.organizationData.folders = [
-      { name: "test-folder", folderId: "folder-1" },
-      { name: "demo-folder", folderId: "folder-2" },
-    ];
-    // restore mockDashboardPanelData fields some tests mutate
-    mockDashboardPanelData.data.type = "table";
-    mockDashboardPanelData.data.queries = [
-      {
-        fields: {
-          x: [{ label: "timestamp", alias: "timestamp" }],
-          y: [{ label: "value", alias: "value" }],
-          z: [],
-        },
-      },
-    ];
   });
 
   afterEach(() => {
@@ -203,7 +125,6 @@ describe("DrilldownPopUp", () => {
 
   const createWrapper = (props = {}) => {
     return mount(DrilldownPopUp, {
-      attachTo: "#app",
       props: {
         ...defaultProps,
         ...props,
@@ -214,7 +135,6 @@ describe("DrilldownPopUp", () => {
           dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          ODialog: ODialogStub,
           DrilldownUserGuide: true,
           CommonAutoComplete: {
             template: '<div><input v-model="modelValue" /></div>',
@@ -243,40 +163,20 @@ describe("DrilldownPopUp", () => {
       ).toBe(true);
     });
 
-    it("should render ODialog wrapper", () => {
+    it("should render create drilldown title by default", () => {
       wrapper = createWrapper();
 
-      // The parent-supplied data-test fallthrough overrides the stub's own
-      // data-test on the root, so assert via findComponent instead.
-      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
+      const title = wrapper.find('[data-test="dashboard-drilldown-title"]');
+      expect(title.exists()).toBe(true);
+      expect(title.text()).toBe("Create Drilldown");
     });
 
-    it("should forward create-drilldown title to ODialog by default", () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Create Drilldown");
-    });
-
-    it("should forward edit-drilldown title to ODialog in edit mode", () => {
+    it("should render edit drilldown title in edit mode", () => {
       wrapper = createWrapper({ isEditMode: true, drilldownDataIndex: 0 });
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Edit Drilldown");
-    });
-
-    it("should forward md size to ODialog", () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("size")).toBe("md");
-    });
-
-    it("should forward open prop to ODialog", () => {
-      wrapper = createWrapper({ open: true });
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("open")).toBe(true);
+      const title = wrapper.find('[data-test="dashboard-drilldown-title"]');
+      expect(title.exists()).toBe(true);
+      expect(title.text()).toBe("Edit Drilldown");
     });
 
     it("should render drilldown name input", () => {
@@ -305,15 +205,11 @@ describe("DrilldownPopUp", () => {
       ).toBe(true);
     });
 
-    it("should render primary and secondary action buttons via ODialog", () => {
+    it("should render action buttons", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="o-dialog-stub-primary"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o-dialog-stub-secondary"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="cancel-button"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="confirm-button"]').exists()).toBe(true);
     });
   });
 
@@ -342,12 +238,6 @@ describe("DrilldownPopUp", () => {
       wrapper = createWrapper({ variablesData: undefined });
 
       expect(wrapper.props("variablesData")).toEqual({});
-    });
-
-    it("should default open prop to false when omitted", () => {
-      wrapper = createWrapper({ open: undefined });
-
-      expect(wrapper.props("open")).toBe(false);
     });
   });
 
@@ -389,6 +279,12 @@ describe("DrilldownPopUp", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.drilldownData.type).toBe("byDashboard");
+      // OButton uses :active prop which applies activeClasses (tw:bg-button-primary) instead of CSS "selected"
+      expect(
+        wrapper
+          .find('[data-test="dashboard-drilldown-by-dashboard-btn"]')
+          .classes(),
+      ).toContain("tw:bg-button-primary");
     });
 
     it("should change to byUrl type when clicked", async () => {
@@ -485,12 +381,10 @@ describe("DrilldownPopUp", () => {
     });
 
     it("should switch to custom logs mode", async () => {
-      // OToggleGroup renders the option values; find the OToggleGroupItem for "custom".
-      const customItem = wrapper
-        .findAllComponents({ name: "OToggleGroupItem" })
-        .find((c: any) => c.props("value") === "custom");
-      expect(customItem).toBeTruthy();
-      await customItem!.trigger("click");
+      const customBtn = wrapper
+        .findAll("button")
+        .find((btn) => btn.text() === "Custom");
+      await customBtn?.trigger("click");
 
       expect(wrapper.vm.drilldownData.data.logsMode).toBe("custom");
     });
@@ -740,23 +634,6 @@ describe("DrilldownPopUp", () => {
 
       expect(wrapper.vm.isFormValid).toBe(false); // false means valid/enabled
     });
-
-    it("should forward primary-button-disabled to ODialog based on isFormValid", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.drilldownData.name = "";
-      await wrapper.vm.$nextTick();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      // empty name => form invalid => primary button disabled
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
-
-      wrapper.vm.drilldownData.name = "Test";
-      wrapper.vm.drilldownData.type = "logs";
-      wrapper.vm.drilldownData.data.logsMode = "auto";
-      await wrapper.vm.$nextTick();
-
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
-    });
   });
 
   describe("Target Blank Toggle", () => {
@@ -789,53 +666,34 @@ describe("DrilldownPopUp", () => {
   });
 
   describe("Event Handling", () => {
-    it("should emit close when ODialog requests cancel (click:secondary)", async () => {
+    it("should emit close when cancel button clicked", async () => {
       wrapper = createWrapper();
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:secondary");
+      const cancelBtn = wrapper.find('[data-test="cancel-button"]');
+      await cancelBtn.trigger("click");
 
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")!.length).toBe(1);
+      // Check that the component calls the emit function
+      expect(wrapper.emitted()).toBeDefined();
     });
 
-    it("should emit close when ODialog requests close via update:open=false", async () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("update:open", false);
-
-      expect(wrapper.emitted("close")).toBeTruthy();
-      expect(wrapper.emitted("close")!.length).toBe(1);
-    });
-
-    it("should not emit close when ODialog reports update:open=true", async () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("update:open", true);
-
-      expect(wrapper.emitted("close")).toBeFalsy();
-    });
-
-    it("should call saveDrilldown when ODialog click:primary emitted", async () => {
+    it("should call saveDrilldown when confirm button clicked", async () => {
       wrapper = createWrapper();
       wrapper.vm.drilldownData.name = "Test";
       wrapper.vm.drilldownData.type = "logs";
       wrapper.vm.drilldownData.data.logsMode = "auto";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.isFormValid).toBe(false); // form valid
+      // Test by checking the form becomes valid and can be submitted
+      expect(wrapper.vm.isFormValid).toBe(false); // false means valid/enabled
 
-      const initialLength = mockDashboardPanelData.data.config.drilldown.length;
-      const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:primary");
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      expect(confirmBtn.exists()).toBe(true);
 
-      // saveDrilldown pushed a new drilldown and emitted close
-      expect(mockDashboardPanelData.data.config.drilldown.length).toBe(
-        initialLength + 1,
-      );
-      expect(wrapper.emitted("close")).toBeTruthy();
+      // Check that button is enabled (not disabled)
+      const isDisabled =
+        confirmBtn.attributes("disable") === "true" ||
+        confirmBtn.attributes("disabled") === "";
+      expect(isDisabled).toBe(false);
     });
 
     it("should save drilldown in create mode", () => {
@@ -881,28 +739,22 @@ describe("DrilldownPopUp", () => {
   });
 
   describe("Button Labels", () => {
-    it("should show 'Add' label on ODialog primary button in create mode", () => {
+    it("should show 'Add' label in create mode", () => {
       wrapper = createWrapper({ isEditMode: false });
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Add");
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      expect(confirmBtn.text()).toContain("Add");
     });
 
-    it("should show 'Update' label on ODialog primary button in edit mode", () => {
+    it("should show 'Update' label in edit mode", () => {
+      // Use valid drilldown data to avoid JSON parsing issues
       wrapper = createWrapper({
         isEditMode: true,
         drilldownDataIndex: 0,
       });
 
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Update");
-    });
-
-    it("should show Cancel label on ODialog secondary button", () => {
-      wrapper = createWrapper();
-
-      const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      const confirmBtn = wrapper.find('[data-test="confirm-button"]');
+      expect(confirmBtn.text()).toContain("Update");
     });
   });
 
@@ -925,7 +777,7 @@ describe("DrilldownPopUp", () => {
     });
 
     it("should handle undefined folders list", () => {
-      (mockStore.state.organizationData as any).folders = undefined;
+      mockStore.state.organizationData.folders = undefined;
       wrapper = createWrapper();
 
       expect(wrapper.vm.folderList).toEqual([]);
@@ -947,7 +799,7 @@ describe("DrilldownPopUp", () => {
   });
 
   describe("Component Integration", () => {
-    it("should render DrilldownUserGuide component in header-right slot", () => {
+    it("should render DrilldownUserGuide component", () => {
       wrapper = createWrapper();
 
       expect(
@@ -969,6 +821,26 @@ describe("DrilldownPopUp", () => {
       // Check that the stub components exist (they might be rendered as stubs)
       const stubElements = wrapper.element.querySelectorAll("div");
       expect(stubElements.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Styling and Layout", () => {
+    it("should have correct container styling", () => {
+      wrapper = createWrapper();
+
+      const container = wrapper.find('[data-test="dashboard-drilldown-popup"]');
+      expect(container.classes()).toContain("scroll");
+      expect(container.classes()).toContain("o2-input");
+    });
+
+    it("should apply selected class to active type button", () => {
+      wrapper = createWrapper();
+
+      const dashboardBtn = wrapper.find(
+        '[data-test="dashboard-drilldown-by-dashboard-btn"]',
+      );
+      // OButton uses :active prop which applies activeClasses (tw:bg-button-primary) instead of CSS "selected"
+      expect(dashboardBtn.classes()).toContain("tw:bg-button-primary");
     });
   });
 });

@@ -35,49 +35,38 @@ const mockGetBoundingClientRect = vi.fn(() => ({
   width: 50,
   height: 30,
   x: 200,
-  y: 100,
-  toJSON: () => ({}),
+  y: 100
 }));
-
-// Helpers to query the teleported content directly from document.body
-const getUserGuideEl = (): HTMLElement | null =>
-  document.body.querySelector(".user-guide");
-const getHighlightEls = (): HTMLElement[] =>
-  Array.from(document.body.querySelectorAll(".user-guide .bg-highlight"));
-const getGuideText = (): string => getUserGuideEl()?.textContent ?? "";
 
 describe("DrilldownUserGuide", () => {
   let wrapper: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    store.state.theme = "light";
-
+    
+    store.state.theme = 'light';
+    
     // Mock getBoundingClientRect for DOM elements
-    Element.prototype.getBoundingClientRect = mockGetBoundingClientRect as any;
+    Element.prototype.getBoundingClientRect = mockGetBoundingClientRect;
   });
 
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount();
     }
-    // Clean up any teleported nodes left behind
-    document.body.innerHTML = "";
   });
 
   const createWrapper = (props = {}) => {
     return mount(DrilldownUserGuide, {
-      attachTo: document.body,
       props: {
-        ...props,
+        ...props
       },
       global: {
         plugins: [i18n, store, router],
         mocks: {
-          $t: (key: string) => key,
-        },
-      },
+          $t: (key: string) => key
+        }
+      }
     });
   };
 
@@ -85,9 +74,7 @@ describe("DrilldownUserGuide", () => {
     it("should render user guide button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()).toBe(true);
     });
 
     it("should render help icon", () => {
@@ -102,19 +89,14 @@ describe("DrilldownUserGuide", () => {
 
       // Test that the component contains tooltip-related content
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-drilldown-help-btn"]').exists()).toBe(true);
     });
 
     it("should not show user guide initially", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.showUserGuide).toBe(false);
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      // v-show => display: none when false
-      expect(userGuide!.style.display).toBe("none");
+      expect(wrapper.find('.user-guide').isVisible()).toBe(false);
     });
   });
 
@@ -125,9 +107,9 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      expect(userGuide!.style.display).not.toBe("none");
+      const userGuide = wrapper.find('.user-guide');
+      expect(userGuide.exists()).toBe(true);
+      expect(userGuide.isVisible()).toBe(true);
     });
 
     it("should contain variable reference documentation", async () => {
@@ -136,10 +118,10 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("dynamic variables");
-      expect(content).toContain("${variable_name}");
-      expect(content).toContain("Use current dashboard's variable");
+      const content = wrapper.text();
+      expect(content).toContain('dynamic variables');
+      expect(content).toContain('${variable_name}');
+      expect(content).toContain('Use current dashboard\'s variable');
     });
 
     it("should contain query reference documentation", async () => {
@@ -148,10 +130,10 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("Use current query");
-      expect(content).toContain("${query}");
-      expect(content).toContain("${query_encoded}");
+      const content = wrapper.text();
+      expect(content).toContain('Use current query');
+      expect(content).toContain('${query}');
+      expect(content).toContain('${query_encoded}');
     });
 
     it("should contain time period reference documentation", async () => {
@@ -160,10 +142,10 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("Use current selected time period");
-      expect(content).toContain("${start_time}");
-      expect(content).toContain("${end_time}");
+      const content = wrapper.text();
+      expect(content).toContain('Use current selected time period');
+      expect(content).toContain('${start_time}');
+      expect(content).toContain('${end_time}');
     });
 
     it("should contain series data reference documentation", async () => {
@@ -172,11 +154,11 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("Use Series name and value");
-      expect(content).toContain("${series.__name}");
-      expect(content).toContain("${series.__value}");
-      expect(content).toContain("${series.__axisValue}");
+      const content = wrapper.text();
+      expect(content).toContain('Use Series name and value');
+      expect(content).toContain('${series.__name}');
+      expect(content).toContain('${series.__value}');
+      expect(content).toContain('${series.__axisValue}');
     });
 
     it("should contain table chart drilldown documentation", async () => {
@@ -185,10 +167,10 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("For table chart drilldown");
-      expect(content).toContain("${row.field");
-      expect(content).toContain("${row.index}");
+      const content = wrapper.text();
+      expect(content).toContain('For table chart drilldown');
+      expect(content).toContain('${row.field');
+      expect(content).toContain('${row.index}');
     });
 
     it("should contain pie/donut chart drilldown documentation", async () => {
@@ -197,8 +179,8 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("For Pie/Donut chart drilldown");
+      const content = wrapper.text();
+      expect(content).toContain('For Pie/Donut chart drilldown');
     });
 
     it("should contain sankey chart drilldown documentation", async () => {
@@ -207,13 +189,13 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-      expect(content).toContain("For Sankey chart drilldown");
-      expect(content).toContain("${edge.__source}");
-      expect(content).toContain("${edge.__target}");
-      expect(content).toContain("${edge.__value}");
-      expect(content).toContain("${node.__name}");
-      expect(content).toContain("${node.__value}");
+      const content = wrapper.text();
+      expect(content).toContain('For Sankey chart drilldown');
+      expect(content).toContain('${edge.__source}');
+      expect(content).toContain('${edge.__target}');
+      expect(content).toContain('${edge.__value}');
+      expect(content).toContain('${node.__name}');
+      expect(content).toContain('${node.__value}');
     });
 
     it("should contain highlighted code examples", async () => {
@@ -222,7 +204,7 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const highlights = getHighlightEls();
+      const highlights = wrapper.findAll('.bg-highlight');
       expect(highlights.length).toBeGreaterThan(0);
     });
   });
@@ -234,11 +216,11 @@ describe("DrilldownUserGuide", () => {
       expect(wrapper.vm.showUserGuide).toBe(false);
 
       const button = wrapper.find('[data-test="dashboard-drilldown-help-btn"]');
-      await button.trigger("click");
+      await button.trigger('click');
 
       expect(wrapper.vm.showUserGuide).toBe(true);
 
-      await button.trigger("click");
+      await button.trigger('click');
 
       expect(wrapper.vm.showUserGuide).toBe(false);
     });
@@ -246,17 +228,17 @@ describe("DrilldownUserGuide", () => {
     it("should have onUserGuideClick method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.onUserGuideClick).toBe("function");
+      expect(typeof wrapper.vm.onUserGuideClick).toBe('function');
     });
 
     it("should toggle visibility through method call", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.showUserGuide).toBe(false);
-
+      
       wrapper.vm.onUserGuideClick();
       expect(wrapper.vm.showUserGuide).toBe(true);
-
+      
       wrapper.vm.onUserGuideClick();
       expect(wrapper.vm.showUserGuide).toBe(false);
     });
@@ -282,16 +264,16 @@ describe("DrilldownUserGuide", () => {
 
       // Mock the refs
       wrapper.vm.userGuideBtnRef = {
-        getBoundingClientRect: mockGetBoundingClientRect,
+        getBoundingClientRect: mockGetBoundingClientRect
       };
       wrapper.vm.userGuideDivRef = {
-        style: {} as any,
+        style: {}
       };
 
       wrapper.vm.onUserGuideClick();
 
-      expect(wrapper.vm.userGuideDivRef.style.top).toBe("132px"); // 100 + 32
-      expect(wrapper.vm.userGuideDivRef.style.left).toBe("248px"); // 200 + 48
+      expect(wrapper.vm.userGuideDivRef.style.top).toBe('132px'); // 100 + 32
+      expect(wrapper.vm.userGuideDivRef.style.left).toBe('248px'); // 200 + 48
     });
 
     it("should handle missing refs gracefully", () => {
@@ -313,10 +295,8 @@ describe("DrilldownUserGuide", () => {
 
       expect(wrapper.vm.showUserGuide).toBe(true);
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      userGuide!.dispatchEvent(new MouseEvent("mouseleave"));
-      await wrapper.vm.$nextTick();
+      const userGuide = wrapper.find('.user-guide');
+      await userGuide.trigger('mouseleave');
 
       expect(wrapper.vm.showUserGuide).toBe(false);
     });
@@ -327,12 +307,11 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
+      const userGuide = wrapper.find('.user-guide');
+      expect(userGuide.exists()).toBe(true);
 
       // Trigger mouseleave
-      userGuide!.dispatchEvent(new MouseEvent("mouseleave"));
-      await wrapper.vm.$nextTick();
+      await userGuide.trigger('mouseleave');
 
       expect(wrapper.vm.showUserGuide).toBe(false);
     });
@@ -340,29 +319,27 @@ describe("DrilldownUserGuide", () => {
 
   describe("Theme Integration", () => {
     it("should apply light theme classes", async () => {
-      store.state.theme = "light";
+      store.state.theme = 'light';
       wrapper = createWrapper();
 
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-light")).toBe(true);
-      expect(userGuide!.classList.contains("bg-white")).toBe(true);
+      const userGuide = wrapper.find('.user-guide');
+      expect(userGuide.classes()).toContain('theme-light');
+      expect(userGuide.classes()).toContain('bg-white');
     });
 
     it("should apply dark theme classes", async () => {
-      store.state.theme = "dark";
+      store.state.theme = 'dark';
       wrapper = createWrapper();
 
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-dark")).toBe(true);
-      expect(userGuide!.classList.contains("bg-dark")).toBe(true);
+      const userGuide = wrapper.find('.user-guide');
+      expect(userGuide.classes()).toContain('theme-dark');
+      expect(userGuide.classes()).toContain('bg-dark');
     });
 
     it("should have access to store", () => {
@@ -375,20 +352,18 @@ describe("DrilldownUserGuide", () => {
     it("should react to theme changes", async () => {
       wrapper = createWrapper();
 
-      store.state.theme = "light";
+      store.state.theme = 'light';
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      let userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-light")).toBe(true);
+      let userGuide = wrapper.find('.user-guide');
+      expect(userGuide.classes()).toContain('theme-light');
 
-      store.state.theme = "dark";
+      store.state.theme = 'dark';
       await wrapper.vm.$nextTick();
 
-      userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-dark")).toBe(true);
+      userGuide = wrapper.find('.user-guide');
+      expect(userGuide.classes()).toContain('theme-dark');
     });
   });
 
@@ -399,9 +374,10 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("user-guide")).toBe(true);
+      const userGuide = wrapper.find('.user-guide');
+      expect(userGuide.exists()).toBe(true);
+      expect(userGuide.classes()).toContain('scroll');
+      expect(userGuide.classes()).toContain('o2-input');
     });
 
     it("should have correct positioning styles", async () => {
@@ -410,15 +386,13 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      const style = userGuide!.getAttribute("style") ?? "";
-
-      // Updated to match migrated styles
-      expect(style).toContain("position: fixed");
-      expect(style).toContain("z-index: 9999");
-      expect(style).toContain("width: 500px");
-      expect(style).toContain("max-height: 300px");
+      const userGuide = wrapper.find('.user-guide');
+      const style = userGuide.element.getAttribute('style');
+      
+      expect(style).toContain('position: absolute');
+      expect(style).toContain('z-index: 1');
+      expect(style).toContain('width: 500px');
+      expect(style).toContain('max-height: 300px');
     });
 
     it("should highlight code examples correctly", async () => {
@@ -427,12 +401,12 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const highlights = getHighlightEls();
+      const highlights = wrapper.findAll('.bg-highlight');
       expect(highlights.length).toBeGreaterThan(0);
 
       // Check that highlights have the correct class
-      highlights.forEach((highlight) => {
-        expect(highlight.classList.contains("bg-highlight")).toBe(true);
+      highlights.forEach(highlight => {
+        expect(highlight.classes()).toContain('bg-highlight');
       });
     });
   });
@@ -441,13 +415,13 @@ describe("DrilldownUserGuide", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe("DrilldownUserGuide");
+      expect(wrapper.vm.$options.name).toBe('DrilldownUserGuide');
     });
 
     it("should have all required methods", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.onUserGuideClick).toBe("function");
+      expect(typeof wrapper.vm.onUserGuideClick).toBe('function');
     });
 
     it("should have all required data properties", () => {
@@ -493,22 +467,20 @@ describe("DrilldownUserGuide", () => {
   describe("Edge Cases", () => {
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-
+      
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
-      // Avoid double-unmount in afterEach
-      wrapper = null;
     });
 
     it("should handle multiple rapid clicks", async () => {
       wrapper = createWrapper();
 
       const button = wrapper.find('[data-test="dashboard-drilldown-help-btn"]');
-
+      
       // Rapid clicks
-      await button.trigger("click");
-      await button.trigger("click");
-      await button.trigger("click");
+      await button.trigger('click');
+      await button.trigger('click');
+      await button.trigger('click');
 
       // Should end up in the correct state
       expect(wrapper.vm.showUserGuide).toBe(true);
@@ -531,10 +503,10 @@ describe("DrilldownUserGuide", () => {
       // Mock error in getBoundingClientRect
       wrapper.vm.userGuideBtnRef = {
         getBoundingClientRect: vi.fn(() => {
-          throw new Error("DOM error");
-        }),
+          throw new Error('DOM error');
+        })
       };
-      wrapper.vm.userGuideDivRef = { style: {} as any };
+      wrapper.vm.userGuideDivRef = { style: {} };
 
       expect(() => wrapper.vm.onUserGuideClick()).toThrow();
     });
@@ -547,8 +519,8 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-
+      const content = wrapper.text();
+      
       // Check all major sections are present
       expect(content).toContain("Use current dashboard's variable");
       expect(content).toContain("Use current query");
@@ -565,12 +537,12 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-
+      const content = wrapper.text();
+      
       // Check specific examples are present
-      expect(content).toContain("${test}");
-      expect(content).toContain("from=${start_time}&to=${end_time}");
-      expect(content).toContain("${row.field.test}");
+      expect(content).toContain('${test}');
+      expect(content).toContain('from=${start_time}&to=${end_time}');
+      expect(content).toContain('${row.field.test}');
       expect(content).toContain('${row.field["test"]}');
     });
 
@@ -580,11 +552,11 @@ describe("DrilldownUserGuide", () => {
       wrapper.vm.showUserGuide = true;
       await wrapper.vm.$nextTick();
 
-      const content = getGuideText();
-
-      expect(content).toContain("Note:");
-      expect(content).toContain("Even with a relative time period");
-      expect(content).toContain("For Example");
+      const content = wrapper.text();
+      
+      expect(content).toContain('Note:');
+      expect(content).toContain('Even with a relative time period');
+      expect(content).toContain('For Example');
     });
   });
 
@@ -594,21 +566,17 @@ describe("DrilldownUserGuide", () => {
 
       // Initially hidden
       expect(wrapper.vm.showUserGuide).toBe(false);
-      const initialUserGuide = getUserGuideEl();
-      expect(initialUserGuide).toBeTruthy();
-      expect(initialUserGuide!.style.display).toBe("none");
+      expect(wrapper.find('.user-guide').isVisible()).toBe(false);
 
       // Show on button click
       const button = wrapper.find('[data-test="dashboard-drilldown-help-btn"]');
-      await button.trigger("click");
+      await button.trigger('click');
 
       expect(wrapper.vm.showUserGuide).toBe(true);
 
       // Hide on mouseleave
-      const userGuide = getUserGuideEl();
-      expect(userGuide).toBeTruthy();
-      userGuide!.dispatchEvent(new MouseEvent("mouseleave"));
-      await wrapper.vm.$nextTick();
+      const userGuide = wrapper.find('.user-guide');
+      await userGuide.trigger('mouseleave');
 
       expect(wrapper.vm.showUserGuide).toBe(false);
     });

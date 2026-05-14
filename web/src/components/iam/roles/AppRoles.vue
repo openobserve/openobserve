@@ -114,10 +114,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   </div>
   </div>
-  <AddRole
-    v-model:open="showAddGroup"
-    @added:role="setupRoles"
-  />
+  <q-dialog v-model="showAddGroup" position="right" full-height maximized>
+    <AddRole
+      style="width: 30vw"
+      @cancel:hideform="hideForm"
+      @added:role="setupRoles"
+    />
+  </q-dialog>
   <ConfirmDialog
     title="Delete Role"
     :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"

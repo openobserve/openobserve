@@ -76,77 +76,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-actions>
 
     <!-- Unified Integration Method Selection Dialog -->
-    <ODialog data-test="aws-integration-tile-template-dialog" v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
-      secondary-button-label="Cancel"
-      @click:secondary="showTemplateDialog = false"
-    >
-      <div class="text-subtitle2 q-mb-md">
-        Select how you want to integrate {{ integration.displayName }}:
-      </div>
-      <q-list>
-        <!-- CloudFormation Templates -->
-        <q-item
-          v-for="(template, index) in integration.cloudFormationTemplates"
-          :key="`cf-${index}`"
-          clickable
-          v-ripple
-          @click="handleTemplateSelection(template)"
-          class="q-mb-sm rounded-borders"
-          style="border: 1px solid rgba(0, 0, 0, 0.12)"
-        >
-          <q-item-section>
-            <q-item-label class="text-weight-medium">
-              {{ template.name }}
-            </q-item-label>
-            <q-item-label caption class="q-mt-xs">
-              {{ template.description }}
-            </q-item-label>
-          </q-item-section>
-          <q-item-section side>
-            <q-icon name="chevron_right" color="primary" />
-          </q-item-section>
-        </q-item>
+    <q-dialog v-model="showTemplateDialog">
+      <q-card style="min-width: 400px">
+        <q-card-section>
+          <div class="text-h6">Choose Integration Method</div>
+        </q-card-section>
 
-        <!-- Component Options -->
-        <q-item
-          v-for="(option, index) in integration.componentOptions"
-          :key="`comp-${index}`"
-          clickable
-          v-ripple
-          @click="handleComponentSelection(option)"
-          class="q-mb-sm rounded-borders"
-          style="border: 1px solid rgba(0, 0, 0, 0.12)"
-        >
-          <q-item-section>
-            <q-item-label class="text-weight-medium">
-              {{ option.name }}
-            </q-item-label>
-            <q-item-label caption class="q-mt-xs">
-              {{ option.description }}
-            </q-item-label>
-          </q-item-section>
-          <q-item-section side>
-            <q-icon name="chevron_right" color="primary" />
-          </q-item-section>
-        </q-item>
-      </q-list>
-    </ODialog>
+        <q-card-section class="q-pt-none">
+          <div class="text-subtitle2 q-mb-md">
+            Select how you want to integrate {{ integration.displayName }}:
+          </div>
+          <q-list>
+            <!-- CloudFormation Templates -->
+            <q-item
+              v-for="(template, index) in integration.cloudFormationTemplates"
+              :key="`cf-${index}`"
+              clickable
+              v-ripple
+              @click="handleTemplateSelection(template)"
+              class="q-mb-sm rounded-borders"
+              style="border: 1px solid rgba(0, 0, 0, 0.12)"
+            >
+              <q-item-section>
+                <q-item-label class="text-weight-medium">
+                  {{ template.name }}
+                </q-item-label>
+                <q-item-label caption class="q-mt-xs">
+                  {{ template.description }}
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-icon name="chevron_right" color="primary" />
+              </q-item-section>
+            </q-item>
+
+            <!-- Component Options -->
+            <q-item
+              v-for="(option, index) in integration.componentOptions"
+              :key="`comp-${index}`"
+              clickable
+              v-ripple
+              @click="handleComponentSelection(option)"
+              class="q-mb-sm rounded-borders"
+              style="border: 1px solid rgba(0, 0, 0, 0.12)"
+            >
+              <q-item-section>
+                <q-item-label class="text-weight-medium">
+                  {{ option.name }}
+                </q-item-label>
+                <q-item-label caption class="q-mt-xs">
+                  {{ option.description }}
+                </q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-icon name="chevron_right" color="primary" />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <OButton variant="outline" size="sm-action" v-close-popup
+            >Cancel</OButton
+          >
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <!-- Component Display Dialog -->
-    <ODialog data-test="aws-integration-tile-content-dialog" v-model:open="showComponentContent" size="xl" :title="selectedComponentTitle">
-      <component
-        :is="selectedComponent"
-        :currOrgIdentifier="organizationId"
-        :currUserEmail="userEmail"
-      />
-    </ODialog>
+    <q-dialog v-model="showComponentContent" full-width>
+      <q-card>
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">{{ selectedComponentTitle }}</div>
+          <q-space />
+          <OButton variant="ghost" size="icon-circle-sm" v-close-popup>
+            <q-icon name="close" />
+          </OButton>
+        </q-card-section>
+
+        <q-card-section>
+          <component
+            :is="selectedComponent"
+            :currOrgIdentifier="organizationId"
+            :currUserEmail="userEmail"
+          />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-card>
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -167,7 +189,7 @@ import LinuxConfig from "./LinuxConfig.vue";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton, ODialog },
+  components: { OButton },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,

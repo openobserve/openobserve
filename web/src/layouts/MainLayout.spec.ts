@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { flushPromises, shallowMount, mount } from "@vue/test-utils";
-import { defineComponent, ref, h } from "vue";
+import { flushPromises, shallowMount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
@@ -23,46 +22,6 @@ import store from "@/test/unit/helpers/store";
 import MainLayout from "@/layouts/MainLayout.vue";
 import router from "@/test/unit/helpers/router";
 import * as cookies from "@/utils/cookies";
-
-// ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
-// update:open / click:* emits). Mirrors stubs used in other migrated specs.
-const ODialogStub = defineComponent({
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryVariant",
-    "secondaryVariant",
-    "neutralVariant",
-    "primaryDisabled",
-    "secondaryDisabled",
-    "neutralDisabled",
-    "primaryLoading",
-    "secondaryLoading",
-    "neutralLoading",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  setup(_, { slots }) {
-    return () =>
-      h(
-        "div",
-        { class: "o-dialog-stub" },
-        [
-          slots.header?.(),
-          slots.default?.(),
-          slots.footer?.(),
-        ],
-      );
-  },
-});
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
@@ -1210,101 +1169,6 @@ describe("MainLayout Methods and Functions", () => {
         { name: "logs", title: "Logs" },
         { name: "", title: "Invalid" }
       ])).toHaveLength(2);
-    });
-  });
-
-  // The MainLayout template now uses <ODialog v-model:open="showGetStarted" size="full"
-  // :show-close="false"> to host <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />.
-  // The full layout requires complex DI (skipped above), so we exercise just the migrated
-  // fragment via a small host component plus an ODialogStub. This guards the migration
-  // contract: prop bindings, v-model:open round-trip, and the removeFirstTimeLogin handler.
-  describe("ODialog Migration - GetStarted Dialog", () => {
-    const GetStartedStub = defineComponent({
-      name: "GetStarted",
-      emits: ["removeFirstTimeLogin"],
-      setup(_, { emit }) {
-        return () =>
-          h(
-            "button",
-            {
-              class: "get-started-stub",
-              onClick: () => emit("removeFirstTimeLogin", false),
-            },
-            "submit",
-          );
-      },
-    });
-
-    const Host = defineComponent({
-      name: "MainLayoutDialogHost",
-      components: { ODialog: ODialogStub, GetStarted: GetStartedStub },
-      setup() {
-        const showGetStarted = ref(true);
-        const removeFirstTimeLogin = (val: boolean) => {
-          showGetStarted.value = val;
-          localStorage.removeItem("isFirstTimeLogin");
-        };
-        return { showGetStarted, removeFirstTimeLogin };
-      },
-      template: `
-        <ODialog v-model:open="showGetStarted" size="full" :show-close="false">
-          <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-        </ODialog>
-      `,
-    });
-
-    beforeEach(() => {
-      localStorage.setItem("isFirstTimeLogin", "true");
-    });
-
-    afterEach(() => {
-      localStorage.removeItem("isFirstTimeLogin");
-    });
-
-    it("renders ODialog with size='full' and showClose=false", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.exists()).toBe(true);
-      expect(dialog.props("size")).toBe("full");
-      expect(dialog.props("showClose")).toBe(false);
-    });
-
-    it("binds open prop from showGetStarted (initially true)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      expect(dialog.props("open")).toBe(true);
-    });
-
-    it("closes via v-model:open when ODialog emits update:open=false", async () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      await dialog.vm.$emit("update:open", false);
-
-      expect(dialog.props("open")).toBe(false);
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-    });
-
-    it("closes and clears isFirstTimeLogin when GetStarted emits removeFirstTimeLogin", async () => {
-      const wrapper = mount(Host);
-      const getStarted = wrapper.findComponent(GetStartedStub);
-
-      await getStarted.vm.$emit("removeFirstTimeLogin", false);
-
-      expect((wrapper.vm as any).showGetStarted).toBe(false);
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-
-    it("does NOT forward any q-dialog-specific props (migration removed maximized/full-height)", () => {
-      const wrapper = mount(Host);
-      const dialog = wrapper.findComponent(ODialogStub);
-
-      // ODialog has no `maximized` / `fullHeight` props — verify only the new contract is in use.
-      expect(dialog.props()).not.toHaveProperty("maximized");
-      expect(dialog.props()).not.toHaveProperty("fullHeight");
-      expect(dialog.props("size")).toBe("full");
     });
   });
 

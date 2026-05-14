@@ -263,12 +263,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
-    <ODrawer data-test="associated-stream-function-index-schema-drawer"
-      v-model:open="showIndexSchemaDialog"
-      size="lg"
+    <q-dialog
+      v-model="showIndexSchemaDialog"
+      position="right"
+      full-height
+      maximized
     >
       <SchemaIndex v-model="schemaData" />
-    </ODrawer>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -297,12 +299,11 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, Trash2, ChevronDown, ChevronUp, RefreshCw },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

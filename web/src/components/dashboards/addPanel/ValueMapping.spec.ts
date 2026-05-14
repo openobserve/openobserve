@@ -74,8 +74,6 @@ describe("ValueMapping", () => {
         },
         stubs: {
           ValueMappingPopUp: {
-            name: "ValueMappingPopUp",
-            props: ["open", "valueMapping"],
             template: '<div data-test="value-mapping-popup"></div>',
             emits: ["close", "save"],
           },
@@ -220,23 +218,18 @@ describe("ValueMapping", () => {
   });
 
   describe("Theme Integration", () => {
-    // After ODialog migration the component no longer reads the theme from the
-    // store directly; theming is handled inside ODialog/ValueMappingPopUp.
-    // These tests verify the component still mounts under both themes.
-    it("should mount under light theme", () => {
+    it("should handle light theme", async () => {
       store.state.theme = "light";
       wrapper = createWrapper();
 
-      expect(wrapper.exists()).toBe(true);
-      expect(store.state.theme).toBe("light");
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
-    it("should mount under dark theme", () => {
+    it("should handle dark theme", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(wrapper.exists()).toBe(true);
-      expect(store.state.theme).toBe("dark");
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
   });
 
@@ -356,40 +349,26 @@ describe("ValueMapping", () => {
   });
 
   describe("Event Handling", () => {
-    it("should pass :open=true to ValueMappingPopUp once opened", async () => {
+    it("should handle close event simulation", async () => {
       wrapper = createWrapper();
 
-      const button = wrapper.find(
-        '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]',
-      );
-      await button.trigger("click");
-
-      const popup = wrapper.findComponent({ name: "ValueMappingPopUp" });
-      expect(popup.exists()).toBe(true);
-      expect(popup.props("open")).toBe(true);
-    });
-
-    it("should close popup when ValueMappingPopUp emits close", async () => {
-      wrapper = createWrapper();
       wrapper.vm.showValueMappingPopUp = true;
       await wrapper.vm.$nextTick();
 
-      const popup = wrapper.findComponent({ name: "ValueMappingPopUp" });
-      popup.vm.$emit("close");
-      await wrapper.vm.$nextTick();
-
+      // Simulate close event
+      wrapper.vm.showValueMappingPopUp = false;
       expect(wrapper.vm.showValueMappingPopUp).toBe(false);
     });
 
-    it("should save mappings when ValueMappingPopUp emits save", async () => {
+    it("should handle save event simulation", async () => {
       wrapper = createWrapper();
+
       wrapper.vm.showValueMappingPopUp = true;
       await wrapper.vm.$nextTick();
 
       const newMappings = [{ value: "1", text: "Test" }];
-      const popup = wrapper.findComponent({ name: "ValueMappingPopUp" });
-      popup.vm.$emit("save", newMappings);
-      await wrapper.vm.$nextTick();
+      // Simulate save event
+      wrapper.vm.saveValueMappingConfig(newMappings);
 
       expect(mockDashboardPanelData.data.config.mappings).toEqual(newMappings);
       expect(wrapper.vm.showValueMappingPopUp).toBe(false);
@@ -439,13 +418,11 @@ describe("ValueMapping", () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should expose dashboardPanelData on the component instance", () => {
-      // After ODialog migration `store` is no longer exposed on the setup
-      // return; verify the remaining injected data is still accessible.
+    it("should handle store access properly", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.dashboardPanelData.data.config.mappings).toBeDefined();
+      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.store.state.theme).toBeDefined();
     });
   });
 

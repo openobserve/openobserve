@@ -35,9 +35,7 @@ class SchemaPage {
             // Stream creation locators
             logStreamAddStreamBtn: '[data-test="log-stream-add-stream-btn"]',
             nameLabel: 'Name *',
-            // AddStream.vue migrated from q-btn to ODrawer's primary footer
-            // button — there is no standalone "save-stream-btn" any more.
-            saveStreamBtn: '[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]',
+            saveStreamBtn: '[data-test="save-stream-btn"]',
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
             menuLogsItem: '[data-test="menu-link-\\/logs-item"]',
             fnEditor: '[data-test="logs-vrl-function-editor"]',
@@ -51,9 +49,7 @@ class SchemaPage {
             dataTypePlaceholder: 'Data Type *',
             schemaFieldSearchInput: '[data-test="schema-field-search-input"]',
             schemaDeleteButton: '[data-test="schema-delete-button"]',
-            // ConfirmDialog migrated to ODialog — primary footer button
-            // is now exposed via the common o-dialog-primary-btn slug.
-            confirmButton: '[data-test="o-dialog-primary-btn"]'
+            confirmButton: '[data-test="confirm-button"]'
         };
     }
 

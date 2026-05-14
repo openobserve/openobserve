@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-sm"
-      @mousedown.prevent
       @click="
         () => {
           showAddFolderDialog = true;
@@ -54,20 +53,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add folder -->
-  <ODrawer
-    v-model:open="showAddFolderDialog"
-    :title="t('common.addFolder')"
-    :width="20"
+  <q-dialog
+    v-model="showAddFolderDialog"
+    position="right"
+    full-height
+    maximized
     data-test="dashboard-folder-move-dialog"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('dashboard.save')"
-    :primary-button-disabled="isAddingFolder"
-    :primary-button-loading="isAddingFolder"
-    @click:secondary="showAddFolderDialog = false"
-    @click:primary="handleAddFolder"
   >
-    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
-  </ODrawer>
+    <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
+  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -76,12 +70,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, ODrawer },
+  components: { AddFolder, OButton },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -95,18 +88,6 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
-    const addFolderRef: any = ref(null);
-    const isAddingFolder = ref(false);
-
-    const handleAddFolder = async () => {
-      if (!addFolderRef.value || isAddingFolder.value) return;
-      isAddingFolder.value = true;
-      try {
-        await addFolderRef.value.submit();
-      } finally {
-        isAddingFolder.value = false;
-      }
-    };
 
     const getInitialFolderValue = () => {
       // priority: activeFolderId > query.folder > default
@@ -169,9 +150,6 @@ export default defineComponent({
       selectedFolder,
       updateFolderList,
       showAddFolderDialog,
-      addFolderRef,
-      isAddingFolder,
-      handleAddFolder,
       computedStyle,
     };
   },
