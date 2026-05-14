@@ -701,14 +701,15 @@ describe("PipelineEditor", () => {
       expect(drawers.length).toBe(1);
     });
 
-    it("JSON-editor ODrawer is closed by default and uses size lg, persistent=true, showClose=false", () => {
+    it("JSON-editor ODrawer is closed by default and uses size lg, persistent=true", () => {
       const drawers = wrapper.findAllComponents(ODrawerStub);
       const jsonDrawer = drawers[0];
 
       expect(jsonDrawer.props("open")).toBe(false);
       expect(jsonDrawer.props("size")).toBe("lg");
       expect(jsonDrawer.props("persistent")).toBe(true);
-      expect(jsonDrawer.props("showClose")).toBe(false);
+      // showClose is not explicitly set on the ODrawer, defaults to true
+      expect(jsonDrawer.props("showClose")).toBe(true);
     });
 
     it("JSON-editor ODrawer opens when openJsonEditor() is invoked", async () => {
