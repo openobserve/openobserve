@@ -256,7 +256,17 @@ export default defineComponent({
       emit("save", editedValueMapping.value);
     };
 
+    const resetValueMapping = () => {
+      if (props.valueMapping && props.valueMapping.length > 0) {
+        editedValueMapping.value = props.valueMapping.map((m: any) => ({ ...m }));
+      } else {
+        editedValueMapping.value = [];
+        addValueMapping();
+      }
+    };
+
     const cancelEdit = () => {
+      resetValueMapping();
       emit("close");
     };
 

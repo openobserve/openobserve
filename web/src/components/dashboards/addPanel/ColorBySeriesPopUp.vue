@@ -289,7 +289,20 @@ export default defineComponent({
       }
     };
 
+    const resetColorBySeries = () => {
+      if (props.colorBySeries?.length) {
+        editColorBySeries.value = props.colorBySeries.map((m: any) => ({
+          ...m,
+          value: typeof m.value === "string" ? m.value : "",
+          color: m.color || null,
+        }));
+      } else {
+        editColorBySeries.value = [{ type: "value", value: "", color: null }];
+      }
+    };
+
     const cancelEdit = () => {
+      resetColorBySeries();
       emit("close");
     };
 
