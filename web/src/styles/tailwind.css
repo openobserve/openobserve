@@ -8,6 +8,12 @@
 
 @source "../**/*.{vue,js,ts}";
 
+@theme {
+  --breakpoint-mobile: 600px;
+  --breakpoint-tablet: 1024px;
+  --breakpoint-desktop: 1440px;
+}
+
 @layer base {
   *, :before, :after {
     border-color: #e5e7eb;
