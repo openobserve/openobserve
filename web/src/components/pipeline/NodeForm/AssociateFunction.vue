@@ -15,22 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-function-node-routing-section"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    :style="computedStyleForFunction"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.associateFunction')"
+    :width="createNewFunction ? '97' : '30'"
+    @keydown.stop
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-function-node-routing-section"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
-      {{ t("pipeline.associateFunction") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
+
 
     <div v-if="loading">
       <q-spinner
@@ -212,7 +208,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -236,6 +233,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
@@ -259,6 +257,10 @@ const AddFunction = defineAsyncComponent(
 );
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   functions: {
     type: Array,
     required: true,
@@ -281,6 +283,16 @@ const emit = defineEmits([
   "delete:node",
   "add:function",
 ]);
+
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 
 const { t } = useI18n();
 

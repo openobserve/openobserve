@@ -142,6 +142,7 @@ const mockDashboardPanelData = reactive({
 const mockResetDashboardPanelData = vi.fn();
 const mockMakeAutoSQLQuery = vi.fn();
 const mockUpdateGroupedFields = vi.fn().mockResolvedValue(undefined);
+const mockValidatePanel = vi.fn();
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
@@ -150,7 +151,22 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     resetDashboardPanelData: mockResetDashboardPanelData,
     makeAutoSQLQuery: mockMakeAutoSQLQuery,
     updateGroupedFields: mockUpdateGroupedFields,
+    validatePanel: mockValidatePanel,
   }),
+}));
+
+// Mock useNotifications composable
+const mockShowErrorNotification = vi.fn();
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showErrorNotification: mockShowErrorNotification,
+    showPositiveNotification: vi.fn(),
+  }),
+}));
+
+// Mock sqlUtils
+vi.mock("@/utils/query/sqlUtils", () => ({
+  parseWhereClauseToFilter: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock PanelEditor component
@@ -177,13 +193,14 @@ vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
   },
 }));
 
-// Mock AddToDashboard component
+// Mock AddToDashboard component (migrated: uses ODrawer with v-model:open)
 vi.mock("@/plugins/metrics/AddToDashboard.vue", () => ({
   default: {
     name: "AddToDashboard",
-    template: '<div class="add-to-dashboard-mock">AddToDashboard</div>',
-    props: ["dashboardPanelData"],
-    emits: ["save"],
+    template:
+      '<div class="add-to-dashboard-mock" data-test="add-to-dashboard" :data-open="open">AddToDashboard</div>',
+    props: ["dashboardPanelData", "open"],
+    emits: ["save", "update:open"],
   },
 }));
 
@@ -239,9 +256,16 @@ function createWrapper(props = {}) {
             runQuery: vi.fn(),
           },
         },
-        AddToDashboard: true,
+        // Stub AddToDashboard explicitly: it is loaded via defineAsyncComponent and
+        // VTU otherwise tries to introspect the mocked ESM module shape (__isTeleport).
+        AddToDashboard: {
+          name: "AddToDashboard",
+          template:
+            '<div class="add-to-dashboard-mock" data-test="add-to-dashboard" :data-open="open"></div>',
+          props: ["dashboardPanelData", "open"],
+          emits: ["save", "update:open"],
+        },
         QueryTypeSelector: true,
-        "q-dialog": true,
       },
     },
   });
@@ -520,32 +544,70 @@ describe("BuildQueryPage Component", () => {
   });
 
   describe("Add to Dashboard Dialog", () => {
-    it("should show add to dashboard dialog when triggered", async () => {
+    it("should not show AddToDashboard drawer initially", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Check initial state
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
 
-      // Trigger the dialog
+    it("should open AddToDashboard drawer when showAddToDashboardDialog is set", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
       wrapper.vm.showAddToDashboardDialog = true;
       await nextTick();
 
       expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
     });
 
-    it("should close add to dashboard dialog on addPanelToDashboard", async () => {
+    it("should close drawer via addPanelToDashboard handler (save emit)", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
+      // Open the drawer first
       wrapper.vm.showAddToDashboardDialog = true;
       await nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
 
-      // Call the handler
-      wrapper.vm.showAddToDashboardDialog = false;
+      // Simulate AddToDashboard emitting "save" (which is wired to addPanelToDashboard)
+      // The handler sets showAddToDashboardDialog to false
+      wrapper.vm.addPanelToDashboard?.();
       await nextTick();
 
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+
+    it("should toggle drawer via v-model:open update flow", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Open
+      wrapper.vm.showAddToDashboardDialog = true;
+      await nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
+
+      // Close (simulates ODrawer's update:open(false) on cancel/backdrop)
+      wrapper.vm.showAddToDashboardDialog = false;
+      await nextTick();
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+    });
+
+    it("should open drawer when onAddToDashboard runs with no validation errors", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
+
+      // Simulate PanelEditor emitting "addToDashboard" which calls onAddToDashboard
+      // (validatePanel mock returns no errors, so dialog should open)
+      wrapper.vm.onAddToDashboard?.();
+      await nextTick();
+
+      // If validatePanel is not mocked to add errors, drawer should open
+      // Note: validatePanel comes from useDashboardPanelData mock which we did not
+      // wire to push errors, so by default errors stays empty and drawer opens
+      expect(wrapper.vm.showAddToDashboardDialog).toBe(true);
     });
   });
 

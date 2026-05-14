@@ -25,14 +25,21 @@ export default class LogsVisualise {
       '[data-test="dashboard-dashboard-new-add"]'
     );
     this.dashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
+    // Inner "New dashboard" ODrawer's Save action — the legacy
+    // `dashboard-add-submit` button was removed when AddDashboard.vue was
+    // migrated to ODrawer (SelectDashboardDropdown now hosts the form and
+    // the footer primary button calls addDashboardRef?.submit()).
     this.dashboardSubmitBtn = page.locator(
-      '[data-test="dashboard-add-submit"]'
+      '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
     );
     this.panelTitleInput = page.locator(
       '[data-test="metrics-new-dashboard-panel-title"]'
     );
+    // Outer "Add to Dashboard" ODrawer's Add action — the legacy
+    // `metrics-schema-update-settings-button` was removed when AddToDashboard.vue
+    // migrated to ODrawer (parent slug: add-to-dashboard-dialog).
     this.updateSettingsBtn = page.locator(
-      '[data-test="metrics-schema-update-settings-button"]'
+      '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]'
     );
 
     // Query editor locators
@@ -548,8 +555,10 @@ export default class LogsVisualise {
     await this.addToDashboardBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.addToDashboardBtn.click();
 
-    // Wait for the "Add to Dashboard" side panel to fully load
-    const sidePanelTitle = this.page.locator('[data-test="schema-title-text"]');
+    // Wait for the "Add to Dashboard" side panel to fully load. The old
+    // `schema-title-text` element was removed when AddToDashboard.vue migrated
+    // to ODrawer — use the drawer's parent slug instead.
+    const sidePanelTitle = this.page.locator('[data-test="add-to-dashboard-dialog"]');
     await sidePanelTitle.waitFor({ state: "visible", timeout: 10000 });
     await sidePanelTitle.waitFor({ state: "attached", timeout: 5000 });
 
@@ -586,7 +595,13 @@ export default class LogsVisualise {
 
   //wait for query inspector to be visible
   async waitForQueryInspector(page) {
-    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-close-btn"]');
+    const queryInspectorCloseBtn = page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
     await queryInspectorCloseBtn.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  async closeQueryInspector() {
+    const closeBtn = this.page.locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]');
+    await closeBtn.click();
+    await this.page.locator('[data-test="query-inspector-dialog"]').waitFor({ state: 'hidden', timeout: 5000 });
   }
 }

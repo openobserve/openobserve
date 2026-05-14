@@ -47,8 +47,8 @@ export class AlertsPage {
             newFolderButton: '[data-test="dashboard-new-folder-btn"]',
             folderNameInput: '[data-test="dashboard-folder-add-name"]',
             folderDescriptionInput: '[data-test="dashboard-folder-add-description"]',
-            folderSaveButton: '[data-test="dashboard-folder-add-save"]',
-            folderCancelButton: '[data-test="dashboard-folder-add-cancel"]',
+            folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]',
+            folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]',
             noDataAvailableText: 'No data available',
             folderExistsError: 'Folder with this name already exists in this organization',
             folderMoreOptionsButton: '[data-test="dashboard-more-icon"]',
@@ -150,21 +150,21 @@ export class AlertsPage {
             cloneAlertName: '[data-test="to-be-clone-alert-name"]',
             cloneStreamType: '[data-test="to-be-clone-stream-type"]',
             cloneStreamName: '[data-test="to-be-clone-stream-name"]',
-            cloneSubmitButton: '[data-test="clone-alert-submit-btn"]',
-            cloneCancelButton: '[data-test="clone-alert-cancel-btn"]',
+            cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
+            cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
             pauseStartAlert: '[data-test="alert-list-{alertName}-pause-start-alert"]',
 
             // Alert management locators
             alertUpdateButton: '[data-test="alert-list-{alertName}-update-alert"]',
             alertCloneButton: '[data-test="alert-list-{alertName}-clone-alert"]',
             alertMoreOptions: '[data-test="alert-list-{alertName}-more-options"]',
-            confirmButton: '[data-test="confirm-button"]',
+            confirmButton: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
 
             // Alert movement locators
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
             moveAcrossFoldersButton: '[data-test="alert-list-move-across-folders-btn"]',
             folderDropdown: '[data-test="alerts-index-dropdown-stream_type"]',
-            moveButton: '[data-test="alerts-folder-move"]',
+            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]',
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators

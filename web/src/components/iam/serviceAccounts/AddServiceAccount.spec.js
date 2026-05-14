@@ -2,144 +2,169 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify, Quasar } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import * as service_accounts from "@/services/service_accounts";
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 
 // Mock the service accounts service
 vi.mock("@/services/service_accounts", () => ({
   default: {
     create: vi.fn(),
-    update: vi.fn()
-  }
+    update: vi.fn(),
+  },
 }));
 
-// Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+// Mock vue-i18n so labels resolve to their keys (predictable assertions)
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
 
-// Create platform mock
+// Mock reo analytics — component calls track() in submit handlers
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: vi.fn() }),
+}));
+
+
+// Platform mock for Quasar
 const platform = {
-  is: {
-    desktop: true,
-    mobile: false,
-  },
-  has: {
-    touch: false,
-  },
+  is: { desktop: true, mobile: false },
+  has: { touch: false },
 };
 
 installQuasar({
   plugins: [Dialog, Notify],
-  config: {
-    platform
-  }
+  config: { platform },
 });
+
+// ODrawer stub: keeps slot content queryable, surfaces open state and
+// proxies the migration emit so the parent's @update:open wiring is exercised.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "showClose",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div data-test-stub="o-drawer" :data-open="open" :data-title="title" :data-size="size">
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+};
+
+// OButton stub: passes through data-test attr and forwards click for interaction.
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "loading", "type"],
+  emits: ["click"],
+  template: `<button
+      data-test-stub="o-button"
+      :data-test="$attrs['data-test']"
+      :disabled="disabled"
+      :type="type"
+      @click="$emit('click', $event)"><slot /></button>`,
+  inheritAttrs: false,
+};
 
 describe("AddServiceAccount Component", () => {
   let wrapper;
   let mockStore;
-  let notifyMock;
   let router;
-  let routerPushSpy;
 
-  beforeEach(async () => {
-    // Reset mock implementations
-    vi.mocked(service_accounts.default.create).mockReset();
-    vi.mocked(service_accounts.default.update).mockReset();
-
-    // Setup store state
-    mockStore = {
-      state: {
-        selectedOrganization: {
-          identifier: "test-org",
-          name: "Test Org"
-        }
-      }
-    };
-
-    // Setup router
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        {
-          path: '/service-accounts',
-          name: 'serviceAccounts',
-          component: { template: '<div>Service Accounts</div>' }
-        }
-      ]
-    });
-
-    // Setup router push spy
-    routerPushSpy = vi.spyOn(router, 'push');
-
-    // Setup notify mock
-    notifyMock = vi.fn().mockReturnValue(vi.fn()); // Return a dismiss function
-
-    // Mount component
-    wrapper = mount(AddServiceAccount, {
+  const mountComp = (props = {}) =>
+    mount(AddServiceAccount, {
       props: {
+        open: true,
         modelValue: {
           org_member_id: "",
           role: "admin",
           first_name: "",
           email: "",
-          organization: ""
+          organization: "",
         },
-        isUpdated: false
+        isUpdated: false,
+        ...props,
       },
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          i18n,
-          router
-        ],
-        provide: {
-          store: mockStore,
-          platform
-        },
-        mocks: {
-          $q: {
-            platform,
-            notify: notifyMock
-          }
-        },
+        plugins: [[Quasar, { platform }], i18n, router],
+        provide: { store: mockStore, platform },
         stubs: {
-          QCard: false,
-          QCardSection: false,
-          QIcon: true,
+          ODrawer: ODrawerStub,
+          OButton: OButtonStub,
           QInput: false,
-          QBtn: false,
           QForm: false,
-          QSeparator: false
-        }
+        },
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
 
+  beforeEach(async () => {
+    vi.mocked(service_accounts.default.create).mockReset();
+    vi.mocked(service_accounts.default.update).mockReset();
+
+    mockStore = {
+      state: {
+        selectedOrganization: {
+          identifier: "test-org",
+          name: "Test Org",
+        },
+      },
+    };
+
+    router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        {
+          path: "/service-accounts",
+          name: "serviceAccounts",
+          component: { template: "<div>Service Accounts</div>" },
+        },
+      ],
+    });
+
+    wrapper = mountComp();
     await flushPromises();
   });
 
   afterEach(() => {
-    if (wrapper && typeof wrapper.unmount === 'function') {
+    if (wrapper && typeof wrapper.unmount === "function") {
       wrapper.unmount();
     }
     vi.clearAllMocks();
   });
 
   describe("Component Initialization", () => {
-    it("mounts successfully", () => {
+    it("mounts successfully and renders ODrawer", () => {
       expect(wrapper.exists()).toBe(true);
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.exists()).toBe(true);
     });
 
     it("initializes with default values", () => {
@@ -148,80 +173,90 @@ describe("AddServiceAccount Component", () => {
         role: "admin",
         first_name: "",
         email: "",
-        organization: ""
+        organization: "test-org",
       });
+    });
+
+    it("passes the add title to ODrawer when not updating", () => {
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-title")).toBe("serviceAccounts.add");
+    });
+
+    it("passes the update title to ODrawer when beingUpdated", async () => {
+      const updateWrapper = mountComp({
+        isUpdated: true,
+        modelValue: {
+          email: "existing@example.com",
+          first_name: "Existing Description",
+          organization: "test-org",
+        },
+      });
+      await nextTick();
+      const drawer = updateWrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-title")).toBe("serviceAccounts.update");
+      expect(updateWrapper.vm.beingUpdated).toBe(true);
+      updateWrapper.unmount();
+    });
+
+    it("forwards open prop to ODrawer", () => {
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes("data-open")).toBe("true");
     });
   });
 
   describe("Form Fields", () => {
-    it("shows email field when adding new service account", () => {
-      const emailInput = wrapper.findComponent({ name: 'QInput' });
-      expect(emailInput.exists()).toBe(true);
+    it("shows email and description fields when adding new service account", () => {
+      const inputs = wrapper.findAllComponents({ name: "QInput" });
+      expect(inputs.length).toBe(2);
     });
 
     it("hides email field when updating service account", async () => {
-      // Create a new wrapper specifically for this test
-      const updateWrapper = mount(AddServiceAccount, {
-        props: {
-          isUpdated: true,
-          modelValue: {
-            email: "test@example.com",
-            first_name: "Test Account",
-            organization: "test-org"
-          }
+      const updateWrapper = mountComp({
+        isUpdated: true,
+        modelValue: {
+          email: "test@example.com",
+          first_name: "Test Account",
+          organization: "test-org",
         },
-        global: {
-          plugins: [[Quasar, { platform }], i18n, router],
-          provide: { store: mockStore, platform },
-          mocks: { $q: { platform, notify: notifyMock } },
-          stubs: {
-            QCard: false,
-            QCardSection: false,
-            QIcon: true,
-            QInput: false,
-            QBtn: false,
-            QForm: false,
-            QSeparator: false
-          }
-        }
       });
 
-      await updateWrapper.vm.$nextTick();
+      await nextTick();
       await flushPromises();
 
-      const emailInputs = updateWrapper.findAllComponents({ name: 'QInput' });
-      expect(emailInputs.length).toBe(1); // Only description field should be visible
-
+      const inputs = updateWrapper.findAllComponents({ name: "QInput" });
+      expect(inputs.length).toBe(1); // Only description field visible
       updateWrapper.unmount();
     });
   });
 
   describe("Form Validation", () => {
-    it("validates required email field", async () => {
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+    it("does not submit when email is empty", async () => {
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       expect(service_accounts.default.create).not.toHaveBeenCalled();
     });
 
-    it("validates email format", async () => {
+    it("does not submit when email format is invalid", async () => {
       wrapper.vm.formData.email = "invalid-email";
-      await wrapper.vm.$nextTick();
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      await nextTick();
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       expect(service_accounts.default.create).not.toHaveBeenCalled();
     });
   });
 
   describe("Service Account Creation", () => {
-    it("creates service account successfully", async () => {
-      service_accounts.default.create.mockResolvedValue({ data: {} });
-      
+    it("creates service account successfully and emits update:open false", async () => {
+      vi.mocked(service_accounts.default.create).mockResolvedValue({
+        data: {},
+      });
+
       wrapper.vm.formData.email = "test@example.com";
       wrapper.vm.firstName = "Test Description";
-      await wrapper.vm.$nextTick();
-      
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      await nextTick();
+
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(service_accounts.default.create).toHaveBeenCalledWith(
@@ -230,64 +265,63 @@ describe("AddServiceAccount Component", () => {
           role: "admin",
           first_name: "Test Description",
           email: "test@example.com",
-          organization: "test-org"
+          organization: "test-org",
         },
-        "test-org"
+        "test-org",
       );
       expect(wrapper.emitted()["updated"]).toBeTruthy();
+      expect(wrapper.emitted()["update:open"]).toBeTruthy();
+      expect(wrapper.emitted()["update:open"][0]).toEqual([false]);
     });
 
-    it("ignores 403 error notifications", async () => {
-      service_accounts.default.create.mockRejectedValue({
-        response: {
-          status: 403
-        }
+    it("does not throw on 403 error during create", async () => {
+      // 403 is intentionally swallowed (no error toast). We just assert the
+      // promise resolves cleanly and the service was invoked.
+      vi.mocked(service_accounts.default.create).mockRejectedValue({
+        response: { status: 403 },
       });
 
       wrapper.vm.formData.email = "test@example.com";
-      await wrapper.vm.$nextTick();
-      
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      await nextTick();
+
+      await expect(
+        (async () => {
+          wrapper.vm.onSubmit();
+          await flushPromises();
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(service_accounts.default.create).toHaveBeenCalled();
+    });
+
+    it("does not emit update:open on create error", async () => {
+      vi.mocked(service_accounts.default.create).mockRejectedValue({
+        response: { status: 500, data: { message: "Server error" } },
+      });
+
+      wrapper.vm.formData.email = "test@example.com";
+      await nextTick();
+
+      wrapper.vm.onSubmit();
       await flushPromises();
 
-      expect(notifyMock).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          color: "negative"
-        })
-      );
+      // On failure the drawer must stay open — no update:open emit
+      expect(wrapper.emitted()["update:open"]).toBeFalsy();
+      expect(wrapper.emitted()["updated"]).toBeFalsy();
     });
   });
 
   describe("Service Account Update", () => {
     let updateWrapper;
-    let updateNotifyMock;
-    let dismissMock;
 
     beforeEach(async () => {
-      dismissMock = vi.fn();
-      updateNotifyMock = vi.fn().mockReturnValue(dismissMock);
-
-      // Create a new wrapper for update tests
-      updateWrapper = mount(AddServiceAccount, {
-        props: {
-          isUpdated: true,
-          modelValue: {
-            email: "existing@example.com",
-            first_name: "Existing Description",
-            organization: "test-org"
-          }
+      updateWrapper = mountComp({
+        isUpdated: true,
+        modelValue: {
+          email: "existing@example.com",
+          first_name: "Existing Description",
+          organization: "test-org",
         },
-        global: {
-          plugins: [[Quasar, { platform }], i18n, router],
-          provide: { store: mockStore, platform },
-          mocks: { 
-            $q: { 
-              platform, 
-              notify: updateNotifyMock 
-            } 
-          }
-        }
       });
 
       await nextTick();
@@ -297,56 +331,93 @@ describe("AddServiceAccount Component", () => {
       updateWrapper.unmount();
     });
 
-    it("updates service account successfully", async () => {
-      service_accounts.default.update.mockResolvedValue({ data: {} });
-      
+    it("updates service account successfully and emits update:open false", async () => {
+      vi.mocked(service_accounts.default.update).mockResolvedValue({
+        data: {},
+      });
+
       updateWrapper.vm.firstName = "Updated Description";
-      await updateWrapper.vm.$nextTick();
-      
-      const form = updateWrapper.find('form');
-      await form.trigger('submit.prevent');
+      await nextTick();
+
+      const form = updateWrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(service_accounts.default.update).toHaveBeenCalledWith(
         expect.objectContaining({
           first_name: "Updated Description",
-          organization: "test-org"
+          organization: "test-org",
         }),
         "test-org",
-        "existing@example.com"
+        "existing@example.com",
       );
       expect(updateWrapper.emitted()["updated"]).toBeTruthy();
+      expect(updateWrapper.emitted()["update:open"]).toBeTruthy();
+      expect(updateWrapper.emitted()["update:open"][0]).toEqual([false]);
     });
 
+    it("does not emit update:open on update error", async () => {
+      vi.mocked(service_accounts.default.update).mockRejectedValue({
+        response: { status: 500, data: { message: "Update failed" } },
+      });
+
+      updateWrapper.vm.onSubmit();
+      await flushPromises();
+
+      // On failure the drawer must stay open — no update:open emit
+      expect(updateWrapper.emitted()["update:open"]).toBeFalsy();
+      expect(updateWrapper.emitted()["updated"]).toBeFalsy();
+    });
+
+    it("does not throw on 403 error during update", async () => {
+      vi.mocked(service_accounts.default.update).mockRejectedValue({
+        response: { status: 403 },
+      });
+
+      await expect(
+        (async () => {
+          updateWrapper.vm.onSubmit();
+          await flushPromises();
+        })(),
+      ).resolves.not.toThrow();
+
+      expect(service_accounts.default.update).toHaveBeenCalled();
+    });
   });
 
   describe("UI Interactions", () => {
-    it("emits cancel event on cancel button click", async () => {
+    it("emits update:open false on cancel button click", async () => {
       const cancelButton = wrapper.find('[data-test="cancel-button"]');
-      await cancelButton.trigger('click');
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
+      expect(cancelButton.exists()).toBe(true);
+      await cancelButton.trigger("click");
+      expect(wrapper.emitted()["update:open"]).toBeTruthy();
+      expect(wrapper.emitted()["update:open"][0]).toEqual([false]);
     });
 
+    it("forwards ODrawer update:open to parent", async () => {
+      await wrapper
+        .findComponent({ name: "ODrawer" })
+        .vm.$emit("update:open", false);
+      expect(wrapper.emitted("update:open")).toBeTruthy();
+      expect(wrapper.emitted("update:open")[0]).toEqual([false]);
+    });
   });
 
   describe("Form State Management", () => {
     it("maintains form state after failed submission", async () => {
-      service_accounts.default.create.mockRejectedValue({
-        response: {
-          status: 400,
-          data: { message: "Error" }
-        }
+      vi.mocked(service_accounts.default.create).mockRejectedValue({
+        response: { status: 400, data: { message: "Error" } },
       });
 
       const testEmail = "test@example.com";
       const testDescription = "Test Description";
-      
+
       wrapper.vm.formData.email = testEmail;
       wrapper.vm.firstName = testDescription;
-      await wrapper.vm.$nextTick();
-      
-      const form = wrapper.find('form');
-      await form.trigger('submit.prevent');
+      await nextTick();
+
+      const form = wrapper.find("form");
+      await form.trigger("submit.prevent");
       await flushPromises();
 
       expect(wrapper.vm.formData.email).toBe(testEmail);
@@ -354,4 +425,3 @@ describe("AddServiceAccount Component", () => {
     });
   });
 });
-

@@ -534,8 +534,10 @@ export default class DashboardPanelTime {
    * Click the view panel date time picker to open it
    */
   async clickViewPanelDateTimePicker() {
-    const picker = this.page.locator('[data-test="dashboard-viewpanel-date-time-picker"]');
-    await picker.click();
+    const pickerBtn = this.page.locator('[data-test="dashboard-viewpanel-date-time-picker"] [data-test="date-time-btn"]');
+    await pickerBtn.waitFor({ state: "visible", timeout: 10000 });
+    await pickerBtn.scrollIntoViewIfNeeded();
+    await pickerBtn.click();
   }
 
   /**
