@@ -312,16 +312,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ></PanelSchemaRenderer>
     </div>
 
-    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
-    </q-dialog>
+    <QueryInspector v-model:open="showViewPanel" :metaData="metaData" :data="props.data" data-test="query-inspector-dialog" />
 
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+      data-test="panel-container-legends-dialog"
+    />
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"

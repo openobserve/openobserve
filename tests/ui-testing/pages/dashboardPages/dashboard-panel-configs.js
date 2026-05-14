@@ -115,24 +115,32 @@ export default class DashboardPanelConfigs {
     );
 
     // Column Order Popup locators (PromQL Aggregate mode)
+    // ColumnOrderPopUp is now an ODialog with parent slug `dashboard-column-order-popup`;
+    // primary/secondary buttons live inside as `o-dialog-{primary,secondary}-btn`.
     this.columnOrderBtn = page.locator('[data-test="dashboard-config-column-order-button"]');
-    this.columnOrderDialog = page.locator('[data-test="column-order-dialog"]');
+    this.columnOrderDialog = page.locator('[data-test="dashboard-column-order-popup"]');
 
     // Color By Series locators
+    // ColorBySeriesPopUp is now an ODialog with parent slug `color-by-series-popup-dialog`;
+    // save/cancel are the ODialog footer buttons.
     this.colorBySeriesBtn = page.locator(
       '[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]'
     );
+    // Inner content div (still rendered inside the ODialog body). The test asserts
+    // visibility/hidden on this selector explicitly, so keep it as-is.
     this.colorBySeriesPopup = page.locator(
       '[data-test="dashboard-color-by-series-popup"]'
     );
     this.colorBySeriesAddColorBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-color-by-series-add-btn"]'
+      '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-neutral-btn"]'
     );
     this.colorBySeriesSaveBtn = page.locator(
-      '[data-test="dashboard-addpanel-config-color-by-series-apply-btn"]'
+      '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-primary-btn"]'
     );
+    // ColorBySeriesPopUp doesn't declare a secondary button (only neutral + primary);
+    // closing without saving uses the ODialog × button.
     this.colorBySeriesCancelBtn = page.locator(
-      '[data-test="dashboard-color-by-series-cancel"]'
+      '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-close-btn"]'
     );
   }
   /// Open the config panel
@@ -360,8 +368,10 @@ export default class DashboardPanelConfigs {
     await unitSelect.click();
     await this.page.getByRole("option", { name: unitName, exact: true }).click();
 
-    // Scope to q-card__actions (OverrideConfigPopup footer) to avoid matching the panel Save btn
-    await this.page.locator('.q-card__actions').getByRole("button", { name: "Save" }).click();
+    // OverrideConfigPopup is now an ODialog — Save is the primary button inside the scoped panel
+    await this.page
+      .locator('[data-test="override-config-popup-dialog"] [data-test="o-dialog-primary-btn"]')
+      .click();
     await fieldSelect.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
 
@@ -393,7 +403,8 @@ export default class DashboardPanelConfigs {
       await popup.locator('.color-section input').first().waitFor({ state: "visible", timeout: 5000 });
     }
 
-    await popup.locator('[data-test="dashboard-addpanel-config-value-mapping-apply-btn"]').click();
+    // ValueMappingPopUp is now an ODialog — Apply is the primary footer button
+    await popup.locator('[data-test="o-dialog-primary-btn"]').click();
     await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
 
@@ -414,7 +425,7 @@ export default class DashboardPanelConfigs {
    */
   async closeValueMappingPopup() {
     const popup = this.page.locator('[data-test="dashboard-value-mapping-popup"]');
-    await popup.locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]').click();
+    await popup.locator('[data-test="o-dialog-close-btn"]').click();
     await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
 
@@ -788,13 +799,17 @@ export default class DashboardPanelConfigs {
 
   /** Saves the column order and waits for the dialog to close. */
   async saveColumnOrder() {
-    await this.page.locator('[data-test="dashboard-column-order-save-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-primary-btn"]')
+      .click();
     await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
   }
 
   /** Cancels the column order dialog without saving. */
   async cancelColumnOrder() {
-    await this.page.locator('[data-test="dashboard-column-order-cancel-btn"]').click();
+    await this.page
+      .locator('[data-test="dashboard-column-order-popup"] [data-test="o-dialog-secondary-btn"]')
+      .click();
     await this.columnOrderDialog.waitFor({ state: 'hidden', timeout: 5000 });
   }
 

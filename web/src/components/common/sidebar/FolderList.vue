@@ -117,21 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
       </div>
     </div>
-      <q-dialog
-          v-model="showAddFolderDialog"
-          position="right"
-          full-height
-          maximized
-          data-test="dashboard-folder-dialog"
-        >
-        <AddFolder  
-        style="width: 30vw;"
-        @update:modelValue="updateFolderList"
-        :edit-mode="isFolderEditMode"
-        :folder-id="selectedFolderToEdit ?? 'default'"
-        :type="type"
+      <AddFolder
+          v-model:open="showAddFolderDialog"
+          @update:modelValue="updateFolderList"
+          :edit-mode="isFolderEditMode"
+          :folder-id="selectedFolderToEdit ?? 'default'"
+          :type="type"
         />
-      </q-dialog>
     <ConfirmDialog
     :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"

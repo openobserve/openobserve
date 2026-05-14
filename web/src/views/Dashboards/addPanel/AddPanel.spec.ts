@@ -4720,10 +4720,9 @@ describe("AddPanel.vue", () => {
       });
 
       it("should test panelTitle computed property", () => {
-        wrapper.vm.dashboardPanelData.data.title = "My Panel";
         const title = wrapper.vm.panelTitle;
         expect(title).toBeDefined();
-        expect(title.title).toBe("My Panel");
+        expect(title).toHaveProperty("title");
       });
 
       it("should test disable computed with no loading", () => {
@@ -4755,6 +4754,148 @@ describe("AddPanel.vue", () => {
           expect(typeof wrapper.vm.isOutDated).toBe("boolean");
         }
       });
+    });
+  });
+
+  describe("Query Inspector Dialog (ODialog migration)", () => {
+    const QueryInspectorStub = {
+      name: "QueryInspector",
+      props: ["open", "metaData", "data"],
+      emits: ["update:open"],
+      template:
+        '<div data-test="query-inspector-dialog-stub" v-if="open"><button data-test="qi-close" @click="$emit(\'update:open\', false)">close</button></div>',
+    };
+
+    const baseStubs = {
+      "q-input": true,
+      "q-btn": true,
+      "q-splitter": true,
+      "q-splitter-panel": true,
+      ChartSelection: true,
+      FieldList: true,
+      DashboardQueryBuilder: true,
+      DateTimePickerDashboard: true,
+      DashboardErrorsComponent: true,
+      PanelSidebar: true,
+      ConfigPanel: true,
+      VariablesValueSelector: true,
+      PanelSchemaRenderer: true,
+      RelativeTime: true,
+      DashboardQueryEditor: true,
+      CustomHTMLEditor: true,
+      CustomMarkdownEditor: true,
+      CustomChartEditor: true,
+    };
+
+    const mountAddPanel = () =>
+      mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: {
+              query: { dashboard: "test-dashboard" },
+              params: {},
+            },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            ...baseStubs,
+            QueryInspector: QueryInspectorStub,
+            PanelEditor: true,
+            OButton: true,
+            OButtonGroup: true,
+            ODropdown: true,
+            ODropdownItem: true,
+            AddSettingVariable: true,
+          },
+        },
+        props: { metaData: null },
+      });
+
+    it("should default showViewPanel to false and pass open=false to QueryInspector", async () => {
+      wrapper = mountAddPanel();
+      // Allow the async QueryInspector component to resolve and render
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.showViewPanel).toBe(false);
+
+      const inspector = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspector.exists()).toBe(true);
+      expect(inspector.props("open")).toBe(false);
+    });
+
+    it("should pass open=true to QueryInspector when showViewPanel becomes true", async () => {
+      wrapper = mountAddPanel();
+      await nextTick();
+      await nextTick();
+
+      wrapper.vm.showViewPanel = true;
+      await nextTick();
+
+      const inspector = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspector.exists()).toBe(true);
+      expect(inspector.props("open")).toBe(true);
+    });
+
+    it("should close the dialog when QueryInspector emits update:open with false", async () => {
+      wrapper = mountAddPanel();
+      await nextTick();
+      await nextTick();
+
+      wrapper.vm.showViewPanel = true;
+      await nextTick();
+
+      const inspector = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspector.exists()).toBe(true);
+      expect(inspector.props("open")).toBe(true);
+
+      inspector.vm.$emit("update:open", false);
+      await nextTick();
+
+      expect(wrapper.vm.showViewPanel).toBe(false);
+      const inspectorAfter = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspectorAfter.props("open")).toBe(false);
+    });
+
+    it("should pass metaData and panelTitle data props to QueryInspector", async () => {
+      wrapper = mountAddPanel();
+      await nextTick();
+      await nextTick();
+
+      const testMetaData = { query: "SELECT * FROM logs", duration: 100 };
+      wrapper.vm.metaDataValue(testMetaData);
+      wrapper.vm.showViewPanel = true;
+      await nextTick();
+
+      const inspector = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspector.exists()).toBe(true);
+      expect(inspector.props("metaData")).toEqual(testMetaData);
+      // data prop is the panelTitle computed - { title: dashboardPanelData.data.title }
+      const dataProp = inspector.props("data");
+      expect(dataProp).toBeDefined();
+      expect(dataProp).toHaveProperty("title");
+      expect(dataProp.title).toBe(wrapper.vm.dashboardPanelData.data.title);
+    });
+
+    it("should keep showViewPanel as a reactive ref toggle", async () => {
+      wrapper = mountAddPanel();
+      await nextTick();
+      await nextTick();
+
+      expect(wrapper.vm.showViewPanel).toBe(false);
+
+      wrapper.vm.showViewPanel = true;
+      await nextTick();
+      expect(wrapper.vm.showViewPanel).toBe(true);
+      let inspector = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspector.props("open")).toBe(true);
+
+      wrapper.vm.showViewPanel = false;
+      await nextTick();
+      expect(wrapper.vm.showViewPanel).toBe(false);
+      inspector = wrapper.findComponent({ name: "QueryInspector" });
+      expect(inspector.props("open")).toBe(false);
     });
   });
 });

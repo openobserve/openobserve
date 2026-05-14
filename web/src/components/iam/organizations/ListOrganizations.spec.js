@@ -111,7 +111,24 @@ describe("ListOrganizations", () => {
           QInput: true,
           QIcon: true,
           QBtn: true,
-          QDialog: true,
+          ODialog: {
+            name: 'ODialog',
+            template: '<div class="o-dialog-stub" v-if="open"><slot /></div>',
+            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+          },
+          ODrawer: {
+            name: 'ODrawer',
+            template: '<div class="o-drawer-stub" v-if="open"><slot /></div>',
+            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+          },
+          AddUpdateOrganization: {
+            name: 'AddUpdateOrganization',
+            template: '<div class="add-update-organization-stub" v-if="open" />',
+            props: ['open', 'modelValue'],
+            emits: ['update:open', 'updated'],
+          },
           QTablePagination: true,
           NoData: true,
         },
@@ -146,7 +163,9 @@ describe("ListOrganizations", () => {
             QInput: true,
             QIcon: true,
             QBtn: true,
-            QDialog: true,
+            ODialog: true,
+            ODrawer: true,
+            AddUpdateOrganization: true,
             QTablePagination: true,
             NoData: true,
           },
@@ -199,7 +218,9 @@ describe("ListOrganizations", () => {
             QInput: true,
             QIcon: true,
             QBtn: true,
-            QDialog: true,
+            ODialog: true,
+            ODrawer: true,
+            AddUpdateOrganization: true,
             QTablePagination: true,
             NoData: true,
           },
@@ -344,8 +365,51 @@ describe("ListOrganizations", () => {
       });
       await flushPromises();
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.showAddOrganizationDialog).toBe(true);
+    });
+
+    it("should render AddUpdateOrganization with v-model:open bound to showAddOrganizationDialog", async () => {
+      wrapper.vm.showAddOrganizationDialog = true;
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      expect(addUpdate.exists()).toBe(true);
+      expect(addUpdate.props('open')).toBe(true);
+    });
+
+    it("should close dialog when AddUpdateOrganization emits update:open false", async () => {
+      await router.push('/organizations');
+      await flushPromises();
+      wrapper.vm.showAddOrganizationDialog = true;
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      expect(addUpdate.exists()).toBe(true);
+
+      await addUpdate.vm.$emit('update:open', false);
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddOrganizationDialog).toBe(false);
+    });
+
+    it("should refresh organization list when AddUpdateOrganization emits updated", async () => {
+      wrapper.vm.showAddOrganizationDialog = true;
+      await flushPromises();
+      await wrapper.vm.$nextTick();
+
+      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      expect(addUpdate.exists()).toBe(true);
+
+      organizationsService.list.mockClear();
+      await addUpdate.vm.$emit('updated');
+      await flushPromises();
+
+      expect(organizationsService.list).toHaveBeenCalled();
+      expect(wrapper.vm.showAddOrganizationDialog).toBe(false);
     });
   });
 

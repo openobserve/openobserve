@@ -32,7 +32,7 @@ export class AlertDestinationsPage {
         this.destinationImportNameInput = '[data-test="destination-import-name-input"]';
         this.destinationImportCancelBtn = '[data-test="destination-import-cancel-btn"]';
         this.destinationListSearchInput = '[data-test="destination-list-search-input"]';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
         this.deleteDestinationButton = '[data-test="alert-destination-list-{destinationName}-delete-destination"]';
         this.importJsonFileTab = '[data-test="tab-import_json_file"]';
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
@@ -1316,7 +1316,7 @@ export class AlertDestinationsPage {
 
         // Confirm deletion in dialog - wait for dialog to be visible
         await this.page.waitForTimeout(1000);
-        const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        const confirmBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
 
