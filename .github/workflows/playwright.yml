@@ -164,17 +164,23 @@ jobs:
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
               ]
-          - testfolder: "Logs-Builder"
+          - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
             run_files:
               [
                 "logsQueryBuilder-chart.spec.js",
-                "logsQueryBuilder-filters.spec.js",
-                "logsQueryBuilder-editor.spec.js",
-                "logsquickmode.spec.js",
-                "logshistogram.spec.js",
+                "logsQueryBuilder-filters-basic.spec.js",
                 "pagination.spec.js",
                 "unflattened.spec.js",
+              ]
+          - testfolder: "Logs-Builder-Advanced"
+            browser: "chrome"
+            run_files:
+              [
+                "logsQueryBuilder-editor.spec.js",
+                "logsQueryBuilder-filters-advanced.spec.js",
+                "logsquickmode.spec.js",
+                "logshistogram.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"
@@ -558,7 +564,7 @@ jobs:
           if [ -n "$FILE_LIST" ]; then
             # Map logical folder names to actual directories
             case "${{ matrix.testfolder }}" in
-              "Logs-Builder"|"Logs-Core"|"Logs-Features")
+              "Logs-Builder-Basic"|"Logs-Builder-Advanced"|"Logs-Core"|"Logs-Features")
                 ACTUAL_FOLDER="Logs"
                 ;;
               "Dashboards-Core"|"Dashboards-Settings"|"Dashboards-Charts"|"Dashboards-Streaming"|"Dashboards-Variables"|"Dashboard-Table-Pagination"|"Dashboard-Pivot-Table"|"Dashboards-Panel-Level-DateTime-Config"|"Dashboard-Config-Settings")
