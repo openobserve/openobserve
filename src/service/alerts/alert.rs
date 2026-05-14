@@ -542,6 +542,9 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
                 "alerts",
                 "PUT",
                 Some(&curr_folder.folder_id),
+                false,
+                true,
+                false,
             )
             .await
             {
@@ -2201,6 +2204,9 @@ async fn permitted_alerts(
                 method: "GET".to_string(),
                 bypass_check: false,
                 parent_id: "".to_string(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: true,
                 auth: "".to_string(), // We don't need to pass the auth token here.
             },
             user_role,

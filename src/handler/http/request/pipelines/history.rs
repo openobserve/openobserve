@@ -270,6 +270,9 @@ pub async fn get_pipeline_history(
                     &pipeline_obj,
                     "",
                     &role,
+                    false,
+                    false,
+                    true,
                 )
                 .await;
 

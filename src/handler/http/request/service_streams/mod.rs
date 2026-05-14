@@ -66,12 +66,15 @@ pub async fn get_dimension_analytics(
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
-            "",
+            &org_id,
             &org_id,
             &user_email.user_id,
             "service_streams",
             "GET",
             None,
+            true,
+            false,
+            false,
         )
         .await
         {
@@ -181,12 +184,15 @@ pub async fn correlate_streams(
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
-            "",
+            &org_id,
             &org_id,
             &user_email.user_id,
             "service_streams",
             "GET",
             None,
+            true,
+            false,
+            false,
         )
         .await
         {
@@ -303,12 +309,15 @@ pub async fn get_identity_config(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if !check_permissions(
-        "",
+        &org_id,
         &org_id,
         &user_email.user_id,
         "service_streams",
         "GET",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -346,12 +355,15 @@ pub async fn save_identity_config(
 
     #[cfg(feature = "enterprise")]
     if !check_permissions(
-        "",
+        &org_id,
         &org_id,
         &user_email.user_id,
         "service_streams",
         "PUT",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -451,12 +463,15 @@ pub async fn reset_services(
     #[cfg(feature = "enterprise")]
     {
         if !check_permissions(
-            "",
+            &org_id,
             &org_id,
             &user_email.user_id,
             "service_streams",
             "DELETE",
             None,
+            true,
+            false,
+            false,
         )
         .await
         {

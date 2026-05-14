@@ -416,6 +416,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("alert_id" = String, Path, description = "Source alert or anomaly config ID"),
+        ("folder" = Option<String>, Query, description = "Folder ID (Required if RBAC enabled)"),
     ),
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
@@ -743,6 +744,9 @@ pub async fn delete_alert_bulk(
             "alerts",
             "DELETE",
             Some(&_folder_id),
+            false,
+            true,
+            false,
         )
         .await
         {
@@ -1036,13 +1040,26 @@ pub async fn enable_alert_bulk(
     Json(req): Json<AlertBulkEnableRequest>,
 ) -> Response {
     let should_enable = query.value;
+    let _folder_id = query.folder;
 
     #[cfg(feature = "enterprise")]
     {
         let user_id = &user_email.user_id;
 
         for id in &req.ids {
-            if !check_permissions(&id.to_string(), &org_id, user_id, "alerts", "PUT", None).await {
+            if !check_permissions(
+                &id.to_string(),
+                &org_id,
+                user_id,
+                "alerts",
+                "PUT",
+                Some(&_folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }

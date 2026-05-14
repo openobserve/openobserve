@@ -157,7 +157,11 @@ pub async fn delete_action_bulk(
             if Ksuid::from_str(id).is_err() {
                 return MetaHttpResponse::bad_request(format!("invalid action id {id}"));
             };
-            if !check_permissions(id, &org_id, &user_id, "actions", "DELETE", None).await {
+            if !check_permissions(
+                id, &org_id, &user_id, "actions", "DELETE", None, false, false, true,
+            )
+            .await
+            {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
         }
@@ -740,6 +744,9 @@ pub async fn upload_zipped_action(
             "actions",
             method,
             None,
+            false,
+            false,
+            true,
         )
         .await
         {

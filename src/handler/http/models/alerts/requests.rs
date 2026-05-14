@@ -244,6 +244,8 @@ pub struct ListAlertsQuery {
 pub struct EnableAlertQuery {
     /// Set to `true` to enable the alert or `false` to disable the alert.
     pub value: bool,
+    /// Pass the folder id, required for rbac
+    pub folder: String,
 }
 
 impl From<CreateAlertRequestBody> for meta_alerts::Alert {

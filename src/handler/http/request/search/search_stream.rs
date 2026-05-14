@@ -406,6 +406,9 @@ pub async fn search_http2_stream(
                 permission_type,
                 method,
                 None,
+                false,
+                false,
+                true,
             )
             .await
             {

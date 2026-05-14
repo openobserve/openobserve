@@ -29,6 +29,10 @@ use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use svix_ksuid::KsuidLike;
 
 use crate::{
+    common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
     handler::http::request::anomaly_detection::{
         CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
     },
@@ -351,6 +355,17 @@ pub async fn create_config(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+    set_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: result.anomaly_id.clone(),
+            parent_type: "alert_folders".to_owned(),
+            parent: folder_name.to_owned(),
+        },
+    )
+    .await;
+
     // Broadcast config creation to all super cluster regions for API-read consistency.
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -643,7 +658,7 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
 
     // Verify the config exists before deleting (returns 404 if missing).
-    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+    let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
@@ -651,6 +666,19 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
     anomaly_config_table::delete(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    // Clean up FGA ownership tuple so stale grants don't linger.
+    let folder_name = pk_to_name(Some(&existing.folder_id)).await;
+    remove_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: anomaly_id.to_string(),
+            parent_type: "alert_folders".to_owned(),
+            parent: folder_name,
+        },
+    )
+    .await;
 
     // Broadcast config deletion to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -770,6 +798,19 @@ pub async fn clone_config(
     let result = anomaly_config_table::create(db, cloned)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+    // Set FGA ownership so non-root users can access the config they just cloned.
+    let folder_name = pk_to_name(Some(&result.folder_id)).await;
+    set_ownership(
+        org_id,
+        "alerts",
+        Authz {
+            obj_id: result.anomaly_id.clone(),
+            parent_type: "alert_folders".to_owned(),
+            parent: folder_name,
+        },
+    )
+    .await;
 
     // Broadcast cloned config to all super cluster regions for API-read consistency.
     #[cfg(feature = "enterprise")]

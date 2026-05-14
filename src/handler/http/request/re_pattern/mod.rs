@@ -382,7 +382,19 @@ pub async fn delete_bulk(
         let mut err = None;
 
         for id in &req.ids {
-            if !check_permissions(id, &org_id, &user_id, "re_patterns", "DELETE", None).await {
+            if !check_permissions(
+                id,
+                &org_id,
+                &user_id,
+                "re_patterns",
+                "DELETE",
+                None,
+                false,
+                false,
+                true,
+            )
+            .await
+            {
                 return MetaHttpResponse::forbidden("Unauthorized Access");
             }
             let pattern_usage = mgr.get_pattern_usage(id);

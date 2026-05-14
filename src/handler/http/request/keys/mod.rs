@@ -374,7 +374,19 @@ pub async fn delete_bulk(
     let org_id = path;
     let user_id = &user_email.user_id;
     for key in &body.ids {
-        if !check_permissions(key, &org_id, user_id, "cipher_keys", "DELETE", None).await {
+        if !check_permissions(
+            key,
+            &org_id,
+            user_id,
+            "cipher_keys",
+            "DELETE",
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }

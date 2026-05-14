@@ -71,6 +71,9 @@ pub async fn list(
         "model_pricing",
         "LIST",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -180,6 +183,9 @@ pub async fn get(
         "model_pricing",
         "GET",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -230,6 +236,9 @@ pub async fn create(
         "model_pricing",
         "PUT",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -311,6 +320,9 @@ pub async fn update(
         "model_pricing",
         "PUT",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -379,6 +391,9 @@ pub async fn delete(
         "model_pricing",
         "DELETE",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -459,6 +474,9 @@ pub async fn get_built_in(
         "model_pricing",
         "LIST",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -546,6 +564,9 @@ pub async fn refresh_built_in(
         "model_pricing",
         "PUT",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
@@ -677,6 +698,9 @@ pub async fn test_model_match(
         "model_pricing",
         "LIST",
         None,
+        true,
+        false,
+        false,
     )
     .await
     {
