@@ -32,6 +32,7 @@ pub struct Organization {
     #[serde(default)]
     pub identifier: String,
     /// Only alphanumeric characters (A-Z, a-z, 0-9), spaces, and underscores are allowed
+    #[serde(alias = "label")]
     pub name: String,
     #[serde(default)]
     pub org_type: String,
