@@ -103,10 +103,9 @@ const checkIfShouldShowScrollButton = () => {
 
   const { scrollTop, scrollHeight, clientHeight } = summaryContainer.value;
 
-  // Show scroll to bottom button when user scrolls up significantly
-  // Only show if there's enough content to scroll and user is not at bottom
-  const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
-  const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
+  // Show scroll to bottom button when there's scrollable content and user is not at bottom
+  const hasScrollableContent = scrollHeight > clientHeight + 10;
+  const isScrolledUp = scrollTop + clientHeight < scrollHeight - 10;
 
   showScrollToBottom.value = hasScrollableContent && isScrolledUp;
 };
@@ -123,7 +122,6 @@ const scrollToBottomSmooth = async () => {
   }
 };
 
-// Check scroll state when summary text changes
 watch(summaryText, async () => {
   await nextTick();
   checkIfShouldShowScrollButton();
@@ -148,6 +146,7 @@ onMounted(async () => {
   font-size: 0.8125rem;
   line-height: 2.2;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem;
   display: flex;
