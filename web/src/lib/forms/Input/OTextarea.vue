@@ -6,7 +6,16 @@ import type {
   TextareaEmits,
   TextareaSlots,
 } from "./OTextarea.types";
-import { computed, nextTick, onMounted, ref, useId, watch } from "vue";
+import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
+
+// Forward the consumer's `data-test` from <OTextarea data-test="…"> onto the
+// root wrapper so E2E selectors can scope to the specific field instance.
+// (Same pattern as ODialog / OInput.)
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(
+  () => $attrs["data-test"] as string | undefined,
+);
 
 const props = withDefaults(defineProps<TextareaProps>(), {
   rows: 3,
@@ -87,7 +96,7 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
+  <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
       v-if="label || $slots.tooltip"
@@ -99,6 +108,7 @@ const wrapperClasses = computed(() => [
         v-if="$slots.tooltip"
         name="info"
         size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
       ><slot name="tooltip" /></q-icon>
     </label>

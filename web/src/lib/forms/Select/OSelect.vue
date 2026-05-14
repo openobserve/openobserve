@@ -34,6 +34,7 @@ import {
   onBeforeUnmount,
   provide,
   ref,
+  useAttrs,
   useSlots,
   watch,
   watchEffect,
@@ -66,6 +67,15 @@ const props = withDefaults(defineProps<SelectProps>(), {
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
+
+// Forward the consumer's `data-test` from <OSelect data-test="…"> onto the
+// root wrapper so E2E selectors can scope to the specific field instance.
+// (Same pattern as ODialog / OInput.)
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(
+  () => $attrs["data-test"] as string | undefined,
+);
 
 const emit = defineEmits<SelectEmits>();
 const slots = useSlots();
@@ -554,7 +564,7 @@ const fieldWidthClass = computed(() => {
 </script>
 
 <template>
-  <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
+  <div v-bind="$attrs" :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
       v-if="label || $slots.tooltip"
@@ -566,6 +576,7 @@ const fieldWidthClass = computed(() => {
         v-if="$slots.tooltip"
         name="info"
         size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
       ><slot name="tooltip" /></q-icon>
     </label>

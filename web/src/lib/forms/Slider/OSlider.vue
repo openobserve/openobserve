@@ -2,7 +2,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SliderProps, SliderEmits, SliderSlots } from "./OSlider.types";
-import { computed, useId } from "vue";
+import { computed, useAttrs, useId } from "vue";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<SliderProps>(), {
   min: 0,
@@ -87,20 +91,27 @@ const resolvedSize = computed(() => props.size ?? "md");
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
     <div
-      v-if="$slots.label || label || showValue"
+      v-if="$slots.label || label || showValue || $slots.tooltip"
       class="tw:flex tw:items-center tw:justify-between tw:gap-2"
     >
       <label
-        v-if="$slots.label || label"
+        v-if="$slots.label || label || $slots.tooltip"
         :for="inputId"
         :class="[
           labelSize[resolvedSize],
-          'tw:font-medium tw:text-slider-label tw:leading-none',
+          'tw:font-medium tw:text-slider-label tw:leading-none tw:flex tw:items-center tw:gap-1',
         ]"
       >
         <slot name="label">{{ label }}</slot>
+        <q-icon
+          v-if="$slots.tooltip"
+          name="info"
+          size="16px"
+          :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+          class="tw:cursor-help tw:text-slider-label"
+        ><slot name="tooltip" /></q-icon>
       </label>
       <span
         v-if="showValue"

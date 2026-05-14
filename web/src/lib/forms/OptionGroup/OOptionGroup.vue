@@ -11,7 +11,11 @@ import ORadioGroup from "../Radio/ORadioGroup.vue";
 import ORadio from "../Radio/ORadio.vue";
 import OCheckboxGroup from "../Checkbox/OCheckboxGroup.vue";
 import OCheckbox from "../Checkbox/OCheckbox.vue";
-import { computed } from "vue";
+import { computed, useAttrs } from "vue";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<OptionGroupProps>(), {
   type: "radio",
@@ -54,17 +58,27 @@ function handleCheckbox(val: (string | number)[]) {
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-2 tw:w-full">
+  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-2 tw:w-full">
     <div
-      v-if="$slots.label || label"
+      v-if="$slots.label || label || $slots.tooltip"
       :class="[
-        'tw:text-xs tw:font-medium tw:leading-none',
+        'tw:text-xs tw:font-medium tw:leading-none tw:flex tw:items-center tw:gap-1',
         disabled
           ? 'tw:text-option-group-label-disabled'
           : 'tw:text-option-group-label',
       ]"
     >
       <slot name="label">{{ label }}</slot>
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+        :class="[
+          'tw:cursor-help',
+          disabled ? 'tw:text-option-group-label-disabled' : 'tw:text-option-group-label',
+        ]"
+      ><slot name="tooltip" /></q-icon>
     </div>
 
     <ORadioGroup

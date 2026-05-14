@@ -45,4 +45,6 @@ export interface DateEmits {
 
 export interface DateSlots {
   label?: () => unknown;
+  /** Tooltip content — renders an info icon in the label row when provided */
+  tooltip?: () => unknown;
 }

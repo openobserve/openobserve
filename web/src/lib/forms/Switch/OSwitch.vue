@@ -2,7 +2,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
-import { computed, ref, useId, useSlots, watch } from "vue";
+import { computed, ref, useAttrs, useId, useSlots, watch } from "vue";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
@@ -79,11 +83,14 @@ const slots = useSlots();
 const autoId = useId();
 const buttonId = computed(() => props.id ?? autoId);
 const labelId = computed(() => `${buttonId.value}-label`);
-const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
+const hasLabel = computed(
+  () => Boolean(slots.label) || props.label !== undefined || Boolean(slots.tooltip),
+);
 </script>
 
 <template>
   <div
+    v-bind="$attrs"
     :class="[
       'tw:inline-flex tw:items-center tw:gap-2',
       labelPosition === 'left' ? 'tw:flex-row-reverse' : 'tw:flex-row',
@@ -129,15 +136,22 @@ const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefine
     </button>
 
     <span
-      v-if="hasLabel"
+      v-if="hasLabel || $slots.tooltip"
       :id="labelId"
       :class="[
         labelSize[size ?? 'md'],
-        'tw:select-none tw:leading-none',
+        'tw:select-none tw:leading-none tw:flex tw:items-center tw:gap-1',
         disabled ? 'tw:text-switch-label-disabled' : 'tw:text-switch-label',
       ]"
     >
       <slot name="label">{{ label }}</slot>
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+        class="tw:cursor-help"
+      ><slot name="tooltip" /></q-icon>
     </span>
   </div>
 </template>
