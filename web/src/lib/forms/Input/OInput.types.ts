@@ -99,4 +99,9 @@ export interface InputSlots {
   prepend?: () => unknown;
   /** Appended block placed outside the border on the right */
   append?: () => unknown;
+  /**
+   * Tooltip content rendered inside an info icon in the label area.
+   * Provide a `<q-tooltip>` element as the slot content.
+   */
+  tooltip?: () => unknown;
 }

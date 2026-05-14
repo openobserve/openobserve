@@ -8,7 +8,7 @@ import type {
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
 } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY } from "./OSelect.types";
+import { SELECT_VALUE_MAP_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import {
   ListboxFilter,
@@ -93,7 +93,13 @@ provide(SELECT_VALUE_MAP_KEY, valueMap);
 const isPrimitiveSelectValue = (
   value: unknown,
 ): value is SelectPrimitiveValue =>
-  ["string", "number", "boolean"].includes(typeof value);
+  value === null || ["string", "number", "boolean"].includes(typeof value);
+
+/** Map null ↔ sentinel so Reka UI receives a valid string */
+function toRekaString(v: SelectPrimitiveValue): string {
+  if (v === null) return NULL_VALUE_SENTINEL;
+  return String(v);
+}
 
 function normalizeOption(raw: unknown): NormalizedOption | null {
   if (isPrimitiveSelectValue(raw)) {
@@ -147,9 +153,10 @@ const normalizedOptions = computed<NormalizedOption[]>(() => {
 // their original type. Without this, numeric values like `1` round-trip as `"1"`
 // (Reka stores listbox values as strings) and strict-equality checks against
 // the typed option value — e.g. the multi-select checkbox indicator — never match.
+// Also registers NULL_VALUE_SENTINEL → null so null options round-trip correctly.
 watchEffect(() => {
   for (const o of normalizedOptions.value) {
-    if (!o.header) valueMap.set(String(o.value), o.value);
+    if (!o.header) valueMap.set(toRekaString(o.value), o.value);
   }
 });
 
@@ -257,7 +264,7 @@ const hasError = computed(() => !!effectiveError.value);
 
 const stringValue = computed(() =>
   !Array.isArray(props.modelValue) && props.modelValue !== undefined
-    ? String(props.modelValue)
+    ? toRekaString(props.modelValue)
     : undefined,
 );
 
@@ -309,9 +316,9 @@ function handleListboxUpdate(value: unknown) {
 
 const listboxStringModelValue = computed<string | string[]>(() => {
   const resolved = props.multiple
-    ? selectedValues.value.map((value) => String(value))
+    ? selectedValues.value.map((value) => toRekaString(value))
     : selectedValues.value[0] !== undefined
-      ? String(selectedValues.value[0])
+      ? toRekaString(selectedValues.value[0])
       : "";
   return resolved;
 });
@@ -386,11 +393,10 @@ const virtualizer = useVirtualizer(
   })),
 );
 
-// md was h-10 (40px); reduced to h-9 (36px) so the trigger matches the
-// compact OInput density and the in-dropdown search filter.
+// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "tw:h-8 tw:text-sm",
-  md: "tw:h-9 tw:text-sm",
+  md: "tw:h-8 tw:text-sm",
 };
 
 // Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
@@ -551,11 +557,17 @@ const fieldWidthClass = computed(() => {
   <div :class="['tw:flex tw:flex-col tw:gap-1', fieldWidthClass]">
     <!-- Label -->
     <label
-      v-if="label"
+      v-if="label || $slots.tooltip"
       :for="id"
-      class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none"
+      class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
+      <q-icon
+        v-if="$slots.tooltip"
+        name="info"
+        size="16px"
+        class="tw:cursor-help tw:text-input-label"
+      ><slot name="tooltip" /></q-icon>
     </label>
 
     <template v-if="listboxModeEnabled">
@@ -581,7 +593,7 @@ const fieldWidthClass = computed(() => {
               'tw:focus:outline-none tw:focus:border-select-border-focus',
               'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
               'tw:transition-colors tw:duration-150',
-              'tw:disabled:bg-select-disabled-bg tw:disabled:opacity-60 tw:disabled:cursor-not-allowed',
+              'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed',
               triggerEndPadding,
               heightClasses[size ?? 'md'],
             ]"
@@ -938,7 +950,7 @@ const fieldWidthClass = computed(() => {
             'tw:focus:outline-none tw:focus:border-select-border-focus',
             'tw:focus:ring-2 tw:focus:ring-select-focus-ring',
             'tw:transition-colors tw:duration-150',
-            'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:opacity-60 tw:data-disabled:cursor-not-allowed',
+            'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed',
             triggerEndPadding,
             heightClasses[size ?? 'md'],
           ]"

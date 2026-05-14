@@ -541,22 +541,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           v-show="isConfigOptionVisible('data', 'limit')"
         >
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.queryLimit") }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-limit-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              {{ t("dashboard.limitForQueryResult") }}
-            </q-tooltip>
-          </div>
           <OInput
             v-model.number="
               dashboardPanelData.data.queries[
@@ -572,34 +556,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ].config.limit = value ? value : 0)
             "
             placeholder="0"
+            :label="t('dashboard.queryLimit')"
             data-test="dashboard-config-limit"
-          />
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+                {{ t("dashboard.limitForQueryResult") }}
+              </q-tooltip>
+            </template>
+          </OInput>
         </div>
 
         <div
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results')"
         >
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.showTopNValues") }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-top_results-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              <b>{{ t("dashboard.topNTooltipTitle") }}</b>
-              <br />
-              <br />
-              {{ t("dashboard.topNTooltipDescription") }}
-            </q-tooltip>
-          </div>
           <OInput
             v-model.number="dashboardPanelData.data.config.top_results"
             type="number"
@@ -616,8 +587,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.layout.currentQueryIndex
               ]?.fields?.breakdown?.length == 0
             "
+            :label="t('dashboard.showTopNValues')"
             data-test="dashboard-config-top_results"
-          />
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
+                <b>{{ t("dashboard.topNTooltipTitle") }}</b>
+                <br /><br />
+                {{ t("dashboard.topNTooltipDescription") }}
+              </q-tooltip>
+            </template>
+          </OInput>
         </div>
 
         <div
@@ -688,27 +668,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
         >
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.noValueReplacement") }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-limit-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              {{ t("dashboard.noValueReplacementTooltip") }}
-            </q-tooltip>
-          </div>
           <OInput
             v-model="dashboardPanelData.data.config.no_value_replacement"
             placeholder="-"
+            :label="t('dashboard.noValueReplacement')"
             data-test="dashboard-config-no-value-replacement"
-          />
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
+                {{ t("dashboard.noValueReplacementTooltip") }}
+              </q-tooltip>
+            </template>
+          </OInput>
         </div>
       </div>
     </q-expansion-item>
@@ -755,76 +726,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          style="width: 100%; display: flex; gap: 16px"
+          class="tw:flex tw:gap-2"
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'y-axis')"
         >
-          <div style="width: 50%">
-            <div style="display: flex; align-items: center; gap: 4px" class="tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-              <span>{{ t("common.yAxisMin") }}</span>
-              <q-icon
-                name="info"
-                size="20px"
-                style="cursor: pointer"
-                data-test="dashboard-config-y_axis_min-info"
-              >
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  :offset="[0, 8]"
-                >
-                  <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
-                  <br />
-                  {{ t("dashboard.yAxisMinTooltipDescription") }}
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <OInput
-              v-model.number="dashboardPanelData.data.config.y_axis_min"
-              type="number"
-              :placeholder="t('dashboard.auto')"
-              @update:model-value="
-                (value: any) =>
-                  (dashboardPanelData.data.config.y_axis_min =
-                    value !== '' ? value : null)
-              "
-              data-test="dashboard-config-y_axis_min"
-            />
-          </div>
-          <div style="width: 50%">
-            <div style="display: flex; align-items: center; gap: 4px" class="tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-              <span>{{ t("common.yAxisMax") }}</span>
-              <q-icon
-                name="info"
-                size="20px"
-                style="cursor: pointer"
-                data-test="dashboard-config-y_axis_max-info"
-              >
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  :offset="[0, 8]"
-                >
-                  <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
-                  <br />
-                  {{ t("dashboard.yAxisMaxTooltipDescription") }}
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <OInput
-              v-model.number="dashboardPanelData.data.config.y_axis_max"
-              type="number"
-              :placeholder="t('dashboard.auto')"
-              @update:model-value="
-                (value: any) =>
-                  (dashboardPanelData.data.config.y_axis_max =
-                    value !== '' ? value : null)
-              "
-              data-test="dashboard-config-y_axis_max"
-            />
-          </div>
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
+            v-model.number="dashboardPanelData.data.config.y_axis_min"
+            type="number"
+            :placeholder="t('dashboard.auto')"
+            :label="t('common.yAxisMin')"
+            @update:model-value="
+              (value: any) =>
+                (dashboardPanelData.data.config.y_axis_min =
+                  value !== '' ? value : null)
+            "
+            data-test="dashboard-config-y_axis_min"
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" :offset="[0, 8]">
+                <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
+                <br />
+                {{ t("dashboard.yAxisMinTooltipDescription") }}
+              </q-tooltip>
+            </template>
+          </OInput>
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
+            v-model.number="dashboardPanelData.data.config.y_axis_max"
+            type="number"
+            :placeholder="t('dashboard.auto')"
+            :label="t('common.yAxisMax')"
+            @update:model-value="
+              (value: any) =>
+                (dashboardPanelData.data.config.y_axis_max =
+                  value !== '' ? value : null)
+            "
+            data-test="dashboard-config-y_axis_max"
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" :offset="[0, 8]">
+                <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
+                <br />
+                {{ t("dashboard.yAxisMaxTooltipDescription") }}
+              </q-tooltip>
+            </template>
+          </OInput>
         </div>
 
         <OSwitch
@@ -882,84 +829,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          style="width: 100%; display: flex; gap: 16px"
+          class="tw:flex tw:gap-2"
           v-if="shouldShowAxisLabelConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'axis-label')"
         >
-          <div style="width: 50%">
-            <div style="display: flex; align-items: center; gap: 4px" class="tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-              <span>{{ t("dashboard.axisLabelRotate") }}</span>
-              <q-icon
-                name="info"
-                size="20px"
-                style="cursor: pointer"
-                data-test="dashboard-config-axis-label-rotate-info"
-              >
-                <q-tooltip
-                  anchor="top middle"
-                  self="bottom middle"
-                  :offset="[0, 8]"
-                  class="bg-grey-8"
-                >
-                  <div>
-                    <span>{{ t("dashboard.axisLabelRotateTooltipText") }}</span>
-                    <br /><br />
-                    <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
-                    <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
-                  </div>
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <OInput
-              v-model.number="dashboardPanelData.data.config.axis_label_rotate"
-              type="number"
-              placeholder="0"
-              @update:model-value="
-                (value: any) =>
-                  (dashboardPanelData.data.config.axis_label_rotate =
-                    value !== '' ? value : 0)
-              "
-              data-test="dashboard-config-axis-label-rotate"
-            />
-          </div>
-          <div style="width: 50%">
-            <div style="display: flex; align-items: center; gap: 4px" class="tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-              <span>{{ t("dashboard.axisLabelTruncate") }}</span>
-              <q-icon
-                name="info"
-                size="20px"
-                style="cursor: pointer"
-                data-test="dashboard-config-axis-label-truncate-info"
-              >
-                <q-tooltip
-                  anchor="top middle"
-                  self="bottom middle"
-                  :offset="[0, 8]"
-                  class="bg-grey-8"
-                >
-                  <div>
-                    <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
-                    <br /><br />
-                    <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
-                    <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
-                  </div>
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <OInput
-              v-model.number="
-                dashboardPanelData.data.config.axis_label_truncate_width
-              "
-              type="number"
-              placeholder="0"
-              @update:model-value="
-                (value: any) =>
-                  (dashboardPanelData.data.config.axis_label_truncate_width =
-                    value !== '' ? value : null)
-              "
-              data-test="dashboard-config-axis-label-truncate-width"
-            />
-          </div>
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
+            v-model.number="dashboardPanelData.data.config.axis_label_rotate"
+            type="number"
+            placeholder="0"
+            :label="t('dashboard.axisLabelRotate')"
+            @update:model-value="
+              (value: any) =>
+                (dashboardPanelData.data.config.axis_label_rotate =
+                  value !== '' ? value : 0)
+            "
+            data-test="dashboard-config-axis-label-rotate"
+          >
+            <template #tooltip>
+              <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]" class="bg-grey-8">
+                <div>
+                  <span>{{ t("dashboard.axisLabelRotateTooltipText") }}</span>
+                  <br /><br />
+                  <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                  <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
+                </div>
+              </q-tooltip>
+            </template>
+          </OInput>
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
+            v-model.number="
+              dashboardPanelData.data.config.axis_label_truncate_width
+            "
+            type="number"
+            placeholder="0"
+            :label="t('dashboard.axisLabelTruncate')"
+            @update:model-value="
+              (value: any) =>
+                (dashboardPanelData.data.config.axis_label_truncate_width =
+                  value !== '' ? value : null)
+            "
+            data-test="dashboard-config-axis-label-truncate-width"
+          >
+            <template #tooltip>
+              <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]" class="bg-grey-8">
+                <div>
+                  <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
+                  <br /><br />
+                  <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                  <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
+                </div>
+              </q-tooltip>
+            </template>
+          </OInput>
         </div>
       </div>
     </q-expansion-item>
@@ -1333,20 +1256,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="dashboardPanelData.data.type == 'maps'"
         >
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.mapsMapType") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              {{ t("dashboard.mapsMapTypeTooltip") }}
-            </q-tooltip>
-          </div>
           <OSelect
             v-model="dashboardPanelData.data.config.map_type.type"
             :options="mapTypeOptions"
             :valueKey="'value'"
             :labelKey="'label'"
+            :label="t('dashboard.mapsMapType')"
             data-test="dashboard-config-map-type"
-          />
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" max-width="250px">
+                {{ t("dashboard.mapsMapTypeTooltip") }}
+              </q-tooltip>
+            </template>
+          </OSelect>
         </div>
 
         <OSelect
@@ -1363,6 +1286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ t("dashboard.initialView") }}</span>
           <div class="row tw:gap-2">
             <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lat"
               :label="t('dashboard.latitudeLabel')"
               type="number"
@@ -1372,6 +1296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-config-latitude"
             />
             <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lng"
               :label="t('dashboard.longitudeLabel')"
               type="number"
@@ -1402,6 +1327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="row tw:gap-2">
             <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-if="
                 dashboardPanelData.data.config.map_symbol_style.size ===
                 'by Value'
@@ -1423,6 +1349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-config-map-symbol-min"
             />
             <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-if="
                 dashboardPanelData.data.config.map_symbol_style.size ===
                 'by Value'
@@ -1576,27 +1503,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="config-section-body">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.trellisLayout") }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-top_results-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              <b>{{
-                hasTimeShifts
-                  ? t("dashboard.trellisTimeShiftTooltip")
-                  : t("dashboard.trellisTooltip")
-              }}</b>
-            </q-tooltip>
-          </div>
           <OSelect
             :label="t('dashboard.trellisLayout')"
             data-test="dashboard-trellis-chart"
@@ -1605,40 +1511,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :valueKey="'value'"
             :labelKey="'label'"
             :disabled="isBreakdownFieldEmpty || hasTimeShifts"
-          />
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
+                <b>{{
+                  hasTimeShifts
+                    ? t("dashboard.trellisTimeShiftTooltip")
+                    : t("dashboard.trellisTooltip")
+                }}</b>
+              </q-tooltip>
+            </template>
+          </OSelect>
         </div>
 
         <div
           v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
           v-show="isConfigOptionVisible('layout', 'trellis-columns')"
         >
-          <div class="row items-center all-pointer-events tw:text-xs tw:font-medium tw:text-input-label tw:mb-1">
-            {{ t("dashboard.numOfColumns") }}
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-top_results-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              <b>{{
-                hasTimeShifts
-                  ? t("dashboard.trellisTimeShiftTooltip")
-                  : t("dashboard.trellisTooltip")
-              }}</b>
-            </q-tooltip>
-          </div>
           <OInput
             v-model.number="
               dashboardPanelData.data.config.trellis.num_of_columns
             "
             type="number"
             :placeholder="t('dashboard.auto')"
+            :label="t('dashboard.numOfColumns')"
             data-test="trellis-chart-num-of-columns"
             :disabled="isBreakdownFieldEmpty || hasTimeShifts"
             :min="1"
@@ -1649,7 +1545,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? (dashboardPanelData.data.config.trellis.num_of_columns = 16)
                   : value
             "
-          />
+          >
+            <template #tooltip>
+              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
+                <b>{{
+                  hasTimeShifts
+                    ? t("dashboard.trellisTimeShiftTooltip")
+                    : t("dashboard.trellisTooltip")
+                }}</b>
+              </q-tooltip>
+            </template>
+          </OInput>
         </div>
 
         <div
@@ -2965,6 +2871,8 @@ export default defineComponent({
   gap: 12px;
   padding: 8px 8px;
   margin-left: 12px;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .config-no-results {

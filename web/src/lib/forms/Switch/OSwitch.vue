@@ -70,7 +70,7 @@ const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
 const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
   sm: "tw:text-xs",
   md: "tw:text-sm",
-  lg: "tw:text-base",
+  lg: "tw:text-sm",
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
