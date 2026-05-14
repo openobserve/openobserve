@@ -61,8 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-folder-move-dialog"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
+    :primary-button-disabled="isAddingFolder"
+    :primary-button-loading="isAddingFolder"
     @click:secondary="showAddFolderDialog = false"
-    @click:primary="addFolderRef?.submit()"
+    @click:primary="handleAddFolder"
   >
     <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
   </ODrawer>
@@ -93,7 +95,18 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
-      const addFolderRef: any = ref(null);
+    const addFolderRef: any = ref(null);
+    const isAddingFolder = ref(false);
+
+    const handleAddFolder = async () => {
+      if (!addFolderRef.value || isAddingFolder.value) return;
+      isAddingFolder.value = true;
+      try {
+        await addFolderRef.value.submit();
+      } finally {
+        isAddingFolder.value = false;
+      }
+    };
 
     const getInitialFolderValue = () => {
       // priority: activeFolderId > query.folder > default
@@ -157,6 +170,8 @@ export default defineComponent({
       updateFolderList,
       showAddFolderDialog,
       addFolderRef,
+      isAddingFolder,
+      handleAddFolder,
       computedStyle,
     };
   },

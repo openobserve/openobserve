@@ -164,9 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title="Add New Folder"
       primary-button-label="Save"
       secondary-button-label="Cancel"
-      @click:primary="addFolderRef?.submit()"
+      :primary-button-disabled="isAddingFolder"
+      :primary-button-loading="isAddingFolder"
+      @click:primary="handleAddFolder"
       @click:secondary="showAddFolderDialog = false"
-      @close="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
     >
       <AddFolder
@@ -229,6 +230,17 @@ export default defineComponent({
     const importing = ref(false);
     const showAddFolderDialog = ref(false);
     const addFolderRef = ref<InstanceType<typeof AddFolder> | null>(null);
+    const isAddingFolder = ref(false);
+
+    const handleAddFolder = async () => {
+      if (!addFolderRef.value || isAddingFolder.value) return;
+      isAddingFolder.value = true;
+      try {
+        await addFolderRef.value.submit();
+      } finally {
+        isAddingFolder.value = false;
+      }
+    };
 
     const filteredDashboards = computed(() => {
       if (!searchQuery.value) return dashboards.value;
@@ -557,6 +569,8 @@ export default defineComponent({
       importing,
       showAddFolderDialog,
       addFolderRef,
+      isAddingFolder,
+      handleAddFolder,
       isSelected,
       toggleDashboard,
       loadDashboards,

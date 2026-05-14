@@ -944,7 +944,8 @@ describe("AddDashboardFromGitHub Component", () => {
 
       const drawers = wrapper.findAllComponents({ name: "ODrawer" });
       const nested = drawers[1];
-      await nested.vm.$emit("close");
+      // The nested ODrawer uses v-model:open, so closing it emits update:open with false.
+      await nested.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
