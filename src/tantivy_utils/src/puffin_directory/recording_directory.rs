@@ -58,11 +58,6 @@ impl HasLen for RecordingFileHandle {
 impl FileHandle for RecordingFileHandle {
     fn read_bytes(&self, byte_range: Range<usize>) -> io::Result<OwnedBytes> {
         let payload = self.inner.read_bytes(byte_range.clone())?;
-        self.ops.lock().unwrap().push(ReadOperation {
-            path: self.path.clone(),
-            offset: byte_range.start,
-            num_bytes: payload.len(),
-        });
         Ok(payload)
     }
 
@@ -125,12 +120,6 @@ impl<D: Directory + Clone + 'static> Directory for RecordingDirectory<D> {
 
     fn atomic_read(&self, path: &Path) -> Result<Vec<u8>, OpenReadError> {
         let data = self.inner.atomic_read(path)?;
-        let len = data.len();
-        self.ops.lock().unwrap().push(ReadOperation {
-            path: path.to_owned(),
-            offset: 0,
-            num_bytes: len,
-        });
         Ok(data)
     }
 
