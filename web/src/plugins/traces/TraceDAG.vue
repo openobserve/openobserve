@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="trace-dag-container">
     <div v-if="isLoading" class="flex items-center justify-center column q-pa-xl loading-container">
-      <q-spinner color="primary" size="50px" />
+      <OSpinner size="lg" />
       <div class="q-mt-md text-grey-7">Loading trace DAG...</div>
     </div>
 
@@ -93,6 +93,7 @@ import searchService from "@/services/search";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface SpanNode {
   span_id: string;
@@ -123,6 +124,7 @@ export default defineComponent({
     Background,
     Controls,
     Handle,
+    OSpinner,
   },
   props: {
     traceId: {

@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading State -->
       <div v-if="loading" class="card-container tw:h-[calc(100vh-242px)]">
         <div class="flex flex-center tw:h-full">
-          <q-spinner-hourglass color="primary" size="50px" />
+          <OSpinner size="lg" />
         </div>
       </div>
 
@@ -409,6 +409,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { X, Copy, Check } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface ProfileEvent {
   timestamp: string;
@@ -453,6 +454,7 @@ export default defineComponent({
     X,
     Copy,
     Check,
+    OSpinner,
   },
   setup() {
     const router = useRouter();

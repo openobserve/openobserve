@@ -31,7 +31,7 @@
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
@@ -170,6 +170,8 @@
     import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+    import { X } from "lucide-vue-next";
+    import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     const defaultStreamData = {
         name: '',
         schema: [],
@@ -200,6 +202,9 @@
         AppTabs,
         QTablePagination,
         ODrawer,
+        OButton,
+        X,
+        OSpinner,
     },
     emits: ['update:open'],
     setup(props) {

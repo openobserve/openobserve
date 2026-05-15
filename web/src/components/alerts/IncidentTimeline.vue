@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:items-center tw:py-12">
-      <q-spinner-dots size="40px" color="primary" />
+      <OSpinner variant="dots" size="md" />
     </div>
 
     <!-- Empty state -->
@@ -326,6 +326,7 @@ import { date } from "quasar";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {
   orgId: string;

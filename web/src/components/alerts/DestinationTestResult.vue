@@ -123,7 +123,7 @@ limitations under the License. -->
       class="o2-test-loading"
     >
       <div class="result-icon">
-        <q-spinner color="primary" size="20px" />
+        <OSpinner size="xs" />
       </div>
       <div class="result-content">
         <div class="result-title">
@@ -155,6 +155,7 @@ import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import { date } from 'quasar';
 import type { TestResult } from '@/utils/prebuilt-templates/types';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 // Define component props
 interface Props {

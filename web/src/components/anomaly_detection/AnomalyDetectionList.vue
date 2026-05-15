@@ -51,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :color="statusColor(props.row)"
             :label="statusLabel(props.row)"
           >
-            <q-spinner
+            <OSpinner
               v-if="props.row.status === 'training'"
-              size="0.7em"
+              size="xs"
               class="q-ml-xs"
             />
           </q-badge>
@@ -258,10 +258,11 @@ import { date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 } from 'lucide-vue-next';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2 },
+  components: { OButton, ODialog, RefreshCw, Pencil, Pause, Play, StopCircle, BrainCircuit, Trash2, OSpinner },
 
   props: {
     org_identifier: {

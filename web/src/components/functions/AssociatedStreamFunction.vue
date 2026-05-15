@@ -80,11 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-md q-py-xs"
               style="height: 60px"
             >
-              <q-inner-loading
-                size="sm"
+              <OInnerLoading
                 :showing="loadingFunctions"
                 label="Fetching functions..."
-                label-style="font-size: 1.1em"
+                size="sm"
               />
             </div>
             <div v-show="!loadingFunctions">
@@ -299,10 +298,11 @@ import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw, OInnerLoading },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

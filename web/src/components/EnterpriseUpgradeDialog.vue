@@ -46,20 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="hero-offer">
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
-                <q-skeleton
-                  type="circle"
-                  size="40px"
-                  class="usage-indicator"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.2);"
+                <OSkeleton
+                  class="usage-indicator tw:rounded-full"
+                  style="width: 40px; height: 40px;"
                 />
-                <q-skeleton
-                  type="rect"
-                  width="200px"
-                  height="44px"
-                  class="offer-badge-skeleton"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.2); border-radius: 24px;"
+                <OSkeleton
+                  class="offer-badge-skeleton tw:rounded-3xl"
+                  style="width: 200px; height: 44px;"
                 />
               </template>
 
@@ -76,12 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="dialogConfig.isLicensed" class="usage-chart-section">
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
-                <q-skeleton
-                  type="rect"
-                  height="150px"
-                  class="chart-skeleton"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.1); border-radius: 8px;"
+                <OSkeleton
+                  class="chart-skeleton tw:rounded-lg"
+                  style="height: 150px;"
                 />
               </template>
               <!-- Loaded chart -->
@@ -237,6 +227,7 @@ import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -288,6 +279,7 @@ export default defineComponent({
     ChartRenderer,
     OButton,
     ODialog,
+    OSkeleton,
   },
   props: {
     modelValue: {

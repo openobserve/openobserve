@@ -63,10 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
-            <q-spinner-dots
+            <OSpinner
               v-if="!store.state.organizationData.folders.length"
-              color="primary"
-              size="2em"
+              variant="dots"
+              size="sm"
             />
             <q-icon
               class="q-table__title tw:text-gray-400 tw:mt-1"
@@ -374,6 +374,7 @@ import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -413,6 +414,7 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
+    OSpinner,
   },
   setup() {
     const { t } = useI18n();

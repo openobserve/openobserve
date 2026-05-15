@@ -95,13 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex justify-center items-center q-ml-xs"
                   :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
                 >
-                  <q-circular-progress
-                    indeterminate
-                    rounded
-                    size="16px"
-                    :value="1"
-                    color="secondary"
-                  />
+                  <OSpinner size="xs" />
                 </div>
                 <OButton
                   :data-test="`alert-list-${props.row.name}-update-alert`"
@@ -318,6 +312,7 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -345,6 +340,7 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     ODialog,
+    OSpinner,
   },
   emits: [
     "updated:fields",
