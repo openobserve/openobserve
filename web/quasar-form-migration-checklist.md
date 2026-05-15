@@ -355,6 +355,66 @@ if (!name.value.trim()) {
 
 ---
 
+### 10b. q-select with custom `#option` slot → OSelect (drop custom slot, use built-in multi-select)
+
+Quasar's `q-select` supports a `#option` slot for fully custom per-item rendering (e.g. a label-click for single-select + a `q-toggle` for multi-toggle). **OSelect has no `#option` slot.**
+
+**Strategy — drop the custom slot and use OSelect's native multi-select checkboxes:**
+
+1. Replace `q-toggle` per-item with OSelect's built-in checkbox (automatic in `multiple` mode)
+2. Drop `#no-option` → use `#empty` slot instead
+3. Remove `@filter` — OSelect has built-in search; pass the full options array directly
+4. If the old code used Quasar's ref API (`hidePopup`, `updateInputValue`, `scrollTo`) via `this.$refs.select`, these are now exposed by OSelect via `defineExpose` — the call sites work unchanged
+5. Remove any per-item click handler that was only used for "single-select from multi" UX — this shortcut is dropped; standard checkbox toggling replaces it
+
+```vue
+<!-- Before -->
+<q-select
+  ref="streamSelect"
+  v-model="selectedStream"
+  :options="streamOptions"
+  multiple emit-value map-options use-input
+  @filter="filterStreamFn"
+  @update:model-value="onStreamChange"
+>
+  <template #no-option><q-item><q-item-section>No results</q-item-section></q-item></template>
+  <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+    <q-item v-bind="itemProps">
+      <q-item-section @click="singleSelect(opt)">{{ opt.label }}</q-item-section>
+      <q-item-section side>
+        <q-toggle :model-value="selected" @update:model-value="toggleOption(opt.value)" />
+      </q-item-section>
+    </q-item>
+  </template>
+</q-select>
+
+<!-- After -->
+<OSelect
+  ref="streamSelect"
+  v-model="selectedStream"
+  :options="streamOptions"
+  multiple
+  @update:model-value="onStreamChange"
+>
+  <template #empty>No results</template>
+</OSelect>
+```
+
+**Ref API calls — no changes needed in the handler:**
+OSelect exposes `hidePopup()`, `updateInputValue(val)`, and `scrollTo(index)` via `defineExpose`, so existing handler code using `this.$refs.streamSelect.updateInputValue("")` continues to work as-is.
+
+**OTooltip placed inside q-select → wrap OSelect in a div:**
+If the original q-select had an OTooltip child (for hover-on-trigger), OTooltip can't be a child of OSelect's template. Move it into a wrapper div alongside OSelect — hovering the div (which OSelect fills) still triggers the tooltip:
+
+```vue
+<div class="tw:flex-1 tw:min-w-0">
+  <OSelect ref="streamSelect" v-model="selected" :options="opts" multiple class="tw:w-full" />
+  <OTooltip v-if="selected.length > 1" :content="selected.join(', ')" side="bottom" />
+</div>
+```
+
+---
+
 ### 11. q-tooltip → OTooltip
 
 `OTooltip` is a drop-in replacement for `q-tooltip`. It supports the same **child mode** (placed inside the trigger element, no default slot) and a **wrapper mode** (trigger provided via default slot).
@@ -1088,7 +1148,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/plugins/correlation/DimensionFiltersBar.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/DetailTable.vue
-- [ ] src/plugins/logs/IndexList.vue
+- ✅ src/plugins/logs/IndexList.vue
 - ✅ src/plugins/logs/JsonPreview.vue
 - ✅ src/plugins/logs/SearchBar.vue
 - ✅ src/plugins/logs/SearchResult.vue
@@ -1147,7 +1207,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/plugins/logs/DetailTable.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
-- [ ] src/plugins/logs/IndexList.vue
+- ✅ src/plugins/logs/IndexList.vue
 - ✅ src/plugins/logs/SearchBar.vue
 - ✅ src/plugins/logs/SearchHistory.vue
 - ✅ src/plugins/logs/TransformSelector.vue
