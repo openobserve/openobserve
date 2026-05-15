@@ -19,7 +19,7 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     get_config,
     meta::{
-        search::{SearchPartitionRequest, StreamResponses, TimeOffset, default_use_cache},
+        search::{PaginatedResponse, SearchPartitionRequest, StreamResponses, TimeOffset, default_use_cache},
         stream::StreamType,
     },
     metrics,
@@ -774,17 +774,15 @@ pub async fn get_latest_traces(
         ])
         .inc();
 
-    let mut resp: HashMap<&str, json::Value> = HashMap::new();
-    resp.insert("took", json::Value::from((time * 1000.0) as usize));
-    resp.insert("total", json::Value::from(traces_data.len()));
-    resp.insert("from", json::Value::from(from));
-    resp.insert("size", json::Value::from(size));
-    resp.insert("hits", json::to_value(traces_data).unwrap());
-    resp.insert("trace_id", json::Value::from(trace_id));
-    if !range_error.is_empty() {
-        resp.insert("function_error", json::Value::String(range_error));
-    }
-    MetaHttpResponse::json(resp)
+    MetaHttpResponse::json(PaginatedResponse {
+        took: (time * 1000.0) as usize,
+        total: traces_data.len(),
+        from,
+        size,
+        hits: traces_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        trace_id,
+        function_error: range_error,
+    })
 }
 
 /// GetLatestTracesStream — HTTP/2 streaming variant of GetLatestTraces

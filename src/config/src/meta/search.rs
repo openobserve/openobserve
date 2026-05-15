@@ -254,6 +254,21 @@ pub struct Response {
     pub peak_memory_usage: Option<f64>,
 }
 
+/// Paginated response used by list-style APIs (sessions, traces, users).
+#[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
+pub struct PaginatedResponse {
+    pub took: usize,
+    pub total: usize,
+    pub from: i64,
+    pub size: i64,
+    #[schema(value_type = Vec<Object>)]
+    pub hits: Vec<json::Value>,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub trace_id: String,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub function_error: String,
+}
+
 /// Iterator for Streaming response of search `Response`
 ///
 /// This is used to split the search response to smaller chunks based on
