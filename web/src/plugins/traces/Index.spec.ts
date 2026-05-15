@@ -1108,7 +1108,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"], false); // liveMode is undefined, so skipSearch = false
+      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
     });
 
     it("should call removeFilterByField when error only toggle is turned off", async () => {
