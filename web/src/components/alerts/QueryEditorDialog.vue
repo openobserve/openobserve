@@ -115,17 +115,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="pane-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                       </div>
                       <div class="tw:flex tw:items-center tw:gap-2">
-                        <q-toggle
+                        <OSwitch
                           v-if="localTab !== 'promql'"
                           :model-value="!sqlEditorMaximized"
-                          :icon="'img:' + getImageURL('images/common/function.svg')"
-                          size="xs"
                           class="o2-toggle-button-xs"
                           :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                           @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
                         >
-                          <q-tooltip :delay="400" class="tw:text-[12px]">{{ sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor' }}</q-tooltip>
-                        </q-toggle>
+                          <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
+                        </OSwitch>
                         <OButton
                           data-test="alert-run-query-btn"
                           variant="primary"
@@ -191,11 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
                       </template>
                     </div>
-                    <q-tooltip
+                    <OTooltip
                       v-if="sqlStatusState === 'sql-status-bar--error'"
-                      anchor="top middle" self="bottom middle" max-width="520px"
+                      side="top" align="center"
+                      :max-width="'520px'"
                       style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
-                    >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</q-tooltip>
+                      :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
+                    />
                   </div>
                 </div>
 
@@ -220,20 +220,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div v-if="!sqlEditorMaximized" class="tw:flex tw:gap-2 tw:items-center">
                       <!-- Saved functions -->
-                      <q-select
+                      <OSelect
                         v-model="selectedFunction"
                         :options="functionOptions"
                         data-test="alert-saved-vrl-function-select"
-                        input-debounce="0"
-                        behavior="menu"
-                        use-input
-                        borderless
-                        dense
-                        hide-selected
-                        menu-anchor="bottom left"
-                        fill-input
-                        option-label="name"
-                        option-value="name"
+                        labelKey="name"
+                        valueKey="name"
                         @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
                         class="mini-select alert-v3-select"
@@ -242,12 +234,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 140px;"
                         :placeholder="t('alerts.placeholders.savedFunctions')"
                       >
-                        <template #no-option>
+                        <template #empty>
                           <q-item>
                             <q-item-section>{{ t("search.noResult") }}</q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                       <!-- Apply VRL -->
                       <OButton
                         data-test="alert-apply-vrl-btn"
@@ -456,6 +448,9 @@ import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 const props = defineProps({
   modelValue: {

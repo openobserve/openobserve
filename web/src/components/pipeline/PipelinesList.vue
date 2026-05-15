@@ -36,19 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:active-tab="updateActiveTab"
             />
 
-            <q-input
+            <OInput
               data-test="pipeline-list-search-input"
               v-model="filterQuery"
-              borderless
-              dense
-              flat
               class="no-border o2-search-input"
               :placeholder="t('pipeline.search')"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
             <!-- Full buttons visible at wide widths -->
             <template v-if="!shouldCollapseToolbar">
               <OButton
@@ -179,10 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="triggerExpand(props)"
               >
                 <q-td auto-width>
-                  <q-checkbox
+                  <OCheckbox
                     v-model="props.selected"
                     class="o2-table-checkbox"
-                    size="sm"
                     @click.stop
                   />
                 </q-td>
@@ -249,9 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <Eye class="tw:size-3.5 tw:shrink-0" />
                         </template>
-                        <q-tooltip position="bottom">
-                          <PipelineView :pipeline="props.row" />
-                        </q-tooltip>
+                        <OTooltip>
+                          <template #content><PipelineView :pipeline="props.row" /></template>
+                        </OTooltip>
                       </OButton>
                       <OButton
                         variant="ghost"
@@ -379,20 +375,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <no-data />
             </template>
             <template v-slot:body-selection="scope">
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 class="o2-table-checkbox"
               />
             </template>
 
             <template v-slot:body-cell-function="props">
               <q-td :props="props">
-                <q-tooltip>
-                  <pre data-test="scheduled-pipeline-expanded-tooltip-sql">{{
-                    props.row.sql
-                  }}</pre>
-                </q-tooltip>
+                <OTooltip>
+                  <template #content><pre data-test="scheduled-pipeline-expanded-tooltip-sql">{{ props.row.sql }}</pre></template>
+                </OTooltip>
                 <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
               </q-td>
             </template>
@@ -477,9 +470,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tr :props="props">
                 <!-- Adding this block to render the select-all checkbox -->
                 <q-th v-if="columns.length > 0">
-                  <q-checkbox
+                  <OCheckbox
                     v-model="props.selected"
-                    size="sm"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-table-checkbox-dark'
@@ -668,6 +660,9 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import PipelineView from "./PipelineView.vue";
 import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 import { filter, update } from "lodash-es";
 

@@ -43,67 +43,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-conditions-select-column"
           class="q-ml-none o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.column"
-            :options="filteredFields"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
+            :options="props.streamFields"
             class="q-py-sm"
-            filled
-            emit-value
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
             :placeholder="t('alerts.column')"
-            @filter="filterColumns"
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :creatable="props.enableNewValueMode"
+            :error="!!fieldErrors[`${field.uuid}-column`]"
+            :error-message="fieldErrors[`${field.uuid}-column`] || ''"
             style="min-width: 220px"
-            v-bind="newValueMode"
+            @create="(val: string) => { field.column = val; emits('input:update', 'conditions', field); }"
+            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
         </div>
         <div
           data-test="alert-conditions-operator-select"
           class="q-ml-none o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.operator"
             :options="triggerOperators"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            color="input-border"
-            bg-color="input-bg"
             class="q-py-sm"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :error="!!fieldErrors[`${field.uuid}-operator`]"
+            :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
             style="min-width: 120px"
-            @update:model-value="emits('input:update', 'conditions', field)"
+            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
         </div>
         <div
           data-test="alert-conditions-value-input"
           class="q-ml-none flex items-end o2-input"
         >
-          <q-input
+          <OInput
             v-model="field.value"
-            :options="streamFields"
-            :popup-content-style="{ textTransform: 'capitalize' }"
             :placeholder="t('common.value')"
-            color="input-border"
-            bg-color="input-bg"
             class="q-py-sm"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :error="!!fieldErrors[`${field.uuid}-value`]"
+            :error-message="fieldErrors[`${field.uuid}-value`] || ''"
             style="min-width: 150px"
-            @update:model-value="emits('input:update', 'conditions', field)"
+            @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-value`] = v ? '' : 'Field is required!'; emits('input:update', 'conditions', field); }"
           />
         </div>
         <div
@@ -138,9 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { ref, computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
@@ -162,6 +142,8 @@ const props = defineProps({
     }
   
 });
+const fieldErrors = reactive<Record<string, string>>({});
+
 var triggerOperators: any = ref([
   "=",
   "!=",
@@ -173,8 +155,6 @@ var triggerOperators: any = ref([
   "NotContains",
 ]);
 const emits = defineEmits(["add", "remove", "input:update"]);
-
-const filteredFields = ref(props.streamFields);
 
 const store = useStore();
 
@@ -189,22 +169,7 @@ const addApiHeader = () => {
   emits("add");
 };
 
-const filterColumns = (val: string, update: Function) => {
-  if (val === "") {
-    update(() => {
-      filteredFields.value = [...props.streamFields];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredFields.value = props.streamFields.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
-    );
-  });
-};
-const newValueMode = computed(() => {
-      return props.enableNewValueMode ? { 'new-value-mode': 'unique' } : {};
-    });
+
 
 </script>
 

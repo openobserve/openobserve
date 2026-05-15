@@ -35,10 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:full-width tw:flex tw:items-center tw:justify-end tw:gap-3"
           >
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
@@ -46,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               data-test="action-list-add-btn"
               variant="primary"
@@ -80,9 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <NoData />
             </template>
             <template v-slot:body-selection="scope">
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 class="o2-table-checkbox"
               />
             </template>
@@ -118,9 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-cell-function="props">
               <q-td :props="props">
-                <q-tooltip>
-                  <pre>{{ props.row.sql }}</pre>
-                </q-tooltip>
+                <OTooltip>
+                  <template #content>
+                    <pre>{{ props.row.sql }}</pre>
+                  </template>
+                </OTooltip>
                 <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
               </q-td>
             </template>
@@ -160,9 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tr :props="props">
                 <!-- Adding this block to render the select-all checkbox -->
                 <q-th v-if="columns.length > 0" auto-width>
-                  <q-checkbox
+                  <OCheckbox
                     v-model="props.selected"
-                    size="sm"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-table-checkbox-dark'
@@ -238,31 +236,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
             <q-form id="action-script-clone-form" @submit="submitForm">
-              <q-input
+              <OInput
                 data-test="to-be-clone-action-name"
                 v-model="toBeCloneAlertName"
                 label="Alert Name"
               />
-              <q-select
+              <OSelect
                 data-test="to-be-clone-stream-type"
                 v-model="toBeClonestreamType"
                 label="Stream Type"
                 :options="streamTypes"
                 @update:model-value="updateStreams()"
               />
-              <q-select
+              <OSelect
                 data-test="to-be-clone-stream-name"
                 v-model="toBeClonestreamName"
                 :loading="isFetchingStreams"
-                :disable="!toBeClonestreamType"
+                :disabled="!toBeClonestreamType"
                 label="Stream Name"
                 :options="streamNames"
-                @change="updateStreamName"
-                @filter="filterStreams"
-                use-input
-                fill-input
-                hide-selected
-                :input-debounce="400"
+                @update:model-value="updateStreamName"
               />
             </q-form>
         </ODialog>
@@ -313,6 +306,10 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -341,6 +338,10 @@ export default defineComponent({
     OButton,
     ODialog,
     OSpinner,
+    OInput,
+    OCheckbox,
+    OTooltip,
+    OSelect,
   },
   emits: [
     "updated:fields",

@@ -48,9 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="model-pricing-info-btn"
           >
             <q-icon name="info_outline" size="14px" />
-            <q-tooltip class="bg-grey-9">
-              {{ t("modelPricing.matchingPriorityTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
           </OButton>
         </div>
         <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
@@ -62,17 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:active-tab="onTabChange"
             />
           </div>
-          <q-input
+          <OInput
             v-model="filterQuery"
-            borderless
-            dense
             class="no-border o2-search-input"
             :placeholder="t('modelPricing.searchPlaceholder')"
           >
             <template #prepend>
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
-          </q-input>
+          </OInput>
           <OButton
             variant="outline"
             size="sm"
@@ -134,11 +130,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="col.style"
             >
               <template v-if="col.name === 'select'">
-                <q-checkbox
+                <OCheckbox
                   v-if="selectableModels.length > 0"
                   :model-value="allSelected"
                   :indeterminate="someSelected"
-                  size="sm"
                   class="o2-table-checkbox"
                   @update:model-value="toggleSelectAll"
                   data-test="model-pricing-select-all"
@@ -156,14 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="13px"
                     class="col-header-info-icon"
                   >
-                    <q-tooltip
-                      :delay="200"
-                      anchor="top middle"
-                      self="bottom middle"
-                      style="max-width: 260px; white-space: normal"
-                    >
-                      {{ col.tooltip }}
-                    </q-tooltip>
+                    <OTooltip
+                      side="top"
+                      align="center"
+                      :content="col.tooltip"
+                    />
                   </q-icon>
                 </span>
               </template>
@@ -219,9 +211,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <template v-if="col.name === 'select'">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selectedIds.includes(props.row.id)"
-                  size="sm"
                   class="o2-table-checkbox"
                   @update:model-value="toggleSelect(props.row.id)"
                   :data-test="`model-pricing-select-${props.rowIndex}`"
@@ -251,12 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:w-[16px] tw:h-[16px]"
                       alt="OpenObserve"
                     />
-                    <q-tooltip
-                      :delay="500"
-                      anchor="top middle"
-                      self="bottom middle"
-                      >{{ t("modelPricing.sourceBuiltIn") }}</q-tooltip
-                    >
+                    <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
                   </span>
                   <q-icon
                     v-else-if="
@@ -268,12 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="16px"
                     class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                   >
-                    <q-tooltip
-                      :delay="500"
-                      anchor="top middle"
-                      self="bottom middle"
-                      >{{ t("modelPricing.sourceInherited") }}</q-tooltip
-                    >
+                    <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
                   </q-icon>
                   <q-icon
                     v-else
@@ -281,26 +262,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="16px"
                     class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                   >
-                    <q-tooltip
-                      :delay="500"
-                      anchor="top middle"
-                      self="bottom middle"
-                      >{{ t("modelPricing.sourceCustom") }}</q-tooltip
-                    >
+                    <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
                   </q-icon>
                   <div class="o2-table-cell-content">{{ props.row.name }}</div>
-                  <q-tooltip
+                  <OTooltip
                     v-if="props.row.name.length > 30"
-                    anchor="top middle"
-                    self="bottom middle"
-                    :delay="500"
-                    style="
-                      max-width: none;
-                      white-space: normal;
-                      word-break: break-all;
-                    "
-                    >{{ props.row.name }}</q-tooltip
-                  >
+                    side="top"
+                    align="center"
+                    :content="props.row.name"
+                  />
                 </div>
               </template>
               <template v-else-if="col.name === 'match_pattern'">
@@ -337,39 +307,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       +{{ getOverflowCount(props.row) }}
                       {{ t("modelPricing.overflowMore") }}
-                      <q-tooltip
-                        :delay="400"
-                        anchor="top middle"
-                        self="bottom middle"
-                        class="pricing-overflow-tooltip"
-                      >
-                        <div class="pricing-breakdown-tooltip">
-                          <div class="pricing-breakdown-title">
-                            {{ props.row.name }}
+                      <OTooltip>
+                        <template #content>
+                          <div class="pricing-breakdown-tooltip">
+                            <div class="pricing-breakdown-title">
+                              {{ props.row.name }}
+                            </div>
+                            <table class="pricing-breakdown-table">
+                              <thead>
+                                <tr>
+                                  <th>{{ t("modelPricing.usageType") }}</th>
+                                  <th>
+                                    {{ t("modelPricing.colPricingSimple") }}
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr
+                                  v-for="[key, price] in sortedPriceEntries(
+                                    getDefaultTier(props.row)?.prices || {},
+                                  )"
+                                  :key="key"
+                                >
+                                  <td>{{ formatPriceKey(key) }}</td>
+                                  <td>{{ formatPerMillion(price) }}</td>
+                                </tr>
+                              </tbody>
+                            </table>
                           </div>
-                          <table class="pricing-breakdown-table">
-                            <thead>
-                              <tr>
-                                <th>{{ t("modelPricing.usageType") }}</th>
-                                <th>
-                                  {{ t("modelPricing.colPricingSimple") }}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr
-                                v-for="[key, price] in sortedPriceEntries(
-                                  getDefaultTier(props.row)?.prices || {},
-                                )"
-                                :key="key"
-                              >
-                                <td>{{ formatPriceKey(key) }}</td>
-                                <td>{{ formatPerMillion(price) }}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </q-tooltip>
+                        </template>
+                      </OTooltip>
                     </span>
                   </template>
                   <span v-else class="text-grey-5">—</span>
@@ -495,9 +462,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <template v-if="col.name === 'select'">
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="selectedIds.includes(child.id)"
-                    size="sm"
                     class="o2-table-checkbox"
                     @update:model-value="toggleSelect(child.id)"
                   />
@@ -519,12 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:w-[16px] tw:h-[16px]"
                         alt="OpenObserve"
                       />
-                      <q-tooltip
-                        :delay="500"
-                        anchor="top middle"
-                        self="bottom middle"
-                        >{{ t("modelPricing.sourceBuiltIn") }}</q-tooltip
-                      >
+                      <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
                     </span>
                     <q-icon
                       v-else-if="
@@ -536,12 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="16px"
                       class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                     >
-                      <q-tooltip
-                        :delay="500"
-                        anchor="top middle"
-                        self="bottom middle"
-                        >{{ t("modelPricing.sourceInherited") }}</q-tooltip
-                      >
+                      <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
                     </q-icon>
                     <q-icon
                       v-else
@@ -549,28 +505,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="16px"
                       class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                     >
-                      <q-tooltip
-                        :delay="500"
-                        anchor="top middle"
-                        self="bottom middle"
-                        >{{ t("modelPricing.sourceCustom") }}</q-tooltip
-                      >
+                      <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
                     </q-icon>
                     <div class="o2-table-cell-content tw:opacity-70">
                       {{ child.name }}
                     </div>
-                    <q-tooltip
+                    <OTooltip
                       v-if="child.name.length > 30"
-                      anchor="top middle"
-                      self="bottom middle"
-                      :delay="500"
-                      style="
-                        max-width: none;
-                        white-space: normal;
-                        word-break: break-all;
-                      "
-                      >{{ child.name }}</q-tooltip
-                    >
+                      side="top"
+                      align="center"
+                      :content="child.name"
+                    />
                   </div>
                 </template>
                 <template v-else-if="col.name === 'match_pattern'">
@@ -585,18 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:shrink-0 shadowed-icon"
                       color="orange-10"
                     >
-                      <q-tooltip
-                        :delay="300"
-                        anchor="top middle"
-                        self="bottom middle"
-                        style="max-width: 260px; white-space: normal"
-                      >
-                        {{
-                          t("modelPricing.shadowedTooltip", {
-                            name: props.row.name,
-                          })
-                        }}
-                      </q-tooltip>
+                      <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: props.row.name })" />
                     </q-icon>
                   </div>
                 </template>
@@ -626,39 +560,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         +{{ getOverflowCount(child) }}
                         {{ t("modelPricing.overflowMore") }}
-                        <q-tooltip
-                          :delay="400"
-                          anchor="top middle"
-                          self="bottom middle"
-                          class="pricing-overflow-tooltip"
-                        >
-                          <div class="pricing-breakdown-tooltip">
-                            <div class="pricing-breakdown-title">
-                              {{ child.name }}
+                        <OTooltip>
+                          <template #content>
+                            <div class="pricing-breakdown-tooltip">
+                              <div class="pricing-breakdown-title">
+                                {{ child.name }}
+                              </div>
+                              <table class="pricing-breakdown-table">
+                                <thead>
+                                  <tr>
+                                    <th>{{ t("modelPricing.usageType") }}</th>
+                                    <th>
+                                      {{ t("modelPricing.colPricingSimple") }}
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr
+                                    v-for="[key, price] in sortedPriceEntries(
+                                      getDefaultTier(child)?.prices || {},
+                                    )"
+                                    :key="key"
+                                  >
+                                    <td>{{ formatPriceKey(key) }}</td>
+                                    <td>{{ formatPerMillion(price) }}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
                             </div>
-                            <table class="pricing-breakdown-table">
-                              <thead>
-                                <tr>
-                                  <th>{{ t("modelPricing.usageType") }}</th>
-                                  <th>
-                                    {{ t("modelPricing.colPricingSimple") }}
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr
-                                  v-for="[key, price] in sortedPriceEntries(
-                                    getDefaultTier(child)?.prices || {},
-                                  )"
-                                  :key="key"
-                                >
-                                  <td>{{ formatPriceKey(key) }}</td>
-                                  <td>{{ formatPerMillion(price) }}</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        </q-tooltip>
+                          </template>
+                        </OTooltip>
                       </span>
                     </template>
                     <span v-else class="text-grey-5">—</span>
@@ -788,12 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:w-[18px] tw:h-[18px]"
               alt="OpenObserve"
             />
-            <q-tooltip
-              :delay="500"
-              anchor="top middle"
-              self="bottom middle"
-              >{{ t("modelPricing.sourceBuiltIn") }}</q-tooltip
-            >
+            <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
           </span>
           <q-icon
             v-else-if="
@@ -806,12 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
-             <q-tooltip
-              :delay="500"
-              anchor="top middle"
-              self="bottom middle"
-              >{{ t("modelPricing.sourceInherited") }}</q-tooltip
-            >
+             <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
           </q-icon>
           <q-icon
             v-else
@@ -819,12 +740,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="18px"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
-            <q-tooltip
-              :delay="500"
-              anchor="top middle"
-              self="bottom middle"
-              >{{ t("modelPricing.sourceCustom") }}</q-tooltip
-            >
+            <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
           </q-icon>
       </template>
 
@@ -912,6 +828,9 @@ import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const { t } = useI18n();
 const store = useStore();
