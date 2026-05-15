@@ -141,7 +141,24 @@ pub async fn save(
         };
     }
 
-    let next_run_at = chrono::Utc::now().timestamp_micros();
+    let next_run_at = if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+        match derived_stream.trigger_condition.get_next_trigger_time(
+            false,
+            derived_stream.tz_offset,
+            false,
+            None,
+        ) {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!(
+                    "Failed to compute next trigger time for DerivedStream {trigger_module_key}: {e}"
+                );
+                chrono::Utc::now().timestamp_micros()
+            }
+        }
+    } else {
+        chrono::Utc::now().timestamp_micros()
+    };
     // Save the trigger to db
     match db::scheduler::get(
         &derived_stream.org_id,
