@@ -189,7 +189,7 @@
           @update:list="getRegexPatterns"
           @close="closeAddRegexPatternDialog"
         />
-      </q-page>
+    </OPage>
   </template>
 
 <script lang="ts">
