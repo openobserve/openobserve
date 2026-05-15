@@ -36,14 +36,15 @@ async searchSchedulerSubmit() {
   await inputField.click();
   await inputField.fill('1000');
 
-  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
+  const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
+  await this.page.waitForSelector(submitBtn);
 
   // Intercept the POST response BEFORE clicking to capture the created job ID
   const jobResponsePromise = this.page.waitForResponse(
     resp => resp.url().includes('/search_jobs') && resp.request().method() === 'POST',
     { timeout: 15000 }
   );
-  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
+  await this.page.locator(submitBtn).click();
 
   const jobResponse = await jobResponsePromise;
   const body = await jobResponse.json();
@@ -117,7 +118,7 @@ async clickJobID () {
       await this.page.locator(cancelBtnSelector).click();
       await this.page.waitForTimeout(2000);
       // Click the confirm button
-      await this.page.locator('[data-test="confirm-button"]').click();
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
       await this.page.waitForTimeout(2000);
       // Click the restart button
       await this.page.locator(restartBtnSelector).click();
@@ -138,8 +139,9 @@ async searchSchedulerInvalid() {
   await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
   await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('100000000');
   await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
-  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
-  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
+  const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
+  await this.page.waitForSelector(submitBtn);
+  await this.page.locator(submitBtn).click();
 }
 
 
