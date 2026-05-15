@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="loading"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[3rem]"
     >
-      <q-spinner-hourglass color="primary" size="3.125rem" />
+      <OSpinner size="lg" />
       <div
         class="q-mt-md text-body2"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -132,6 +132,7 @@ import { useI18n } from "vue-i18n";
 import PatternCard from "./PatternCard.vue";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 defineProps<{
   patterns: any[];

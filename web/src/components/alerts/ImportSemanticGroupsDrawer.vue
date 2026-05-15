@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Loading State -->
       <div v-if="isLoading" class="text-center q-pa-lg">
-        <q-spinner-dots size="50px" color="primary" />
+        <OSpinner variant="dots" size="lg" />
         <div class="text-body2 text-grey-7 q-mt-md">Analyzing file...</div>
       </div>
 
@@ -337,6 +337,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface SemanticGroup {
   id: string;

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </div>
         <div v-else class="text-center full-width full-height q-mt-lg">
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
       </template>
       <template #header-selection="scope">
@@ -105,10 +105,11 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { X } from 'lucide-vue-next';
 import { durationFormatter } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QTablePagination, NoData, OButton, X },
+  components: { QTablePagination, NoData, OButton, X, OSpinner },
   props: {
     rows: {
       type: Array,

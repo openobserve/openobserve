@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tr v-if="loadingStream == true">
           <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
-              <q-spinner-hourglass size="1.25rem" />
+              <OSpinner size="xs" />
               {{ t("confirmDialog.loading") }}
             </div>
           </q-td>
@@ -228,6 +228,7 @@ import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
 import FieldListPagination from "./FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { t } = useI18n();
 

@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
-        <q-spinner-dots size="60px" color="primary" />
+        <OSpinner variant="dots" size="xl" />
         <h5 class="q-mt-md">Setting up your subscription...</h5>
         <p class="text-grey-7">Please wait while we configure your account.</p>
       </div>
@@ -178,6 +178,7 @@ import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type SetupState =
   | "select_org"
@@ -189,7 +190,7 @@ type SetupState =
 
 export default defineComponent({
   name: "AzureMarketplaceSetup",
-  components: { OButton },
+  components: { OButton, OSpinner },
   setup() {
     const store = useStore();
     const router = useRouter();
