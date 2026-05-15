@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
@@ -298,31 +298,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-    <q-dialog
-      v-model="showEnrichmentSchema"
-      position="right"
-      full-height
-      maximized
-    >
-      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
-    </q-dialog>
+    <EnrichmentSchema
+      v-model:open="showEnrichmentSchema"
+      :selectedEnrichmentTable="selectedEnrichmentTable"
+    />
 
     <!-- URL Jobs Dialog -->
-    <q-dialog
-      v-model="showUrlJobsDialogState"
-      position="right"
-      full-height
-      maximized
+    <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
+      v-model:open="showUrlJobsDialogState"
+      size="lg"
     >
-      <q-card style="width: 600px; max-width: 80vw;">
-        <q-card-section class="row items-center q-pb-none">
+      <div class="tw:p-4">
+        <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="14" /></OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
+        </div>
+        <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
             <q-list separator>
               <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="q-pa-md">
                 <q-item-section>
@@ -347,10 +337,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="text-center q-pa-md text-grey-7">
             No URL jobs found
           </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+      </div>
+    </ODrawer>
+  </div>
 </template>
 
 <script lang="ts">
@@ -379,6 +368,7 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
@@ -391,6 +381,7 @@ export default defineComponent({
     EnrichmentSchema,
     AppTabs,
     OButton,
+    ODrawer,
     Search,
     List,
     Pencil,

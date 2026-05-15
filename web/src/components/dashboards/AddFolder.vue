@@ -66,7 +66,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const addFolderForm: any = ref(null);
@@ -151,6 +151,7 @@ export default defineComponent({
       isValidIdentifier,
       getImageURL,
       onSubmit,
+      submit,
     };
   },
 });

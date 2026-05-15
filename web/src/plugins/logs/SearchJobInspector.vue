@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="search-job-inspector q-pa-none">
+  <div class="tw:rounded-md search-job-inspector q-pa-none">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
@@ -358,64 +358,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <q-dialog v-model="showSqlDialog" position="right" full-height maximized>
-      <q-card style="width: 600px; max-width: 80vw;">
-        <q-card-section class="row items-center q-pb-none tw:justify-between tw:mb-2">
-          <div class="text-h6">SQL Query</div>
-          <div class="tw:flex tw:items-center tw:gap-1">
-            <OButton
-              v-if="profileData?.sql"
-              variant="ghost"
-              size="icon-sm"
-              :class="[
+    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" title="SQL Query">
+      <template #header-right>
+        <OButton
+          v-if="profileData?.sql"
+          variant="ghost"
+          size="icon-sm"
+          :class="[
                 'tw:border',
                 copiedSql ? 'tw:text-green-600 tw:border-green-400' : 'tw:border-gray-300'
               ]"
-              @click="copySql"
-              data-test="inspector-copy-sql-btn"
-            >
-              <Copy v-if="!copiedSql" :size="16" />
+          @click="copySql"
+          data-test="inspector-copy-sql-btn"
+        >
+          <Copy v-if="!copiedSql" :size="16" />
               <Check v-else :size="16" />
-              <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
-            </OButton>
-            <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
-          </div>
-        </q-card-section>
-
-        <q-separator />
-        <q-card-section>
-          <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
-            <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+          <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
+        </OButton>
+      </template>
+      <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
+        <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
+      </div>
+    </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <q-dialog v-model="showTraceIdDialog">
-      <q-card style="min-width: 500px;">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Full Trace ID</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div class="tw:flex tw:items-center tw:gap-3">
-            <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
-                 :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
-              {{ traceId }}
-            </div>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="copyTraceId"
-            ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
+      <div class="tw:flex tw:items-center tw:gap-3">
+        <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
+             :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
+          {{ traceId }}
+        </div>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="copyTraceId"
+        ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
+      </div>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
@@ -426,6 +406,8 @@ import { useQuasar } from "quasar";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { X, Copy, Check } from "lucide-vue-next";
 
 interface ProfileEvent {
@@ -466,6 +448,8 @@ export default defineComponent({
   components: {
     NoData,
     OButton,
+    ODrawer,
+    ODialog,
     X,
     Copy,
     Check,

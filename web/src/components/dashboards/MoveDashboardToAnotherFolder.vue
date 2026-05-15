@@ -75,15 +75,19 @@ export default defineComponent({
       type: Array,
       default: [],
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["updated"],
+  emits: ["updated", "close", "update:open"],
   setup(props, { emit }) {
     const store: any = useStore();
     //dropdown selected folder
     const selectedFolder = ref({
       label: store.state.organizationData.folders.find(
         (item: any) => item.folderId === props.activeFolderId,
-      ).name,
+      )?.name,
       value: props.activeFolderId,
     });
     const { t } = useI18n();

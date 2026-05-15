@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="col">
+    <div class="tw:flex tw:flex-col tw:h-full">
       <div
         data-test="iam-service-accounts-selection-filters"
-       class="flex justify-start q-px-md q-py-sm card-container"
-        style="position: sticky; top: 0px; z-index: 2"
+       class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
       >
         <div data-test="iam-service-accounts-selection-show-toggle" class="q-mr-md">
           <div class="flex items-center">
@@ -64,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
+      <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto card-container">
         <template v-if="rows.length">
           <app-table
             :rows="visibleRows"
@@ -73,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :virtual-scroll="false"
             style="height: fit-content"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+            :tableStyle="hasVisibleRows ? 'height: 100%; overflow-y: auto;' : ''"
             :hideTopPagination="true"
             :showBottomPaginationWithTitle="true"
             :filter="{

@@ -104,12 +104,7 @@ describe("WebVitalsDashboard", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "q-page": {
-            name: "q-page",
-            template: '<div class="q-page"><slot /></div>',
-            props: ["class"]
-          },
-          "q-icon": {
+                    "q-icon": {
             name: "q-icon",
             template: '<div class="q-icon"></div>',
             props: ["name", "size", "class"]

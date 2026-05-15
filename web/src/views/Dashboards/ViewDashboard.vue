@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
     <div
       ref="fullscreenDiv"
       :class="{
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <span
               class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              data-test="dashboard-view-folder-breadcrumb"
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
@@ -290,59 +291,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:runId="updateRunId"
       />
 
-      <q-dialog
-        v-model="showDashboardSettingsDialog"
-        position="right"
-        full-height
-        maximized
-        data-test="dashboard-settings-dialog"
-      >
-        <DashboardSettings @refresh="loadDashboard" />
-      </q-dialog>
+      <DashboardSettings
+        v-model:open="showDashboardSettingsDialog"
+        @refresh="loadDashboard"
+        @close="showDashboardSettingsDialog = false"
+      />
 
-      <q-dialog
-        v-model="selectedPanelConfig.show"
-        position="right"
-        full-height
-        maximized
-      >
-        <PanelLayoutSettings
-          :layout="selectedPanelConfig.data.layout"
-          @save:layout="savePanelLayout"
-        />
-      </q-dialog>
+      <PanelLayoutSettings
+        v-if="selectedPanelConfig.data"
+        v-model:open="selectedPanelConfig.show"
+        :layout="selectedPanelConfig.data.layout"
+        @save:layout="savePanelLayout"
+        @close="selectedPanelConfig.show = false"
+      />
 
-      <q-dialog
-        v-model="showScheduledReportsDialog"
-        position="right"
-        full-height
-        maximized
-      >
-        <ScheduledDashboards
-          :reports="scheduledReports"
-          :loading="isLoadingReports"
-          :folderId="folderId"
-          :dashboardId="dashboardId"
-          :tabId="tabId"
-          :tabs="currentDashboardData?.data?.tabs || []"
-        />
-      </q-dialog>
+      <ScheduledDashboards
+        v-model:open="showScheduledReportsDialog"
+        :reports="scheduledReports"
+        :loading="isLoadingReports"
+        :folderId="folderId"
+        :dashboardId="dashboardId"
+        :tabId="tabId"
+        :tabs="currentDashboardData?.data?.tabs || []"
+      />
 
-      <q-dialog
-        v-model="showJsonEditorDialog"
-        position="right"
-        full-height
-        maximized
-        :persistent="true"
-      >
-        <DashboardJsonEditor
-          :dashboard-data="currentDashboardData.data"
-          :save-json-dashboard="saveJsonDashboard"
-          @close="showJsonEditorDialog = false"
-        />
-      </q-dialog>
+      <DashboardJsonEditor
+        v-model:open="showJsonEditorDialog"
+        :dashboard-data="currentDashboardData.data"
+        :save-json-dashboard="saveJsonDashboard"
+      />
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

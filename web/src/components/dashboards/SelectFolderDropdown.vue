@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-sm"
+      @mousedown.prevent
       @click="
         () => {
           showAddFolderDialog = true;
@@ -44,15 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add folder -->
-  <q-dialog
-    v-model="showAddFolderDialog"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="showAddFolderDialog"
+    :title="t('common.addFolder')"
+    :width="20"
     data-test="dashboard-folder-move-dialog"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    :primary-button-disabled="isAddingFolder"
+    :primary-button-loading="isAddingFolder"
+    @click:secondary="showAddFolderDialog = false"
+    @click:primary="handleAddFolder"
   >
-    <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
-  </q-dialog>
+    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -81,6 +87,18 @@ export default defineComponent({
     const store: any = useStore();
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
+    const addFolderRef: any = ref(null);
+    const isAddingFolder = ref(false);
+
+    const handleAddFolder = async () => {
+      if (!addFolderRef.value || isAddingFolder.value) return;
+      isAddingFolder.value = true;
+      try {
+        await addFolderRef.value.submit();
+      } finally {
+        isAddingFolder.value = false;
+      }
+    };
 
     const getInitialFolderValue = (): string => {
       // priority: activeFolderId > query.folder > default
@@ -139,6 +157,9 @@ export default defineComponent({
       selectedFolder,
       updateFolderList,
       showAddFolderDialog,
+      addFolderRef,
+      isAddingFolder,
+      handleAddFolder,
       computedStyle,
     };
   },

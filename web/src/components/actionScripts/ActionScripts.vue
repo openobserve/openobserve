@@ -220,31 +220,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm" persistent>
-        <q-card class="clone-alert-popup">
-          <div class="row items-center no-wrap q-mx-md q-my-sm">
-            <div class="flex items-center">
-              <div
-                data-test="add-action-back-btn"
-                class="flex justify-center items-center q-mr-md cursor-pointer"
-                style="
-                  border: 1.5px solid;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                "
-                title="Go Back"
-                @click="showForm = false"
-              >
-                <q-icon name="arrow_back_ios_new" size="14px" />
-              </div>
-              <div class="text-h6" data-test="clone-alert-title">
-                {{ t("alerts.cloneTitle") }}
-              </div>
-            </div>
+      <ODialog data-test="action-scripts-form-dialog"
+        v-model:open="showForm"
+        persistent
+        size="md"
+        :show-close="false"
+        :title="t('alerts.cloneTitle')"
+        :secondary-button-label="t('alerts.cancel')"
+        :primary-button-label="t('alerts.save')"
+        :primary-button-disabled="isSubmitting"
+        @click:secondary="showForm = false"
+        @click:primary="submitForm"
+      >
+        <template #header-left>
+          <div
+            data-test="add-action-back-btn"
+            class="flex justify-center items-center cursor-pointer"
+            style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
+            title="Go Back"
+            @click="showForm = false"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
           </div>
-          <q-card-section>
-            <q-form @submit="submitForm">
+        </template>
+            <q-form id="action-script-clone-form" @submit="submitForm">
               <q-input
                 data-test="to-be-clone-action-name"
                 v-model="toBeCloneAlertName"
@@ -271,28 +270,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 hide-selected
                 :input-debounce="400"
               />
-              <div class="tw:flex tw:gap-2 tw:justify-center q-mt-lg">
-                <OButton
-                  data-test="clone-action-cancel-btn"
-                  variant="outline"
-                  size="sm-action"
-                  @click="showForm = false"
-                  >{{ t("alerts.cancel") }}</OButton
-                >
-                <OButton
-                  data-test="clone-action-submit-btn"
-                  variant="primary"
-                  size="sm-action"
-                  type="submit"
-                  :disabled="isSubmitting"
-                  >{{ t("alerts.save") }}</OButton
-                >
-              </div>
             </q-form>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
-    </template>
+        </ODialog>
+      </template>
   </div>
 </template>
 
@@ -337,6 +317,7 @@ import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -363,6 +344,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    ODialog,
   },
   emits: [
     "updated:fields",

@@ -258,8 +258,9 @@ const classes = computed<string[]>(() => [
     ? "tw:flex tw:w-full tw:items-center tw:justify-center"
     : "tw:inline-flex tw:items-center tw:justify-center",
   "tw:whitespace-nowrap",
-  "tw:font-medium tw:transition-colors tw:duration-150",
+  "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
   "tw:outline-none",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:disabled:cursor-not-allowed tw:enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],

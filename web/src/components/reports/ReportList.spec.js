@@ -120,6 +120,40 @@ installQuasar({
   }
 });
 
+// ODrawer stub: mirrors props/events from the real component so tests can drive
+// open/close via v-model:open and the @close emit (q-dialog → ODrawer migration).
+// Props are exposed via `data-stub-*` to avoid colliding with the parent's
+// `data-test` attr which fallthroughs to the stub root.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent"],
+  emits: ["update:open", "close"],
+  inheritAttrs: false,
+  template: `
+    <div
+      v-if="open"
+      class="o-drawer-stub"
+      :data-stub-size="size"
+      :data-stub-show-close="String(showClose)"
+      v-bind="$attrs"
+    >
+      <slot />
+    </div>
+  `,
+};
+
+const MoveAcrossFoldersStub = {
+  name: "MoveAcrossFolders",
+  props: ["open", "activeFolderId", "moduleId", "type"],
+  emits: ["updated", "close", "update:open"],
+  inheritAttrs: false,
+  template: `
+    <div v-if="open" v-bind="$attrs">
+      <div data-test="move-across-folders-stub" />
+    </div>
+  `,
+};
+
 describe("ReportList Component", () => {
   let wrapper;
   let mockRouter;
@@ -186,7 +220,7 @@ describe("ReportList Component", () => {
           [Quasar, { platform }],
           [i18n]
         ],
-        provide: { 
+        provide: {
           store,
           platform,
           router: mockRouter
@@ -199,7 +233,11 @@ describe("ReportList Component", () => {
             dialog: dialogMock
           },
           router: mockRouter
-        }
+        },
+        stubs: {
+          ODrawer: ODrawerStub,
+          MoveAcrossFolders: MoveAcrossFoldersStub,
+        },
       },
       attachTo: document.body
     });
@@ -644,6 +682,110 @@ describe("ReportList Component", () => {
           folder: "default",
         }
       });
+    });
+  });
+
+  // ── Move-to-folder ODrawer (q-dialog → ODrawer migration) ────────────────
+  describe("Move-to-folder ODrawer", () => {
+    it("should keep showMoveDialog false on initial render", () => {
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+      expect(
+        wrapper.find(
+          '[data-test="report-move-to-another-folder-dialog"]',
+        ).exists(),
+      ).toBe(false); // MoveAcrossFolders renders nothing when open=false
+    });
+
+    it("should open drawer with single row's report id and folder", async () => {
+      wrapper.vm.openMoveDialog({
+        report_id: "report-1",
+        folder_id: "folder-A",
+      });
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      expect(wrapper.vm.activeFolderToMove).toBe("folder-A");
+      expect(wrapper.vm.reportIdsToMove).toEqual(["report-1"]);
+    });
+
+    it("should fall back to activeFolderId when row has no folder_id", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1" });
+      await nextTick();
+      expect(wrapper.vm.activeFolderToMove).toBe(wrapper.vm.activeFolderId);
+    });
+
+    it("should render MoveAcrossFolders element when open", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      const drawer = wrapper.find(
+        '[data-test="report-move-to-another-folder-dialog"]',
+      );
+      expect(drawer.exists()).toBe(true);
+    });
+
+    it("should render MoveAcrossFolders inside the drawer when open", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      expect(
+        wrapper.findComponent(MoveAcrossFoldersStub).exists(),
+      ).toBe(true);
+    });
+
+    it("should open drawer for bulk move via moveMultipleReports", async () => {
+      wrapper.vm.selectedReports = [
+        { report_id: "report-1" },
+        { report_id: "report-2" },
+      ];
+      wrapper.vm.moveMultipleReports();
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      expect(wrapper.vm.reportIdsToMove).toEqual(["report-1", "report-2"]);
+    });
+
+    it("should close drawer when MoveAcrossFolders emits update:open false", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      const child = wrapper.findComponent(MoveAcrossFoldersStub);
+      expect(child.exists()).toBe(true);
+      await child.vm.$emit("update:open", false);
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+    });
+
+    it("should close drawer when showMoveDialog is set to false", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      wrapper.vm.showMoveDialog = false;
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+    });
+
+    it("should run onMoveUpdated when MoveAcrossFolders emits @updated", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "from-f" });
+      await nextTick();
+      const child = wrapper.findComponent(MoveAcrossFoldersStub);
+      expect(child.exists()).toBe(true);
+      vi.mocked(reports.listByFolderId).mockClear();
+      vi.mocked(reports.listByFolderId).mockResolvedValue({ data: [] });
+      // Pass the active folder ("default") as the source folder so its cache
+      // is invalidated and loadReports() goes back to the API instead of cache.
+      await child.vm.$emit("updated", "default", "to-f");
+      await flushPromises();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+      expect(wrapper.vm.selectedReports).toEqual([]);
+      expect(wrapper.vm.reportIdsToMove).toEqual([]);
+      expect(reports.listByFolderId).toHaveBeenCalled();
+    });
+
+    it("should open drawer when row-level move button is clicked", async () => {
+      const btn = wrapper.find(
+        '[data-test="report-list-Test Report 1-move-report"]',
+      );
+      expect(btn.exists()).toBe(true);
+      await btn.trigger("click");
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      expect(wrapper.vm.reportIdsToMove).toEqual(["report-1"]);
     });
   });
 

@@ -1,5 +1,5 @@
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -31,7 +31,7 @@
         />
       </template>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

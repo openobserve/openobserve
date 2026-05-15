@@ -1,5 +1,5 @@
 ﻿<template>
-    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
@@ -181,10 +181,15 @@
           @update:cancel="confirmBulkDelete = false"
           v-model="confirmBulkDelete"
         />
-        <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
-          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
-        </q-dialog>
-      </q-page>
+        <AddRegexPattern
+          data-test="regex-pattern-list-add-regex-pattern-drawer"
+          v-model:open="showAddRegexPatternDialog.show"
+          :data="showAddRegexPatternDialog.data"
+          :is-edit="showAddRegexPatternDialog.isEdit"
+          @update:list="getRegexPatterns"
+          @close="closeAddRegexPatternDialog"
+        />
+    </div>
   </template>
 
 <script lang="ts">

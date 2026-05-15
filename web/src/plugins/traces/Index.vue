@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -296,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -1740,7 +1739,15 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
     allFilters.push("span_status = 'ERROR'");
   }
   // Apply each filter term independently so replace-or-append works per field
-  searchBarRef.value?.applyFilters(allFilters);
+  // Skip search only when live mode is ON (datetime trigger will handle it)
+  // Don't skip when live mode is OFF (datetime trigger won't fire)
+  const skipSearch = Boolean(searchObj.meta.liveMode);
+
+  if (searchBarRef.value?.applyFilters) {
+    searchBarRef.value.applyFilters(allFilters, skipSearch);
+  } else {
+    console.warn("SearchBar not ready for filter application");
+  }
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,

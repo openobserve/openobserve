@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <q-table
       data-test="log-stream-table"
       ref="qTable"
@@ -263,15 +263,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
-    <q-dialog
-      v-model="showIndexSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer data-test="associated-stream-function-index-schema-drawer"
+      v-model:open="showIndexSchemaDialog"
+      size="lg"
     >
       <SchemaIndex v-model="schemaData" />
-    </q-dialog>
-  </q-page>
+    </ODrawer>
+  </div>
 </template>
 
 <script lang="ts">
@@ -299,11 +297,12 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, Trash2, ChevronDown, ChevronUp, RefreshCw },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

@@ -92,11 +92,7 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QPage: {
-          template: "<div data-test-stub='q-page' :class='$attrs.class'><slot></slot></div>",
-          props: ["class"],
-        },
-        QSeparator: {
+                QSeparator: {
           template: "<div data-test-stub='q-separator' :class='$attrs.class'></div>",
           props: ["class"],
         },

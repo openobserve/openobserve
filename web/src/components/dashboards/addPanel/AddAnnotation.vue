@@ -11,8 +11,7 @@
           :rows="3"
         />
 
-        <div class="q-mt-md">
-          <q-select
+        <q-select
             hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
@@ -58,59 +57,48 @@
               </q-item>
             </template>
           </q-select>
-        </div>
         <div class="text-caption q-mt-md">
           Timestamp: {{ annotationDateString }}
         </div>
-      </q-card-section>
-      <q-card-actions align="right">
-        <div class="tw:w-full tw:flex tw:gap-2">
-          <OButton
-            v-if="annotationData.annotation_id"
-            variant="destructive"
-            size="sm-action"
-            @click="handleDeleteWithConfirm"
-            >Delete</OButton
-          >
-          <div class="tw:flex-1"></div>
-          <OButton variant="outline" size="sm-action" @click="handleClose"
-            >Cancel</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="saveAnnotation.execute()"
-            :loading="saveAnnotation.isLoading?.value"
-            :disabled="!annotationData.title"
-            >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
-          >
-        </div>
-      </q-card-actions>
-    </q-card>
+    </div>
+    <template #footer>
+      <div class="tw:w-full tw:flex tw:gap-2">
+        <OButton
+          v-if="annotationData.annotation_id"
+          variant="destructive"
+          size="sm-action"
+          @click="handleDeleteWithConfirm"
+          >Delete</OButton
+        >
+        <div class="tw:flex-1"></div>
+        <OButton variant="outline" size="sm-action" @click="handleClose"
+          >Cancel</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="saveAnnotation.execute()"
+          :loading="saveAnnotation.isLoading?.value"
+          :disabled="!annotationData.title"
+          >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
+        >
+      </div>
+    </template>
 
-    <q-dialog v-model="showDeleteConfirm">
-      <q-card>
-        <q-card-section>
-          <div class="text-h6">Confirm Delete</div>
-        </q-card-section>
-        <q-card-section>
-          Are you sure you want to delete this annotation?
-        </q-card-section>
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton variant="outline" size="sm-action" v-close-popup
-            >Cancel</OButton
-          >
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            :loading="deleteAnnotation.isLoading.value"
-            @click="deleteAnnotation.execute()"
-            >Delete</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-dialog>
+    <ODialog data-test="add-annotation-delete-confirm-dialog"
+      v-model:open="showDeleteConfirm"
+      size="xs"
+      title="Confirm Delete"
+      secondary-button-label="Cancel"
+      primary-button-label="Delete"
+      primary-button-variant="destructive"
+      :primary-button-loading="deleteAnnotation.isLoading.value"
+      @click:secondary="showDeleteConfirm = false"
+      @click:primary="deleteAnnotation.execute()"
+    >
+      <p>Are you sure you want to delete this annotation?</p>
+    </ODialog>
+  </ODialog>
 </template>
 
 <script setup>

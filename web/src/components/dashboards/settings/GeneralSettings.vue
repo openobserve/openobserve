@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex justify-center tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
             data-test="dashboard-general-setting-cancel-btn"
@@ -97,7 +97,7 @@ export default defineComponent({
     OInput,
     OSwitch,
   },
-  emits: ["save"],
+  emits: ["save", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const { t } = useI18n();

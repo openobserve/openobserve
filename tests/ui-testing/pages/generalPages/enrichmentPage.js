@@ -21,7 +21,7 @@ class EnrichmentPage {
         
         // Logs table locators
         this.timestampColumn = '[data-test="log-table-column-0-_timestamp"]';
-        this.closeDialog = '[data-test="close-dialog"]';
+        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.expandMenu = '[data-test="table-row-expand-menu"]';
         this.protocolKeywordText = '[data-test="log-expand-detail-key-protocol_keyword"]';
         this.dateTimeBtn = '[data-test="date-time-btn"]';
@@ -810,8 +810,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async verifySchemaModalVisible() {
-        // Look for schema modal/dialog with schema content
-        const schemaModal = this.page.locator('.q-dialog').filter({ hasText: /schema|field|type/i });
+        // EnrichmentSchema migrated from q-dialog to ODrawer
+        const schemaModal = this.page.locator('[data-test="enrichment-schema-drawer"]');
         await schemaModal.waitFor({ state: 'visible', timeout: 15000 });
     }
 
@@ -889,18 +889,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async verifyDeleteConfirmationDialog() {
-        // Use more specific selector to avoid duplicate text - look for the dialog container
-        await this.page.locator('.q-dialog').getByText('Delete Enrichment Table', { exact: true }).first().waitFor({ state: 'visible' });
-        await this.page.getByText('Are you sure you want to delete enrichment table?').waitFor({ state: 'visible' });
+        // ConfirmDialog migrated from q-dialog to ODialog — scope to the new panel
+        const dialog = this.page.locator('[data-test="confirm-dialog"]');
+        await dialog.getByText('Delete Enrichment Table', { exact: true }).first().waitFor({ state: 'visible' });
+        await dialog.getByText('Are you sure you want to delete enrichment table?').waitFor({ state: 'visible' });
     }
 
     async clickDeleteCancel() {
-        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
         await this.page.waitForLoadState('domcontentloaded');
     }
 
     async clickDeleteOK() {
-        await this.page.getByRole('button', { name: 'OK' }).click();
+        await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
@@ -1536,13 +1537,31 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     /**
-     * Close any open dialogs/modals by pressing Escape
+     * Close any open dialogs/modals.
+     *
+     * The logs row-detail panel was migrated from q-dialog to an ODrawer
+     * (SearchResult.vue → `logs-search-result-detail-dialog`). Reka UI's
+     * escape-key-down only fires when focus is inside the drawer, but
+     * ODrawer's handleOpenAutoFocus prevents the default focus move and the
+     * detail drawer has no form input or primary button to auto-focus —
+     * so pressing Escape from the page does nothing and the overlay
+     * intercepts subsequent clicks. Click ODrawer's built-in close
+     * button (data-test="o-drawer-close-btn") instead, and wait for the drawer
+     * to fully unmount before continuing.
      */
     async closeAnyOpenDialogs() {
         testLogger.debug('Closing any open dialogs');
 
-        // Press Escape to close any open dialogs/modals
-        await this.page.keyboard.press('Escape');
+        const detailDrawer = this.page.locator('[data-test="logs-search-result-detail-dialog"]');
+        const closeBtn = detailDrawer.locator('[data-test="o-drawer-close-btn"]').first();
+
+        if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+            await closeBtn.click();
+            await detailDrawer.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        } else {
+            // Fallback for other (non-DetailTable) dialogs that still respond to Escape
+            await this.page.keyboard.press('Escape');
+        }
         await this.page.waitForTimeout(500);
 
         testLogger.debug('Dialogs closed');
@@ -1931,7 +1950,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Verifying job failed');
 
         // Look for the failed badge (use first() to avoid strict mode violation)
-        const failedBadge = this.page.locator('.q-dialog .q-badge').filter({ hasText: 'failed' }).first();
+        const failedBadge = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"] .q-badge').filter({ hasText: 'failed' }).first();
         await expect(failedBadge).toBeVisible({ timeout: 10000 });
 
         testLogger.debug('Job failed status verified');
@@ -1944,7 +1963,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async verifyJobError(errorPattern) {
         testLogger.debug(`Verifying job error matches: ${errorPattern}`);
 
-        const errorMessage = this.page.locator('.q-dialog').getByText(errorPattern);
+        const errorMessage = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]').getByText(errorPattern);
         await expect(errorMessage.first()).toBeVisible({ timeout: 10000 });
 
         testLogger.debug('Job error verified');
@@ -1957,7 +1976,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Verifying job completed');
 
         // Look for the completed badge
-        const completedBadge = this.page.locator('.q-dialog').getByText('completed');
+        const completedBadge = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]').getByText('completed');
         await expect(completedBadge).toBeVisible({ timeout: 10000 });
 
         testLogger.debug('Job completed status verified');
@@ -1969,8 +1988,8 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async closeUrlJobsDialog() {
         testLogger.debug('Closing URL Jobs dialog');
 
-        // Try clicking X button, fallback to pressing Escape
-        const closeBtn = this.page.locator('.q-dialog [aria-label="Close"], .q-dialog button[data-o2-btn]').first();
+        // URL Jobs migrated from q-dialog to ODrawer — use the o-drawer close button
+        const closeBtn = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"] [data-test="o-drawer-close-btn"]').first();
         if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await closeBtn.click();
         } else {
@@ -2166,7 +2185,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isJobsDialogVisible() {
-        const dialog = this.page.locator('.q-dialog');
+        const dialog = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]');
         return await dialog.isVisible({ timeout: 3000 }).catch(() => false);
     }
 
@@ -2176,7 +2195,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
      */
     async getJobStatusFromDialog() {
         testLogger.debug('Getting job status from dialog');
-        const dialog = this.page.locator('.q-dialog');
+        const dialog = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]');
 
         const failedBadge = dialog.locator('.q-badge').filter({ hasText: /failed/i }).first();
         const completedBadge = dialog.locator('.q-badge').filter({ hasText: /completed/i }).first();
@@ -2198,7 +2217,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
      */
     async isSchemaErrorVisibleInDialog() {
         testLogger.debug('Checking for schema error in dialog');
-        const dialog = this.page.locator('.q-dialog');
+        const dialog = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]');
         const errorText = dialog.locator('text=/schema|column|mismatch/i');
         const isVisible = await errorText.first().isVisible({ timeout: 3000 }).catch(() => false);
         testLogger.debug(`Schema error visible: ${isVisible}`);
@@ -2210,7 +2229,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
      */
     async verifyAnyJobStatusBadgeVisible() {
         testLogger.debug('Verifying any job status badge is visible');
-        const dialog = this.page.locator('.q-dialog');
+        const dialog = this.page.locator('[data-test="enrichment-table-list-url-jobs-drawer"]');
         const anyBadge = dialog.locator('.q-badge').first();
         await expect(anyBadge).toBeVisible({ timeout: 10000 });
         testLogger.debug('Job status badge verified visible');

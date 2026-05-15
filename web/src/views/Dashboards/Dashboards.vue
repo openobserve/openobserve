@@ -460,19 +460,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-table>
 
               <!-- add dashboard -->
-              <q-dialog
-                v-model="showAddDashboardDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showAddDashboardDialog"
+                :width="30"
+                :title="t('dashboard.createdashboard')"
                 data-test="dashboard-add-dialog"
+                :secondary-button-label="t('dashboard.cancel')"
+                :primary-button-label="t('dashboard.save')"
+                @click:secondary="showAddDashboardDialog = false"
+                @click:primary="addDashboardRef?.submit()"
               >
                 <AddDashboard
-                  style="width: 30vw"
+                  ref="addDashboardRef"
+                  @close="showAddDashboardDialog = false"
                   @updated="updateDashboardList"
                   :activeFolderId="activeFolderId"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- add dashboard from GitHub gallery -->
               <AddDashboardFromGitHub
@@ -481,35 +485,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- add/edit folder -->
-              <q-dialog
-                v-model="showAddFolderDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showAddFolderDialog"
+                :width="30"
+                :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
                 data-test="dashboard-folder-dialog"
+                :secondary-button-label="t('dashboard.cancel')"
+                :primary-button-label="t('dashboard.save')"
+                @click:secondary="showAddFolderDialog = false"
+                @click:primary="addFolderRef?.submit()"
               >
                 <AddFolder
-                  style="width: 30vw"
+                  ref="addFolderRef"
                   @update:modelValue="updateFolderList"
                   :edit-mode="isFolderEditMode"
                   :folder-id="selectedFolderToEdit ?? 'default'"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- move dashboard to another folder -->
-              <q-dialog
-                v-model="showMoveDashboardDialog"
-                position="right"
-                full-height
-                maximized
+              <MoveDashboardToAnotherFolder
+                v-model:open="showMoveDashboardDialog"
+                @updated="handleDashboardMoved"
+                :dashboard-ids="selectedDashboardIdToMove"
+                :activeFolderId="activeFolderToMove"
                 data-test="dashboard-move-to-another-folder-dialog"
-              >
-                <MoveDashboardToAnotherFolder
-                  @updated="handleDashboardMoved"
-                  :dashboard-ids="selectedDashboardIdToMove"
-                  :activeFolderId="activeFolderToMove"
-                />
-              </q-dialog>
+              />
 
               <!-- delete dashboard dialog -->
               <ConfirmDialog
@@ -552,6 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -623,6 +625,7 @@ export default defineComponent({
     ODropdownItem,
     OInput,
     OSwitch,
+    ODrawer,
     AddDashboard,
     AddDashboardFromGitHub,
     QTablePagination,
@@ -639,6 +642,8 @@ export default defineComponent({
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
     const showAddFolderDialog = ref(false);
+    const addDashboardRef: any = ref(null);
+    const addFolderRef: any = ref(null);
     const qTable: any = ref(null);
     const router = useRouter();
     const route = useRoute();
@@ -1437,6 +1442,8 @@ export default defineComponent({
       activeFolderId,
       addFolder,
       showAddFolderDialog,
+      addDashboardRef,
+      addFolderRef,
       isFolderEditMode,
       updateFolderList,
       editFolder,

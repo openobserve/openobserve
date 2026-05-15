@@ -149,67 +149,50 @@
     </div>
 
     <!-- Operation Selector Dialog -->
-    <q-dialog v-model="showOperationSelector">
-      <q-card style="min-width: 500px">
-        <q-card-section class="tw:pt-[0.625rem]! tw:pb-[0.625rem]!">
-          <div class="tw:text-[1.2rem]">Add Operation</div>
-        </q-card-section>
+    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" title="Add Operation"
+      primary-button-label="Close"
+      @click:primary="showOperationSelector = false"
+    >
+      <q-input
+        v-model="searchQuery"
+        dense
+        borderless
+        stack-label
+        hide-bottom-space
+        class="showLabelOnTop"
+        clearable
+      >
+        <template v-slot:prepend>
+          <q-icon name="search" />
+        </template>
+      </q-input>
 
-        <q-card-section class="tw:py-[0.625rem]!">
-          <q-input
-            v-model="searchQuery"
-            dense
-            borderless
-            stack-label
-            hide-bottom-space
-            class="showLabelOnTop"
-            clearable
-          >
-            <template v-slot:prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-        </q-card-section>
-
-        <q-card-section
-          class="q-pt-none"
-          style="max-height: 400px; overflow-y: auto"
-        >
-          <q-list bordered separator>
-            <template v-for="category in categories" :key="category">
-              <q-expansion-item
-                :label="category"
-                default-opened
-                header-class="text-weight-medium"
-              >
-                <q-list>
-                  <q-item
-                    v-for="op in getFilteredOperationsForCategory(category)"
-                    :key="op.id"
-                    clickable
-                    v-close-popup
-                    @click="addOperation(op)"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ op.name }}</q-item-label>
-                      <q-item-label caption>{{
-                        op.documentation
-                      }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-expansion-item>
-            </template>
-          </q-list>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      <div style="max-height: 400px; overflow-y: auto">
+        <q-list bordered separator>
+          <template v-for="category in categories" :key="category">
+            <q-expansion-item
+              :label="category"
+              default-opened
+              header-class="text-weight-medium"
+            >
+              <q-list>
+                <q-item
+                  v-for="op in getFilteredOperationsForCategory(category)"
+                  :key="op.id"
+                  clickable
+                  @click="addOperation(op); showOperationSelector = false"
+                >
+                  <q-item-section>
+                    <q-item-label>{{ op.name }}</q-item-label>
+                    <q-item-label caption>{{ op.documentation }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-expansion-item>
+          </template>
+        </q-list>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -217,6 +200,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {

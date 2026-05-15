@@ -41,19 +41,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add dashboard -->
-  <q-dialog
-    v-model="showAddDashboardDialog"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="showAddDashboardDialog"
+    :width="20"
+    title="New dashboard"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
     data-test="dashboard-dashboard-add-dialog"
+    @update:open="showAddDashboardDialog = $event"
+    @click:secondary="showAddDashboardDialog = false"
+    @click:primary="addDashboardRef?.submit()"
   >
     <AddDashboard
+      ref="addDashboardRef"
       :active-folder-id="folderId as any"
       @updated="updateDashboardList"
       :show-folder-selection="false"
     />
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -83,6 +88,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const showAddDashboardDialog: any = ref(false);
+    const addDashboardRef = ref<InstanceType<typeof AddDashboard> | null>(null);
     const dashboardList: any = ref([]);
 
     //dropdown selected dashboard id (primitive string for OSelect)
@@ -155,6 +161,7 @@ export default defineComponent({
       selectedDashboard,
       updateDashboardList,
       showAddDashboardDialog,
+      addDashboardRef,
       dashboardList,
       getDashboardList,
     };

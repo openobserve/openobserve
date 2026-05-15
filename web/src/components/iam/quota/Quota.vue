@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <q-page
-    class="quota-page text-left card-container"
+  <div class="tw:rounded-md quota-page text-left card-container"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -548,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
     />
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

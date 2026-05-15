@@ -16,12 +16,12 @@
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
-          <!-- select folder or create new folder and select -->
-          <select-dashboard-dropdown
-            v-if="activeFolderId"
-            :folder-id="activeFolderId"
-            @dashboard-selected="updateSelectedDashboard"
-          />
+      <!-- select folder or create new folder and select -->
+      <select-dashboard-dropdown
+        v-if="activeFolderId"
+        :folder-id="activeFolderId"
+        @dashboard-selected="updateSelectedDashboard"
+      />
 
       <!-- select tab or create new tab and select -->
       <select-tab-dropdown
@@ -40,7 +40,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, onBeforeMount, ref, toRaw, type Ref } from "vue";
+import { defineComponent, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
@@ -66,12 +66,16 @@ export default defineComponent({
     OInput,
   },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     dashboardPanelData: {
       type: Object,
       required: true,
     },
   },
-  emits: ["save", "cancel"],
+  emits: ["save", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -89,11 +93,17 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
-    onBeforeMount(async () => {
-      // get folders list
-      await getFoldersList(store);
-      // updateDashboardOptions();
-    });
+    // Fetch folders only when the drawer opens (matches old q-dialog behaviour where the
+    // component mounted only on first open). Avoids an eager API call on page load.
+    watch(
+      () => props.open,
+      async (isOpen) => {
+        if (isOpen) {
+          await getFoldersList(store);
+        }
+      },
+      { immediate: true },
+    );
 
     const updateActiveFolderId = (selectedFolder: any) => {
       activeFolderId.value = selectedFolder.value;

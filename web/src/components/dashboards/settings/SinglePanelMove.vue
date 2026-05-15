@@ -49,65 +49,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="add" /></template>
           <q-tooltip>Add Tab</q-tooltip>
         </OButton>
-        <q-dialog
-          v-model="showAddTabDialog"
-          position="right"
-          full-height
-          maximized
-        >
-          <AddTab
-            :edit-mode="isTabEditMode"
-            :tabId="selectedTabIdToEdit"
-            :dashboard-id="currentDashboardData.data.dashboardId"
-            @refresh="refreshRequired"
-            data-test="dashboard-tab-move-add-tab-dialog"
-          />
-        </q-dialog>
+        <AddTab
+          v-model:open="showAddTabDialog"
+          :edit-mode="isTabEditMode"
+          :tabId="selectedTabIdToEdit"
+          :dashboard-id="currentDashboardData.data.dashboardId"
+          @refresh="refreshRequired"
+          data-test="dashboard-tab-move-add-tab-dialog"
+        />
       </div>
-      <q-card-actions class="confirmActions">
-        <div class="button-container tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="onConfirm"
-            data-test="confirm-button"
-            :disabled="selectedMoveTabId === null"
-          >
-            Move
-          </OButton>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { getDashboard } from "@/utils/commons";
 import { reactive } from "vue";
 import { onMounted } from "vue";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton, OSelect },
+  components: { AddTab, OButton, OSelect, ODialog },
   emits: ["update:ok", "update:cancel", "refresh"],
-  props: ["title", "message"],
+  props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
@@ -117,6 +89,11 @@ export default defineComponent({
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit = ref(null);
+
+    const open = computed({
+      get: () => !!props.modelValue,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     const moveTabOptions = ref([]);
 
@@ -178,6 +155,7 @@ export default defineComponent({
     };
     return {
       t,
+      open,
       onCancel,
       onConfirm,
       action,

@@ -91,7 +91,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
       },
     });
 
@@ -103,7 +103,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
       },
     });
 
@@ -117,7 +117,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
       },
     });
 
@@ -132,7 +132,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
       },
     });
 
@@ -147,7 +147,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
       },
     });
 

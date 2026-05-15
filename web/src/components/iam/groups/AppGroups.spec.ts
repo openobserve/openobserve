@@ -92,9 +92,9 @@ vi.mock("@/components/ConfirmDialog.vue", () => ({
 vi.mock("./AddGroup.vue", () => ({
   default: {
     name: "AddGroup",
-    template: `<div data-test="add-group-mock"></div>`,
-    props: ["style", "org_identifier"],
-    emits: ["cancel:hideform", "added:group"],
+    template: `<div data-test="add-group-mock" :data-open="open"></div>`,
+    props: ["open", "org_identifier"],
+    emits: ["update:open", "added:group"],
   },
 }));
 
@@ -253,11 +253,27 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.showAddGroup).toBe(true);
     });
 
-    it("renders add group dialog when showAddGroup is true", async () => {
+    it("passes open prop to AddGroup based on showAddGroup state", async () => {
       wrapper.vm.showAddGroup = true;
       await wrapper.vm.$nextTick();
-      // The dialog is conditionally rendered with v-model, should check for dialog presence differently
-      expect(wrapper.vm.showAddGroup).toBe(true);
+      const addGroup = wrapper.findComponent({ name: "AddGroup" });
+      expect(addGroup.exists()).toBe(true);
+      expect(addGroup.props("open")).toBe(true);
+    });
+
+    it("passes org_identifier prop to AddGroup", () => {
+      const addGroup = wrapper.findComponent({ name: "AddGroup" });
+      expect(addGroup.props("org_identifier")).toBe(
+        store.state.selectedOrganization.identifier,
+      );
+    });
+
+    it("closes add group dialog when AddGroup emits update:open false", async () => {
+      wrapper.vm.showAddGroup = true;
+      await wrapper.vm.$nextTick();
+      const addGroup = wrapper.findComponent({ name: "AddGroup" });
+      await addGroup.vm.$emit("update:open", false);
+      expect(wrapper.vm.showAddGroup).toBe(false);
     });
 
     it("hides add group dialog when hideAddGroup is called", () => {
@@ -266,10 +282,15 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.showAddGroup).toBe(false);
     });
 
-    it("refreshes groups list when group is added", async () => {
-      const setupGroupsSpy = vi.spyOn(wrapper.vm, "setupGroups");
-      await wrapper.vm.setupGroups();
-      expect(setupGroupsSpy).toHaveBeenCalled();
+    it("refreshes groups list when AddGroup emits added:group", async () => {
+      const { getGroups } = await import("@/services/iam");
+      vi.mocked(getGroups).mockClear();
+      const addGroup = wrapper.findComponent({ name: "AddGroup" });
+      await addGroup.vm.$emit("added:group");
+      await flushPromises();
+      expect(getGroups).toHaveBeenCalledWith(
+        store.state.selectedOrganization.identifier,
+      );
     });
   });
 

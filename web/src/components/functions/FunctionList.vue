@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
@@ -199,49 +199,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <q-dialog v-model="confirmForceDelete" persistent>
-      <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
-        <q-card-section
-          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
-        >
-          <div>
-            Pipelines Associated with
-            <strong> {{ selectedDelete.name }}</strong>
-          </div>
-          <q-icon
-            name="close"
-            size="18px"
-            @click="closeDialog"
-            style="cursor: pointer"
-          />
-        </q-card-section>
-        <q-card-section>
-          <div
-            v-if="transformedPipelineList.length > 0"
-            class="pipeline-list-container"
+    <ODialog data-test="function-list-force-delete-dialog" v-model:open="confirmForceDelete" persistent size="md"
+      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+    >
+      <div
+        v-if="transformedPipelineList.length > 0"
+        class="pipeline-list-container"
+      >
+        <q-list class="scrollable-list">
+          <q-item
+            v-for="(pipeline, index) in transformedPipelineList"
+            :key="pipeline.value"
+            clickable
+            @click="onPipelineSelect(pipeline)"
           >
-            <q-list class="scrollable-list">
-              <q-item
-                v-for="(pipeline, index) in transformedPipelineList"
-                :key="pipeline.value"
-                clickable
-                @click="onPipelineSelect(pipeline)"
-              >
-                <q-item-section>
-                  {{ index + 1 }}. {{ pipeline.label }}
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-          <div v-else>
-            <div class="text-h6 text-center">
-              No pipelines associated with this function
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+            <q-item-section>
+              {{ index + 1 }}. {{ pipeline.label }}
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </div>
+      <div v-else>
+        <div class="text-h6 text-center">
+          No pipelines associated with this function
+        </div>
+      </div>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
@@ -272,6 +256,7 @@ import {
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
@@ -282,6 +267,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    ODialog,
     Pencil,
     Trash2,
   },

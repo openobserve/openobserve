@@ -60,6 +60,67 @@ Object.assign(navigator, {
   },
 });
 
+// ---------------------------------------------------------------------------
+// ODrawer stub — replaces the migrated trace filters drawer
+// (q-dialog/q-card -> ODrawer with v-model:open). Renders default + footer
+// slots and exposes migrated props/emits so we can assert wiring without
+// going through the real Reka portal/teleport.
+// ---------------------------------------------------------------------------
+const ODrawerStub = {
+  name: "ODrawer",
+  inheritAttrs: false,
+  props: [
+    "open",
+    "side",
+    "persistent",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "seamless",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="trace-details-filters-drawer-stub"
+      :data-open="String(open)"
+      :data-width="width"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="trace-details-filters-drawer-primary"
+        @click="$emit('click:primary')"
+      />
+      <button
+        data-test="trace-details-filters-drawer-secondary"
+        @click="$emit('click:secondary')"
+      />
+      <button
+        data-test="trace-details-filters-drawer-update-open-false"
+        @click="$emit('update:open', false)"
+      />
+    </div>
+  `,
+};
+
 describe("TraceDetails", () => {
   let wrapper: any;
 
@@ -152,6 +213,14 @@ describe("TraceDetails", () => {
         provide: { store },
         stubs: {
           "q-resize-observer": true,
+          ODrawer: ODrawerStub,
+          CodeQueryEditor: {
+            name: "CodeQueryEditor",
+            props: ["query", "language"],
+            emits: ["update:query"],
+            template:
+              '<div data-test="trace-details-filters-code-editor" />',
+          },
           "chart-renderer": {
             template: '<div data-test="chart-renderer">Chart</div>',
             props: ["data", "id"],
@@ -539,6 +608,14 @@ describe("TraceDetails", () => {
             provide: { store },
             stubs: {
               "q-resize-observer": true,
+              ODrawer: ODrawerStub,
+              CodeQueryEditor: {
+                name: "CodeQueryEditor",
+                props: ["query", "language"],
+                emits: ["update:query"],
+                template:
+                  '<div data-test="trace-details-filters-code-editor" />',
+              },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
                 props: ["data", "id"],
@@ -693,6 +770,14 @@ describe("TraceDetails", () => {
           provide: { store },
           stubs: {
             "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template:
+                '<div data-test="trace-details-filters-code-editor" />',
+            },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
               props: ["data", "id"],
@@ -825,6 +910,14 @@ describe("TraceDetails", () => {
             provide: { store },
             stubs: {
               "q-resize-observer": true,
+              ODrawer: ODrawerStub,
+              CodeQueryEditor: {
+                name: "CodeQueryEditor",
+                props: ["query", "language"],
+                emits: ["update:query"],
+                template:
+                  '<div data-test="trace-details-filters-code-editor" />',
+              },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
               },
@@ -863,6 +956,14 @@ describe("TraceDetails", () => {
             provide: { store },
             stubs: {
               "q-resize-observer": true,
+              ODrawer: ODrawerStub,
+              CodeQueryEditor: {
+                name: "CodeQueryEditor",
+                props: ["query", "language"],
+                emits: ["update:query"],
+                template:
+                  '<div data-test="trace-details-filters-code-editor" />',
+              },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
               },
@@ -912,6 +1013,14 @@ describe("TraceDetails", () => {
             provide: { store },
             stubs: {
               "q-resize-observer": true,
+              ODrawer: ODrawerStub,
+              CodeQueryEditor: {
+                name: "CodeQueryEditor",
+                props: ["query", "language"],
+                emits: ["update:query"],
+                template:
+                  '<div data-test="trace-details-filters-code-editor" />',
+              },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
               },
@@ -952,6 +1061,14 @@ describe("TraceDetails", () => {
             provide: { store },
             stubs: {
               "q-resize-observer": true,
+              ODrawer: ODrawerStub,
+              CodeQueryEditor: {
+                name: "CodeQueryEditor",
+                props: ["query", "language"],
+                emits: ["update:query"],
+                template:
+                  '<div data-test="trace-details-filters-code-editor" />',
+              },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
               },
@@ -1000,6 +1117,14 @@ describe("TraceDetails", () => {
             provide: { store },
             stubs: {
               "q-resize-observer": true,
+              ODrawer: ODrawerStub,
+              CodeQueryEditor: {
+                name: "CodeQueryEditor",
+                props: ["query", "language"],
+                emits: ["update:query"],
+                template:
+                  '<div data-test="trace-details-filters-code-editor" />',
+              },
               "chart-renderer": {
                 template: '<div data-test="chart-renderer">Chart</div>',
               },
@@ -1048,6 +1173,14 @@ describe("TraceDetails", () => {
           provide: { store },
           stubs: {
             "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template:
+                '<div data-test="trace-details-filters-code-editor" />',
+            },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
             },
@@ -1091,6 +1224,14 @@ describe("TraceDetails", () => {
           provide: { store },
           stubs: {
             "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template:
+                '<div data-test="trace-details-filters-code-editor" />',
+            },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
             },
@@ -1136,6 +1277,14 @@ describe("TraceDetails", () => {
           provide: { store },
           stubs: {
             "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template:
+                '<div data-test="trace-details-filters-code-editor" />',
+            },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
             },
@@ -1377,6 +1526,14 @@ describe("TraceDetails", () => {
           provide: { store },
           stubs: {
             "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template:
+                '<div data-test="trace-details-filters-code-editor" />',
+            },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
             },
@@ -1843,6 +2000,14 @@ describe("TraceDetails", () => {
           provide: { store },
           stubs: {
             "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template:
+                '<div data-test="trace-details-filters-code-editor" />',
+            },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
               props: ["data", "id"],
@@ -2275,6 +2440,93 @@ describe("TraceDetails", () => {
       expect(traceTree.props("hoveredSpanId")).toBe(
         "hovered-span-from-parent",
       );
+    });
+  });
+
+  describe("Migrated filters drawer (ODrawer)", () => {
+    const drawerSelector = '[data-test="trace-details-filters-drawer-stub"]';
+
+    it("renders the ODrawer with migrated props (width, title, button labels)", () => {
+      const drawer = wrapper.find(drawerSelector);
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.attributes("data-width")).toBe("30");
+      // title and labels are wired from i18n; the data attributes just need to be defined
+      expect(drawer.attributes("data-title")).toBeDefined();
+      expect(drawer.attributes("data-primary-label")).toBeDefined();
+      expect(drawer.attributes("data-secondary-label")).toBeDefined();
+    });
+
+    it("binds open via v-model:open to showFilterPopover state", async () => {
+      expect(wrapper.vm.showFilterPopover).toBe(false);
+      expect(wrapper.find(drawerSelector).attributes("data-open")).toBe(
+        "false",
+      );
+
+      wrapper.vm.showFilterPopover = true;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(drawerSelector).attributes("data-open")).toBe("true");
+    });
+
+    it("closes drawer when ODrawer emits click:secondary (cancel)", async () => {
+      wrapper.vm.showFilterPopover = true;
+      await wrapper.vm.$nextTick();
+
+      await wrapper
+        .find('[data-test="trace-details-filters-drawer-secondary"]')
+        .trigger("click");
+
+      expect(wrapper.vm.showFilterPopover).toBe(false);
+    });
+
+    it("applies query and closes drawer when ODrawer emits click:primary", async () => {
+      wrapper.vm.showFilterPopover = true;
+      wrapper.vm.localEditorValue = "service_name = 'test-service'";
+      await wrapper.vm.$nextTick();
+
+      await wrapper
+        .find('[data-test="trace-details-filters-drawer-primary"]')
+        .trigger("click");
+
+      // applyAndViewTraces() closes the drawer and clears the local editor value
+      expect(wrapper.vm.showFilterPopover).toBe(false);
+      expect(wrapper.vm.localEditorValue).toBe("");
+    });
+
+    it("merges existing editorValue with localEditorValue on click:primary", async () => {
+      wrapper.vm.searchObj.data.editorValue = "level = 'error'";
+      wrapper.vm.localEditorValue = "duration > 100";
+      wrapper.vm.showFilterPopover = true;
+      await wrapper.vm.$nextTick();
+
+      await wrapper
+        .find('[data-test="trace-details-filters-drawer-primary"]')
+        .trigger("click");
+
+      expect(wrapper.vm.searchObj.data.editorValue).toBe(
+        "level = 'error' and duration > 100",
+      );
+      expect(wrapper.vm.showFilterPopover).toBe(false);
+    });
+
+    it("uses localEditorValue alone when existing editorValue is empty", async () => {
+      wrapper.vm.searchObj.data.editorValue = "";
+      wrapper.vm.localEditorValue = "status_code = 200";
+      wrapper.vm.showFilterPopover = true;
+      await wrapper.vm.$nextTick();
+
+      await wrapper
+        .find('[data-test="trace-details-filters-drawer-primary"]')
+        .trigger("click");
+
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("status_code = 200");
+    });
+
+    it("renders the CodeQueryEditor inside the drawer default slot", () => {
+      const editor = wrapper.find(
+        '[data-test="trace-details-filters-code-editor"]',
+      );
+      expect(editor.exists()).toBe(true);
     });
   });
 });

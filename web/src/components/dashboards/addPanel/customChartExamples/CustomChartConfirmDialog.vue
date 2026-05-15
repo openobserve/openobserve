@@ -108,25 +108,37 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    modelValue: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+
+    const open = computed({
+      get: () => props.modelValue ?? false,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     // If no query exists, default to true (auto-checked); otherwise false
     const hasQuery = computed(() => props.currentQuery?.trim().length > 0);
     const replaceQuery = ref(!hasQuery.value);
 
     const onCancel = () => {
+      open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
+      open.value = false;
       emit("update:ok", { replaceQuery: replaceQuery.value });
     };
     return {
       t,
       store,
+      open,
       replaceQuery,
       hasQuery,
       onCancel,

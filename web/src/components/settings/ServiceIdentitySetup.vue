@@ -230,66 +230,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Field Mapping Dialog -->
-          <q-dialog v-model="showFieldMappingDialog">
-            <q-card
-              style="min-width: 480px; max-width: 600px"
-              class="tw:rounded-xl"
-            >
-              <q-card-section
-                class="tw:flex tw:items-center tw:justify-between tw:pb-2"
-              >
-                <div>
-                  <div class="text-h6">
-                    {{ t("settings.correlation.customizeFieldMappings") }}
-                  </div>
-                  <div
-                    class="tw:text-xs tw:mt-1"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-6'
-                    "
-                  >
-                    {{ t("settings.correlation.fieldMappingDialogHelp") }}
-                  </div>
-                </div>
-                <OButton variant="ghost" size="icon" v-close-popup>
-                  <q-icon name="close" size="14px" />
-                </OButton>
-              </q-card-section>
-
-              <q-separator />
-
-              <q-card-section class="tw:pt-4">
-                <TagInput
-                  :model-value="editableServiceFields"
-                  @update:model-value="editableServiceFields = $event"
-                  :placeholder="
-                    t('settings.correlation.fieldMappingPlaceholder')
-                  "
-                  label=""
-                />
-              </q-card-section>
-
-              <q-separator />
-
-              <q-card-actions align="right" class="tw:px-4 tw:py-3">
-                <div class="tw:flex tw:gap-2">
-                  <OButton variant="outline" size="sm-action" v-close-popup>
-                    {{ t("common.cancel") }}
-                  </OButton>
-                  <OButton
-                    variant="primary"
-                    size="sm-action"
-                    :loading="savingFieldMappings"
-                    @click="saveFieldMappings"
-                  >
-                    {{ t("common.save") }}
-                  </OButton>
-                </div>
-              </q-card-actions>
-            </q-card>
-          </q-dialog>
+          <ODialog data-test="service-identity-setup-field-mapping-dialog"
+            v-model:open="showFieldMappingDialog"
+            size="sm"
+            :title="t('settings.correlation.customizeFieldMappings')"
+            :sub-title="t('settings.correlation.fieldMappingDialogHelp')"
+            :secondary-button-label="t('common.cancel')"
+            :primary-button-label="t('common.save')"
+            :primary-button-loading="savingFieldMappings"
+            @click:secondary="showFieldMappingDialog = false"
+            @click:primary="saveFieldMappings"
+          >
+            <TagInput
+              :model-value="editableServiceFields"
+              @update:model-value="editableServiceFields = $event"
+              :placeholder="
+                t('settings.correlation.fieldMappingPlaceholder')
+              "
+              label=""
+            />
+          </ODialog>
 
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="tw:mb-3">
@@ -438,10 +398,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-tooltip>
                     <OButton
                       variant="ghost"
-                      size="icon-xs-circle"
+                      size="icon-xs-sq"
                       @click="removeFieldByIdFromEnv(envKey, fieldId)"
                     >
-                      <q-icon name="cancel" size="12px" />
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </OButton>
                   </div>
 
@@ -505,13 +465,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-select>
                     <OButton
                       variant="ghost"
-                      size="icon"
+                      size="icon-xs-sq"
                       @click="
                         addingToEnv = '';
                         addFieldValue = '';
                       "
                     >
-                      <q-icon name="close" size="14px" />
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </OButton>
                   </template>
 
@@ -603,13 +563,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-select>
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs-sq"
                     @click="
                       addingToEnv = '';
                       addFieldValue = '';
                     "
                   >
-                    <q-icon name="close" size="14px" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </OButton>
                 </div>
               </template>
@@ -749,14 +709,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ alias.label }}</span>
                   <OButton
                     variant="ghost"
-                    size="icon-xs-circle"
+                    size="icon-xs-sq"
                     @click="
                       trackedAliasIds = trackedAliasIds.filter(
                         (id) => id !== alias.id,
                       )
                     "
                   >
-                    <q-icon name="cancel" size="12px" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </OButton>
                 </div>
                 <!-- Inline add select -->
@@ -779,13 +739,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <OButton
                     variant="ghost"
-                    size="icon"
+                    size="icon-xs-sq"
                     @click="
                       addingTrackedAlias = false;
                       addTrackedAliasValue = '';
                     "
                   >
-                    <q-icon name="close" size="14px" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </OButton>
                 </template>
                 <!-- Add field button -->
@@ -1089,85 +1049,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Workload Insight Sidebar -->
-        <q-dialog
-          v-model="insightDialogOpen"
-          position="right"
-          full-height
-          maximized
+        <ODrawer data-test="service-identity-setup-insight-drawer"
+          v-model:open="insightDialogOpen"
+          :width="insightPanelWidthPct"
         >
-          <q-card
-            :style="{ width: insightPanelWidth, maxWidth: '90vw' }"
-            class="tw:flex tw:flex-col tw:h-full"
-            :class="
-              store.state.theme === 'dark' ? 'tw:!bg-grey-10' : 'tw:!bg-white'
-            "
-          >
-            <!-- Header -->
-            <q-card-section
-              class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b tw:shrink-0 q-ma-none"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tw:border-grey-8'
-                  : 'tw:border-grey-3'
-              "
-            >
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[16px] tw:flex tw:items-center">
-                  {{ insightData.subtitle }}
-                  <span
-                    :class="[
-                      'tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
-                      store.state.theme === 'dark'
-                        ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                        : 'tw:text-blue-600 tw:bg-blue-50',
-                    ]"
+          <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
+               containing the title + tooltip; second line is a conditional coverage row with icon.
+               Cannot be expressed cleanly with title + sub-title props alone. -->
+          <template #header>
+            <div class="tw:flex-1 tw:min-w-0">
+              <div class="tw:text-[16px] tw:flex tw:items-center">
+                {{ insightData.subtitle }}
+                <span
+                  :class="[
+                    'tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                    store.state.theme === 'dark'
+                      ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                      : 'tw:text-blue-600 tw:bg-blue-50',
+                  ]"
+                >
+                  {{ insightData.title }}
+                  <q-tooltip
+                    v-if="insightData.title.length > 25"
+                    class="tw:text-xs"
                   >
                     {{ insightData.title }}
-                    <q-tooltip
-                      v-if="insightData.title.length > 25"
-                      class="tw:text-xs"
-                    >
-                      {{ insightData.title }}
-                    </q-tooltip>
-                  </span>
-                </div>
-                <div
-                  v-if="
-                    !(insightData as any).isCardLevel &&
-                    insightData.coverage !== null
-                  "
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tw:text-grey-4'
-                      : 'tw:text-grey-6'
-                  "
-                >
-                  <q-icon
-                    name="verified"
-                    size="14px"
-                    class="tw:text-positive"
-                  />
-                  <span
-                    >{{ insightData.coverage }}% of services
-                    <span
-                      v-if="
-                        insightData.count !== null && insightData.total !== null
-                      "
-                      >({{ insightData.count }}/{{ insightData.total }})</span
-                    >
-                  </span>
-                </div>
+                  </q-tooltip>
+                </span>
               </div>
-              <OButton variant="ghost" size="icon" v-close-popup>
-                <q-icon name="cancel" size="14px" />
-              </OButton>
-            </q-card-section>
-
-            <!-- Content area — flex column so dimension columns fill remaining height -->
-            <q-card-section
-              class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:px-4 tw:py-3 q-ma-none"
-            >
+              <div
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  insightData.coverage !== null
+                "
+                class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-grey-4'
+                    : 'tw:text-grey-6'
+                "
+              >
+                <q-icon
+                  name="verified"
+                  size="14px"
+                  class="tw:text-positive"
+                />
+                <span
+                  >{{ insightData.coverage }}% of services
+                  <span
+                    v-if="
+                      insightData.count !== null && insightData.total !== null
+                    "
+                    >({{ insightData.count }}/{{ insightData.total }})</span
+                  >
+                </span>
+              </div>
+            </div>
+          </template>
               <!-- Stream contribution chart (single-value only) -->
               <template
                 v-if="
@@ -1395,9 +1333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </template>
-            </q-card-section>
-          </q-card>
-        </q-dialog>
+          </ODrawer>
       </div>
 
       <!-- Section 3: Warnings -->
@@ -1419,27 +1355,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field Details Dialog -->
-      <q-dialog
-        v-model="detailsDialogVisible"
-        @hide="
-          preselectedValue = '';
-          popupPrimaryValue = '';
-          popupColumnSelections = [];
-        "
+      <ODialog data-test="service-identity-setup-details-dialog"
+        v-model:open="detailsDialogVisible"
+        @update:open="(v) => { if (!v) { preselectedValue = ''; popupPrimaryValue = ''; popupColumnSelections = []; } }"
+        size="md"
+        :title="primaryDim?.display"
+        :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-        <q-card style="width: 760px; max-width: 95vw">
-          <q-card-section class="row items-center q-pb-none">
-            <div class="text-h6 tw:flex tw:items-center tw:gap-2">
-              {{ primaryDim?.display }}
-              <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey"
-                >: {{ popupPrimaryValue }}</span
-              >
-            </div>
-            <q-space />
-            <OButton variant="ghost" size="icon" v-close-popup>
-              <q-icon name="close" size="14px" />
-            </OButton>
-          </q-card-section>
 
           <q-card-section
             class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t"
@@ -1652,8 +1574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               No sample data available for this field.
             </div>
           </q-card-section>
-        </q-card>
-      </q-dialog>
+      </ODialog>
     </div>
   </div>
 </template>
@@ -1668,6 +1589,8 @@ import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { Plus } from "lucide-vue-next";
 import type {
   ServiceIdentityConfig,
@@ -2576,6 +2499,14 @@ const insightPanelWidth = computed(() => {
   if (colCount <= 2) return "480px";
   if (colCount === 3) return "640px";
   return "800px"; // 4+
+});
+
+const insightPanelWidthPct = computed(() => {
+  const dims = (insightData.value as any)?.relatedDimensions;
+  const colCount = dims?.length ?? 0;
+  if (colCount <= 2) return 37;
+  if (colCount === 3) return 50;
+  return 63; // 4+
 });
 
 const STREAM_TYPE_COLORS: Record<string, string> = {

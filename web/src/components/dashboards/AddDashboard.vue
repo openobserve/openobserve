@@ -61,7 +61,6 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
 import { useQuasar } from "quasar";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -92,7 +91,7 @@ export default defineComponent({
       default: true,
     },
   },
-  emits: ["updated"],
+  emits: ["updated", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const beingUpdated: any = ref(false);
@@ -208,6 +207,7 @@ export default defineComponent({
       getImageURL,
       selectedFolder,
       onSubmit,
+      submit: () => onSubmit.execute(),
     };
   },
   methods: {

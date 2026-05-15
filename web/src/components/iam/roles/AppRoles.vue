@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div>
       <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
@@ -114,13 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   </div>
   </div>
-  <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-    <AddRole
-      style="width: 30vw"
-      @cancel:hideform="hideForm"
-      @added:role="setupRoles"
-    />
-  </q-dialog>
+  <AddRole
+    v-model:open="showAddGroup"
+    @added:role="setupRoles"
+  />
   <ConfirmDialog
     title="Delete Role"
     :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
@@ -135,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
   />
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">

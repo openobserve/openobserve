@@ -51,13 +51,25 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 describe("AddFolder", () => {
   let store: any;
 
+  const createWrapper = (props: Record<string, any> = {}) =>
+    mount(AddFolder, {
+      props,
+      global: {
+        plugins: [i18n, store],
+      },
+    });
+
   beforeEach(() => {
     store = createStore({
       state: {
         theme: "light",
         organizationData: {
           folders: [
-            { folderId: "folder1", name: "Test Folder", description: "Test description" },
+            {
+              folderId: "folder1",
+              name: "Test Folder",
+              description: "Test description",
+            },
           ],
         },
       },
@@ -67,149 +79,57 @@ describe("AddFolder", () => {
   });
 
   it("should render the component", () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper();
 
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("should display new folder title when not in edit mode", () => {
-    const wrapper = mount(AddFolder, {
-      props: {
-        editMode: false,
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    expect(wrapper.text()).toContain("New Folder");
-  });
-
-  it("should display update folder title when in edit mode", () => {
-    const wrapper = mount(AddFolder, {
-      props: {
-        editMode: true,
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    expect(wrapper.text()).toContain("Update Folder");
-  });
-
   it("should render name input field", () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper();
 
     const nameInput = wrapper.find('[data-test="dashboard-folder-add-name"]');
     expect(nameInput.exists()).toBe(true);
   });
 
   it("should render description input field", () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper();
 
-    const descInput = wrapper.find('[data-test="dashboard-folder-add-description"]');
+    const descInput = wrapper.find(
+      '[data-test="dashboard-folder-add-description"]',
+    );
     expect(descInput.exists()).toBe(true);
   });
 
-  it("should render cancel button", () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+  it("should expose submit method", () => {
+    const wrapper = createWrapper();
 
-    const cancelButton = wrapper.find('[data-test="dashboard-folder-add-cancel"]');
-    expect(cancelButton.exists()).toBe(true);
+    expect(typeof wrapper.vm.submit).toBe("function");
   });
 
-  it("should render save button", () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+  it("should expose onSubmit loading state", () => {
+    const wrapper = createWrapper();
 
-    const saveButton = wrapper.find('[data-test="dashboard-folder-add-save"]');
-    expect(saveButton.exists()).toBe(true);
-  });
-
-  it("should disable save button when name is empty", async () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    wrapper.vm.folderData.name = "";
-    await wrapper.vm.$nextTick();
-
-    const saveButton = wrapper.find('[data-test="dashboard-folder-add-save"]');
-    expect((saveButton.element as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("should enable save button when name is provided", async () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    wrapper.vm.folderData.name = "Valid Folder Name";
-    await wrapper.vm.$nextTick();
-
-    const saveButton = wrapper.find('[data-test="dashboard-folder-add-save"]');
-    expect(saveButton.attributes("disable")).toBeUndefined();
+    expect(wrapper.vm.onSubmit).toBeDefined();
+    expect(wrapper.vm.onSubmit.isLoading).toBeDefined();
   });
 
   it("should initialize with empty folder data in create mode", () => {
-    const wrapper = mount(AddFolder, {
-      props: {
-        editMode: false,
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper({ editMode: false });
 
     expect(wrapper.vm.folderData.name).toBe("");
     expect(wrapper.vm.folderData.description).toBe("");
+    expect(wrapper.vm.folderData.folderId).toBe("");
   });
 
   it("should initialize with existing folder data in edit mode", () => {
-    const wrapper = mount(AddFolder, {
-      props: {
-        editMode: true,
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
 
     expect(wrapper.vm.folderData.name).toBe("Test Folder");
     expect(wrapper.vm.folderData.description).toBe("Test description");
   });
 
   it("should update folder name when input changes", async () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper();
 
     const nameInput = wrapper.find('[data-test="dashboard-folder-add-name"]');
     await nameInput.setValue("My New Folder");
@@ -218,27 +138,18 @@ describe("AddFolder", () => {
   });
 
   it("should update folder description when input changes", async () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper();
 
-    const descInput = wrapper.find('[data-test="dashboard-folder-add-description"]');
+    const descInput = wrapper.find(
+      '[data-test="dashboard-folder-add-description"]',
+    );
     await descInput.setValue("My folder description");
 
     expect(wrapper.vm.folderData.description).toBe("My folder description");
   });
 
   it("should emit update:modelValue on successful folder creation", async () => {
-    const wrapper = mount(AddFolder, {
-      props: {
-        editMode: false,
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper({ editMode: false });
 
     wrapper.vm.folderData.name = "Test Folder";
     await flushPromises();
@@ -250,12 +161,20 @@ describe("AddFolder", () => {
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
   });
 
-  it("should validate that name is required", async () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+  it("should emit update:modelValue on successful folder update in edit mode", async () => {
+    const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
+
+    await flushPromises();
+
+    const form = wrapper.find("form");
+    await form.trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+  });
+
+  it("should not emit update:modelValue when name is empty (validation fails)", async () => {
+    const wrapper = createWrapper();
 
     wrapper.vm.folderData.name = "";
     await flushPromises();
@@ -264,18 +183,90 @@ describe("AddFolder", () => {
     await form.trigger("submit");
     await flushPromises();
 
-    // Form validation should prevent submission
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("should not emit update:modelValue when name is whitespace-only", async () => {
+    const wrapper = createWrapper();
+
+    wrapper.vm.folderData.name = "   ";
+    await flushPromises();
+
+    const form = wrapper.find("form");
+    await form.trigger("submit");
+    await flushPromises();
+
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
   });
 
   it("should accept whitespace-trimmed name", () => {
-    const wrapper = mount(AddFolder, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = createWrapper();
 
     wrapper.vm.folderData.name = "  Valid Name  ";
     expect(wrapper.vm.folderData.name.trim()).toBe("Valid Name");
+  });
+
+  it("should handle folder creation error gracefully", async () => {
+    const commons = await import("@/utils/commons");
+    (commons.createFolder as any).mockRejectedValueOnce(
+      new Error("Folder creation failed"),
+    );
+
+    const wrapper = createWrapper({ editMode: false });
+
+    wrapper.vm.folderData.name = "Valid Folder";
+    await flushPromises();
+
+    const form = wrapper.find("form");
+    await form.trigger("submit");
+    await flushPromises();
+
+    // No update:modelValue should be emitted on failure
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("should handle folder update error gracefully", async () => {
+    const commons = await import("@/utils/commons");
+    (commons.updateFolder as any).mockRejectedValueOnce(
+      new Error("Folder updation failed"),
+    );
+
+    const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
+
+    await flushPromises();
+
+    const form = wrapper.find("form");
+    await form.trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("submit() should trigger onSubmit.execute", async () => {
+    const wrapper = createWrapper({ editMode: false });
+
+    wrapper.vm.folderData.name = "Programmatic Folder";
+    await flushPromises();
+
+    await wrapper.vm.submit();
+    await flushPromises();
+
+    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+  });
+
+  it("should reset folder data after successful creation", async () => {
+    const wrapper = createWrapper({ editMode: false });
+
+    wrapper.vm.folderData.name = "Folder To Reset";
+    wrapper.vm.folderData.description = "desc";
+    await flushPromises();
+
+    const form = wrapper.find("form");
+    await form.trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.vm.folderData.name).toBe("");
+    expect(wrapper.vm.folderData.description).toBe("");
+    expect(wrapper.vm.folderData.folderId).toBe("");
   });
 });

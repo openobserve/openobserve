@@ -14,8 +14,12 @@
  * Static selectors - Quasar Framework UI components
  */
 const QUASAR = {
-  // Dialog components
-  DIALOG: '.q-dialog',
+  // Dialog components — match both the legacy Quasar dialog and the new ODrawer/ODialog
+  // panels migrated for the dialog v2 UX overhaul. Many specs use this to detect "is the
+  // settings overlay still open" after `addScopedVariable` saves; the settings drawer
+  // overlay intercepts pointer events on the dashboard, so missing the new selector
+  // here causes clicks on variable dropdowns to time out.
+  DIALOG: '.q-dialog, [data-test="dashboard-settings-drawer"], [data-o2-dialog], [data-o2-drawer]',
   DIALOG_CARD: '.q-dialog .q-card',
 
   // Menu/Dropdown components

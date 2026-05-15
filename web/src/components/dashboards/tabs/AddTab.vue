@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
@@ -63,6 +63,10 @@ export default defineComponent({
   name: "AddTab",
   components: { ODrawer, OForm, OFormInput },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     tabId: {
       validator: (value) => {
         return typeof value === "string" || value === null;
@@ -86,7 +90,7 @@ export default defineComponent({
       },
     },
   },
-  emits: ["refresh"],
+  emits: ["refresh", "update:open"],
   setup(props: any, { emit }) {
     const { t } = useI18n();
     const route = useRoute();
@@ -151,6 +155,7 @@ export default defineComponent({
 
             // emit refresh to rerender
             emit("refresh", updatedTab);
+            emit("update:open", false);
 
             showPositiveNotification("Tab updated successfully", {
               timeout: 2000,
@@ -167,6 +172,7 @@ export default defineComponent({
 
             // emit refresh to rerender
             emit("refresh", newTab);
+            emit("update:open", false);
 
             showPositiveNotification("Tab added successfully", {
               timeout: 2000,
@@ -206,6 +212,7 @@ export default defineComponent({
       store,
       isValidIdentifier,
       onSubmit,
+      submit,
     };
   },
 });

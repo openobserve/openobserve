@@ -22,7 +22,6 @@
     </template>
 
     <!-- Body -->
-    <q-card-section class="tw:flex-1 tw:max-h-[60vh] tw:overflow-y-auto tw:p-6">
       <div
         v-if="queryData.length === 0"
         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:text-[var(--o2-text-muted)]"
@@ -246,8 +245,7 @@
           </div>
         </div>
       </div>
-    </q-card-section>
-  </q-card>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -265,6 +263,10 @@ export default defineComponent({
   emits: ["update:open"],
   components: { OButton, ODialog, OInput },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     metaData: {
       type: Object,
       required: true,

@@ -59,27 +59,33 @@ export class TracesPage {
     this.errorOnlyToggle = '[data-test="traces-search-bar-error-only-toggle-btn"]';
     // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
-    // TracesAnalysisDashboard.vue: data-test="analysis-dashboard-close"
-    this.analysisDashboardClose = '[data-test="analysis-dashboard-close"]';
+    // TracesAnalysisDashboard.vue was migrated to ODrawer
+    // (data-test="traces-analysis-dashboard-drawer"). The legacy
+    // `analysis-dashboard-close` data-test and `.analysis-dashboard-card`
+    // template class were removed — `.analysis-dashboard-card` only survives
+    // in CSS rules now, no element actually carries the class. Scope all
+    // selectors via the ODrawer slug instead.
+    this.analysisDashboardDrawer = '[data-test="traces-analysis-dashboard-drawer"]';
+    this.analysisDashboardClose = '[data-test="traces-analysis-dashboard-drawer"] [data-test="o-drawer-close-btn"]';
     // TracesAnalysisDashboard.vue: dimension sidebar (visible by default, not a dialog)
     this.dimensionSelectorSidebar = '[data-test="dimension-selector-sidebar"]';
     this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
     this.dimensionSearchInput = '[data-test="dimension-search-input"]';
     // TracesAnalysisDashboard.vue: data-test="percentile-refresh-button"
     this.percentileRefreshButton = '[data-test="percentile-refresh-button"]';
-    // Analysis dashboard card (container)
-    this.analysisDashboardCard = '.analysis-dashboard-card';
+    // Analysis dashboard card (container) — alias to the drawer slug for backwards-compat
+    this.analysisDashboardCard = '[data-test="traces-analysis-dashboard-drawer"]';
     // Metrics dashboard container
     this.tracesMetricsDashboard = '.traces-metrics-dashboard';
-    // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors")
-    this.analysisDashboardTabs = '.analysis-dashboard-card [role="tablist"]';
-    this.rateTab = '.analysis-dashboard-card [role="tab"]:has-text("Rate")';
-    this.latencyTab = '.analysis-dashboard-card [role="tab"]:has-text("Duration")';
-    this.errorsTab = '.analysis-dashboard-card [role="tab"]:has-text("Errors")';
-    // Analysis dashboard states
-    this.analysisDashboardLoading = '.analysis-dashboard-card .q-spinner, .analysis-dashboard-card .q-spinner-hourglass';
-    this.analysisDashboardError = '.analysis-dashboard-card .q-banner--top-padding';
-    this.analysisDashboardRetryBtn = '.analysis-dashboard-card button:has-text("Retry")';
+    // Analysis Dashboard Tabs (i18n labels: "Rate", "Latency", "Errors") — scope inside the drawer
+    this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"] [role="tablist"]';
+    this.rateTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Rate")';
+    this.latencyTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Duration")';
+    this.errorsTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Errors")';
+    // Analysis dashboard states — scope inside the drawer
+    this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] .q-spinner, [data-test="traces-analysis-dashboard-drawer"] .q-spinner-hourglass';
+    this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
+    this.analysisDashboardRetryBtn = '[data-test="traces-analysis-dashboard-drawer"] button:has-text("Retry")';
 
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
@@ -1618,7 +1624,9 @@ export class TracesPage {
    * @returns {Promise<boolean>}
    */
   async hasAnalysisDashboardCharts() {
-    const chartPanel = this.page.locator('.analysis-dashboard-card canvas, .analysis-dashboard-card [data-test*="chart"]');
+    const chartPanel = this.page.locator(
+      `${this.analysisDashboardDrawer} canvas, ${this.analysisDashboardDrawer} [data-test*="chart"]`
+    );
     return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
   }
 
@@ -1837,7 +1845,9 @@ export class TracesPage {
    * @returns {Promise<boolean>}
    */
   async isTabActive(tabLabel) {
-    const activeTab = this.page.locator('.analysis-dashboard-card [role="tab"][data-state="active"]')
+    // Scope inside the ODrawer slug — the old `.analysis-dashboard-card` class
+    // is no longer present on any template element post-ODrawer migration.
+    const activeTab = this.page.locator(`${this.analysisDashboardDrawer} [role="tab"][data-state="active"]`)
       .filter({ hasText: new RegExp(tabLabel, 'i') });
     return await activeTab.first().isVisible({ timeout: 2000 }).catch(() => false);
   }
@@ -1847,7 +1857,7 @@ export class TracesPage {
    * @returns {Promise<number>}
    */
   async getVisibleTabCount() {
-    return await this.page.locator('.analysis-dashboard-card [role="tab"]').count();
+    return await this.page.locator(`${this.analysisDashboardDrawer} [role="tab"]`).count();
   }
 
   // --- Percentile Refresh (Latency tab only) ---

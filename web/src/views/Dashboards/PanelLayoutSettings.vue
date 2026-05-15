@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -83,13 +84,18 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["save:layout"],
+  emits: ["save:layout", "close", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
 
+    const panelFormRef = ref(null);
     const updatedLayout = ref({ ...props.layout });
 
     const savePanelLayout = () => {
@@ -117,8 +123,10 @@ export default defineComponent({
       router,
       getImageURL,
       savePanelLayout,
+      submitForm,
       getRowCount,
       updatedLayout,
+      panelFormRef,
     };
   },
 });

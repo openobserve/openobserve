@@ -1,21 +1,15 @@
 <template>
-  <div style="padding: 0px 10px; min-width: min(1000px, 90vw)">
-    <div
-      class="flex justify-between items-center q-py-md header"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>{{ t("dashboard.overrideConfigTitle") }}</span>
-      </div>
-      <OButton
-        variant="ghost"
-        size="icon"
-        :title="t('dashboard.cancel')"
-        @click.stop="closePopup"
-      >
-        <template #icon-left><q-icon name="close" /></template>
-      </OButton>
-    </div>
+  <ODialog data-test="override-config-popup-dialog"
+    :open="open"
+    @update:open="(v) => { if (!v) closePopup() }"
+    :title="t('dashboard.overrideConfigTitle')"
+    :width="70"
+    :neutral-button-label="t('dashboard.overrideConfigAddNew')"
+    neutral-button-variant="outline"
+    :primary-button-label="t('dashboard.overrideConfigSave')"
+    @click:neutral="addOverrideConfig"
+    @click:primary="saveOverrides"
+  >
 
     <div
       v-for="(overrideConfig, index) in overrideConfigs"
@@ -79,20 +73,7 @@
         </OButton>
       </div>
     </div>
-    <OButton
-      variant="outline"
-      size="sm"
-      class="tw:mt-3"
-      @click="addOverrideConfig"
-      >{{ t("dashboard.overrideConfigAddNew") }}</OButton
-    >
-
-    <q-card-actions align="right">
-      <OButton variant="primary" size="sm-action" @click="saveOverrides">{{
-        t("dashboard.overrideConfigSave")
-      }}</OButton>
-    </q-card-actions>
-  </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -115,6 +96,10 @@ export default defineComponent({
   name: "OverrideConfigPopup",
   components: { OButton, ODialog, OSelect, OInput, OCheckbox },
   props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
     columns: {
       type: Array as PropType<Array<{ label: string; alias: string }>>,
       required: true,

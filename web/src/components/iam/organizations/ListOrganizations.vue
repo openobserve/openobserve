@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit;">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -115,16 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
       </div>
-    <q-dialog
-      v-model="showAddOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideAddOrgDialog"
-    >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
-    </q-dialog>
-  </q-page>
+    <add-update-organization
+      :open="showAddOrganizationDialog"
+      @update:open="onDrawerOpenChange"
+      @updated="updateOrganizationList"
+      :model-value="toBeUpdatedOrganization"
+    />
+  </div>
 </template>
 
 <script lang="ts">
@@ -393,6 +390,7 @@ export default defineComponent({
         name: "",
         identifier: "",
       };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "add",
@@ -417,6 +415,11 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
+
+    const onDrawerOpenChange = (val: boolean) => {
+      showAddOrganizationDialog.value = val;
+      if (!val) hideAddOrgDialog();
     };
 
     const inviteTeam = (props: any) => {
@@ -460,6 +463,12 @@ export default defineComponent({
     }, { immediate: true });
 
     const renameOrganization = (props: any) => {
+      toBeUpdatedOrganization.value = {
+        id: props.row.identifier,
+        name: props.row.name,
+        identifier: props.row.identifier,
+      };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "update",
@@ -467,13 +476,7 @@ export default defineComponent({
           to_be_updated_org_id: props.row.identifier,
           to_be_updated_org_name: props.row.name,
         },
-      })
-      toBeUpdatedOrganization.value = {
-        id: props.row.identifier,
-        name: props.row.name,
-        identifier: props.row.identifier,
-      };
-
+      });
     };
 
     return {
@@ -501,6 +504,7 @@ export default defineComponent({
       filterQuery,
       filterData,
       hideAddOrgDialog,
+      onDrawerOpenChange,
       visibleRows,
       hasVisibleRows,
 
