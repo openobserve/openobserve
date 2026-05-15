@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :options="streamOptions"
       data-cy="index-dropdown"
-      searchable
       class="tw:mb-[0.375rem]"
       @search="onStreamSearch"
       @update:model-value="onStreamChange"

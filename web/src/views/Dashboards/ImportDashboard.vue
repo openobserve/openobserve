@@ -241,7 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="streamTypes[errorIndex]"
                           :options="streamTypeSelectOptions"
                           label="Stream Type"
-                          searchable
                           @update:model-value="
                             updateStreamType(
                               streamTypes[errorIndex],

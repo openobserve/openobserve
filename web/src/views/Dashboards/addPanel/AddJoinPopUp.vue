@@ -82,7 +82,6 @@
           v-model="modelValue.stream"
           :options="filteredStreamOptions"
           label="On Stream"
-          searchable
           data-test="dashboard-config-panel-join-to"
           @search="onStreamSearch"
         />

@@ -5,7 +5,6 @@
       label="Select Function"
       :options="filteredFunctions"
       data-test="dashboard-function-dropdown"
-      searchable
       class="tw:w-72"
       @search="onFunctionSearch"
     />

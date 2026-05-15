@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.selectIndex')"
         :options="dashboardPanelData.meta.stream.streamResults"
         data-test="index-dropdown-stream"
-        searchable
         :loading="streamDataLoading.isLoading.value"
         valueKey="name"
         labelKey="name"

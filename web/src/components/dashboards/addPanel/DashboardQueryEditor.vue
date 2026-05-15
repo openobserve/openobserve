@@ -208,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('dashboard.useSavedFunction')"
                       :options="functionOptions"
                       data-test="dashboard-use-saved-vrl-function"
-                      searchable
                       labelKey="name"
                       valueKey="function"
                       @search="onFunctionSearch"

@@ -58,7 +58,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   clearable: false,
   error: false,
   multiple: false,
-  searchable: false,
+  searchable: true,
   searchDebounce: 0,
   hideSelected: false,
   creatable: false,
