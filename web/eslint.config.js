@@ -128,6 +128,10 @@ export default [
           message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
         }
         // {
+        //   element: 'q-tooltip',
+        //   message: 'Use <OTooltip> from "@/lib/overlay/Tooltip/OTooltip.vue" instead of <q-tooltip>.'
+        // }
+        // {
         //   element: 'q-drawer',
         //   message: 'Use <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" instead of <q-drawer>.'
         // }
