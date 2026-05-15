@@ -334,6 +334,25 @@ const onSubmit = () => {
 
 **Never** replace inline field validation with `showErrorNotification(...)` — that is a different UX and does not tell the user which field is wrong.
 
+#### When `$q.notify` is acceptable for validation
+
+`$q.notify` is only acceptable for validating fields that **never had `:rules`** in the original Quasar code — e.g., a code editor textarea or a field whose only feedback was always a toast. **Always verify via `git show main:path/to/file.vue` before deciding.**
+
+If the original field had `:rules`, the error must still appear inline below the field after migration — not as a toast.
+
+```typescript
+// Acceptable — original had NO :rules, content is a code editor (not a form field)
+if (content.trim() == "") {
+  $q.notify({ type: "warning", message: "Function body cannot be empty." });
+  return;
+}
+
+// NOT acceptable — original q-input had :rules; must use inline :error/:error-message instead
+if (!name.value.trim()) {
+  $q.notify({ message: "Name is required" }); // ❌ wrong — use error ref below the field
+}
+```
+
 ---
 
 ### 11. q-tooltip → OTooltip
@@ -754,8 +773,8 @@ Legend: `[ ]` = not done · `✅` = done
 - [ ] src/enterprise/components/EvalTemplateList.vue
 - [ ] src/plugins/correlation/CorrelatedLogsTable.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
-- [ ] src/plugins/traces/ServiceGraphNodeSidePanel.vue
-- [ ] src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+- ✅ src/plugins/traces/ServiceGraphNodeSidePanel.vue
+- ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 - ✅ src/views/Dashboards/addPanel/AddCondition.vue
 - [ ] src/views/LogStream.vue
@@ -921,17 +940,17 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
-- [ ] src/plugins/logs/JsonPreview.vue
-- [ ] src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/JsonPreview.vue
+- ✅ src/plugins/logs/SearchBar.vue
 - ✅ src/plugins/logs/TransformSelector.vue
-- [ ] src/plugins/logs/components/FieldList.vue
+- ✅ src/plugins/logs/components/FieldList.vue
 - ✅ src/plugins/metrics/AddToDashboard.vue
 - ✅ src/plugins/metrics/MetricList.vue
 - ✅ src/plugins/traces/IndexList.vue
-- [ ] src/plugins/traces/ServiceGraph.vue
-- [ ] src/plugins/traces/ServicesCatalog.vue
-- [ ] src/plugins/traces/TraceDetails.vue
-- [ ] src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+- ✅ src/plugins/traces/ServiceGraph.vue
+- ✅ src/plugins/traces/ServicesCatalog.vue
+- ✅ src/plugins/traces/TraceDetails.vue
+- ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 - [ ] src/views/AwsMarketplaceSetup.vue
 - [ ] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/Dashboards.vue
@@ -1070,19 +1089,19 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/DetailTable.vue
 - [ ] src/plugins/logs/IndexList.vue
-- [ ] src/plugins/logs/JsonPreview.vue
-- [ ] src/plugins/logs/SearchBar.vue
-- [ ] src/plugins/logs/SearchResult.vue
+- ✅ src/plugins/logs/JsonPreview.vue
+- ✅ src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/SearchResult.vue
 - ✅ src/plugins/logs/TransformSelector.vue
 - ✅ src/plugins/metrics/MetricList.vue
 - ✅ src/plugins/traces/IndexList.vue
-- [ ] src/plugins/traces/LLMInsightsDashboard.vue
+- ✅ src/plugins/traces/LLMInsightsDashboard.vue
 - ✅ src/plugins/traces/SearchBar.vue
-- [ ] src/plugins/traces/SearchResult.vue
-- [ ] src/plugins/traces/ServiceGraph.vue
-- [ ] src/plugins/traces/ServicesCatalog.vue
-- [ ] src/plugins/traces/TraceDetails.vue
-- [ ] src/plugins/traces/TraceEvaluationsView.vue
+- ✅ src/plugins/traces/SearchResult.vue
+- ✅ src/plugins/traces/ServiceGraph.vue
+- ✅ src/plugins/traces/ServicesCatalog.vue
+- ✅ src/plugins/traces/TraceDetails.vue
+- ✅ src/plugins/traces/TraceEvaluationsView.vue
 - [ ] src/views/AwsMarketplaceSetup.vue
 - [ ] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
@@ -1129,11 +1148,11 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/plugins/logs/DetailTable.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
 - [ ] src/plugins/logs/IndexList.vue
-- [ ] src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/SearchBar.vue
 - ✅ src/plugins/logs/SearchHistory.vue
 - ✅ src/plugins/logs/TransformSelector.vue
 - ✅ src/plugins/traces/SearchBar.vue
-- [ ] src/plugins/traces/TraceDetailsSidebar.vue
+- ✅ src/plugins/traces/TraceDetailsSidebar.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 
 ---
@@ -1380,31 +1399,31 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/plugins/correlation/DimensionFiltersBar.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
-- [ ] src/plugins/logs/IndexList.vue
-- [ ] src/plugins/logs/JsonPreview.vue
-- [ ] src/plugins/logs/SearchBar.vue
-- [ ] src/plugins/logs/SearchJobInspector.vue
-- [ ] src/plugins/logs/SearchResult.vue
-- [ ] src/plugins/logs/SyntaxGuide.vue
+- ✅ src/plugins/logs/IndexList.vue
+- ✅ src/plugins/logs/JsonPreview.vue
+- ✅ src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/SearchJobInspector.vue
+- ✅ src/plugins/logs/SearchResult.vue
+- ✅ src/plugins/logs/SyntaxGuide.vue
 - ✅ src/plugins/logs/TransformSelector.vue
-- [ ] src/plugins/logs/components/FieldListPagination.vue
-- [ ] src/plugins/logs/patterns/PatternCard.vue
+- ✅ src/plugins/logs/components/FieldListPagination.vue
+- ✅ src/plugins/logs/patterns/PatternCard.vue
 - [ ] src/plugins/pipelines/CustomNode.vue
-- [ ] src/plugins/traces/LLMInsightsDashboard.vue
+- ✅ src/plugins/traces/LLMInsightsDashboard.vue
 - ✅ src/plugins/traces/SearchBar.vue
-- [ ] src/plugins/traces/SearchResult.vue
-- [ ] src/plugins/traces/ServiceGraph.vue
-- [ ] src/plugins/traces/ServiceGraphEdgeSidePanel.vue
-- [ ] src/plugins/traces/ServiceGraphNodeSidePanel.vue
-- [ ] src/plugins/traces/ServicesCatalog.vue
-- [ ] src/plugins/traces/SyntaxGuide.vue
-- [ ] src/plugins/traces/ThreadView.vue
-- [ ] src/plugins/traces/TraceDetails.vue
-- [ ] src/plugins/traces/TraceEvaluationsView.vue
-- [ ] src/plugins/traces/components/SpanKindBadge.vue
-- [ ] src/plugins/traces/components/TraceErrorTab.vue
-- [ ] src/plugins/traces/components/TracesSearchResultList.vue
-- [ ] src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+- ✅ src/plugins/traces/SearchResult.vue
+- ✅ src/plugins/traces/ServiceGraph.vue
+- ✅ src/plugins/traces/ServiceGraphEdgeSidePanel.vue
+- ✅ src/plugins/traces/ServiceGraphNodeSidePanel.vue
+- ✅ src/plugins/traces/ServicesCatalog.vue
+- ✅ src/plugins/traces/SyntaxGuide.vue
+- ✅ src/plugins/traces/ThreadView.vue
+- ✅ src/plugins/traces/TraceDetails.vue
+- ✅ src/plugins/traces/TraceEvaluationsView.vue
+- ✅ src/plugins/traces/components/SpanKindBadge.vue
+- ✅ src/plugins/traces/components/TraceErrorTab.vue
+- ✅ src/plugins/traces/components/TracesSearchResultList.vue
+- ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 
 #### views/
 

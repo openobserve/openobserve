@@ -58,13 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="swap_horiz" size="13px" />
                 <span class="traffic-label">Total</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.total_requests ?? 0) }}</span>
-                <q-tooltip>Total requests flowing through this connection</q-tooltip>
+                <OTooltip content="Total requests flowing through this connection" />
               </div>
               <div class="traffic-pill failed" data-test="service-graph-edge-side-panel-failed">
                 <q-icon name="close" size="13px" />
                 <span class="traffic-label">Failed</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.failed_requests ?? 0) }}</span>
-                <q-tooltip>Number of failed requests on this connection</q-tooltip>
+                <OTooltip content="Number of failed requests on this connection" />
               </div>
               <div
                 class="traffic-pill error-rate"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="error_outline" size="13px" />
                 <span class="traffic-label">Error Rate</span>
                 <span class="traffic-value">{{ errorRateFormatted }}</span>
-                <q-tooltip>Percentage of requests that failed</q-tooltip>
+                <OTooltip content="Percentage of requests that failed" />
               </div>
             </div>
 
@@ -237,12 +237,13 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
-  components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner },
+  components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip },
   props: {
     selectedEdge: {
       type: Object as PropType<{

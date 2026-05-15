@@ -35,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="onStreamTypeChange('logs')"
       >
         <q-icon :name="streamTypeIcon" size="16px" />
-        <q-tooltip anchor="bottom middle" self="top middle">
-          {{ streamTypeLabel }} — {{ t("search.switchToLogs") }}
-        </q-tooltip>
+        <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <q-select
         ref="streamSelect"
@@ -58,16 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @filter="filterStreamFn"
         @update:model-value="handleMultiStreamSelection"
       >
-        <q-tooltip
+        <OTooltip
           v-if="searchObj.data.stream.selectedStream.length > 1"
           :delay="500"
-          anchor="bottom left"
-          self="top left"
+          side="bottom"
+          align="start"
           max-width="280px"
-          style="font-size: 13px"
-        >
-          {{ searchObj.data.stream.selectedStream.join(", ") }}
-        </q-tooltip>
+          :content="searchObj.data.stream.selectedStream.join(', ')"
+        />
         <template #no-option>
           <q-item>
             <q-item-section> {{ t("search.noResult") }}</q-item-section>
@@ -225,6 +221,7 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
