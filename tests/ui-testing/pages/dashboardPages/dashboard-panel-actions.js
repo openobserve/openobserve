@@ -141,23 +141,29 @@ export default class DashboardactionPage {
 
   /**
    * Verify that actual data is plotted on the chart canvas.
-   * Checks three things:
-   *   1. Query loading has completed (Apply button no longer disabled)
-   *   2. No "no-data" placeholder is visible
-   *   3. At least one canvas has colored (non-background, non-transparent) pixels
+   * Waits for the full data pipeline to settle, then asserts:
+   *   1. No "no-data" placeholder is visible
+   *   2. At least one canvas has colored (non-background, non-transparent) pixels
    *
    * Uses the same canvas pixel-scan approach as the multiwindow color spec.
    * @param {Function} expect - Playwright expect function
    */
   async verifyChartHasData(expect) {
-    // 1. Wait for query loading to finish (Apply button enabled)
-    await expect(this.applyDashboard).toBeEnabled({ timeout: 30000 });
+    // Wait for full data pipeline: query loading + panelData conversion.
+    // The Apply button switches data-test to "dashboard-cancel" while loading.
+    // After the query completes, the panelData conversion runs async —
+    // poll until loading is done AND the no-data element clears.
+    await this.page.waitForFunction(() => {
+      if (document.querySelector('[data-test="dashboard-cancel"]')) return false;
+      const noData = document.querySelector('[data-test="no-data"]');
+      return !noData || noData.textContent.trim() !== 'No Data';
+    }, { timeout: 30000 });
 
-    // 2. No "no data" placeholder
+    // 1. No "no data" placeholder
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
 
-    // 3. Canvas has non-background pixels
+    // 2. Canvas has non-background pixels
     const hasData = await this.page.evaluate(() => {
       const canvases = document.querySelectorAll("canvas");
       for (const canvas of canvases) {
