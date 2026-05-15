@@ -239,10 +239,7 @@ describe("OrganizationManagement.vue", () => {
           }
         },
         stubs: {
-          ODialog: ODialogStub,
-          'q-page': {
-            template: '<div class="q-page"><slot /></div>'
-          },
+                    ODialog: ODialogStub,
           'q-table': {
             template: `
               <div

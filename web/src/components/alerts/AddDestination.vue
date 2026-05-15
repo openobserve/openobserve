@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none o2-custom-bg"
+  <div class="tw:rounded-md q-pa-none o2-custom-bg"
     style="
       height: calc(100vh - 48px);
       min-height: inherit;
@@ -173,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="prebuilt-form"
             />
             <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
-              <q-spinner color="primary" size="40px" />
+              <OSpinner size="md" />
               <div class="q-mt-sm text-grey-7">Loading destination data...</div>
             </div>
 
@@ -583,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :template-content="previewContent"
       data-test="destination-preview-modal"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts" setup>
 import {
@@ -618,6 +617,7 @@ import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   templates: {

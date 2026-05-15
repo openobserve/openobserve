@@ -184,7 +184,7 @@
             v-if="loading.events"
             class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
           >
-            <q-spinner-hourglass size="18px" />
+            <OSpinner size="xs" />
             <div class="tw:relative tw:top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
@@ -244,7 +244,7 @@
             v-if="loading.output"
             class="text-subtitle2 text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
           >
-            <q-spinner-hourglass size="18px" />
+            <OSpinner size="xs" />
             <div class="tw:relative tw:top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
@@ -333,6 +333,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   vrlFunction: {

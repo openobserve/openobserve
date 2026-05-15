@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="incident-detail-page" class="q-pa-none" style="height: calc(100vh - 50px); overflow: hidden;">
+  <div class="tw:rounded-md q-pa-none" data-test="incident-detail-page" style="height: calc(100vh - 50px); overflow: hidden;">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
     <!-- Header -->
     <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
@@ -1020,7 +1020,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" />
           </div>
 
           <!-- Error/No Data State -->
@@ -1070,7 +1070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
@@ -1128,7 +1128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <q-spinner-hourglass color="primary" size="3rem" class="tw-mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 
@@ -1177,10 +1177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading state -->
     <div v-if="loading" class="tw:flex-1 tw:flex tw:items-center tw:justify-center">
-      <q-spinner-hourglass size="lg" color="primary" />
+      <OSpinner size="md" />
     </div>
   </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -1214,6 +1214,7 @@ import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1229,6 +1230,7 @@ export default defineComponent({
     IncidentTimeline,
     CustomChartRenderer,
     OButton,
+    OSpinner,
   },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {

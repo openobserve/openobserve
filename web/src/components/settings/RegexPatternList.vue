@@ -1,5 +1,5 @@
 ﻿<template>
-    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
@@ -55,7 +55,7 @@
             <NoData />
           </div>
           <div v-else class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
-            <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
+            <OSpinner size="lg" class="tw:mt-[20vh]" />
 
           </div>
         </template>
@@ -186,7 +186,7 @@
           @update:list="getRegexPatterns"
           @close="closeAddRegexPatternDialog"
         />
-      </q-page>
+    </div>
   </template>
 
 <script lang="ts">
@@ -208,6 +208,7 @@
     import NoData from "@/components/shared/grid/NoData.vue";
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import OButton from "@/lib/core/Button/OButton.vue";
+    import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -219,6 +220,7 @@
             ImportRegexPattern,
             NoData,
             OButton,
+            OSpinner,
         },
     setup() {
 

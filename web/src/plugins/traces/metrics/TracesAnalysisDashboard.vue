@@ -245,11 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="loading"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="3.75rem"
-                    class="tw:mb-4"
-                  />
+                  <OSpinner size="xl" class="tw:mb-4" />
                   <div class="tw:text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
@@ -332,6 +328,7 @@ import {
   selectDimensionsFromData,
   selectTraceDimensions,
 } from "@/composables/useDimensionSelector";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),

@@ -385,13 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="flex justify-center items-center q-ml-xs"
                             :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
                           >
-                            <q-circular-progress
-                              indeterminate
-                              rounded
-                              size="16px"
-                              :value="1"
-                              color="secondary"
-                            />
+                            <OSpinner size="xs" />
                           </div>
                           <OButton
                             v-else
@@ -881,6 +875,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -904,6 +899,7 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
+    OSpinner,
   },
   emits: [
     "update:changeRecordPerPage",

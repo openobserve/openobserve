@@ -21,11 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
       >
         <div>
-          <q-spinner-hourglass
-            color="primary"
-            size="2.5rem"
-            class="tw:mx-auto tw:block"
-          />
+          <OSpinner size="md" class="tw:mx-auto tw:block" />
           <div class="text-center full-width">
             {{ t("rum.loadingMsg") }}
           </div>
@@ -123,6 +119,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const route = useRoute();
 const router = useRouter();

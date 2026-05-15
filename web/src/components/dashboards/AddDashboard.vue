@@ -15,31 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="beingUpdated" class="text-body1 text-bold">
-            {{ t("dashboard.updatedashboard") }}
-          </div>
-          <div v-else class="text-body1 text-bold">
-            {{ t("dashboard.createdashboard") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-add-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-px-md q-py-sm add-dashboard-form-card-section">
+  <div class="q-px-md q-py-sm add-dashboard-form-card-section">
       <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
         <q-input
           v-if="beingUpdated"
@@ -82,8 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span>&nbsp;</span> 
       </q-form>
-    </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">

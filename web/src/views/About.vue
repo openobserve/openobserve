@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
+  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
     <div class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto">
       <div class="q-px-sm q-py-sm tw:h-full">
         <!-- Hero Section -->
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="loadingLicense" class="tw:text-center tw:py-8">
-              <q-spinner size="40px" color="primary" />
+              <OSpinner size="md" />
               <div class="tw:mt-3 tw:text-sm tw:opacity-70">{{ t("about.loading_license_info") }}</div>
             </div>
 
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -282,6 +282,7 @@ import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vu
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "PageAbout",
@@ -289,6 +290,7 @@ export default defineComponent({
     FeatureComparisonTable,
     OButton,
     OIcon,
+    OSpinner,
   },
   setup() {
     const store = useStore();

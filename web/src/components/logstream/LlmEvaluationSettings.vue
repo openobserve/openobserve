@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   <div class="llm-eval-settings">
     <!-- Loading skeleton -->
     <div v-if="loading" class="llm-eval-settings__loading">
-      <q-spinner-hourglass color="primary" size="lg" />
+      <OSpinner size="md" />
     </div>
 
     <template v-else>
@@ -328,10 +328,11 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import pipelineService from "@/services/pipelines";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
-  components: { OButton },
+  components: { OButton, OSpinner },
 
   props: {
     streamName: {

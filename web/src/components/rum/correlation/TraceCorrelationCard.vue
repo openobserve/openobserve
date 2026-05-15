@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="isLoading">
       <div class="q-pa-md text-center">
-        <q-spinner-hourglass color="primary" size="1.5rem" />
+        <OSpinner size="sm" />
         <div class="q-mt-sm text-grey-7">Loading trace data...</div>
       </div>
     </template>
@@ -204,6 +204,7 @@ import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { GitBranch } from 'lucide-vue-next';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   traceId: {

@@ -323,7 +323,7 @@
                           </div>
                           <div v-else-if="testLoading">
                             <span class="tw:flex tw:items-center tw:justify-center tw:h-[111px]">
-                              <q-spinner-hourglass color="primary" size="24px" />
+                              <OSpinner size="sm" />
                             </span>
                           </div>
                         </div>
@@ -414,6 +414,7 @@ import FullViewContainer from '../functions/FullViewContainer.vue';
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from '../ConfirmDialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export interface PatternAssociation {
     field: string;
@@ -428,6 +429,7 @@ export default defineComponent({
         FullViewContainer,
         ConfirmDialog,
         OButton,
+        OSpinner,
     },
     props: {
         data: {

@@ -154,7 +154,6 @@ import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 
-
 interface Props {
   modelValue: boolean;
   matchedDimensions: Record<string, string>;

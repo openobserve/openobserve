@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <router-view
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   ></router-view>
+  <OToastProvider />
 </template>
 
 <script lang="ts">
@@ -26,8 +27,10 @@ import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
 import { applyThemeColors } from "@/utils/theme";
+import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 
 export default {
+  components: { OToastProvider },
   setup() {
     const store = useStore();
     const router = useRouter();

@@ -216,13 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="display: inline-block; width: 33.14px; height: auto"
                       class="flex justify-center items-center"
                     >
-                      <q-circular-progress
-                        indeterminate
-                        rounded
-                        size="16px"
-                        :value="1"
-                        color="secondary"
-                      />
+                      <OSpinner size="xs" />
                     </div>
                     <OButton
                       v-else
@@ -366,7 +360,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),

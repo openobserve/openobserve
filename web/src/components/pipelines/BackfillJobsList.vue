@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="backfill-jobs-list-page">
+  <div class="tw:rounded-md" data-test="backfill-jobs-list-page">
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header -->
       <div class="card-container tw:mb-[0.625rem]">
@@ -147,23 +147,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td :props="props">
                 <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
                   <div class="tw:flex-1 tw:relative">
-                    <q-linear-progress
+                    <OProgressBar
                       :value="props.row.progress_percent / 100"
-                      :color="getProgressColor(props.row.deletion_status)"
-                      size="20px"
-                      rounded
+                      variant="default"
+                      size="lg"
                       data-test="progress-bar"
                     >
-                      <div
-                        class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center"
-                      >
-                        <div
-                          class="text-caption tw:font-semibold tw:text-white tw:drop-shadow-sm"
-                        >
-                          {{ props.row.progress_percent }}%
-                        </div>
-                      </div>
-                    </q-linear-progress>
+                      <template #label>
+                        <span class="text-caption tw:font-semibold">{{ props.row.progress_percent }}%</span>
+                      </template>
+                    </OProgressBar>
                   </div>
                   <div
                     v-if="props.row.chunks_total"
@@ -354,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDialog.onConfirm"
       @update:cancel="resetConfirmDialog"
     />
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -387,6 +380,7 @@ import {
   outlinedPlayArrow,
   outlinedVisibility,
 } from "@quasar/extras/material-icons-outlined";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 const router = useRouter();
 const $q = useQuasar();

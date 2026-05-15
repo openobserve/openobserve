@@ -61,8 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   data-test="close-drawer-btn"
-                  @click="emit('update:open', false)"
-                />
+                @click="emit('update:open', false)"
+                >
+                  <X class="tw:size-4" />
+                </OButton>
               </div>
             </div>
             <div
@@ -284,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="event.type === 'action'" class="tw:mb-3">
             <template v-if="isLoadingRelatedResources">
               <div class="tw:mt-2 tw:p-2 text-center">
-                <q-spinner-hourglass color="primary" size="1rem" />
+                <OSpinner size="xs" />
                 <div class="tw:mt-1 text-grey-7 tw:text-xs">
                   Loading related events...
                 </div>
@@ -547,6 +549,7 @@ import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { GitBranch } from 'lucide-vue-next';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   open: {

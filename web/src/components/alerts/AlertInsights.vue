@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @contextmenu="handleNativeContextMenu"
         >
           <div v-show="isLoading" class="loading-container flex items-center justify-center">
-            <q-spinner-hourglass color="primary" size="40px" />
+            <OSpinner size="md" />
             <div class="q-ml-md">Loading insights...</div>
           </div>
 
@@ -294,6 +294,7 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const router = useRouter();
 const route = useRoute();

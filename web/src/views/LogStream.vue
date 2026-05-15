@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
-                <q-spinner-hourglass color="primary" size="lg" />
+                <OSpinner size="md" />
               </div>
             </template>
             <template #body-selection="scope">
@@ -353,6 +353,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "PageLogStream",
@@ -366,6 +367,18 @@ export default defineComponent({
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
+    OToggleGroup,
+    OToggleGroupItem,
+    OSpinner,
+    ScrollText,
+    BarChart2,
+    GitFork,
+    Info,
+    Search,
+    FileText,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {

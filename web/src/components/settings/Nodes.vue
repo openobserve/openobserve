@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <q-splitter
       v-model="splitterModel"
       :limits="[0, 250]"
@@ -648,13 +648,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-slot:body-cell-cpu="props">
             <q-td :props="props">
-              <q-linear-progress
-                dark
-                size="10px"
-                class="progresbar tw:w-[80%]! tw:max-w-[80%] inline-block"
-                rounded
+              <OProgressBar
+                size="sm"
+                class="progresbar tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
                 :value="props.row.cpu_usage / 100"
-                :color="props.row.cpu_usage > 85 ? 'red-9' : 'primary'"
+                :variant="props.row.cpu_usage > 85 ? 'danger' : 'default'"
               />
               {{ props.row.cpu_usage }}%
             </q-td>
@@ -662,15 +660,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-slot:body-cell-memory="props">
             <q-td :props="props">
-              <q-linear-progress
-                dark
-                size="10px"
-                class="progresbar tw:w-[80%]! tw:max-w-[80%] inline-block"
-                rounded
+              <OProgressBar
+                size="sm"
+                class="progresbar tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
                 :value="props.row.percentage_memory_usage / 100"
-                :color="
-                  props.row.percentage_memory_usage > 85 ? 'red-9' : 'primary'
-                "
+                :variant="props.row.percentage_memory_usage > 85 ? 'danger' : 'default'"
               />
               {{ props.row.percentage_memory_usage }}%
             </q-td>
@@ -689,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-table>
       </template>
     </q-splitter>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -712,6 +706,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -719,6 +714,7 @@ export default defineComponent({
     QTablePagination,
     NoData,
     OButton,
+    OProgressBar,
   },
   setup() {
     const store = useStore();

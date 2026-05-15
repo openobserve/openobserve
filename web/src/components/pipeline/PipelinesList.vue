@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page v-if="currentRouteName === 'pipelines'">
+  <div class="tw:rounded-md" v-if="currentRouteName === 'pipelines'">
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <div class="card-container tw:mb-[0.625rem]">
         <div
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </q-page>
+  </div>
 
   <router-view v-else />
 

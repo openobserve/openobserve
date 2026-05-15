@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="loading"
           class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
         >
-          <q-spinner color="primary" size="3em" />
+          <OSpinner size="lg" />
         </div>
 
         <!-- Error State -->
@@ -119,60 +119,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
     <!-- Folder Selection Dialog -->
-    <q-dialog v-model="showFolderSelection" persistent>
-      <q-card style="min-width: 500px; max-width: 600px" class="tw:rounded-xl">
-        <q-card-section class="q-py-md">
-          <div class="text-h6 tw:font-bold">Select Destination Folder</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-select
-              v-model="selectedFolderObj"
-              :options="folderOptions"
-              label="Folder"
-              outlined
-              dense
-              class="tw:grow o2-custom-select-dashboard"
-              data-test="add-dashboard-github-folder-select"
-            >
-              <template v-slot:selected>
-                <span v-if="selectedFolderObj">{{
-                  selectedFolderObj.label
-                }}</span>
-              </template>
-            </q-select>
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="showAddFolderDialog = true"
-              data-test="add-dashboard-github-add-folder"
-              title="Add New Folder"
-            >
-              <template #icon-left><q-icon name="add" /></template>
-            </OButton>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="showFolderSelection = false"
-            >Back</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!selectedFolderObj"
-            :loading="importing"
-            @click="confirmAdd"
-            data-test="add-dashboard-github-confirm"
-            >Add Dashboard</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="add-dashboard-from-github-folder-selection-dialog"
+      v-model:open="showFolderSelection"
+      persistent
+      size="sm"
+      title="Select Destination Folder"
+      secondary-button-label="Back"
+      primary-button-label="Add Dashboard"
+      :primary-button-disabled="!selectedFolderObj"
+      :primary-button-loading="importing"
+      @click:secondary="showFolderSelection = false"
+      @click:primary="confirmAdd"
+    >
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <q-select
+          v-model="selectedFolderObj"
+          :options="folderOptions"
+          label="Folder"
+          outlined
+          dense
+          class="tw:grow o2-custom-select-dashboard"
+          data-test="add-dashboard-github-folder-select"
+        >
+          <template v-slot:selected>
+            <span v-if="selectedFolderObj">{{ selectedFolderObj.label }}</span>
+          </template>
+        </q-select>
+        <OButton
+          variant="ghost"
+          size="icon"
+          @click="showAddFolderDialog = true"
+          data-test="add-dashboard-github-add-folder"
+          title="Add New Folder"
+        >
+          <template #icon-left><q-icon name="add" /></template>
+        </OButton>
+      </div>
+    </ODialog>
 
     <!-- Add Folder Dialog -->
     <ODrawer
@@ -206,6 +189,7 @@ import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface GitHubDashboard {
   name: string;
@@ -217,7 +201,7 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton, ODialog, ODrawer },
+  components: { AddFolder, OButton, ODialog, ODrawer, OSpinner },
   props: {
     modelValue: {
       type: Boolean,

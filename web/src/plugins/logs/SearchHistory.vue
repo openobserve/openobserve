@@ -268,7 +268,7 @@
             v-if="isLoading"
             class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
           >
-            <q-spinner-hourglass color="primary" size="lg" />
+            <OSpinner size="md" />
           </div>
         </div>
       </div>
@@ -304,6 +304,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -318,6 +319,7 @@ export default defineComponent({
     AppTabs,
     QueryEditor,
     OButton,
+    OSpinner,
   },
   props: {
     isClicked: {

@@ -1043,7 +1043,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="height: calc(100vh - 190px) !important"
                     class="flex justify-center items-center"
                   >
-                    <q-spinner-hourglass color="primary" size="lg" />
+                    <OSpinner size="md" />
                   </div>
 
                   <TenstackTable
@@ -1238,6 +1238,7 @@ import { onBeforeUnmount } from "vue";
 import { debounce } from "lodash-es";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),

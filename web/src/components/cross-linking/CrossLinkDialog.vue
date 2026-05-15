@@ -122,8 +122,7 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Plus } from "lucide-vue-next";
-
+import { Plus } from 'lucide-vue-next';
 
 export interface CrossLink {
   name: string;

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="search-job-inspector q-pa-none">
+  <div class="tw:rounded-md search-job-inspector q-pa-none">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading State -->
       <div v-if="loading" class="card-container tw:h-[calc(100vh-242px)]">
         <div class="flex flex-center tw:h-full">
-          <q-spinner-hourglass color="primary" size="50px" />
+          <OSpinner size="lg" />
         </div>
       </div>
 
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
       </div>
     </ODialog>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -410,6 +410,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { Copy, Check } from "lucide-vue-next";
 
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface ProfileEvent {
   timestamp: string;
@@ -453,6 +454,7 @@ export default defineComponent({
     ODialog,
     Copy,
     Check,
+    OSpinner,
   },
   setup() {
     const router = useRouter();

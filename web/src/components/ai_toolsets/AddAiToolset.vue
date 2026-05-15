@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <!-- Header -->
     <div class="row items-center no-wrap q-mx-md q-pt-sm">
       <div class="flex items-center tw:py-2">
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </q-form>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

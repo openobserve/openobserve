@@ -283,7 +283,7 @@
                 v-if="isLoading"
                 class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
-                <q-spinner-hourglass color="primary" size="lg" />
+                <OSpinner size="md" />
               </div>
             </template>
             <template v-slot:header="props">
@@ -359,6 +359,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -371,6 +372,7 @@ export default defineComponent({
     AppTabs,
     JsonPreview,
     OButton,
+    OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

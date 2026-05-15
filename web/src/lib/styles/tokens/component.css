@@ -127,6 +127,12 @@
   --color-dropdown-item-destructive-text: var(--color-error-600);
   --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
+  /* Tooltip */
+  --color-tooltip-bg: var(--color-primary-100);
+  --color-tooltip-text: var(--color-text-primary);
+  --color-tooltip-border: var(--color-border-strong);
+  --color-tooltip-arrow: var(--color-primary-100);
+
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);
   /* 12px */
@@ -157,6 +163,156 @@
   --color-tabs-focus-ring: var(--color-primary-400);
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
+
+  /* Card */
+  --color-card-bg: var(--color-surface-panel);
+  --color-card-text: var(--color-text-primary);
+
+  /* Collapsible */
+  --color-collapsible-label: var(--color-text-primary);
+  --color-collapsible-caption: var(--color-text-secondary);
+  --color-collapsible-icon: var(--color-text-secondary);
+  --color-collapsible-trigger-hover-bg: var(--color-primary-50);
+  --color-collapsible-trigger-active-bg: var(--color-primary-100);
+  --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+
+  /* Stepper */
+  --color-stepper-indicator-default: var(--color-border-strong);
+  --color-stepper-indicator-default-text: var(--color-text-primary);
+  --color-stepper-indicator-active: var(--color-primary-600);
+  --color-stepper-indicator-done: var(--color-primary-600);
+  --color-stepper-indicator-error: var(--color-error-600);
+  --color-stepper-indicator-fg: var(--color-white);
+  --color-stepper-connector: var(--color-border-default);
+  --color-stepper-connector-done: var(--color-primary-300);
+  --color-stepper-title-default: var(--color-text-secondary);
+  --color-stepper-title-active: var(--color-text-primary);
+  --color-stepper-title-done: var(--color-text-primary);
+  --color-stepper-trigger-hover: var(--color-surface-subtle);
+  --color-stepper-trigger-focus-ring: var(--color-primary-400);
+
+  /* ── Dialog ──────────────────────────────────────────────── */
+
+  /* Overlay */
+  --color-dialog-overlay: var(--color-overlay-scrim);
+
+  /* Panel */
+  --color-dialog-bg:            var(--color-surface-overlay);
+  --color-dialog-border:        var(--color-border-default);
+  --shadow-dialog:              var(--shadow-lg);
+
+  /* Header */
+  --color-dialog-header-bg:     var(--color-surface-panel);
+  --color-dialog-header-text:   var(--color-text-primary);
+  --color-dialog-header-border: var(--color-border-default);
+
+  /* Content */
+  --color-dialog-content-text:  var(--color-text-primary);
+
+  /* Footer */
+  --color-dialog-footer-bg:     var(--color-surface-panel);
+  --color-dialog-footer-border: var(--color-border-default);
+
+  /* Close button */
+  --color-dialog-close-text:      var(--color-text-secondary);
+  --color-dialog-close-hover-bg:  var(--color-surface-subtle);
+  --color-dialog-close-active-bg: var(--color-surface-subtle-hover);
+  --color-dialog-focus-ring:      var(--color-primary-400);
+
+  /* Spacing */
+  --spacing-dialog-header-px: var(--spacing-5);
+  --spacing-dialog-header-py: var(--spacing-3);
+  --spacing-dialog-content-px: var(--spacing-5);
+  --spacing-dialog-content-py: var(--spacing-3);
+  --spacing-dialog-footer-px: var(--spacing-5);
+  --spacing-dialog-footer-py: var(--spacing-3);
+
+  /* Badge — default (neutral grey) */
+  --color-badge-default-solid-bg: var(--color-grey-200);
+  --color-badge-default-solid-text: var(--color-grey-700);
+  --color-badge-default-ol-border: var(--color-grey-400);
+  --color-badge-default-ol-text: var(--color-grey-600);
+
+  /* Badge — primary */
+  --color-badge-primary-solid-bg: var(--color-primary-600);
+  --color-badge-primary-solid-text: var(--color-white);
+  --color-badge-primary-ol-border: var(--color-primary-400);
+  --color-badge-primary-ol-text: var(--color-primary-700);
+
+  /* Badge — success */
+  --color-badge-success-solid-bg: var(--color-success-500);
+  --color-badge-success-solid-text: var(--color-white);
+  --color-badge-success-ol-border: var(--color-success-500);
+  --color-badge-success-ol-text: var(--color-success-700);
+
+  /* Badge — warning (dark text on yellow — never white) */
+  --color-badge-warning-solid-bg: var(--color-warning-400);
+  --color-badge-warning-solid-text: var(--color-grey-900);
+  --color-badge-warning-ol-border: var(--color-warning-600);
+  --color-badge-warning-ol-text: var(--color-warning-700);
+
+  /* Badge — error */
+  --color-badge-error-solid-bg: var(--color-error-600);
+  --color-badge-error-solid-text: var(--color-white);
+  --color-badge-error-ol-border: var(--color-error-500);
+  --color-badge-error-ol-text: var(--color-error-600);
+
+  /* Badge — shared */
+  --color-badge-focus-ring: var(--color-primary-400);
+
+  /* ── Toast ─────────────────────────────────────────────── */
+  /* success */
+  --color-toast-success-bg:     var(--color-success-50);
+  --color-toast-success-border: var(--color-success-500);
+  --color-toast-success-icon:   var(--color-success-700);
+
+  /* error */
+  --color-toast-error-bg:       var(--color-error-50);
+  --color-toast-error-border:   var(--color-error-400);
+  --color-toast-error-icon:     var(--color-error-600);
+
+  /* warning */
+  --color-toast-warning-bg:     var(--color-warning-50);
+  --color-toast-warning-border: var(--color-warning-400);
+  --color-toast-warning-icon:   var(--color-warning-600);
+
+  /* info */
+  --color-toast-info-bg:        var(--color-primary-50);
+  --color-toast-info-border:    var(--color-primary-300);
+  --color-toast-info-icon:      var(--color-primary-600);
+
+  /* loading / default */
+  --color-toast-loading-bg:     var(--color-surface-overlay);
+  --color-toast-loading-border: var(--color-border-default);
+  --color-toast-loading-icon:   var(--color-primary-600);
+  --color-toast-default-bg:     var(--color-surface-overlay);
+  --color-toast-default-border: var(--color-border-default);
+
+  /* shared foreground */
+  --color-toast-fg:             var(--color-text-primary);
+  --color-toast-fg-secondary:   var(--color-text-secondary);
+  --color-toast-action-text:    var(--color-primary-600);
+  --color-toast-action-hover:   var(--color-primary-700);
+  --shadow-toast:               var(--shadow-lg);
+
+  /* Spinner */
+  --color-spinner: var(--color-primary-600);
+  --color-spinner-track: var(--color-primary-200);
+
+  /* InnerLoading */
+  --color-inner-loading-overlay: color-mix(in srgb, var(--color-surface-base) 70%, transparent);
+  --color-inner-loading-label: var(--color-text-secondary);
+
+  /* Skeleton */
+  --color-skeleton-base: var(--color-grey-200);
+  --color-skeleton-highlight: var(--color-grey-100);
+
+  /* ProgressBar */
+  --color-progress-bar-default: var(--color-primary-600);
+  --color-progress-bar-warning: var(--color-warning-500);
+  --color-progress-bar-danger: var(--color-error-600);
+  --color-progress-bar-track: var(--color-grey-200);
+  --color-progress-bar-label: var(--color-white);
 
   /* ── Dialog ──────────────────────────────────────────────── */
 
@@ -322,6 +478,12 @@
   --color-dropdown-item-destructive-text: var(--color-dropdown-item-destructive-text);
   --color-dropdown-item-destructive-hover-bg: var(--color-dropdown-item-destructive-hover-bg);
 
+  /* Tooltip */
+  --color-tooltip-bg: var(--color-tooltip-bg);
+  --color-tooltip-text: var(--color-tooltip-text);
+  --color-tooltip-border: var(--color-tooltip-border);
+  --color-tooltip-arrow: var(--color-tooltip-arrow);
+
   /* Icon sizes */
   --text-icon-xs: var(--text-icon-xs);
   --text-icon-sm: var(--text-icon-sm);
@@ -370,4 +532,129 @@
   --spacing-dialog-content-py: var(--spacing-dialog-content-py);
   --spacing-dialog-footer-px: var(--spacing-dialog-footer-px);
   --spacing-dialog-footer-py: var(--spacing-dialog-footer-py);
+
+  /* Card */
+  --color-card-bg: var(--color-card-bg);
+  --color-card-text: var(--color-card-text);
+
+  /* Collapsible */
+  --color-collapsible-label: var(--color-collapsible-label);
+  --color-collapsible-caption: var(--color-collapsible-caption);
+  --color-collapsible-icon: var(--color-collapsible-icon);
+  --color-collapsible-trigger-hover-bg: var(--color-collapsible-trigger-hover-bg);
+  --color-collapsible-trigger-active-bg: var(--color-collapsible-trigger-active-bg);
+  --color-collapsible-trigger-focus-ring: var(--color-collapsible-trigger-focus-ring);
+
+  /* Dialog */
+  --color-dialog-overlay: var(--color-dialog-overlay);
+  --color-dialog-bg: var(--color-dialog-bg);
+  --color-dialog-border: var(--color-dialog-border);
+  --shadow-dialog: var(--shadow-dialog);
+  --color-dialog-header-bg: var(--color-dialog-header-bg);
+  --color-dialog-header-text: var(--color-dialog-header-text);
+  --color-dialog-header-border: var(--color-dialog-header-border);
+  --color-dialog-content-text: var(--color-dialog-content-text);
+  --color-dialog-footer-bg: var(--color-dialog-footer-bg);
+  --color-dialog-footer-border: var(--color-dialog-footer-border);
+  --color-dialog-close-text: var(--color-dialog-close-text);
+  --color-dialog-close-hover-bg: var(--color-dialog-close-hover-bg);
+  --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
+  --color-dialog-focus-ring: var(--color-dialog-focus-ring);
+  --spacing-dialog-header-px: var(--spacing-dialog-header-px);
+  --spacing-dialog-header-py: var(--spacing-dialog-header-py);
+  --spacing-dialog-content-px: var(--spacing-dialog-content-px);
+  --spacing-dialog-content-py: var(--spacing-dialog-content-py);
+  --spacing-dialog-footer-px: var(--spacing-dialog-footer-px);
+  --spacing-dialog-footer-py: var(--spacing-dialog-footer-py);
+
+  /* Badge — default */
+  --color-badge-default-solid-bg: var(--color-badge-default-solid-bg);
+  --color-badge-default-solid-text: var(--color-badge-default-solid-text);
+  --color-badge-default-ol-border: var(--color-badge-default-ol-border);
+  --color-badge-default-ol-text: var(--color-badge-default-ol-text);
+
+  /* Badge — primary */
+  --color-badge-primary-solid-bg: var(--color-badge-primary-solid-bg);
+  --color-badge-primary-solid-text: var(--color-badge-primary-solid-text);
+  --color-badge-primary-ol-border: var(--color-badge-primary-ol-border);
+  --color-badge-primary-ol-text: var(--color-badge-primary-ol-text);
+
+  /* Badge — success */
+  --color-badge-success-solid-bg: var(--color-badge-success-solid-bg);
+  --color-badge-success-solid-text: var(--color-badge-success-solid-text);
+  --color-badge-success-ol-border: var(--color-badge-success-ol-border);
+  --color-badge-success-ol-text: var(--color-badge-success-ol-text);
+
+  /* Badge — warning */
+  --color-badge-warning-solid-bg: var(--color-badge-warning-solid-bg);
+  --color-badge-warning-solid-text: var(--color-badge-warning-solid-text);
+  --color-badge-warning-ol-border: var(--color-badge-warning-ol-border);
+  --color-badge-warning-ol-text: var(--color-badge-warning-ol-text);
+
+  /* Badge — error */
+  --color-badge-error-solid-bg: var(--color-badge-error-solid-bg);
+  --color-badge-error-solid-text: var(--color-badge-error-solid-text);
+  --color-badge-error-ol-border: var(--color-badge-error-ol-border);
+  --color-badge-error-ol-text: var(--color-badge-error-ol-text);
+
+  /* Badge — shared */
+  --color-badge-focus-ring: var(--color-badge-focus-ring);
+
+  /* Toast */
+  --color-toast-success-bg: var(--color-toast-success-bg);
+  --color-toast-success-border: var(--color-toast-success-border);
+  --color-toast-success-icon: var(--color-toast-success-icon);
+  --color-toast-error-bg: var(--color-toast-error-bg);
+  --color-toast-error-border: var(--color-toast-error-border);
+  --color-toast-error-icon: var(--color-toast-error-icon);
+  --color-toast-warning-bg: var(--color-toast-warning-bg);
+  --color-toast-warning-border: var(--color-toast-warning-border);
+  --color-toast-warning-icon: var(--color-toast-warning-icon);
+  --color-toast-info-bg: var(--color-toast-info-bg);
+  --color-toast-info-border: var(--color-toast-info-border);
+  --color-toast-info-icon: var(--color-toast-info-icon);
+  --color-toast-loading-bg: var(--color-toast-loading-bg);
+  --color-toast-loading-border: var(--color-toast-loading-border);
+  --color-toast-loading-icon: var(--color-toast-loading-icon);
+  --color-toast-default-bg: var(--color-toast-default-bg);
+  --color-toast-default-border: var(--color-toast-default-border);
+  --color-toast-fg: var(--color-toast-fg);
+  --color-toast-fg-secondary: var(--color-toast-fg-secondary);
+  --color-toast-action-text: var(--color-toast-action-text);
+  --color-toast-action-hover: var(--color-toast-action-hover);
+  --shadow-toast: var(--shadow-toast);
+
+  /* Stepper */
+  --color-stepper-indicator-default: var(--color-stepper-indicator-default);
+  --color-stepper-indicator-default-text: var(--color-stepper-indicator-default-text);
+  --color-stepper-indicator-active: var(--color-stepper-indicator-active);
+  --color-stepper-indicator-done: var(--color-stepper-indicator-done);
+  --color-stepper-indicator-error: var(--color-stepper-indicator-error);
+  --color-stepper-indicator-fg: var(--color-stepper-indicator-fg);
+  --color-stepper-connector: var(--color-stepper-connector);
+  --color-stepper-connector-done: var(--color-stepper-connector-done);
+  --color-stepper-title-default: var(--color-stepper-title-default);
+  --color-stepper-title-active: var(--color-stepper-title-active);
+  --color-stepper-title-done: var(--color-stepper-title-done);
+  --color-stepper-trigger-hover: var(--color-stepper-trigger-hover);
+  --color-stepper-trigger-focus-ring: var(--color-stepper-trigger-focus-ring);
+
+  /* Spinner */
+  --color-spinner: var(--color-spinner);
+  --color-spinner-track: var(--color-spinner-track);
+
+  /* InnerLoading */
+  --color-inner-loading-overlay: var(--color-inner-loading-overlay);
+  --color-inner-loading-label: var(--color-inner-loading-label);
+
+  /* Skeleton */
+  --color-skeleton-base: var(--color-skeleton-base);
+  --color-skeleton-highlight: var(--color-skeleton-highlight);
+
+  /* ProgressBar */
+  --color-progress-bar-default: var(--color-progress-bar-default);
+  --color-progress-bar-warning: var(--color-progress-bar-warning);
+  --color-progress-bar-danger: var(--color-progress-bar-danger);
+  --color-progress-bar-track: var(--color-progress-bar-track);
+  --color-progress-bar-label: var(--color-progress-bar-label);
 }

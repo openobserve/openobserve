@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <q-table
       data-test="log-stream-table"
       ref="qTable"
@@ -78,11 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-md q-py-xs"
               style="height: 60px"
             >
-              <q-inner-loading
-                size="sm"
+              <OInnerLoading
                 :showing="loadingFunctions"
                 label="Fetching functions..."
-                label-style="font-size: 1.1em"
+                size="sm"
               />
             </div>
             <div v-show="!loadingFunctions">
@@ -295,10 +294,11 @@ import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, OIcon },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, OIcon, OInnerLoading },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();

@@ -120,11 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="isLoading">
         <div class="q-pa-lg flex items-center justify-center text-center">
           <div>
-            <q-spinner-hourglass
-              color="primary"
-              size="2.5rem"
-              class="tw:mx-auto tw:block"
-            />
+            <OSpinner size="md" class="tw:mx-auto tw:block" />
             <div class="text-center full-width q-mt-md">
               Loading source maps...
             </div>
@@ -254,6 +250,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const store = useStore();
 const router = useRouter();
