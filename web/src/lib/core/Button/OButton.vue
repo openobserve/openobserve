@@ -283,6 +283,7 @@ function handleClick(event: MouseEvent): void {
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"
+    :data-test="dataTest"
     v-bind="$attrs"
     @click="handleClick"
   >

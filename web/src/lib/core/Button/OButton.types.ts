@@ -87,6 +87,9 @@ export interface ButtonProps extends PrimitiveProps {
   type?: "button" | "submit" | "reset";
   /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
   block?: boolean;
+  /** data-test attribute for E2E testing — declared as a prop so it reliably renders on the
+   *  underlying DOM element even when OButton is used as a reka-ui as-child trigger */
+  dataTest?: string;
 }
 
 export interface ButtonEmits {
