@@ -157,6 +157,8 @@ export interface OTableProps<TData = any> {
 
   // ── Display ──
   loading?: boolean;
+  /** Data is arriving incrementally (SSE/WebSocket). Shows a pulsing indicator. */
+  streaming?: boolean;
   error?: string | null;
   /** Text shown when data is empty and not loading */
   emptyMessage?: string;
