@@ -135,8 +135,18 @@ export default [
           element: 'q-dialog',
           message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
         }
+        // {        //   element: 'q-stepper',
+        //   message: 'Use <OStepper> from "@/lib/navigation/Stepper/OStepper.vue" instead of <q-stepper>.'
+        // },
         // {
-        //   element: 'q-tooltip',
+        //   element: 'q-step',
+        //   message: 'Use <OStep> from "@/lib/navigation/Stepper/OStep.vue" instead of <q-step>.'
+        // },
+        // {
+        //   element: 'q-stepper-navigation',
+        //   message: 'Remove <q-stepper-navigation> \u2014 place Back/Continue buttons in a single nav div outside </OStepper>.'
+        // },
+        // {        //   element: 'q-tooltip',
         //   message: 'Use <OTooltip> from "@/lib/overlay/Tooltip/OTooltip.vue" instead of <q-tooltip>.'
         // }
         // {

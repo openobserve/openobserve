@@ -134,6 +134,12 @@
     --color-dialog-close-text: var(--color-grey-400);
     --color-dialog-close-hover-bg: var(--color-grey-700);
     --color-dialog-close-active-bg: var(--color-grey-600);
+
+    /* Stepper */
+    --color-stepper-indicator-active: var(--color-primary-500);
+    --color-stepper-indicator-done: var(--color-primary-500);
+    --color-stepper-connector-done: var(--color-primary-700);
+    --color-stepper-trigger-hover: var(--color-surface-subtle-hover);
 }
 
 /* ToggleGroup — primary variant dark overrides */
