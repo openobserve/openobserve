@@ -93,8 +93,8 @@ describe('MemberSubscription.vue', () => {
           $store: store,
         },
         stubs: {
-          'q-page': {
-            template: '<div class="q-page"><slot /></div>',
+          'OPage': {
+            template: '<div data-o2-page><slot /></div>',
           },
           'q-btn': {
             template: '<button class="q-btn"><slot /></button>',
@@ -142,7 +142,7 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#token=test-token-123', true); // Prevent auto processing
       await wrapper.vm.$nextTick();
       
-      expect(wrapper.find('.q-page').exists()).toBe(true);
+      expect(wrapper.find('[data-o2-page]').exists()).toBe(true);
       expect(wrapper.text()).toContain('Member Subscription');
     });
 

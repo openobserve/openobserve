@@ -136,7 +136,7 @@ describe("Ingestion", () => {
               props: ['title', 'message', 'modelValue'],
               emits: ['update:ok', 'update:cancel']
             },
-            'q-page': { template: '<div class="q-page"><slot /></div>' },
+            'OPage': { template: '<div data-o2-page><slot /></div>' },
             'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
             'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
             'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
@@ -176,7 +176,7 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".q-page").exists()).toBe(true);
+      expect(wrapper.find('[data-o2-page]').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {

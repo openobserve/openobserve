@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md">
+  <OPage class="q-pa-md">
     <div class="row q-col-gutter-md">
       <!-- Left: Simulated Log Viewer -->
       <div class="col-8">
@@ -132,7 +132,7 @@
         <pre class="query-preview">{{ queryPreview.sql }}</pre>
       </div>
     </ODialog>
-  </q-page>
+  </OPage>
 </template>
 
 <script setup lang="ts">
