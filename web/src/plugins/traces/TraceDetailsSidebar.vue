@@ -956,6 +956,8 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1992,7 +1994,9 @@ export default defineComponent({
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
         store.state.theme === "dark",
-        searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+        props.span
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
+          : "#9e9e9e",
       ),
     );
 
