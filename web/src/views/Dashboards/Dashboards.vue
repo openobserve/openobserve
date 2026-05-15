@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearchHistory"
               data-test="dashboard-search"
             >
-              <template #prepend>
+              <template #icon-left>
                 <q-icon name="search" />
               </template>
             </OInput>
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       clearable
                       class="tw:mx-2"
                     >
-                      <template #prepend>
+                      <template #icon-left>
                         <q-icon name="search" />
                       </template>
                     </OInput>

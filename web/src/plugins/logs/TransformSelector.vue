@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('search.searchSavedFunction')"
               data-test="function-search-input"
             >
-              <template #prepend>
+              <template #icon-left>
                 <q-icon name="search" />
               </template>
             </OInput>

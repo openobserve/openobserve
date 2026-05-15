@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounce="1"
               :placeholder="t('search.searchField')"
             >
-              <template #prepend>
+              <template #icon-left>
                 <q-icon name="search" />
               </template>
             </OInput>
