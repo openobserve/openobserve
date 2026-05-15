@@ -34,6 +34,7 @@ const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
+const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -187,6 +188,17 @@ const useRoutes = () => {
       component: TraceDetails,
       meta: {
         title: "Trace Details",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/session-details",
+      name: "sessionDetails",
+      component: SessionDetails,
+      meta: {
+        title: "Session Details",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

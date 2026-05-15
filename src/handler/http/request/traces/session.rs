@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::{search::PaginatedResponse, stream::StreamType}, metrics, utils::json};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -30,7 +30,7 @@ use crate::{
     handler::http::{
         extractors::Headers, request::search::error_utils::map_error_to_http_response,
     },
-    service::{search as SearchService, traces::otel::attributes::O2Attributes},
+    service::search as SearchService,
 };
 
 /// GetLatestSessions
@@ -73,7 +73,8 @@ use crate::{
                     "gen_ai_usage_input_tokens": 100,
                     "gen_ai_usage_output_tokens": 50,
                     "gen_ai_usage_total_tokens": 150,
-                    "gen_ai_usage_cost": 0.005
+                    "gen_ai_usage_cost": 0.005,
+                    "error_count": 1
                 }
             ]
         })),
@@ -199,7 +200,7 @@ pub async fn get_latest_sessions(
     // gen_ai_* fields may be on different spans than session_id.
     // So we must: get session→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate gen_ai_* totals.
-    let session_id_col = O2Attributes::SESSION_ID;
+    let session_id_col = "gen_ai_conversation_id";
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
 
@@ -291,8 +292,30 @@ pub async fn get_latest_sessions(
         .into_iter()
         .collect();
 
+    if all_trace_ids.is_empty() {
+        return MetaHttpResponse::json(PaginatedResponse {
+            took: 0,
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+            trace_id,
+            function_error: String::new(),
+        });
+    }
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
-    let trace_ids_sql = all_trace_ids.join("','");
+    // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
+    // Trace IDs originate from ingested data and could contain injected SQL if not validated.
+    let sanitized_ids: Vec<String> = all_trace_ids
+        .iter()
+        .map(|tid| {
+            tid.chars()
+                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                .collect::<String>()
+        })
+        .filter(|tid| !tid.is_empty())
+        .collect();
+    let trace_ids_sql = sanitized_ids.join("','");
     let query_sql = format!(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
@@ -300,7 +323,8 @@ pub async fn get_latest_sessions(
         sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
         sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
         sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
+        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+        sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
         GROUP BY trace_id"
@@ -373,6 +397,7 @@ pub async fn get_latest_sessions(
                 gen_ai_usage_cost: json::get_float_value(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
+                error_count: json::get_int_value(item.get("error_count").unwrap_or_default()),
             },
         );
     }
@@ -402,17 +427,15 @@ pub async fn get_latest_sessions(
         ])
         .inc();
 
-    let mut resp: HashMap<&str, json::Value> = HashMap::new();
-    resp.insert("took", json::Value::from((time * 1000.0) as usize));
-    resp.insert("total", json::Value::from(sessions_data.len()));
-    resp.insert("from", json::Value::from(from));
-    resp.insert("size", json::Value::from(size));
-    resp.insert("hits", json::to_value(sessions_data).unwrap());
-    resp.insert("trace_id", json::Value::from(trace_id));
-    if !range_error.is_empty() {
-        resp.insert("function_error", json::Value::String(range_error));
-    }
-    MetaHttpResponse::json(resp)
+    MetaHttpResponse::json(PaginatedResponse {
+        took: (time * 1000.0) as usize,
+        total: sessions_data.len(),
+        from,
+        size,
+        hits: sessions_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        trace_id,
+        function_error: range_error,
+    })
 }
 
 struct TraceDetail {
@@ -422,6 +445,7 @@ struct TraceDetail {
     gen_ai_usage_output_tokens: i64,
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
+    error_count: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -435,6 +459,7 @@ struct SessionResponseItem {
     gen_ai_usage_output_tokens: i64,
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
+    error_count: i64,
 }
 
 fn parse_session_trace_ids(
@@ -480,6 +505,7 @@ fn aggregate_sessions(
         let mut usage_output: i64 = 0;
         let mut usage_total: i64 = 0;
         let mut cost_total: f64 = 0.0;
+        let mut error_count: i64 = 0;
         for tid in trace_ids {
             if let Some(detail) = trace_details.get(tid) {
                 if session_start_time == 0 || detail.start_time < session_start_time {
@@ -492,6 +518,7 @@ fn aggregate_sessions(
                 usage_output += detail.gen_ai_usage_output_tokens;
                 usage_total += detail.gen_ai_usage_total_tokens;
                 cost_total += detail.gen_ai_usage_cost;
+                error_count += detail.error_count;
             }
         }
         let duration = if session_end_time > session_start_time {
@@ -509,6 +536,7 @@ fn aggregate_sessions(
             gen_ai_usage_output_tokens: usage_output,
             gen_ai_usage_total_tokens: usage_total,
             gen_ai_usage_cost: cost_total,
+            error_count,
         });
     }
     sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
@@ -523,7 +551,7 @@ mod tests {
 
     #[test]
     fn test_parse_session_trace_ids_empty() {
-        let (ids, map) = parse_session_trace_ids(&[], "session_id");
+        let (ids, map) = parse_session_trace_ids(&[], "gen_ai_conversation_id");
         assert!(ids.is_empty());
         assert!(map.is_empty());
     }
@@ -531,10 +559,10 @@ mod tests {
     #[test]
     fn test_parse_session_trace_ids_basic() {
         let hits = vec![
-            json!({"session_id": "sess-1", "trace_ids": ["t1", "t2"]}),
-            json!({"session_id": "sess-2", "trace_ids": ["t3"]}),
+            json!({"gen_ai_conversation_id": "sess-1", "trace_ids": ["t1", "t2"]}),
+            json!({"gen_ai_conversation_id": "sess-2", "trace_ids": ["t3"]}),
         ];
-        let (ids, map) = parse_session_trace_ids(&hits, "session_id");
+        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
         assert_eq!(ids, vec!["sess-1", "sess-2"]);
         assert_eq!(
             map.get("sess-1").unwrap(),
@@ -547,17 +575,17 @@ mod tests {
     fn test_parse_session_trace_ids_skips_missing_col() {
         let hits = vec![
             json!({"other": "value"}),
-            json!({"session_id": "sess-1", "trace_ids": ["t1"]}),
+            json!({"gen_ai_conversation_id": "sess-1", "trace_ids": ["t1"]}),
         ];
-        let (ids, map) = parse_session_trace_ids(&hits, "session_id");
+        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
         assert_eq!(ids.len(), 1);
         assert!(map.contains_key("sess-1"));
     }
 
     #[test]
     fn test_parse_session_trace_ids_no_trace_ids_array() {
-        let hits = vec![json!({"session_id": "sess-1"})];
-        let (ids, map) = parse_session_trace_ids(&hits, "session_id");
+        let hits = vec![json!({"gen_ai_conversation_id": "sess-1"})];
+        let (ids, map) = parse_session_trace_ids(&hits, "gen_ai_conversation_id");
         assert_eq!(ids, vec!["sess-1"]);
         assert!(map.get("sess-1").unwrap().is_empty());
     }
@@ -586,6 +614,7 @@ mod tests {
                 gen_ai_usage_output_tokens: 50,
                 gen_ai_usage_total_tokens: 150,
                 gen_ai_usage_cost: 0.01,
+                error_count: 0,
             },
         );
         trace_details.insert(
@@ -597,6 +626,7 @@ mod tests {
                 gen_ai_usage_output_tokens: 100,
                 gen_ai_usage_total_tokens: 300,
                 gen_ai_usage_cost: 0.02,
+                error_count: 0,
             },
         );
 
@@ -612,6 +642,7 @@ mod tests {
         assert_eq!(s.gen_ai_usage_output_tokens, 150);
         assert_eq!(s.gen_ai_usage_total_tokens, 450);
         assert!((s.gen_ai_usage_cost - 0.03).abs() < 1e-10);
+        assert_eq!(s.error_count, 0);
     }
 
     #[test]
@@ -630,6 +661,7 @@ mod tests {
                 gen_ai_usage_output_tokens: 0,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
+                error_count: 0,
             },
         );
         trace_details.insert(
@@ -641,6 +673,7 @@ mod tests {
                 gen_ai_usage_output_tokens: 0,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
+                error_count: 0,
             },
         );
 
@@ -677,6 +710,7 @@ mod tests {
                 gen_ai_usage_output_tokens: 0,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
+                error_count: 0,
             },
         );
 
@@ -703,6 +737,7 @@ mod tests {
                     gen_ai_usage_output_tokens: 0,
                     gen_ai_usage_total_tokens: 0,
                     gen_ai_usage_cost: 0.0,
+                    error_count: 0,
                 },
             );
         }
@@ -710,5 +745,44 @@ mod tests {
         let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
         assert_eq!(result[0].start_time, 100);
         assert_eq!(result[0].end_time, 600); // max(500+100, 100+100, 300+100)
+    }
+
+    #[test]
+    fn test_aggregate_sessions_error_count_across_traces() {
+        let session_ids = vec!["sess-1".to_string()];
+        let mut session_trace_ids = HashMap::new();
+        session_trace_ids.insert(
+            "sess-1".to_string(),
+            vec!["t1".to_string(), "t2".to_string()],
+        );
+        let mut trace_details = HashMap::new();
+        trace_details.insert(
+            "t1".to_string(),
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                gen_ai_usage_input_tokens: 0,
+                gen_ai_usage_output_tokens: 0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
+                error_count: 3,
+            },
+        );
+        trace_details.insert(
+            "t2".to_string(),
+            TraceDetail {
+                start_time: 1500,
+                end_time: 3000,
+                gen_ai_usage_input_tokens: 0,
+                gen_ai_usage_output_tokens: 0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
+                error_count: 2,
+            },
+        );
+
+        let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].error_count, 5);
     }
 }

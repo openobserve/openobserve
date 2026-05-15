@@ -82,6 +82,8 @@ pub struct ModelPricing {
     pub pattern: String,
     /// Pricing tiers (evaluated in order, first matching tier is used)
     pub tiers: Vec<PricingTier>,
+    /// Pre-compiled regex for efficient matching in the hot path.
+    compiled: Regex,
 }
 
 impl ModelPricing {
@@ -94,6 +96,7 @@ impl ModelPricing {
                 input_price_per_million: input_price,
                 output_price_per_million: output_price,
             }],
+            compiled: Regex::new(pattern).expect("invalid regex in model pricing pattern"),
         }
     }
 
@@ -102,6 +105,7 @@ impl ModelPricing {
         Self {
             pattern: pattern.to_string(),
             tiers,
+            compiled: Regex::new(pattern).expect("invalid regex in model pricing pattern"),
         }
     }
 
@@ -122,12 +126,7 @@ impl ModelPricing {
 
     /// Check if this pricing matches the given model name
     pub fn matches(&self, model_name: &str) -> bool {
-        if let Ok(re) = Regex::new(&self.pattern) {
-            re.is_match(model_name)
-        } else {
-            // Fallback to simple substring match if regex is invalid
-            model_name.contains(&self.pattern)
-        }
+        self.compiled.is_match(model_name)
     }
 }
 

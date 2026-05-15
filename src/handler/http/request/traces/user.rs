@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::{search::PaginatedResponse, stream::StreamType}, metrics, utils::json};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -30,7 +30,7 @@ use crate::{
     handler::http::{
         extractors::Headers, request::search::error_utils::map_error_to_http_response,
     },
-    service::{search as SearchService, traces::otel::attributes::O2Attributes},
+    service::{search as SearchService, traces::otel::attributes::OtelAttributes},
 };
 
 /// GetLatestUsers
@@ -196,7 +196,7 @@ pub async fn get_latest_users(
     // _o2_llm_* fields may be on different spans than user_id.
     // So we must: get user→trace_id mapping first, then query by trace_id
     // (which captures ALL spans) to get accurate _o2_llm_* totals.
-    let user_id_col = O2Attributes::USER_ID;
+    let user_id_col = OtelAttributes::USER_ID;
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
 
@@ -288,7 +288,18 @@ pub async fn get_latest_users(
         .collect();
 
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
-    let trace_ids_sql = all_trace_ids.join("','");
+    // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
+    // Trace IDs originate from ingested data and could contain injected SQL if not validated.
+    let sanitized_ids: Vec<String> = all_trace_ids
+        .iter()
+        .map(|tid| {
+            tid.chars()
+                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                .collect::<String>()
+        })
+        .filter(|tid| !tid.is_empty())
+        .collect();
+    let trace_ids_sql = sanitized_ids.join("','");
     let query_sql = format!(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \
@@ -390,17 +401,15 @@ pub async fn get_latest_users(
         ])
         .inc();
 
-    let mut resp: HashMap<&str, json::Value> = HashMap::new();
-    resp.insert("took", json::Value::from((time * 1000.0) as usize));
-    resp.insert("total", json::Value::from(users_data.len()));
-    resp.insert("from", json::Value::from(from));
-    resp.insert("size", json::Value::from(size));
-    resp.insert("hits", json::to_value(users_data).unwrap());
-    resp.insert("trace_id", json::Value::from(trace_id));
-    if !range_error.is_empty() {
-        resp.insert("function_error", json::Value::String(range_error));
-    }
-    MetaHttpResponse::json(resp)
+    MetaHttpResponse::json(PaginatedResponse {
+        took: (time * 1000.0) as usize,
+        total: users_data.len(),
+        from,
+        size,
+        hits: users_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        trace_id,
+        function_error: range_error,
+    })
 }
 
 struct TraceDetail {

@@ -27,13 +27,35 @@ use super::{
         GenAiAttributes, GenAiExtensions, LangfuseAttributes, O2Attributes, OtelAttributes,
     },
     extractors::{
-        EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
+        Evaluation, EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
         ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor,
         ToolExtractor, UsageExtractor, is_generation_or_embedding, map_to_gen_ai_operation_name,
     },
     pricing,
 };
 use crate::{common::meta::traces::Event, service::db::model_pricing::CachedModelPricing};
+
+/// Results of extracting span enrichment data from raw attributes.
+/// Captures all information needed before I/O attribute cleanup.
+struct SpanExtractions {
+    op_name: &'static str,
+    model_name: Option<String>,
+    provider_name: Option<String>,
+    input: Option<json::Value>,
+    output: Option<json::Value>,
+    model_params: HashMap<String, String>,
+    usage: HashMap<String, i64>,
+    cost: HashMap<String, f64>,
+    user_id: Option<String>,
+    session_id: Option<String>,
+    prompt_name: Option<String>,
+    completion_start_time: Option<i64>,
+    tool_name: Option<String>,
+    tool_call_id: Option<String>,
+    tool_call_arguments: Option<json::Value>,
+    tool_call_result: Option<json::Value>,
+    evaluation: Evaluation,
+}
 
 pub struct OtelIngestionProcessor {
     model_extractor: ModelExtractor,
@@ -94,54 +116,59 @@ impl OtelIngestionProcessor {
         org_pricing_entries: &[CachedModelPricing],
         span_start_nanos: u64,
     ) {
-        // Extract and add observation type
+        // Phase 1: Extract all raw data from span attributes.
+        let extracted = self.extract_all(span_attributes, resource_attributes, scope_name, events);
+
+        // Remove input/output attributes now that extraction is complete.
+        span_attributes
+            .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
+
+        // Phase 2: Compute derived values — token counts, cost estimates, defaults.
+        let (usage, cost) =
+            self.compute_usage_and_cost(&extracted, org_pricing_entries, span_start_nanos);
+
+        // Phase 3: Write enriched attributes back to the span.
+        self.emit_enriched_attributes(span_attributes, &extracted, &usage, &cost);
+    }
+
+    // ── Phase 1: Extract raw data ──────────────────────────────────────────
+
+    fn extract_all(
+        &self,
+        span_attributes: &HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
+        scope_name: Option<&str>,
+        events: &[Event],
+    ) -> SpanExtractions {
         let scope_info = scope_name.map(|name| ScopeInfo {
             name: Some(name.to_string()),
         });
+        let scope_name_default = scope_name.unwrap_or("");
+
         let op_name =
             map_to_gen_ai_operation_name(span_attributes, resource_attributes, scope_info.as_ref());
-
-        // Extract model name
         let model_name = self.model_extractor.extract(span_attributes);
-
-        // Extract provider name
         let provider_name = self.provider_extractor.extract(span_attributes);
-
-        // Extract input and output (this will identify which attributes to remove)
         let (input, output) =
             self.input_output_extractor
-                .extract(events, span_attributes, scope_name.unwrap_or(""));
-
-        // Extract model parameters
+                .extract(events, span_attributes, scope_name_default);
         let model_params = self
             .parameters_extractor
-            .extract(span_attributes, scope_name.unwrap_or(""));
-
-        // Extract usage details
-        let mut usage = self
+            .extract(span_attributes, scope_name_default);
+        let usage = self
             .usage_extractor
-            .extract_usage(span_attributes, scope_name.unwrap_or(""));
-
-        // Extract cost details
-        let mut cost = self.usage_extractor.extract_cost(span_attributes);
-
-        // Extract user and session
+            .extract_usage(span_attributes, scope_name_default);
+        let cost = self.usage_extractor.extract_cost(span_attributes);
         let user_id = self
             .metadata_extractor
             .extract_user_id(span_attributes, resource_attributes);
         let session_id = self
             .metadata_extractor
             .extract_session_id(span_attributes, resource_attributes);
-
-        // Extract prompt information
         let prompt_name = self.prompt_extractor.extract_name(span_attributes);
-
-        // Extract completion start time (TTFT - Time To First Token)
         let completion_start_time = span_attributes
             .get(LangfuseAttributes::COMPLETION_START_TIME)
             .and_then(|v| parse_timestamp_micro_from_value(v).ok().map(|(ts, _)| ts));
-
-        // Extract tool information
         let tool_name = self.tool_extractor.extract_tool_name(span_attributes);
         let tool_call_id = self.tool_extractor.extract_tool_call_id(span_attributes);
         let tool_call_arguments = self
@@ -150,50 +177,70 @@ impl OtelIngestionProcessor {
         let tool_call_result = self
             .tool_extractor
             .extract_tool_call_result(span_attributes);
-
-        // Extract evaluation scores (if present)
         let evaluation = self.evaluation_extractor.extract(span_attributes);
 
-        // Now remove all input/output related attributes
-        span_attributes
-            .retain(|key, _| !self.input_output_extractor.is_input_output_attribute(key));
+        SpanExtractions {
+            op_name,
+            model_name,
+            provider_name,
+            input,
+            output,
+            model_params,
+            usage,
+            cost,
+            user_id,
+            session_id,
+            prompt_name,
+            completion_start_time,
+            tool_name,
+            tool_call_id,
+            tool_call_arguments,
+            tool_call_result,
+            evaluation,
+        }
+    }
 
-        // need to guarantee have the field USAGE_DETAILS and COST_DETAILS
-        if input.is_some() || output.is_some() {
-            // Convert span start time from nanoseconds to microseconds for valid_from comparison.
+    // ── Phase 2: Compute usage, cost, and defaults ─────────────────────────
+
+    fn compute_usage_and_cost(
+        &self,
+        extracted: &SpanExtractions,
+        org_pricing_entries: &[CachedModelPricing],
+        span_start_nanos: u64,
+    ) -> (HashMap<String, i64>, HashMap<String, f64>) {
+        let mut usage = extracted.usage.clone();
+        let mut cost = extracted.cost.clone();
+
+        if extracted.input.is_some() || extracted.output.is_some() {
             let span_ts_micros = i64::try_from(span_start_nanos / 1_000).unwrap_or(i64::MAX);
-            let matched_pricing = model_name.as_ref().and_then(|mn| {
+            let matched_pricing = extracted.model_name.as_ref().and_then(|mn| {
                 crate::service::db::model_pricing::find_pricing_sync_at(
                     org_pricing_entries,
                     mn,
                     Some(span_ts_micros),
                 )
             });
-            // Use model_name as the tiktoken key for fallback token counting.
-            let tokenizer_key: &str = model_name.as_deref().unwrap_or("");
+            let tokenizer_key: &str = extracted.model_name.as_deref().unwrap_or("");
 
-            if let Some(v) = &input
+            if let Some(v) = &extracted.input
                 && !usage.contains_key("input")
-                && is_generation_or_embedding(op_name)
+                && is_generation_or_embedding(extracted.op_name)
             {
                 let prompt = v.to_string();
                 let prompt_tokens = pricing::calculate_token_count(tokenizer_key, &prompt);
                 usage.insert("input".to_string(), prompt_tokens);
             }
-            if let Some(v) = &output
+            if let Some(v) = &extracted.output
                 && !usage.contains_key("output")
-                && is_generation_or_embedding(op_name)
+                && is_generation_or_embedding(extracted.op_name)
             {
                 let output_text = v.to_string();
                 let output_tokens = pricing::calculate_token_count(tokenizer_key, &output_text);
                 usage.insert("output".to_string(), output_tokens);
             }
 
-            // Calculate cost from tokens if cost is missing but we have model and usage.
-            // User-defined pricing takes priority over built-in pricing.
-            if cost.is_empty() && is_generation_or_embedding(op_name) {
+            if cost.is_empty() && is_generation_or_embedding(extracted.op_name) {
                 if let Some(pricing_def) = matched_pricing {
-                    // Use user-defined per-token pricing (already matched above)
                     let result = crate::service::db::model_pricing::calculate_cost_from_definition(
                         &pricing_def,
                         &usage,
@@ -201,15 +248,14 @@ impl OtelIngestionProcessor {
                     if !result.cost.is_empty() {
                         log::debug!(
                             "[model_pricing] model='{}' pattern='{}' tier='{}' total_cost={:.8}",
-                            model_name.as_deref().unwrap_or(""),
+                            extracted.model_name.as_deref().unwrap_or(""),
                             pricing_def.match_pattern,
                             result.tier_name,
                             result.cost.get("total").copied().unwrap_or(0.0),
                         );
                         cost = result.cost;
                     }
-                } else if let Some(ref model_name) = model_name {
-                    // Fall back to built-in pricing (per-1M token rates)
+                } else if let Some(ref model_name) = extracted.model_name {
                     let input_tokens = usage.get("input").cloned().unwrap_or_default();
                     let output_tokens = usage.get("output").cloned().unwrap_or_default();
                     if let Some((input_cost, output_cost, total_cost)) =
@@ -223,7 +269,7 @@ impl OtelIngestionProcessor {
             }
         }
 
-        // Ensure usage has a input,output,total
+        // Ensure usage defaults (input, output, total).
         if !usage.contains_key("input") {
             usage.insert("input".to_string(), 0);
         }
@@ -231,64 +277,65 @@ impl OtelIngestionProcessor {
             usage.insert("output".to_string(), 0);
         }
         if !usage.contains_key("total") {
-            // Total = input + output only. Cache tokens (cache_read_input_tokens,
-            // cache_creation_input_tokens) are subsets of input, not additive.
             let input = usage.get("input").copied().unwrap_or(0);
             let output = usage.get("output").copied().unwrap_or(0);
             usage.insert("total".to_string(), input + output);
         }
 
-        // Ensure cost has a total if it has any data — sum all component costs
-        // (not just input+output) so cache token costs are included.
+        // Ensure cost total (sum all components, not just input+output).
         if !cost.contains_key("total") {
             let total: f64 = cost.values().sum();
             cost.insert("total".to_string(), total);
         }
 
-        // Add enriched fields using OTEL Gen-AI semantic-convention attribute keys.
-        // After dot→underscore flattening at ingestion, these become the gen_ai_*
-        // columns provisioned by GEN_AI_SCHEMA_FIELDS in service/db/schema.rs.
+        (usage, cost)
+    }
+
+    // ── Phase 3: Emit enriched attributes ──────────────────────────────────
+
+    fn emit_enriched_attributes(
+        &self,
+        span_attributes: &mut HashMap<String, json::Value>,
+        extracted: &SpanExtractions,
+        usage: &HashMap<String, i64>,
+        cost: &HashMap<String, f64>,
+    ) {
         span_attributes.insert(
             GenAiAttributes::OPERATION_NAME.to_string(),
-            json::json!(op_name),
+            json::json!(extracted.op_name),
         );
 
-        if let Some(model) = model_name {
+        if let Some(ref model) = extracted.model_name {
             span_attributes.insert(
                 GenAiAttributes::RESPONSE_MODEL.to_string(),
                 json::json!(model),
             );
         }
 
-        if let Some(provider) = provider_name {
+        if let Some(ref provider) = extracted.provider_name {
             span_attributes.insert(
                 GenAiAttributes::PROVIDER_NAME.to_string(),
                 json::json!(provider),
             );
         }
 
-        // Spec defines gen_ai.input.messages / gen_ai.output.messages as structured
-        // arrays; OpenObserve flattens these to a single string for ergonomic UI
-        // display in the gen_ai_input_messages / gen_ai_output_messages columns.
-        if let Some(input_val) = input {
-            span_attributes.insert(GenAiAttributes::INPUT_MESSAGES.to_string(), input_val);
+        if let Some(ref input_val) = extracted.input {
+            span_attributes.insert(GenAiAttributes::INPUT_MESSAGES.to_string(), input_val.clone());
         }
 
-        if let Some(output_val) = output {
-            span_attributes.insert(GenAiAttributes::OUTPUT_MESSAGES.to_string(), output_val);
+        if let Some(ref output_val) = extracted.output {
+            span_attributes.insert(GenAiAttributes::OUTPUT_MESSAGES.to_string(), output_val.clone());
         }
 
-        // Model parameters JSON: kept as OO extension (no Gen-AI spec equivalent for
-        // an aggregated parameters blob).
-        if !model_params.is_empty() {
-            span_attributes.insert(
-                O2Attributes::MODEL_PARAMETERS.to_string(),
-                json::json!(model_params),
-            );
+        // Model parameters as individual gen_ai.request.* scalars.
+        for (key, value) in &extracted.model_params {
+            if key == "model" {
+                continue;
+            }
+            span_attributes.insert(format!("gen_ai.request.{key}"), json::json!(value));
         }
 
-        // Token usage: emit individual scalar attributes per Gen-AI spec so they
-        // flatten cleanly to gen_ai_usage_input_tokens / output_tokens / total_tokens.
+        // Token usage as individual scalar attributes.
         if let Some(&v) = usage.get("input") {
             span_attributes.insert(
                 GenAiAttributes::USAGE_INPUT_TOKENS.to_string(),
@@ -308,8 +355,7 @@ impl OtelIngestionProcessor {
             );
         }
 
-        // Cost: spec defines a single `gen_ai.usage.cost` (total). The per-direction
-        // breakdown is OO extension under the same gen_ai namespace.
+        // Cost: per-direction breakdown + total.
         if let Some(&v) = cost.get("input") {
             span_attributes.insert(
                 GenAiExtensions::USAGE_COST_INPUT.to_string(),
@@ -326,26 +372,23 @@ impl OtelIngestionProcessor {
             span_attributes.insert(GenAiAttributes::USAGE_COST.to_string(), json::json!(v));
         }
 
-        if let Some(uid) = user_id {
+        if let Some(ref uid) = extracted.user_id {
             span_attributes.insert(OtelAttributes::USER_ID.to_string(), json::json!(uid));
         }
 
-        // Session → conversation: Gen-AI spec uses gen_ai.conversation.id for the
-        // same concept as the legacy session.id. Flattens to gen_ai_conversation_id.
-        if let Some(sid) = session_id {
+        if let Some(ref sid) = extracted.session_id {
             span_attributes.insert(
                 GenAiAttributes::CONVERSATION_ID.to_string(),
                 json::json!(sid),
             );
         }
 
-        if let Some(pname) = prompt_name {
+        if let Some(ref pname) = extracted.prompt_name {
             span_attributes.insert(GenAiAttributes::PROMPT_NAME.to_string(), json::json!(pname));
         }
 
-        // TTFT: Gen-AI spec field is Float64 seconds; the source extractor returns
-        // microseconds, so convert here. Flattens to gen_ai_response_time_to_first_chunk.
-        if let Some(ct) = completion_start_time {
+        // TTFT: convert microseconds → Float64 seconds.
+        if let Some(ct) = extracted.completion_start_time {
             let ttfc_seconds = ct as f64 / 1_000_000.0;
             span_attributes.insert(
                 GenAiAttributes::RESPONSE_TIME_TO_FIRST_CHUNK.to_string(),
@@ -353,23 +396,24 @@ impl OtelIngestionProcessor {
             );
         }
 
-        if let Some(tname) = tool_name {
-            span_attributes.insert(O2Attributes::TOOL_NAME.to_string(), json::json!(tname));
+        if let Some(ref tname) = extracted.tool_name {
+            span_attributes.insert(GenAiAttributes::TOOL_NAME.to_string(), json::json!(tname));
         }
 
-        if let Some(tcid) = tool_call_id {
-            span_attributes.insert(O2Attributes::TOOL_CALL_ID.to_string(), json::json!(tcid));
+        if let Some(ref tcid) = extracted.tool_call_id {
+            span_attributes.insert(GenAiAttributes::TOOL_CALL_ID.to_string(), json::json!(tcid));
         }
 
-        if let Some(targs) = tool_call_arguments {
-            span_attributes.insert(O2Attributes::TOOL_CALL_ARGUMENTS.to_string(), targs);
+        if let Some(ref targs) = extracted.tool_call_arguments {
+            span_attributes.insert(GenAiAttributes::TOOL_CALL_ARGUMENTS.to_string(), targs.clone());
         }
 
-        if let Some(tresult) = tool_call_result {
-            span_attributes.insert(O2Attributes::TOOL_CALL_RESULT.to_string(), tresult);
+        if let Some(ref tresult) = extracted.tool_call_result {
+            span_attributes.insert(GenAiAttributes::TOOL_CALL_RESULT.to_string(), tresult.clone());
         }
 
-        // Add evaluation scores and metadata if present
+        // Evaluation scores and metadata.
+        let evaluation = &extracted.evaluation;
         if evaluation.has_any() {
             if let Some(q) = evaluation.scores.quality_score {
                 span_attributes
@@ -530,9 +574,9 @@ mod tests {
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // Provider name should be extracted from gen_ai.system
-        assert!(span_attrs.contains_key(O2Attributes::PROVIDER_NAME));
+        assert!(span_attrs.contains_key(GenAiAttributes::SYSTEM));
         assert_eq!(
-            span_attrs.get(O2Attributes::PROVIDER_NAME).unwrap(),
+            span_attrs.get(GenAiAttributes::SYSTEM).unwrap(),
             &json::json!("anthropic")
         );
     }
@@ -582,30 +626,32 @@ mod tests {
         processor.process_span(&mut span_attrs, &resource_attrs, None, &events);
 
         // Tool name should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_NAME));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_NAME));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_NAME).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_NAME).unwrap(),
             &json::json!("get_weather")
         );
 
         // Tool call ID should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ID));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ID));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_ID).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_ID).unwrap(),
             &json::json!("call_12345")
         );
 
         // Tool call arguments should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ARGUMENTS));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ARGUMENTS));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_ARGUMENTS).unwrap(),
+            span_attrs
+                .get(GenAiAttributes::TOOL_CALL_ARGUMENTS)
+                .unwrap(),
             &json::json!({"city": "San Francisco"})
         );
 
         // Tool call result should be extracted and added
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_RESULT));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_RESULT));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_RESULT).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_RESULT).unwrap(),
             &json::json!({"temperature": 72})
         );
 
@@ -658,15 +704,15 @@ mod tests {
         );
 
         // Tool name and ID should be extracted
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_NAME));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_NAME));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_NAME).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_NAME).unwrap(),
             &json::json!("Read")
         );
 
-        assert!(span_attrs.contains_key(O2Attributes::TOOL_CALL_ID));
+        assert!(span_attrs.contains_key(GenAiAttributes::TOOL_CALL_ID));
         assert_eq!(
-            span_attrs.get(O2Attributes::TOOL_CALL_ID).unwrap(),
+            span_attrs.get(GenAiAttributes::TOOL_CALL_ID).unwrap(),
             &json::json!("toolu_01T1Mfo98ePBYgoRXG3yPkWt")
         );
 
