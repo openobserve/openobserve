@@ -272,3 +272,209 @@ impl std::ops::AddAssign for PersistStat {
         self.records += other.records;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+
+    fn make_entry(org: &str, stream: &str, schema_key: &str, partition_key: &str) -> Entry {
+        Entry {
+            org_id: Arc::from(org),
+            stream: Arc::from(stream),
+            schema: None,
+            schema_key: Arc::from(schema_key),
+            partition_key: Arc::from(partition_key),
+            data: vec![Arc::new(serde_json::json!({"key": "value"}))],
+            data_size: 0,
+        }
+    }
+
+    #[test]
+    fn test_entry_roundtrip_with_org_id() {
+        let mut entry = make_entry("myorg", "mystream", "schema_v1", "2024/01/01/00");
+        let bytes = entry.into_bytes().expect("serialize");
+        let decoded = Entry::from_bytes(&bytes).expect("deserialize");
+        assert_eq!(decoded.org_id.as_ref(), "myorg");
+        assert_eq!(decoded.stream.as_ref(), "mystream");
+        assert_eq!(decoded.schema_key.as_ref(), "schema_v1");
+        assert_eq!(decoded.partition_key.as_ref(), "2024/01/01/00");
+        assert_eq!(decoded.data.len(), 1);
+    }
+
+    #[test]
+    fn test_entry_roundtrip_empty_data() {
+        let mut entry = Entry {
+            org_id: Arc::from("org"),
+            stream: Arc::from("stream"),
+            schema: None,
+            schema_key: Arc::from("key"),
+            partition_key: Arc::from("part"),
+            data: vec![],
+            data_size: 0,
+        };
+        let bytes = entry.into_bytes().expect("serialize");
+        let decoded = Entry::from_bytes(&bytes).expect("deserialize");
+        assert_eq!(decoded.data.len(), 0);
+    }
+
+    #[test]
+    fn test_entry_into_bytes_updates_data_size() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        assert_eq!(entry.data_size, 0);
+        entry.into_bytes().expect("serialize");
+        assert!(entry.data_size > 0);
+    }
+
+    #[test]
+    fn test_persist_stat_add() {
+        let a = PersistStat {
+            json_size: 100,
+            arrow_size: 200,
+            file_num: 1,
+            batch_num: 2,
+            records: 10,
+        };
+        let b = PersistStat {
+            json_size: 50,
+            arrow_size: 100,
+            file_num: 1,
+            batch_num: 3,
+            records: 5,
+        };
+        let c = a + b;
+        assert_eq!(c.json_size, 150);
+        assert_eq!(c.arrow_size, 300);
+        assert_eq!(c.file_num, 2);
+        assert_eq!(c.batch_num, 5);
+        assert_eq!(c.records, 15);
+    }
+
+    #[test]
+    fn test_persist_stat_add_assign() {
+        let mut a = PersistStat {
+            json_size: 10,
+            arrow_size: 20,
+            file_num: 1,
+            batch_num: 1,
+            records: 5,
+        };
+        let b = PersistStat {
+            json_size: 5,
+            arrow_size: 10,
+            file_num: 2,
+            batch_num: 0,
+            records: 3,
+        };
+        a += b;
+        assert_eq!(a.json_size, 15);
+        assert_eq!(a.arrow_size, 30);
+        assert_eq!(a.file_num, 3);
+        assert_eq!(a.batch_num, 1);
+        assert_eq!(a.records, 8);
+    }
+
+    #[test]
+    fn test_persist_stat_default_is_zeroed() {
+        let s = PersistStat::default();
+        assert_eq!(s.json_size, 0);
+        assert_eq!(s.arrow_size, 0);
+        assert_eq!(s.file_num, 0);
+        assert_eq!(s.batch_num, 0);
+        assert_eq!(s.records, 0);
+    }
+
+    fn make_ts_batch(values: Vec<i64>) -> RecordBatch {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+        let col = Arc::new(Int64Array::from(values));
+        RecordBatch::try_new(schema, vec![col]).unwrap()
+    }
+
+    #[test]
+    fn test_pop_time_range_basic() {
+        let batch = make_ts_batch(vec![100i64, 50i64, 200i64]);
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 50);
+        assert_eq!(max_ts, 200);
+    }
+
+    #[test]
+    fn test_pop_time_range_single_value() {
+        let batch = make_ts_batch(vec![42i64]);
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 42);
+        assert_eq!(max_ts, 42);
+    }
+
+    #[test]
+    fn test_pop_time_range_column_not_found() {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "other_col",
+            DataType::Int64,
+            false,
+        )]));
+        let col = Arc::new(Int64Array::from(vec![100i64]));
+        let batch = RecordBatch::try_new(schema, vec![col]).unwrap();
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_pop_time_range_wrong_column_type() {
+        use arrow::array::StringArray;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Utf8,
+            false,
+        )]));
+        let col = Arc::new(StringArray::from(vec!["abc"]));
+        let batch = RecordBatch::try_new(schema, vec![col]).unwrap();
+        let (min_ts, max_ts) = pop_time_range(&batch, None, None);
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
+
+    #[test]
+    fn test_pop_time_range_separate_min_max_columns() {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![
+            Field::new("ts_min", DataType::Int64, false),
+            Field::new("ts_max", DataType::Int64, false),
+        ]));
+        let min_col = Arc::new(Int64Array::from(vec![10i64, 5i64]));
+        let max_col = Arc::new(Int64Array::from(vec![100i64, 200i64]));
+        let batch = RecordBatch::try_new(schema, vec![min_col, max_col]).unwrap();
+        let (min_ts, max_ts) = pop_time_range(&batch, Some("ts_min"), Some("ts_max"));
+        assert_eq!(min_ts, 5);
+        assert_eq!(max_ts, 200);
+    }
+
+    #[test]
+    fn test_pop_time_range_separate_missing_min_col() {
+        use arrow::array::Int64Array;
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(arrow_schema::Schema::new(vec![Field::new(
+            "ts_max",
+            DataType::Int64,
+            false,
+        )]));
+        let max_col = Arc::new(Int64Array::from(vec![100i64]));
+        let batch = RecordBatch::try_new(schema, vec![max_col]).unwrap();
+        // ts_min column missing → (0, 0)
+        let (min_ts, max_ts) = pop_time_range(&batch, Some("ts_min"), Some("ts_max"));
+        assert_eq!(min_ts, 0);
+        assert_eq!(max_ts, 0);
+    }
+}

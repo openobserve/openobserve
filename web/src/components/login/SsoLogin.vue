@@ -13,12 +13,10 @@
     </div>
 
     <div class="flex justify-center q-mt-lg">
-      <q-btn
+      <OButton
         data-test="sso-login-btn"
-        class="text-bold no-border"
-        padding="sm lg"
-        color="primary"
-        no-caps
+        variant="primary"
+        size="sm-action"
         style="width: 400px"
       >
         <div
@@ -32,7 +30,7 @@
           />
           <span class="text-center"> Login with SSO</span>
         </div>
-      </q-btn>
+      </OButton>
     </div>
 
     <div class="q-mb-md q-mt-lg text-center">
@@ -72,18 +70,17 @@
           />
 
           <div class="q-mt-lg q-mb-xl">
-            <q-btn
+            <OButton
               data-cy="login-sign-in"
-              unelevated
-              class="full-width text-bold no-border"
-              color="primary"
+              variant="primary"
+              size="sm-action"
+              block
               type="submit"
-              padding="sm lg"
-              :label="t('login.signIn')"
               :loading="isSubmitting"
-              no-caps
               @click="onSignIn()"
-            />
+            >
+              {{ t('login.signIn') }}
+            </OButton>
           </div>
         </q-form>
       </div>
@@ -96,6 +93,7 @@ import { ref } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const store = useStore();
 

@@ -614,6 +614,13 @@ pub struct SearchPartitionResponse {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub is_histogram_eligible: bool,
+    /// ORDER BY columns when the primary sort is a non-timestamp column.
+    /// Non-empty means this is a non-ts ORDER BY query; empty means timestamp sort (normal path).
+    /// Each entry is (column_name, is_descending). The heap honors all columns in order so
+    /// that ties on the primary column are broken correctly by secondary columns.
+    /// Skipped from serialization — internal leader use only, not exposed to callers.
+    #[serde(skip)]
+    pub non_ts_order_by_cols: Vec<(String, bool)>,
 }
 
 /// Request parameters for querying search history
@@ -2931,6 +2938,7 @@ mod tests {
             streaming_aggs: false,
             streaming_id: Some("stream123".to_string()),
             is_histogram_eligible: false,
+            non_ts_order_by_cols: vec![],
         };
 
         response
@@ -3292,5 +3300,427 @@ mod tests {
             Interval::FiveMinutes,
             "Negative time range should return FiveMinutes"
         );
+    }
+
+    #[test]
+    fn test_response_set_order_by_metadata() {
+        let mut resp = Response::default();
+        assert!(resp.order_by_metadata.is_empty());
+        resp.set_order_by_metadata(vec![
+            ("field1".to_string(), OrderBy::Desc),
+            ("field2".to_string(), OrderBy::Asc),
+        ]);
+        assert_eq!(resp.order_by_metadata.len(), 2);
+        assert_eq!(resp.order_by_metadata[0].0, "field1");
+        assert_eq!(resp.order_by_metadata[1].1, OrderBy::Asc);
+    }
+
+    #[test]
+    fn test_response_set_peak_memory_usage() {
+        let mut resp = Response::default();
+        assert!(resp.peak_memory_usage.is_none());
+        resp.set_peak_memory_usage(1024.5);
+        assert_eq!(resp.peak_memory_usage, Some(1024.5));
+        // overwrite
+        resp.set_peak_memory_usage(2048.0);
+        assert_eq!(resp.peak_memory_usage, Some(2048.0));
+    }
+
+    #[test]
+    fn test_scan_stats_add_zero_self_aggs_cache_ratio() {
+        // When self.aggs_cache_ratio == 0, take other's value
+        let mut stats1 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        let stats2 = ScanStats {
+            aggs_cache_ratio: 75,
+            ..Default::default()
+        };
+        stats1.add(&stats2);
+        assert_eq!(stats1.aggs_cache_ratio, 75);
+    }
+
+    #[test]
+    fn test_scan_stats_add_zero_other_aggs_cache_ratio() {
+        // When other.aggs_cache_ratio == 0, keep self's value
+        let mut stats1 = ScanStats {
+            aggs_cache_ratio: 60,
+            ..Default::default()
+        };
+        let stats2 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        stats1.add(&stats2);
+        assert_eq!(stats1.aggs_cache_ratio, 60);
+    }
+
+    #[test]
+    fn test_search_event_type_display_download_and_insights() {
+        assert_eq!(SearchEventType::Download.to_string(), "download");
+        assert_eq!(SearchEventType::Insights.to_string(), "insights");
+    }
+
+    #[test]
+    fn test_search_event_type_try_from_download_and_insights() {
+        assert_eq!(
+            SearchEventType::try_from("download").unwrap(),
+            SearchEventType::Download
+        );
+        assert_eq!(
+            SearchEventType::try_from("insights").unwrap(),
+            SearchEventType::Insights
+        );
+    }
+
+    #[test]
+    fn test_storage_type_equality() {
+        assert_eq!(StorageType::Memory, StorageType::Memory);
+        assert_eq!(StorageType::Wal, StorageType::Wal);
+        assert_ne!(StorageType::Memory, StorageType::Wal);
+    }
+
+    #[test]
+    fn test_values_event_context_serde_defaults() {
+        let json = r#"{"field":"myfield","no_count":false}"#;
+        let ctx: ValuesEventContext = serde_json::from_str(json).unwrap();
+        assert_eq!(ctx.field, "myfield");
+        assert!(ctx.top_k.is_none());
+        assert!(!ctx.no_count);
+    }
+
+    #[test]
+    fn test_request_encoding_default_is_empty() {
+        let enc: RequestEncoding = Default::default();
+        assert_eq!(enc, RequestEncoding::Empty);
+    }
+
+    #[test]
+    fn test_scan_stats_add_both_zero_aggs_cache_ratio() {
+        // Both zero → result is zero (other.aggs_cache_ratio branch)
+        let mut stats1 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        let stats2 = ScanStats {
+            aggs_cache_ratio: 0,
+            ..Default::default()
+        };
+        stats1.add(&stats2);
+        assert_eq!(stats1.aggs_cache_ratio, 0);
+    }
+
+    #[test]
+    fn test_logical_operator_serde_uppercase() {
+        let and = serde_json::to_string(&LogicalOperator::And).unwrap();
+        assert_eq!(and, "\"AND\"");
+        let or = serde_json::to_string(&LogicalOperator::Or).unwrap();
+        assert_eq!(or, "\"OR\"");
+        let back: LogicalOperator = serde_json::from_str("\"AND\"").unwrap();
+        assert!(matches!(back, LogicalOperator::And));
+        let back2: LogicalOperator = serde_json::from_str("\"OR\"").unwrap();
+        assert!(matches!(back2, LogicalOperator::Or));
+    }
+
+    #[test]
+    fn test_having_node_condition_serde() {
+        let node = HavingNode::Condition {
+            expression: "count(*)".to_string(),
+            alias: Some("cnt".to_string()),
+            operator: ">".to_string(),
+            value: "3".to_string(),
+        };
+        let s = serde_json::to_string(&node).unwrap();
+        let back: HavingNode = serde_json::from_str(&s).unwrap();
+        match back {
+            HavingNode::Condition {
+                expression,
+                alias,
+                operator,
+                value,
+            } => {
+                assert_eq!(expression, "count(*)");
+                assert_eq!(alias, Some("cnt".to_string()));
+                assert_eq!(operator, ">");
+                assert_eq!(value, "3");
+            }
+            _ => panic!("Expected Condition variant"),
+        }
+    }
+
+    #[test]
+    fn test_having_node_logical_op_serde() {
+        let node = HavingNode::LogicalOp {
+            operator: LogicalOperator::And,
+            conditions: vec![
+                HavingNode::Condition {
+                    expression: "avg(latency)".to_string(),
+                    alias: None,
+                    operator: "<".to_string(),
+                    value: "500".to_string(),
+                },
+                HavingNode::Condition {
+                    expression: "count(*)".to_string(),
+                    alias: None,
+                    operator: ">".to_string(),
+                    value: "10".to_string(),
+                },
+            ],
+        };
+        let s = serde_json::to_string(&node).unwrap();
+        let back: HavingNode = serde_json::from_str(&s).unwrap();
+        match back {
+            HavingNode::LogicalOp {
+                operator,
+                conditions,
+            } => {
+                assert!(matches!(operator, LogicalOperator::And));
+                assert_eq!(conditions.len(), 2);
+            }
+            _ => panic!("Expected LogicalOp variant"),
+        }
+    }
+
+    #[test]
+    fn test_interval_from_unknown_defaults_to_zero() {
+        let unknown = Interval::from(999_i64);
+        assert_eq!(unknown, Interval::Zero);
+        assert_eq!(unknown.get_duration_minutes(), 0);
+    }
+
+    #[test]
+    fn test_interval_all_variants_from_i64() {
+        assert_eq!(Interval::from(0_i64), Interval::Zero);
+        assert_eq!(Interval::from(5_i64), Interval::FiveMinutes);
+        assert_eq!(Interval::from(10_i64), Interval::TenMinutes);
+        assert_eq!(Interval::from(30_i64), Interval::ThirtyMinutes);
+        assert_eq!(Interval::from(60_i64), Interval::OneHour);
+        assert_eq!(Interval::from(120_i64), Interval::TwoHours);
+        assert_eq!(Interval::from(360_i64), Interval::SixHours);
+        assert_eq!(Interval::from(720_i64), Interval::TwelveHours);
+        assert_eq!(Interval::from(1440_i64), Interval::OneDay);
+    }
+
+    #[test]
+    fn test_interval_seconds_and_microseconds() {
+        let h = Interval::OneHour;
+        assert_eq!(h.get_interval_seconds(), 3600);
+        assert_eq!(h.get_interval_microseconds(), 3_600_000_000);
+        let five = Interval::FiveMinutes;
+        assert_eq!(five.get_interval_seconds(), 300);
+    }
+
+    #[test]
+    fn test_response_skip_serializing_if_empty_fields_absent() {
+        let r = Response::default();
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty fields
+        assert!(!obj.contains_key("columns"));
+        assert!(!obj.contains_key("function_error"));
+        assert!(!obj.contains_key("order_by_metadata"));
+        // String::is_empty fields
+        assert!(!obj.contains_key("response_type"));
+        assert!(!obj.contains_key("trace_id"));
+        // Option::is_none fields
+        assert!(!obj.contains_key("histogram_interval"));
+        assert!(!obj.contains_key("new_start_time"));
+        assert!(!obj.contains_key("new_end_time"));
+        assert!(!obj.contains_key("work_group"));
+        assert!(!obj.contains_key("order_by"));
+        assert!(!obj.contains_key("converted_histogram_query"));
+        assert!(!obj.contains_key("histogram_breakdown_field"));
+        assert!(!obj.contains_key("is_histogram_eligible"));
+        assert!(!obj.contains_key("query_index"));
+        assert!(!obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_response_skip_serializing_if_set_fields_present() {
+        let mut r = Response::default();
+        r.columns = vec!["col1".to_string()];
+        r.function_error = vec!["err".to_string()];
+        r.response_type = "json".to_string();
+        r.trace_id = "t1".to_string();
+        r.histogram_interval = Some(3600);
+        r.new_start_time = Some(1000);
+        r.new_end_time = Some(2000);
+        r.work_group = Some("wg".to_string());
+        r.order_by = Some(OrderBy::Desc);
+        r.converted_histogram_query = Some("SELECT ...".to_string());
+        r.histogram_breakdown_field = Some("level".to_string());
+        r.is_histogram_eligible = Some(true);
+        r.query_index = Some(3);
+        r.peak_memory_usage = Some(512.0);
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("columns"));
+        assert!(obj.contains_key("function_error"));
+        assert!(obj.contains_key("response_type"));
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("histogram_interval"));
+        assert!(obj.contains_key("new_start_time"));
+        assert!(obj.contains_key("new_end_time"));
+        assert!(obj.contains_key("work_group"));
+        assert!(obj.contains_key("order_by"));
+        assert!(obj.contains_key("converted_histogram_query"));
+        assert!(obj.contains_key("histogram_breakdown_field"));
+        assert!(obj.contains_key("is_histogram_eligible"));
+        assert!(obj.contains_key("query_index"));
+        assert!(obj.contains_key("peak_memory_usage"));
+    }
+
+    #[test]
+    fn test_search_event_context_default_all_absent() {
+        let ctx = SearchEventContext::default();
+        let json = serde_json::to_value(&ctx).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("alert_key"));
+        assert!(!obj.contains_key("alert_name"));
+        assert!(!obj.contains_key("derived_stream_key"));
+        assert!(!obj.contains_key("report_id"));
+        assert!(!obj.contains_key("dashboard_id"));
+        assert!(!obj.contains_key("dashboard_name"));
+        assert!(!obj.contains_key("folder_id"));
+        assert!(!obj.contains_key("folder_name"));
+    }
+
+    #[test]
+    fn test_search_event_context_some_fields_present() {
+        let ctx = SearchEventContext {
+            alert_key: Some("alert-1".to_string()),
+            alert_name: Some("My Alert".to_string()),
+            report_key: Some("rpt-42".to_string()),
+            dashboard_id: Some("dash-1".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&ctx).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("alert_key"));
+        assert!(obj.contains_key("alert_name"));
+        assert!(obj.contains_key("report_id"));
+        assert!(obj.contains_key("dashboard_id"));
+    }
+
+    #[test]
+    fn test_request_search_type_none_absent() {
+        let req = Request {
+            query: Query::default(),
+            search_type: None,
+            search_event_context: None,
+            local_mode: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("search_event_context"));
+        assert!(!obj.contains_key("local_mode"));
+    }
+
+    #[test]
+    fn test_search_history_hit_response_none_fields_absent() {
+        let hit = SearchHistoryHitResponse {
+            org_id: "org".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "s".to_string(),
+            min_ts: 0,
+            max_ts: 0,
+            request_body: "SELECT 1".to_string(),
+            size: 0.0,
+            num_records: 0,
+            response_time: 0.0,
+            cached_ratio: 0,
+            trace_id: "t1".to_string(),
+            function: None,
+            _timestamp: None,
+            unit: None,
+            event: None,
+        };
+        let json = serde_json::to_value(&hit).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("function"));
+        assert!(!obj.contains_key("_timestamp"));
+        assert!(!obj.contains_key("unit"));
+        assert!(!obj.contains_key("event"));
+    }
+
+    #[test]
+    fn test_search_history_hit_response_some_fields_present() {
+        let hit = SearchHistoryHitResponse {
+            org_id: "org".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "s".to_string(),
+            min_ts: 0,
+            max_ts: 0,
+            request_body: "SELECT 1".to_string(),
+            size: 0.0,
+            num_records: 0,
+            response_time: 0.0,
+            cached_ratio: 0,
+            trace_id: "t1".to_string(),
+            function: Some("my_fn".to_string()),
+            _timestamp: Some(1000),
+            unit: Some("bytes".to_string()),
+            event: Some("ui".to_string()),
+        };
+        let json = serde_json::to_value(&hit).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("function"));
+        assert!(obj.contains_key("_timestamp"));
+        assert!(obj.contains_key("unit"));
+        assert!(obj.contains_key("event"));
+    }
+
+    #[test]
+    fn test_query_sampling_fields_none_absent() {
+        let q = Query::default();
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("sampling_config"));
+        assert!(!obj.contains_key("sampling_ratio"));
+    }
+
+    #[test]
+    fn test_query_sampling_ratio_some_present() {
+        let q = Query {
+            sampling_ratio: Some(0.5),
+            ..Query::default()
+        };
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("sampling_ratio"));
+        assert_eq!(obj["sampling_ratio"], serde_json::json!(0.5_f64));
+    }
+
+    #[test]
+    fn test_deserialize_sql_old_format_string_array() {
+        // Old format: array of plain SQL strings
+        let json = r#"{"sql":["SELECT 1","SELECT 2"],"start_time":0,"end_time":100}"#;
+        let req: MultiStreamRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.sql.len(), 2);
+        assert_eq!(req.sql[0].sql, "SELECT 1");
+        assert!(req.sql[0].is_old_format);
+        assert_eq!(req.sql[1].sql, "SELECT 2");
+        assert!(req.sql[1].is_old_format);
+    }
+
+    #[test]
+    fn test_deserialize_sql_new_format_object_array() {
+        // New format: array of SqlQuery objects
+        let json = r#"{"sql":[{"sql":"SELECT 1","start_time":10,"end_time":20}],"start_time":0,"end_time":100}"#;
+        let req: MultiStreamRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.sql.len(), 1);
+        assert_eq!(req.sql[0].sql, "SELECT 1");
+        assert!(!req.sql[0].is_old_format);
+        assert_eq!(req.sql[0].start_time, Some(10));
+    }
+
+    #[test]
+    fn test_deserialize_sql_empty_array() {
+        let json = r#"{"sql":[],"start_time":0,"end_time":100}"#;
+        let req: MultiStreamRequest = serde_json::from_str(json).unwrap();
+        assert!(req.sql.is_empty());
     }
 }

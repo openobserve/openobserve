@@ -51,3 +51,18 @@ enum IncidentEvents {
     IncidentId,
     Events,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20260214_000001_create_incident_events_table"
+        );
+    }
+}

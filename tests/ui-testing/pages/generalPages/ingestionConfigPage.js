@@ -7,7 +7,7 @@ export class IngestionConfigPage {
         // Global ingestion search (moved from Recommended page to Ingestion parent)
         this.globalSearchInput = '[data-test="ingestion-global-search"]';
         // Recommended page tabs container
-        this.recommendedTabsContainer = '.data-sources-recommended-tabs';
+        this.recommendedTabsContainer = '[data-test="data-sources-recommended-tabs"]';
 
         // Configuration content selectors
         this.copyButton = '[data-test="rum-copy-btn"]';
@@ -118,7 +118,7 @@ export class IngestionConfigPage {
         await this.waitForRecommendedTabs();
         // Count only the integration tabs within the data-sources-recommended-tabs container
         // This excludes the top-level navigation tabs
-        return await this.page.locator('.data-sources-recommended-tabs .q-tab').count();
+        return await this.page.locator('[data-test="data-sources-recommended-tabs"] [role="tab"]').count();
     }
 
     // ==================== Assertions ====================

@@ -24,13 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
+          <OTabs
             v-model="ingestiontabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
+            orientation="vertical"
           >
-            <q-route-tab
+            <ORouteTab
               name="openTelemetry"
               :to="{
                 name: 'tracesOTLP',
@@ -40,9 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
               label="OpenTelemetry"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="ingestTracesFromOtel"
               :to="{
                 name: 'ingestTracesFromOtel',
@@ -52,9 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
               label="OTEL Collector"
-              content-class="tab_content"
             />
-          </q-tabs>
+          </OTabs>
         </div>
       </div>
     </template>
@@ -76,6 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onMounted, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -89,11 +88,10 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IngestTraces",
-  components: {},
+  components: {
+    OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      ingestiontabs: "openTelemetry",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -108,6 +106,11 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const routeToTracesTab: Record<string, string> = {
+      tracesOTLP: "openTelemetry",
+      ingestTracesFromOtel: "ingestTracesFromOtel",
+    };
+    const ingestiontabs = ref(routeToTracesTab[router.currentRoute.value.name as string] ?? "openTelemetry");
 
     onMounted(() => {
       const ingestRoutes = ["tracesOTLP"];
@@ -184,6 +187,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
     };

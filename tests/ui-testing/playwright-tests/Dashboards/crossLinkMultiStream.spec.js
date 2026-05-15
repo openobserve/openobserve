@@ -154,8 +154,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await page.waitForTimeout(1500);
 
         // Step 6: Verify BOTH cross-links appear in the dropdown
-        const crossLinkItemA = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkNameA });
-        const crossLinkItemB = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkNameB });
+        const crossLinkItemA = page.locator(`[data-test="log-details-cross-link-${crossLinkNameA}"]`);
+        const crossLinkItemB = page.locator(`[data-test="log-details-cross-link-${crossLinkNameB}"]`);
 
         const hasA = await crossLinkItemA.isVisible().catch(() => false);
         const hasB = await crossLinkItemB.isVisible().catch(() => false);
@@ -233,8 +233,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await page.waitForTimeout(1500);
 
         // Step 6: Verify BOTH cross-links appear (backend merges from both streams)
-        const crossLinkItemA = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkNameA });
-        const crossLinkItemB = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkNameB });
+        const crossLinkItemA = page.locator(`[data-test="log-details-cross-link-${crossLinkNameA}"]`);
+        const crossLinkItemB = page.locator(`[data-test="log-details-cross-link-${crossLinkNameB}"]`);
 
         const hasA = await crossLinkItemA.isVisible().catch(() => false);
         const hasB = await crossLinkItemB.isVisible().catch(() => false);
@@ -575,7 +575,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await page.waitForTimeout(1500);
 
         // Step 5: Verify cross-link appears
-        const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
+        const crossLinkItem = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
         const hasCrossLink = await crossLinkItem.isVisible().catch(() => false);
 
         testLogger.info('Single-stream cross-link visibility', { visible: hasCrossLink });

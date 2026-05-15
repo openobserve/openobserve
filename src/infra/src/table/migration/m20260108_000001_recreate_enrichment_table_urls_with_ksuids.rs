@@ -211,6 +211,32 @@ mod legacy_enrichment_table_urls {
         let hash = hasher.finalize();
         svix_ksuid::Ksuid::from_bytes(hash.into())
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_ksuid_is_deterministic() {
+            let k1 = enrichment_job_ksuid_from_hash("org1", "table-a");
+            let k2 = enrichment_job_ksuid_from_hash("org1", "table-a");
+            assert_eq!(k1.to_string(), k2.to_string());
+        }
+
+        #[test]
+        fn test_ksuid_different_orgs_differ() {
+            let k1 = enrichment_job_ksuid_from_hash("org-a", "same-table");
+            let k2 = enrichment_job_ksuid_from_hash("org-b", "same-table");
+            assert_ne!(k1.to_string(), k2.to_string());
+        }
+
+        #[test]
+        fn test_ksuid_different_names_differ() {
+            let k1 = enrichment_job_ksuid_from_hash("org1", "table-x");
+            let k2 = enrichment_job_ksuid_from_hash("org1", "table-y");
+            assert_ne!(k1.to_string(), k2.to_string());
+        }
+    }
 }
 
 /// New enrichment_table_urls table with KSUID primary key

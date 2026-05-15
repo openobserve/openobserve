@@ -458,7 +458,7 @@ test.describe("Cross-Linking testcases", () => {
             await page.waitForTimeout(1000);
 
             // Look for the cross-link item in the dropdown menu
-            const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
+            const crossLinkItem = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
             const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
 
             // Assert cross-link menu item is visible
@@ -1271,7 +1271,7 @@ test.describe("Cross-Linking testcases", () => {
             await page.waitForTimeout(1000);
 
             // Look for the org-level cross-link item in the dropdown menu
-            const crossLinkItem = page.locator('.q-menu .q-item, .q-list .q-item').filter({ hasText: crossLinkName });
+            const crossLinkItem = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
             const crossLinkVisible = await crossLinkItem.isVisible().catch(() => false);
             testLogger.info('Org-level cross-link menu item visibility', { crossLinkVisible, crossLinkName });
 

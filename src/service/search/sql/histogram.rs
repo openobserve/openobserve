@@ -438,4 +438,76 @@ mod tests {
 
         assert!(result.contains("\"severity\" AS zo_sql_breakdown"));
     }
+
+    #[test]
+    fn test_convert_query_with_cte_not_eligible() {
+        let original_query = "WITH cte AS (SELECT * FROM logs) SELECT * FROM cte";
+        let stream_names = vec!["logs".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, false, None);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("Histogram unavailable"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_convert_query_with_limit_not_eligible() {
+        let original_query = "SELECT * FROM \"logs\" LIMIT 100";
+        let stream_names = vec!["logs".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, false, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_convert_query_with_distinct_not_eligible() {
+        let original_query = "SELECT DISTINCT level FROM \"logs\"";
+        let stream_names = vec!["logs".to_string()];
+        let result = convert_to_histogram_query(original_query, &stream_names, false, None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multi_stream_histogram_empty_statements_returns_error() {
+        let statements: Vec<Statement> = vec![];
+        let stream_names = vec!["logs".to_string()];
+        let result = multi_stream_histogram_query(&statements, &stream_names);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multi_stream_histogram_empty_stream_names_returns_error() {
+        let sql = "SELECT * FROM logs";
+        let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
+        let stream_names: Vec<String> = vec![];
+        let result = multi_stream_histogram_query(&statements, &stream_names);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_convert_query_breakdown_field_with_quote_escaped() {
+        // breakdown field containing a double-quote is escaped in the output
+        let original_query = "SELECT * FROM \"logs\"";
+        let stream_names = vec!["logs".to_string()];
+        let result =
+            convert_to_histogram_query(original_query, &stream_names, false, Some("bad\"field"))
+                .unwrap();
+        // The double-quote inside the field name must be escaped as "" inside the identifier
+        assert!(result.contains("\"bad\"\"field\""));
+    }
+
+    #[test]
+    fn test_single_stream_sub_query_skips_where_clause() {
+        // When is_sub_query=true, the WHERE clause from the original must be dropped.
+        // is_eligible_for_histogram returns (true, true) for a sub-query pattern
+        // which we trigger via a UNION ALL (multi-stream) is_sub_query path.
+        // Instead, call single_stream_histogram_query directly with is_sub_query=true.
+        let sql = "SELECT * FROM logs WHERE level = 'error'";
+        let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
+        let stream_names = vec!["logs".to_string()];
+        let result = single_stream_histogram_query(&statements, &stream_names, true, None).unwrap();
+        // WHERE clause must be absent when is_sub_query is true
+        assert!(!result.contains("WHERE"), "expected no WHERE: {result}");
+    }
 }

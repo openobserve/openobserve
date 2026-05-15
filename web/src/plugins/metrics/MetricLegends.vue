@@ -1,9 +1,8 @@
 <template>
-  <q-btn
+  <OButton
     data-cy="metric-legends-button"
-    size="sm"
-    dense
-    flat
+    variant="ghost"
+    size="sm-action"
     class="metric-legends-button"
   >
     <q-icon name="category" class="q-mr-sm" />
@@ -29,16 +28,18 @@
         </q-card-section>
       </q-card>
     </q-menu>
-  </q-btn>
+  </OButton>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 export default defineComponent({
   name: "MetricLegends",
+  components: { OButton },
   setup() {
     const { t } = useI18n();
     const store = useStore();

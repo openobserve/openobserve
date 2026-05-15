@@ -83,6 +83,14 @@ pub async fn create_backfill(
     Path((org_id, pipeline_id)): Path<(String, String)>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    }
+
     log::info!(
         "[BACKFILL API] Create backfill job request for pipeline {} in org {}, range: {}-{}, delete: {}",
         pipeline_id,
@@ -633,4 +641,39 @@ pub async fn update_backfill(
     Json(_body): Json<BackfillRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backfill_request_optional_fields_absent_when_none() {
+        let req = BackfillRequest {
+            start_time: 1000,
+            end_time: 2000,
+            chunk_period_minutes: None,
+            delay_between_chunks_secs: None,
+            delete_before_backfill: false,
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("chunk_period_minutes"));
+        assert!(!obj.contains_key("delay_between_chunks_secs"));
+    }
+
+    #[test]
+    fn test_backfill_request_optional_fields_present_when_some() {
+        let req = BackfillRequest {
+            start_time: 1000,
+            end_time: 2000,
+            chunk_period_minutes: Some(60),
+            delay_between_chunks_secs: Some(5),
+            delete_before_backfill: false,
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("chunk_period_minutes"));
+        assert!(obj.contains_key("delay_between_chunks_secs"));
+    }
 }

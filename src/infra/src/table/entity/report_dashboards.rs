@@ -54,3 +54,25 @@ impl Related<super::reports::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            report_id: "r-1".to_string(),
+            dashboard_id: "d-1".to_string(),
+            tab_names: serde_json::json!(["tab1"]),
+            variables: serde_json::json!({}),
+            timerange: serde_json::json!({"from": "now-1h"}),
+            report_type: 0,
+            email_attachment_type: 0,
+            attachment_dimensions: None,
+        };
+        assert_eq!(m.report_id, "r-1");
+        assert_eq!(m.report_type, 0);
+        assert!(m.attachment_dimensions.is_none());
+    }
+}

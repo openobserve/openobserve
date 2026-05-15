@@ -76,7 +76,7 @@ const defaultMockResponse = {
       span_status: "OK",
       start_time: 1000000,
       end_time: 1100000,
-      llm_observation_type: null,
+      gen_ai_operation_name: null,
     },
     {
       span_id: "span-2",
@@ -86,7 +86,7 @@ const defaultMockResponse = {
       span_status: "OK",
       start_time: 1010000,
       end_time: 1050000,
-      llm_observation_type: "generation",
+      gen_ai_operation_name: "generation",
     },
     {
       span_id: "span-3",
@@ -96,7 +96,7 @@ const defaultMockResponse = {
       span_status: "ERROR",
       start_time: 1060000,
       end_time: 1080000,
-      llm_observation_type: "tool",
+      gen_ai_operation_name: "tool",
     },
   ],
   edges: [
@@ -577,7 +577,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const cssClass = wrapper.vm.getObservationTypeClass("generation");
+      const cssClass = wrapper.vm.getObservationTypeClass("chat");
       expect(cssClass).toBe("node-llm-generation");
     });
 
@@ -596,7 +596,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const cssClass = wrapper.vm.getObservationTypeClass("tool");
+      const cssClass = wrapper.vm.getObservationTypeClass("execute_tool");
       expect(cssClass).toBe("node-llm-tool");
     });
 
@@ -653,7 +653,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const cssClass = wrapper.vm.getObservationTypeClass("GENERATION");
+      const cssClass = wrapper.vm.getObservationTypeClass("chat");
       expect(cssClass).toBe("node-llm-generation");
     });
 
@@ -672,7 +672,7 @@ describe("TraceDAG", () => {
 
       await flushPromises();
 
-      const textClass = wrapper.vm.getObservationTypeTextClass("agent");
+      const textClass = wrapper.vm.getObservationTypeTextClass("invoke_agent");
       expect(textClass).toBe("node-llm-text-agent");
     });
   });

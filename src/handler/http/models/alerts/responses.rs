@@ -214,6 +214,226 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike as _;
+
+    use super::*;
+
+    fn valid_ksuid_str() -> String {
+        svix_ksuid::Ksuid::new(None, None).to_string()
+    }
+
+    #[test]
+    fn test_anomaly_config_to_list_item_missing_anomaly_id_returns_none() {
+        let v = serde_json::json!({ "name": "test" });
+        assert!(anomaly_config_to_list_item(&v).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_to_list_item_invalid_ksuid_returns_none() {
+        let v = serde_json::json!({ "anomaly_id": "not-a-ksuid", "name": "test" });
+        assert!(anomaly_config_to_list_item(&v).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_to_list_item_valid_returns_correct_fields() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "my_config",
+            "enabled": true,
+            "status": "waiting",
+            "detection_window_seconds": 3600,
+            "schedule_interval": "5m",
+            "last_detection_run": 1_700_000_000i64,
+        });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.name, "my_config");
+        assert_eq!(item.alert_type, "anomaly_detection");
+        assert!(item.enabled);
+        assert_eq!(item.status.as_deref(), Some("waiting"));
+        assert!(!item.is_real_time);
+        assert_eq!(item.last_triggered_at, Some(1_700_000_000));
+    }
+
+    #[test]
+    fn test_anomaly_config_folder_id_defaults_to_default_when_absent() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.folder_id, "default");
+    }
+
+    #[test]
+    fn test_list_alerts_response_item_skip_fields_absent_when_none() {
+        let item = ListAlertsResponseBodyItem {
+            alert_id: svix_ksuid::Ksuid::new(None, None),
+            folder_id: "f1".to_string(),
+            folder_name: "folder".to_string(),
+            name: "alert".to_string(),
+            owner: None,
+            description: None,
+            alert_type: "anomaly_detection".to_string(),
+            condition: None,
+            trigger_condition: None,
+            enabled: false,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            is_real_time: false,
+            last_trained_at: None,
+            status: None,
+            last_error: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("condition"));
+        assert!(!obj.contains_key("trigger_condition"));
+        assert!(!obj.contains_key("last_trained_at"));
+        assert!(!obj.contains_key("status"));
+        assert!(!obj.contains_key("last_error"));
+    }
+
+    #[test]
+    fn test_generate_sql_response_metadata_none_absent() {
+        let r = GenerateSqlResponseBody {
+            sql: "SELECT 1".to_string(),
+            metadata: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("metadata"));
+    }
+
+    #[test]
+    fn test_generate_sql_response_metadata_some_present() {
+        let r = GenerateSqlResponseBody {
+            sql: "SELECT 1".to_string(),
+            metadata: Some(GenerateSqlMetadata {
+                has_aggregation: true,
+                has_conditions: false,
+                has_group_by: false,
+            }),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        assert!(json.as_object().unwrap().contains_key("metadata"));
+    }
+
+    #[test]
+    fn test_anomaly_config_trigger_condition_derived_from_window_and_interval() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "x",
+            "detection_window_seconds": 120,
+            "schedule_interval": "2m",
+        });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        let tc = item
+            .trigger_condition
+            .expect("trigger_condition should be set");
+        assert_eq!(tc.period_minutes, 2); // 120 / 60
+        assert_eq!(tc.frequency_minutes, 2); // "2m" → 2
+    }
+
+    #[test]
+    fn test_anomaly_config_missing_name_returns_none() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id });
+        assert!(anomaly_config_to_list_item(&v).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_empty_folder_id_defaults_to_default() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "folder_id": "" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.folder_id, "default");
+    }
+
+    #[test]
+    fn test_anomaly_config_last_error_non_empty_is_set() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "last_error": "oops" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.last_error, Some("oops".to_string()));
+    }
+
+    #[test]
+    fn test_anomaly_config_empty_last_error_is_none() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "last_error": "" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert!(item.last_error.is_none());
+    }
+
+    #[test]
+    fn test_anomaly_config_training_completed_at_populates_last_trained_at() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "training_completed_at": 1_700_000i64 });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert_eq!(item.last_trained_at, Some(1_700_000i64));
+    }
+
+    #[test]
+    fn test_anomaly_config_empty_description_is_none() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({ "anomaly_id": id, "name": "x", "description": "" });
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+        assert!(item.description.is_none());
+    }
+
+    #[test]
+    fn test_list_alerts_item_try_from_missing_alert_id_returns_err() {
+        let folder = meta_folders::Folder::default();
+        let alert = meta_alerts::Alert::default(); // id is None
+        let result = ListAlertsResponseBodyItem::try_from((folder, alert, None));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_alerts_body_try_from_propagates_err_when_alert_id_missing() {
+        let folder = meta_folders::Folder::default();
+        let alert = meta_alerts::Alert::default(); // id is None
+        let result = ListAlertsResponseBody::try_from(vec![(folder, alert, None)]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_alerts_item_try_from_realtime_alert() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.is_real_time = true;
+        let folder = meta_folders::Folder {
+            folder_id: "f1".to_string(),
+            name: "Folder".to_string(),
+            description: String::new(),
+        };
+        let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
+        assert_eq!(item.alert_type, "realtime");
+        assert!(item.is_real_time);
+    }
+
+    #[test]
+    fn test_list_alerts_item_try_from_scheduled_alert() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.is_real_time = false;
+        alert.name = "my-alert".to_string();
+        let folder = meta_folders::Folder::default();
+        let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
+        assert_eq!(item.alert_type, "scheduled");
+        assert_eq!(item.name, "my-alert");
+        assert!(!item.is_real_time);
+    }
+
+    #[test]
+    fn test_list_alerts_body_try_from_empty_vec_ok() {
+        let result = ListAlertsResponseBody::try_from(vec![]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().list.is_empty());
+    }
+}
+
 #[derive(Default, Serialize, ToSchema)]
 pub struct AlertBulkEnableResponse {
     #[schema(value_type = Vec<String>)]

@@ -298,3 +298,35 @@ pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
         .map(|r| (r.org.clone(), r.name.clone()))
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enrichment_table_record_new_sets_org_and_name() {
+        let record = EnrichmentTableRecord::new("myorg", "my-table", vec![1, 2, 3]);
+        assert_eq!(record.org, "myorg");
+        assert_eq!(record.name, "my-table");
+        assert_eq!(record.data, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_enrichment_table_record_new_timestamp_is_positive() {
+        let record = EnrichmentTableRecord::new("org", "table", vec![]);
+        assert!(record.created_at > 0);
+    }
+
+    #[test]
+    fn test_enrichment_table_record_new_empty_data() {
+        let record = EnrichmentTableRecord::new("org", "table", vec![]);
+        assert!(record.data.is_empty());
+    }
+
+    #[test]
+    fn test_enrichment_table_record_new_large_data() {
+        let data: Vec<u8> = (0u8..=255).collect();
+        let record = EnrichmentTableRecord::new("org", "table", data.clone());
+        assert_eq!(record.data, data);
+    }
+}

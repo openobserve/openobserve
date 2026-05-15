@@ -23,15 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:gap-1"
       style="max-width: 100%; overflow: hidden"
     >
-      <q-btn
+      <OButton
         v-if="
           searchObj.data.stream.streamType &&
           searchObj.data.stream.streamType !== 'logs'
         "
         data-test="log-search-index-list-stream-type-badge"
-        flat
-        dense
-        no-caps
+        variant="ghost"
+        size="icon-sm"
         class="stream-type-badge tw:shrink-0"
         @click="onStreamTypeChange('logs')"
       >
@@ -39,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tooltip anchor="bottom middle" self="top middle">
           {{ streamTypeLabel }} — {{ t("search.switchToLogs") }}
         </q-tooltip>
-      </q-btn>
+      </OButton>
       <q-select
         ref="streamSelect"
         data-test="log-search-index-list-select-stream"
@@ -221,9 +220,11 @@ import {
   removeFieldFromWhereAST,
 } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
+import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -241,6 +242,7 @@ export default defineComponent({
     FieldList: defineAsyncComponent(
       () => import("@/plugins/logs/components/FieldList.vue"),
     ),
+    OButton,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
@@ -695,6 +697,13 @@ export default defineComponent({
       setDefaultFieldTab();
     });
 
+    // Reset to page 1 whenever the field search term changes so the user
+    // always sees results from the beginning of the filtered list.
+    watch(
+      () => searchObj.data.stream.filterField,
+      () => { pagination.value = { ...pagination.value, page: 1 }; },
+    );
+
     const filterStreamFn = (val: string, update: any) => {
       update(() => {
         const needle = val.toLowerCase();
@@ -731,22 +740,41 @@ export default defineComponent({
     }
 
     const filterFieldFn = (rows: any, terms: any) => {
-      var filtered = [];
-      var includedFields: any = [];
-      if (terms != "") {
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) &&
-            includedFields.indexOf(rows[i]["name"]) == -1
-          ) {
-            filtered.push(rows[i]);
-            includedFields.push(rows[i]["name"]);
+      if (!terms) return rows;
+
+      const term = terms.toLowerCase();
+
+      // Build a label-row lookup from the current rows so we can re-inject
+      // the correct group header for each matched field.
+      const labelByGroup: Record<string, any> = {};
+      for (const row of rows) {
+        if (row.label && row.group) labelByGroup[row.group] = row;
+      }
+
+      const seen = new Set<string>();
+      const seenGroups = new Set<string>();
+      const filtered: any[] = [];
+
+      for (const row of rows) {
+        // Never include label rows directly — they'll be re-injected below
+        if (row.label) continue;
+
+        if (row.name.toLowerCase().includes(term) && !seen.has(row.name)) {
+          seen.add(row.name);
+
+          // Inject the group label row once, the first time a field from that group matches
+          const group = row.group;
+          if (group && labelByGroup[group] && !seenGroups.has(group)) {
+            seenGroups.add(group);
+            filtered.push(labelByGroup[group]);
           }
+
+          filtered.push(row);
         }
       }
+
       if (!filtered.length) {
-        return [{ name: "no-fields-found", label: "No matching fields found" }];
+        return [{ name: "No matching fields found", label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -1489,6 +1517,8 @@ export default defineComponent({
     const toggleFieldGroup = (group: string) => {
       searchObj.data.stream.expandGroupRows[group] =
         !searchObj.data.stream.expandGroupRows[group];
+      // Reset to page 1 so Quasar recalculates page count from the new row total
+      pagination.value = { ...pagination.value, page: 1 };
     };
 
     const hasUserDefinedSchemas = () => {
@@ -1899,47 +1929,15 @@ export default defineComponent({
       fieldListRef,
       toggleFieldGroup,
       streamFieldsRows: computed(() => {
-        let expandKeys = Object.keys(
-          searchObj.data.stream.expandGroupRows,
-        ).reverse();
+        const source = showOnlyInterestingFields.value
+          ? searchObj.data.stream.selectedInterestingStreamFields
+          : searchObj.data.stream.selectedStreamFields;
 
-        const expandGroupRowsFieldCount = showOnlyInterestingFields.value
-          ? searchObj.data.stream.interestingExpandedGroupRowsFieldCount
-          : searchObj.data.stream.expandGroupRowsFieldCount;
+        if (!source?.length) return source;
 
-        let startIndex = 0;
-        // Iterate over the keys in reverse order
-        let selectedStreamFields = cloneDeep(
-          showOnlyInterestingFields.value
-            ? searchObj.data.stream.selectedInterestingStreamFields
-            : searchObj.data.stream.selectedStreamFields,
-        );
-        let count = 0;
-        for (let key of expandKeys) {
-          if (
-            searchObj.data.stream.expandGroupRows[key] == false &&
-            selectedStreamFields != undefined &&
-            selectedStreamFields?.length > 0
-          ) {
-            startIndex =
-              selectedStreamFields.length - expandGroupRowsFieldCount[key];
-            if (startIndex > 0) {
-              // console.log("startIndex", startIndex);
-              // console.log("count", count);
-              // console.log("selectedStreamFields", selectedStreamFields.length);
-              // console.log(searchObj.data.stream.expandGroupRowsFieldCount[key]);
-              // console.log("========");
-              selectedStreamFields.splice(
-                startIndex - count,
-                expandGroupRowsFieldCount[key],
-              );
-            }
-          } else {
-            count += expandGroupRowsFieldCount[key];
-          }
-          count++;
-        }
-        return selectedStreamFields;
+        const expandGroupRows = searchObj.data.stream.expandGroupRows;
+
+        return applyCollapseFilter(source, expandGroupRows, searchObj.data.stream.filterField ?? "");
       }),
       formatLargeNumber,
       sortedStreamFields,

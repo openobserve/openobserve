@@ -15,19 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
+  <OButton
     data-cy="syntax-guide-button"
-    dense
-    flat
+    variant="ghost"
+    size="icon-sm"
     :class="[
-      noBorder ? 'syntax-guide-no-border' : 'q-ml-xs q-pa-xs',
+      noBorder ? 'syntax-guide-no-border' : 'q-ml-xs',
       sqlmode ? 'sql-mode' : 'normal-mode',
-      !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
-      store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
     ]"
-    icon="help"
-    :label="label || (noBorder ? undefined : 'Syntax Guide')"
   >
+    <HelpCircle :size="14" />
+    <span v-if="label" class="tw:ml-1">{{ label }}</span>
+    <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
@@ -209,13 +208,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-tooltip>
       {{ t('search.syntaxGuideLabel') }}
     </q-tooltip>
-  </q-btn>
+  </OButton>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { HelpCircle } from "lucide-vue-next";
 
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
@@ -233,8 +234,7 @@ export default defineComponent({
       default: '',
     },
   },
-  components:{
-  },
+  components: { OButton, HelpCircle },
   setup() {
     const { t } = useI18n();
     const store = useStore();

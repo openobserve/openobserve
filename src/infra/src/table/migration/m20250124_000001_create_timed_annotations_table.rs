@@ -108,3 +108,30 @@ enum Dashboards {
     Table,
     Id,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_table_name() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("timed_annotations"));
+    }
+
+    #[test]
+    fn test_dashboard_id_idx_name() {
+        let sql = create_index_dashboard_id_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(ANNOTATIONS_DASHBOARD_ID_IDX));
+    }
+
+    #[test]
+    fn test_dashboards_fk_constant() {
+        assert_eq!(
+            TIMED_ANNOTATIONS_DASHBOARDS_FK,
+            "fk_timed_annotation_panels_dashboard_id"
+        );
+    }
+}

@@ -14,7 +14,7 @@ export class DashboardPage {
     // Navigation & Menu locators
     this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
-    this.signOutButton = page.getByText('Sign Out');
+    this.signOutButton = page.locator('[data-test="menu-link-logout-item"]');
     this.logoutMenuItem = page.locator('[data-test="menu-link-logout-item"]');
 
     // Dashboard list locators
@@ -179,7 +179,7 @@ export class DashboardPage {
 
     await this.dashboardDelete.click({ force: true });
     await this.page.waitForTimeout(2000);
-    await this.confirmButton.filter({ has: this.page.locator(':visible') }).first().click();
+    await this.confirmButton.click();
     await expect(this.page.getByRole('alert')).toContainText('Dashboard deleted successfully.');
   }
 

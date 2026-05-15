@@ -760,6 +760,24 @@ mod tests {
         assert_eq!(builder.fst_fields, vec!["field1".to_string()]);
     }
 
+    #[test]
+    fn test_table_builder_file_stat_cache_none() {
+        let builder = TableBuilder::new().file_stat_cache(None);
+        assert!(builder.file_stat_cache.is_none());
+    }
+
+    #[test]
+    fn test_table_builder_index_condition_none() {
+        let builder = TableBuilder::new().index_condition(None);
+        assert!(builder.index_condition.is_none());
+    }
+
+    #[test]
+    fn test_table_builder_timestamp_filter() {
+        let builder = TableBuilder::new().timestamp_filter((100, 200));
+        assert_eq!(builder.timestamp_filter, Some((100, 200)));
+    }
+
     #[tokio::test]
     async fn test_create_session_config_memory_pools() -> Result<()> {
         // Test different memory pool configurations by creating runtime environments

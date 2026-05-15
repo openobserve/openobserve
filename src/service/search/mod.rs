@@ -627,6 +627,28 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
+/// Returns true when the query's primary ORDER BY column is not a timestamp column,
+/// meaning per-partition `hits_to_skip` is incorrect and the TopKHeap merge path
+/// must be used instead.
+///
+/// Only the first ORDER BY column is evaluated; secondary columns are not compared.
+/// Aggregate and histogram queries always return false — their partitioning is not
+/// affected by non-ts ORDER BY.
+fn detect_non_ts_order_by(
+    order_by: &[(String, config::meta::sql::OrderBy)],
+    ts_column: Option<&str>,
+    is_aggregate: bool,
+    is_histogram: bool,
+) -> bool {
+    if is_aggregate || is_histogram {
+        return false;
+    }
+    order_by
+        .first()
+        .map(|(field, _)| field.as_str() != TIMESTAMP_COL_NAME && ts_column != Some(field.as_str()))
+        .unwrap_or(false)
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
@@ -893,6 +915,7 @@ pub async fn search_partition(
         #[cfg(feature = "enterprise")]
         streaming_id: None,
         is_histogram_eligible,
+        non_ts_order_by_cols: vec![],
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -1011,20 +1034,24 @@ pub async fn search_partition(
         })
         .unwrap_or(OrderBy::Desc);
 
-    if cfg.limit.disable_partitions_for_non_ts_order_by
-        && !is_aggregate
-        && !is_histogram
-        && sql
+    let is_non_ts_order_by = detect_non_ts_order_by(
+        &sql.order_by,
+        ts_column.as_deref(),
+        is_aggregate,
+        is_histogram,
+    );
+
+    if is_non_ts_order_by {
+        resp.non_ts_order_by_cols = sql
             .order_by
-            .first()
-            .map(|(field, _)| {
-                field.as_str() != TIMESTAMP_COL_NAME
-                    && (ts_column.as_deref() != Some(field.as_str()))
-            })
-            .unwrap_or(false)
-    {
+            .iter()
+            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
+            .collect();
+    }
+
+    if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
         log::info!(
-            "[trace_id {trace_id}] search_partition: ORDER BY on non-timestamp column, disabling partitioning"
+            "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
         return Ok(resp);
@@ -1633,4 +1660,304 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
 
     #[cfg(not(feature = "enterprise"))]
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use hashbrown::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_generate_filter_from_equal_items_empty() {
+        let result = generate_filter_from_equal_items(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_generate_filter_from_equal_items_single_pair() {
+        let items = vec![("field1".to_string(), "val1".to_string())];
+        let result = generate_filter_from_equal_items(&items);
+        assert_eq!(result.len(), 1);
+        let (field, values) = &result[0];
+        assert_eq!(field, "field1");
+        assert_eq!(values, &["val1"]);
+    }
+
+    #[test]
+    fn test_generate_filter_from_equal_items_groups_by_field() {
+        let items = vec![
+            ("a".to_string(), "3".to_string()),
+            ("b".to_string(), "5".to_string()),
+            ("a".to_string(), "4".to_string()),
+            ("b".to_string(), "6".to_string()),
+        ];
+        let mut result = generate_filter_from_equal_items(&items);
+        result.sort_by(|x, y| x.0.cmp(&y.0));
+        assert_eq!(result.len(), 2);
+        let (_, a_vals) = result.iter().find(|(f, _)| f == "a").unwrap();
+        let mut a_vals = a_vals.clone();
+        a_vals.sort();
+        assert_eq!(a_vals, vec!["3", "4"]);
+        let (_, b_vals) = result.iter().find(|(f, _)| f == "b").unwrap();
+        let mut b_vals = b_vals.clone();
+        b_vals.sort();
+        assert_eq!(b_vals, vec!["5", "6"]);
+    }
+
+    #[test]
+    fn test_generate_filter_from_equal_items_single_field_multiple_values() {
+        let items = vec![
+            ("status".to_string(), "200".to_string()),
+            ("status".to_string(), "404".to_string()),
+            ("status".to_string(), "500".to_string()),
+        ];
+        let result = generate_filter_from_equal_items(&items);
+        assert_eq!(result.len(), 1);
+        let (_, values) = &result[0];
+        let mut v = values.clone();
+        v.sort();
+        assert_eq!(v, vec!["200", "404", "500"]);
+    }
+
+    #[test]
+    fn test_generate_search_schema_diff_no_diff() {
+        let field = Arc::new(Field::new("col1", DataType::Utf8, false));
+        let schema = Schema::new(vec![field.clone()]);
+        let map: HashMap<&String, &Arc<Field>> = [(field.name(), &field)].into_iter().collect();
+        let diff = generate_search_schema_diff(&schema, &map);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_generate_search_schema_diff_detects_type_change() {
+        let old_field = Arc::new(Field::new("col1", DataType::Utf8, false));
+        let new_field = Arc::new(Field::new("col1", DataType::Int64, false));
+        let schema = Schema::new(vec![old_field.clone()]);
+        let map: HashMap<&String, &Arc<Field>> =
+            [(new_field.name(), &new_field)].into_iter().collect();
+        let diff = generate_search_schema_diff(&schema, &map);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff.get("col1").unwrap(), &DataType::Int64);
+    }
+
+    #[test]
+    fn test_generate_search_schema_diff_missing_in_latest() {
+        let field = Arc::new(Field::new("col1", DataType::Utf8, false));
+        let schema = Schema::new(vec![field]);
+        let map: HashMap<&String, &Arc<Field>> = HashMap::new();
+        let diff = generate_search_schema_diff(&schema, &map);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_server_internal_error_contains_message() {
+        let err = server_internal_error("disk full");
+        assert!(err.to_string().contains("disk full"));
+    }
+
+    #[test]
+    fn test_check_search_allowed_non_enterprise_always_ok() {
+        assert!(check_search_allowed("myorg", None).is_ok());
+        assert!(check_search_allowed("myorg", Some("logs")).is_ok());
+    }
+
+    // ── detect_non_ts_order_by unit tests ──────────────────────────────────────
+
+    use config::meta::sql::OrderBy;
+
+    fn ob(col: &str, dir: OrderBy) -> (String, OrderBy) {
+        (col.to_string(), dir)
+    }
+
+    // Helper: parse SQL string → run ColumnVisitor → return order_by vec.
+    // Uses empty schemas so no schema resolution happens, which is fine for
+    // ORDER BY extraction (pre_visit_query doesn't touch schemas).
+    fn parse_order_by(sql_str: &str) -> Vec<(String, OrderBy)> {
+        use ::datafusion::common::TableReference;
+        use hashbrown::HashMap;
+        use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
+
+        use crate::service::search::sql::visitor::column::ColumnVisitor;
+
+        let mut stmt = Parser::parse_sql(&GenericDialect {}, sql_str)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let schemas = HashMap::<TableReference, _>::new();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = stmt.visit(&mut visitor);
+        visitor.order_by
+    }
+
+    // ── direct helper tests ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_detect_no_order_by_returns_false() {
+        assert!(!detect_non_ts_order_by(&[], None, false, false));
+    }
+
+    #[test]
+    fn test_detect_timestamp_order_by_returns_false() {
+        let order_by = vec![ob("_timestamp", OrderBy::Desc)];
+        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_non_ts_desc_returns_true() {
+        let order_by = vec![ob("duration", OrderBy::Desc)];
+        assert!(detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_non_ts_asc_returns_true() {
+        let order_by = vec![ob("duration", OrderBy::Asc)];
+        assert!(detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_aggregate_always_false() {
+        let order_by = vec![ob("duration", OrderBy::Desc)];
+        assert!(!detect_non_ts_order_by(&order_by, None, true, false));
+    }
+
+    #[test]
+    fn test_detect_histogram_always_false() {
+        let order_by = vec![ob("duration", OrderBy::Desc)];
+        assert!(!detect_non_ts_order_by(&order_by, None, false, true));
+    }
+
+    #[test]
+    fn test_detect_custom_ts_column_returns_false() {
+        // stream uses "time" as its timestamp column
+        let order_by = vec![ob("time", OrderBy::Desc)];
+        assert!(!detect_non_ts_order_by(
+            &order_by,
+            Some("time"),
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn test_detect_custom_ts_column_other_col_returns_true() {
+        let order_by = vec![ob("duration", OrderBy::Desc)];
+        assert!(detect_non_ts_order_by(
+            &order_by,
+            Some("time"),
+            false,
+            false
+        ));
+    }
+
+    #[test]
+    fn test_detect_multi_col_first_is_ts_returns_false() {
+        // ORDER BY _timestamp DESC, duration ASC — primary is ts → false
+        let order_by = vec![
+            ob("_timestamp", OrderBy::Desc),
+            ob("duration", OrderBy::Asc),
+        ];
+        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_multi_col_first_is_non_ts_returns_true() {
+        // ORDER BY duration DESC, _timestamp DESC — primary is non-ts → true
+        // secondary _timestamp is ignored (known limitation: ties break arbitrarily)
+        let order_by = vec![
+            ob("duration", OrderBy::Desc),
+            ob("_timestamp", OrderBy::Desc),
+        ];
+        assert!(detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    // ── SQL-parsing integration tests (via ColumnVisitor + is_aggregate_query) ──
+
+    #[test]
+    fn test_detect_sql_multi_col_non_ts_primary() {
+        // ORDER BY duration DESC, _timestamp DESC — primary non-ts → true
+        // _timestamp as secondary is honored by the heap but irrelevant for detection
+        let sql = "SELECT * FROM logs ORDER BY duration DESC, _timestamp DESC";
+        let order_by = parse_order_by(sql);
+        assert_eq!(order_by[0].0, "duration");
+        assert_eq!(order_by[1].0, "_timestamp");
+        assert!(detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_sql_multi_col_ts_primary() {
+        // ORDER BY _timestamp DESC, duration DESC — primary ts → false
+        let sql = "SELECT * FROM logs ORDER BY _timestamp DESC, duration DESC";
+        let order_by = parse_order_by(sql);
+        assert_eq!(order_by[0].0, "_timestamp");
+        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_sql_three_col_non_ts_primary() {
+        // ORDER BY total_amt DESC, status ASC, _timestamp DESC — primary non-ts → true
+        let sql = "SELECT * FROM logs ORDER BY total_amt DESC, status ASC, _timestamp DESC";
+        let order_by = parse_order_by(sql);
+        assert_eq!(order_by[0].0, "total_amt");
+        assert_eq!(order_by.len(), 3);
+        assert!(detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_sql_aggregate_with_count_order() {
+        // is_aggregate_query returns true for GROUP BY → detect always false
+        let sql = "SELECT count(*), status FROM logs GROUP BY status ORDER BY count(*) DESC";
+        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
+        assert!(is_agg, "GROUP BY query must be detected as aggregate");
+        let order_by = parse_order_by(sql);
+        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+    }
+
+    #[test]
+    fn test_detect_sql_join_is_aggregate_short_circuits() {
+        // is_aggregate_query returns true for JOINs → detect always false regardless of ORDER BY
+        let sql = "SELECT a.duration, b.name FROM logs a \
+                   JOIN users b ON a.user_id = b.id \
+                   ORDER BY duration DESC";
+        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
+        assert!(is_agg, "JOIN query must be detected as aggregate");
+        let order_by = parse_order_by(sql);
+        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+    }
+
+    #[test]
+    fn test_detect_sql_subquery_is_aggregate_short_circuits() {
+        // is_aggregate_query returns true for subqueries → detect always false
+        let sql = "SELECT * FROM (SELECT * FROM logs WHERE status = 200) sub \
+                   ORDER BY duration DESC";
+        let is_agg = config::utils::sql::is_aggregate_query(sql).unwrap_or(false);
+        assert!(is_agg, "subquery must be detected as aggregate");
+        let order_by = parse_order_by(sql);
+        assert!(!detect_non_ts_order_by(&order_by, None, is_agg, false));
+    }
+
+    #[test]
+    fn test_detect_sql_cte_outer_ts_order_by() {
+        // CTE: pre_visit_query is top-down → outer ORDER BY _timestamp first → false
+        let sql = "WITH t AS (SELECT * FROM logs ORDER BY duration DESC) \
+                   SELECT * FROM t ORDER BY _timestamp DESC";
+        let order_by = parse_order_by(sql);
+        assert_eq!(order_by[0].0, "_timestamp");
+        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
+    }
+
+    #[test]
+    fn test_detect_sql_cte_outer_non_ts_order_by() {
+        // CTE: outer ORDER BY duration first → true
+        // Note: is_aggregate_query may return true for CTEs with subquery body;
+        // in that case the aggregate guard fires before this helper.
+        let sql = "WITH t AS (SELECT * FROM logs ORDER BY _timestamp DESC) \
+                   SELECT * FROM t ORDER BY duration DESC";
+        let order_by = parse_order_by(sql);
+        assert_eq!(order_by[0].0, "duration");
+        assert!(detect_non_ts_order_by(&order_by, None, false, false));
+    }
 }

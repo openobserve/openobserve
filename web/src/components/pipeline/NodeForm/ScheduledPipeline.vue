@@ -18,41 +18,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="full-width scheduled-pipeline-container">
     <div class="flex items-center justify-between q-pb-sm">
       <div class="flex items-center">
-        <q-btn
-          icon="cancel"
-          size="14px"
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
           class="q-pt-sm"
-          flat
-          dense
           @click="$emit('cancel:form')"
-        />
+        >
+          <template #icon-left>
+            <X class="tw:size-3.5 tw:shrink-0" />
+          </template>
+        </OButton>
         <div class="q-pb-sm stream-routing-title q-pl-xs">
           {{ t("pipeline.query") }}
         </div>
       </div>
 
       <div class="flex items-center">
-        <q-btn
+        <OButton
           v-if="
             config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
           "
-          :ripple="false"
+          variant="ghost"
+          size="icon-toolbar"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
-          no-caps
-          :borderless="true"
-          flat
-          dense
-          class="o2-button ai-hover-btn q-px-sm q-py-sm q-mr-sm"
+          class="ai-hover-btn q-mr-sm"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-          style="border-radius: 6px"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
           <div class="row items-center no-wrap tw:gap-2">
             <img :src="getBtnLogo" class="header-icon ai-icon" />
           </div>
-        </q-btn>
+        </OButton>
         <div class="flex items-center app-tabs-container tw:h-[36px] q-mr-sm">
           <AppTabs
             data-test="scheduled-pipeline-tabs"
@@ -67,19 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="updateDateChange"
           class="q-mr-sm"
         />
-        <q-btn
+        <OButton
           data-test="logs-search-bar-refresh-btn"
           data-cy="search-bar-refresh-button"
-          flat
-          no-caps
-          :title="t('search.runQuery')"
-          class="q-pa-none q-mr-sm o2-primary-button tw:h-[36px]"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          :disable="!selectedStreamName"
+          variant="primary"
+          size="sm-action"
+          class="q-mr-sm"
+          :disabled="!selectedStreamName"
           @click="
             {
               expandState.output = true;
@@ -89,20 +81,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           {{ t("search.runQuery") }}
-          <q-tooltip v-if="!selectedStreamName" anchor="bottom middle" self="top middle">
+          <q-tooltip
+            v-if="!selectedStreamName"
+            anchor="bottom middle"
+            self="top middle"
+          >
             {{ t("search.selectStreamFirst") }}
           </q-tooltip>
-        </q-btn>
+        </OButton>
 
-        <q-btn
+        <OButton
           data-test="add-function-fullscreen-btn"
-          :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
-          dense
-          style="height: 34px"
-          no-caps
-          :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+          variant="ghost"
+          size="icon-xs-sq"
           @click="handleFullScreen"
-        />
+        >
+          <template #icon-left>
+            <Maximize2 v-if="!isFullscreen" class="tw:size-3.5 tw:shrink-0" />
+            <Minimize2 v-else class="tw:size-3.5 tw:shrink-0" />
+          </template>
+        </OButton>
       </div>
     </div>
     <q-separator />
@@ -387,40 +385,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 @update:model-value="updateTrigger"
                               />
                             </div>
-                            <q-btn
+                            <OButton
                               data-test="scheduled-pipeline-group-by-delete-btn"
-                              :icon="outlinedDelete"
-                              class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                              :class="
-                                store.state?.theme === 'dark' ? 'icon-dark' : ''
-                              "
-                              padding="xs"
-                              unelevated
-                              size="sm"
-                              round
-                              flat
+                              variant="ghost-destructive"
+                              size="icon-xs-sq"
+                              class="q-mb-sm q-ml-xs q-mr-sm"
                               :title="t('alert_templates.delete')"
                               @click="deleteGroupByColumn(index)"
-                              style="min-width: auto"
-                            />
+                            >
+                              <template #icon-left>
+                                <Trash2 class="tw:size-3.5 tw:shrink-0" />
+                              </template>
+                            </OButton>
                           </div>
                         </template>
-                        <q-btn
+                        <OButton
                           data-test="scheduled-pipeline-group-by-add-btn"
-                          icon="add"
-                          class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
-                          :class="
-                            store.state?.theme === 'dark' ? 'icon-dark' : ''
-                          "
-                          padding="xs"
-                          unelevated
-                          size="sm"
-                          round
-                          flat
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="q-mb-sm q-ml-xs q-mr-sm"
                           :title="t('common.add')"
                           @click="addGroupByColumn()"
-                          style="min-width: auto"
-                        />
+                        >
+                          <template #icon-left>
+                            <Plus class="tw:size-3.5 tw:shrink-0" />
+                          </template>
+                        </OButton>
                       </div>
                     </div>
                     <div
@@ -1079,19 +1069,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-splitter>
           </template>
           <template #separator>
-            <q-btn
+            <OButton
               data-test="logs-search-field-list-collapse-btn"
-              :icon="collapseFields ? 'chevron_right' : 'chevron_left'"
+              variant="ghost"
+              size="icon-xs-sq"
               :title="
                 collapseFields
                   ? t('search.collapseFields')
                   : t('search.openFields')
               "
-              dense
-              size="20px"
-              round
               class="q-mr-xs field-list-collapse-btn"
-              color="primary"
               style="
                 left: 10px;
                 position: absolute;
@@ -1100,7 +1087,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 z-index: 100 !important;
               "
               @click="collapseFieldList"
-            ></q-btn>
+            >
+              <template #icon-left>
+                <ChevronRight v-if="collapseFields" class="tw:size-3.5 tw:shrink-0" />
+                <ChevronLeft v-else class="tw:size-3.5 tw:shrink-0" />
+              </template>
+            </OButton>
           </template>
           <template #after>
             <div class="full-width tw:flex tw:flex-col" style="height: 100%">
@@ -1184,7 +1176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" color="primary"
+size="md" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -1199,7 +1192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <q-icon name="info" color="primary"
+size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -1220,42 +1214,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="scheduled-pipeline-footer tw:sticky tw:bottom-0 tw:px-4 tw:py-3 tw:z-10"
                 :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
               >
-                <div class="flex justify-end">
-                  <q-btn
+                <div class="flex justify-end tw:gap-2">
+                  <OButton
                     v-if="pipelineObj.isEditNode"
                     data-test="stream-routing-query-delete-btn"
-                    class="o2-secondary-button tw:h-[36px]"
-                    flat
-                    no-caps
+                    variant="outline-destructive"
+                    size="sm-action"
                     @mousedown.prevent
                     @click="$emit('delete:node')"
                   >
-                    <q-icon name="delete" class="q-mr-xs" />
+                    <template #icon-left>
+                      <Trash2 class="tw:size-4 tw:shrink-0" />
+                    </template>
                     {{ t("pipeline.deleteNode") }}
-                  </q-btn>
+                  </OButton>
 
-                  <q-btn
+                  <OButton
                     data-test="stream-routing-query-cancel-btn"
-                    class="o2-secondary-button tw:h-[36px] q-ml-md"
-                    :label="t('alerts.cancel')"
-                    flat
-                    no-caps
+                    variant="outline"
+                    size="sm-action"
                     @mousedown.prevent
                     @click="$emit('cancel:form')"
-                  />
-                  <q-btn
+                  >
+                    {{ t('alerts.cancel') }}
+                  </OButton>
+                  <OButton
                     data-test="stream-routing-query-save-btn"
-                    :label="
+                    variant="primary"
+                    size="sm-action"
+                    :disabled="validatingSqlQuery"
+                    @mousedown.prevent
+                    @click.prevent="$emit('submit:form')"
+                  >
+                    {{
                       validatingSqlQuery
                         ? t('pipeline.validating')
                         : t('pipeline.validateAndClose')
-                    "
-                    class="no-border q-ml-md o2-primary-button tw:h-[36px]"
-                    no-caps
-                    @mousedown.prevent
-                    @click.prevent="$emit('submit:form')"
-                    :disable="validatingSqlQuery"
-                  />
+                    }}
+                  </OButton>
                 </div>
               </div>
             </div>
@@ -1328,6 +1324,8 @@ import { split } from "postcss/lib/list";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { X, Maximize2, Minimize2, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-vue-next";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1336,6 +1334,7 @@ import useLogs from "@/composables/useLogs";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Code2, BarChart2 } from "lucide-vue-next";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1504,10 +1503,12 @@ const tabOptions = computed(() => [
   {
     label: t("alerts.sql"),
     value: "sql",
+    icon: Code2,
   },
   {
     label: t("alerts.promql"),
     value: "promql",
+    icon: BarChart2,
     disabled: selectedStreamType.value !== "metrics",
     tooltipLabel:
       selectedStreamType.value !== "metrics"
@@ -1553,14 +1554,13 @@ watch(
 );
 
 // Watch for stream name changes and auto-generate query
-// Fix for issue #9658: Auto-generate SELECT * query when stream changes
 watch(
   () => selectedStreamName.value,
   (newStreamName, oldStreamName) => {
     if (newStreamName && oldStreamName && oldStreamName !== newStreamName) {
-      // Stream changed: Generate new SELECT * query for the new stream
+      // Stream changed: Generate default query for the new stream
       if (tab.value === "sql") {
-        query.value = `SELECT * FROM "${newStreamName}"`;
+        query.value = `SELECT max(_timestamp) as _timestamp, count(_timestamp) as total_events\nFROM "${newStreamName}"\nGROUP BY histogram(_timestamp)`;
         updateQueryValue(query.value);
       } else if (tab.value === "promql") {
         query.value = `${newStreamName}{}`;
@@ -1569,7 +1569,7 @@ watch(
     } else if (!oldStreamName && newStreamName) {
       // Initial stream selection: Generate default query
       if (tab.value === "sql" && !query.value.trim()) {
-        query.value = `SELECT * FROM "${newStreamName}"`;
+        query.value = `SELECT max(_timestamp) as _timestamp, count(_timestamp) as total_events\nFROM "${newStreamName}"\nGROUP BY histogram(_timestamp)`;
         updateQueryValue(query.value);
       } else if (tab.value === "promql" && !query.value.trim()) {
         query.value = `${newStreamName}{}`;

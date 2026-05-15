@@ -61,7 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="addReportFormRef"
             @submit="onSubmit"
           >
-            <div class="tw:flex tw:items-start tw:gap-4 q-px-sm" style="padding-top: 12px">
+            <div
+              class="tw:flex tw:items-start tw:gap-4 q-px-sm"
+              style="padding-top: 12px"
+            >
               <div data-test="add-report-name-input" class="o2-input">
                 <q-input
                   v-model.trim="formData.name"
@@ -100,7 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="reports"
                   :style="'height: 34px;top:28px'"
                   :disableDropdown="isEditingReport"
-                  @folder-selected="(f: any) => selectedReportFolderId = f.value"
+                  @folder-selected="
+                    (f: any) => (selectedReportFolderId = f.value)
+                  "
                 />
               </div>
             </div>
@@ -349,6 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="[
                               { label: 'PDF (default)', value: 'pdf' },
                               { label: 'PNG (Image)', value: 'png' },
+                              { label: 'CSV (Data)', value: 'csv' },
                             ]"
                             emit-value
                             map-options
@@ -365,6 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Email Attachment Type -->
                         <div
+                          v-if="dashboard.report_type !== 'csv'"
                           class="col-auto o2-input"
                           data-test="add-report-attachment-type-select"
                         >
@@ -430,6 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Custom Dimensions (Advanced) -->
                       <div
+                        v-if="dashboard.report_type !== 'csv'"
                         class="q-mt-md"
                         data-test="add-report-custom-dimensions-section"
                       >
@@ -510,19 +518,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <q-stepper-navigation>
-                  <q-btn
+                  <OButton
                     data-test="add-report-step1-continue-btn"
+                    variant="primary"
+                    size="sm-action"
                     @click="step = 2"
-                    class="o2-primary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-primary-button-dark'
-                        : 'o2-primary-button-light'
-                    "
-                    flat
-                    no-caps
-                    :label="'Continue'"
-                  />
+                  >
+                    Continue
+                  </OButton>
                 </q-stepper-navigation>
               </q-step>
 
@@ -548,34 +551,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Frequency
                   </div>
-                  <div
-                    style="
-                      border: 1px solid #d7d7d7;
-                      width: fit-content;
-                      border-radius: 0.4rem;
-                    "
+                  <OToggleGroup
+                    :model-value="frequency.type"
+                    @update:model-value="frequency.type = $event as string"
+                    data-test="add-report-schedule-frequency-tabs"
                   >
-                    <template
+                    <OToggleGroupItem
                       v-for="visual in frequencyTabs"
                       :key="visual.value"
+                      :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
+                      :value="visual.value"
+                      size="sm"
                     >
-                      <q-btn
-                        :data-test="`add-report-schedule-frequency-${visual.value}-btn`"
-                        :color="
-                          visual.value === frequency.type ? 'primary' : ''
-                        "
-                        :flat="visual.value === frequency.type ? false : true"
-                        dense
-                        no-caps
-                        size="12px"
-                        class="q-px-lg visual-selection-btn"
-                        style="padding-top: 4px; padding-bottom: 4px"
-                        @click="frequency.type = visual.value"
-                      >
-                        {{ visual.label }}</q-btn
-                      >
-                    </template>
-                  </div>
+                      {{ visual.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
 
                   <template v-if="frequency.type === 'cron'">
                     <div class="flex items-center justify-start q-mt-md">
@@ -670,37 +660,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="q-mt-md tw:flex tw:justify-start tw:items-center"
                     >
-                      <div
-                        class="tw:flex tw:justify-center tw:align-center"
-                        style="
-                          border: 1px solid #d7d7d7;
-                          width: fit-content;
-                          border-radius: 0.4rem;
-                        "
+                      <OToggleGroup
+                        :model-value="selectedTimeTab"
+                        @update:model-value="selectedTimeTab = $event as string"
                       >
-                        <template
+                        <OToggleGroupItem
                           v-for="visual in timeTabs"
                           :key="visual.value"
+                          :data-test="`add-report-schedule-${visual.value}-btn`"
+                          :value="visual.value"
+                          size="sm"
                         >
-                          <q-btn
-                            :data-test="`add-report-schedule-${visual.value}-btn`"
-                            :color="
-                              visual.value === selectedTimeTab ? 'primary' : ''
-                            "
-                            :flat="
-                              visual.value === selectedTimeTab ? false : true
-                            "
-                            dense
-                            no-caps
-                            size="12px"
-                            class="q-px-md visual-selection-btn"
-                            style="padding-top: 4px; padding-bottom: 4px"
-                            @click="selectedTimeTab = visual.value"
-                          >
-                            {{ visual.label }}</q-btn
-                          >
-                        </template>
-                      </div>
+                          {{ visual.label }}
+                        </OToggleGroupItem>
+                      </OToggleGroup>
                       <q-icon
                         name="info_outline"
                         class="cursor-pointer q-ml-sm"
@@ -806,12 +779,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   mask="DD-MM-YYYY"
                                 >
                                   <div class="row items-center justify-end">
-                                    <q-btn
+                                    <OButton
                                       v-close-popup="true"
-                                      label="Close"
-                                      color="primary"
-                                      flat
-                                    />
+                                      variant="outline"
+                                      size="sm-action"
+                                    >
+                                      Close
+                                    </OButton>
                                   </div>
                                 </q-date>
                               </q-popup-proxy>
@@ -845,12 +819,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 <q-time v-model="scheduling.time">
                                   <div class="row items-center justify-end">
-                                    <q-btn
+                                    <OButton
                                       v-close-popup="true"
-                                      label="Close"
-                                      color="primary"
-                                      flat
-                                    />
+                                      variant="outline"
+                                      size="sm-action"
+                                    >
+                                      Close
+                                    </OButton>
                                   </div>
                                 </q-time>
                               </q-popup-proxy>
@@ -891,33 +866,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <q-stepper-navigation>
-                  <q-btn
+                  <OButton
                     data-test="add-report-step2-back-btn"
-                    flat
+                    variant="outline"
+                    size="sm-action"
+                    class="q-ml-sm"
                     @click="step = 1"
-                    class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    :label="'Back'"
-                    no-caps
-                  />
-                  <q-btn
+                  >
+                    Back
+                  </OButton>
+                  <OButton
                     v-if="!isCachedReport"
                     data-test="add-report-step2-continue-btn"
+                    variant="primary"
+                    size="sm-action"
+                    class="q-ml-sm"
                     @click="step = 3"
-                    class="o2-primary-button tw:h-[36px] q-ml-md"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-primary-button-dark'
-                        : 'o2-primary-button-light'
-                    "
-                    flat
-                    no-caps
-                    :label="'Continue'"
-                  />
+                  >
+                    Continue
+                  </OButton>
                 </q-stepper-navigation>
               </q-step>
 
@@ -1017,19 +984,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <q-stepper-navigation>
-                  <q-btn
+                  <OButton
                     data-test="add-report-step3-back-btn"
-                    flat
+                    variant="outline"
+                    size="sm-action"
+                    class="q-ml-sm"
                     @click="step = 2"
-                    class="o2-secondary-button tw:h-[36px] q-ml-sm"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    :label="'Back'"
-                    no-caps
-                  />
+                  >
+                    Back
+                  </OButton>
                 </q-stepper-navigation>
               </q-step>
             </q-stepper>
@@ -1048,23 +1011,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'rgb(240 240 240) 0px -4px 7px 0px',
       }"
     >
-      <q-btn
+      <OButton
         data-test="add-report-cancel-btn"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
+        variant="outline"
+        size="sm-action"
+        class="q-mr-sm"
         @click="openCancelDialog"
-      />
-      <q-btn
+      >
+        {{ t("alerts.cancel") }}
+      </OButton>
+      <OButton
         data-test="add-report-save-btn"
-        class="o2-primary-button no-border tw:h-[36px]"
-        :label="t('alerts.save')"
+        variant="primary"
+        size="sm-action"
         type="submit"
-        no-caps
-        flat
         @click="saveReport"
-      />
+      >
+        {{ t("alerts.save") }}
+      </OButton>
     </div>
   </div>
   <ConfirmDialog
@@ -1104,6 +1068,9 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
 const props = defineProps({
@@ -1126,7 +1093,7 @@ const defaultReport = {
         from: 0,
         to: 0,
       },
-      report_type: "pdf" as "pdf" | "png",
+      report_type: "pdf" as "pdf" | "png" | "csv",
       email_attachment_type: "standard" as "standard" | "inline",
       attachment_dimensions: null as { width: number; height: number } | null,
     },
@@ -1337,7 +1304,9 @@ const setInitialReportData = async () => {
   }
 
   // Support both ?folder= (from ReportList) and ?folderId= (legacy links)
-  const reportFolderId = (queryParams.folder || queryParams.folderId) as string | undefined;
+  const reportFolderId = (queryParams.folder || queryParams.folderId) as
+    | string
+    | undefined;
   if (reportFolderId) {
     formData.value.dashboards[0].folder = reportFolderId;
     await onFolderSelection(reportFolderId);

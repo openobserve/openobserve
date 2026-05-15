@@ -236,3 +236,26 @@ pub fn get_scheduler_max_retries() -> (bool, i32) {
     let max_retries = config::get_config().limit.scheduler_max_retries;
     (max_retries > 0, max_retries.unsigned_abs() as i32)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_triggers_key_value() {
+        assert_eq!(TRIGGERS_KEY, "/triggers/");
+    }
+
+    #[test]
+    fn test_triggers_key_starts_with_slash() {
+        assert!(TRIGGERS_KEY.starts_with('/'));
+    }
+
+    #[test]
+    fn test_get_scheduler_max_retries_returns_tuple() {
+        let (has_max, _max) = get_scheduler_max_retries();
+        // when config is default (0), should return false and abs(0) = 0
+        let max_retries = config::get_config().limit.scheduler_max_retries;
+        assert_eq!(has_max, max_retries > 0);
+    }
+}

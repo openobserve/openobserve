@@ -33,6 +33,50 @@ use crate::errors::{Error, ErrorCodes};
 
 static CHANNELS: Lazy<RwAHashMap<String, Channel>> = Lazy::new(Default::default);
 
+#[cfg(test)]
+mod tests {
+    use opentelemetry::propagation::Injector;
+    use tonic::metadata::MetadataMap as TonicMap;
+
+    use super::MetadataMap;
+
+    #[test]
+    fn test_set_valid_key_and_value_inserts_into_map() {
+        let mut inner = TonicMap::new();
+        let mut map = MetadataMap(&mut inner);
+        map.set("x-trace-id", "abc123".to_string());
+        assert!(inner.contains_key("x-trace-id"));
+    }
+
+    #[test]
+    fn test_set_invalid_key_does_nothing() {
+        let mut inner = TonicMap::new();
+        let original_len = inner.len();
+        let mut map = MetadataMap(&mut inner);
+        // Keys with spaces are invalid for gRPC metadata
+        map.set("invalid key with spaces", "some-value".to_string());
+        assert_eq!(inner.len(), original_len);
+    }
+
+    #[test]
+    fn test_set_multiple_keys() {
+        let mut inner = TonicMap::new();
+        let mut map = MetadataMap(&mut inner);
+        map.set("traceparent", "00-abc-def-01".to_string());
+        map.set("tracestate", "vendor=trace".to_string());
+        assert!(inner.contains_key("traceparent"));
+        assert!(inner.contains_key("tracestate"));
+    }
+
+    #[test]
+    fn test_set_empty_value_inserts_key() {
+        let mut inner = TonicMap::new();
+        let mut map = MetadataMap(&mut inner);
+        map.set("x-empty", String::new());
+        assert!(inner.contains_key("x-empty"));
+    }
+}
+
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl opentelemetry::propagation::Injector for MetadataMap<'_> {

@@ -33,21 +33,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:mb-6">
-      <q-tabs
+      <OTabs
         v-model="activeCategory"
         dense
-        inline-label
         class="text-grey-7"
-        active-color="primary"
-        indicator-color="primary"
         data-test="aws-integration-category-tabs"
       >
-        <q-tab name="all" label="All Services" />
-        <q-tab name="logs" label="Logs" />
-        <q-tab name="metrics" label="Metrics" />
-        <q-tab name="security" label="Security" />
-        <q-tab name="networking" label="Networking" />
-      </q-tabs>
+        <OTab name="all" label="All Services" />
+        <OTab name="logs" label="Logs" />
+        <OTab name="metrics" label="Metrics" />
+        <OTab name="security" label="Security" />
+        <OTab name="networking" label="Networking" />
+      </OTabs>
     </div>
 
     <div
@@ -71,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { awsIntegrations } from "@/utils/awsIntegrations";
@@ -79,6 +78,7 @@ import AWSIntegrationTile from "./AWSIntegrationTile.vue";
 export default defineComponent({
   name: "AWSIntegrationGrid",
   components: {
+    OTabs, OTab,
     AWSIntegrationTile,
   },
   props: {

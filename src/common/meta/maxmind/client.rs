@@ -44,3 +44,22 @@ impl MaxmindClient {
         Ok(MaxmindClient::new_with_reader(city_reader))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_with_path_nonexistent_returns_error() {
+        let result = MaxmindClient::new_with_path("/nonexistent/path/city.mmdb");
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert!(err.to_string().contains("Failed to find city-database"));
+    }
+
+    #[test]
+    fn test_new_with_path_empty_path_returns_error() {
+        let result = MaxmindClient::new_with_path("");
+        assert!(result.is_err());
+    }
+}

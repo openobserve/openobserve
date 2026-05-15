@@ -44,26 +44,32 @@
         </q-card>
 
         <div class="q-mt-md row q-gutter-sm">
-          <q-btn
-            color="primary"
-            label="Copy Query"
-            icon="content_copy"
+          <OButton
+            variant="primary"
+            size="sm-action"
             @click="copyQuery"
-            :disable="!generatedQuery"
-          />
-          <q-btn
-            color="secondary"
-            label="Clear All"
-            icon="clear"
+            :disabled="!generatedQuery"
+          >
+            <q-icon name="content_copy" size="14px" class="q-mr-xs" />
+            Copy Query
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="clearQuery"
-          />
-          <q-btn
-            color="positive"
-            label="Test Query"
-            icon="play_arrow"
+          >
+            <q-icon name="clear" size="14px" class="q-mr-xs" />
+            Clear All
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="testQuery"
-            :disable="!generatedQuery"
-          />
+            :disabled="!generatedQuery"
+          >
+            <q-icon name="play_arrow" size="14px" class="q-mr-xs" />
+            Test Query
+          </OButton>
         </div>
       </q-card-section>
 
@@ -88,6 +94,7 @@ import { promQueryModeller } from "@/components/promql/operations/queryModeller"
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const $q = useQuasar();
 

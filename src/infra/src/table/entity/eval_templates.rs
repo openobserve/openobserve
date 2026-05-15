@@ -38,3 +38,30 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "tmpl-1".to_string(),
+            org_id: "org".to_string(),
+            response_type: "json".to_string(),
+            name: "test_template".to_string(),
+            description: None,
+            content: "template content".to_string(),
+            dimensions: serde_json::json!([]),
+            version: 1,
+            is_active: true,
+            created_by: Some("user1".to_string()),
+            created_at: 1000,
+            updated_by: None,
+            updated_at: 2000,
+        };
+        assert_eq!(m.org_id, "org");
+        assert_eq!(m.version, 1);
+        assert!(m.is_active);
+    }
+}

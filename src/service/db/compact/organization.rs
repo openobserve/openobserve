@@ -58,3 +58,37 @@ pub async fn set_offset(
     };
     Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mk_key_basic() {
+        assert_eq!(
+            mk_key("default", "files"),
+            "/compact/organization/default/files"
+        );
+    }
+
+    #[test]
+    fn test_mk_key_different_module() {
+        assert_eq!(
+            mk_key("my_org", "retention"),
+            "/compact/organization/my_org/retention"
+        );
+    }
+
+    #[test]
+    fn test_mk_key_empty_strings() {
+        assert_eq!(mk_key("", ""), "/compact/organization//");
+    }
+
+    #[test]
+    fn test_mk_key_special_chars() {
+        assert_eq!(
+            mk_key("org-123", "file_list"),
+            "/compact/organization/org-123/file_list"
+        );
+    }
+}

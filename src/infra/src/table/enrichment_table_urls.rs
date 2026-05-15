@@ -415,4 +415,73 @@ mod tests {
         // The test validates the function signature
         assert!(result.is_ok() || result.is_err());
     }
+
+    fn make_model() -> Model {
+        Model {
+            id: "id-abc".to_string(),
+            org: "myorg".to_string(),
+            name: "my-table".to_string(),
+            url: "https://example.com/data.csv".to_string(),
+            status: 0,
+            error_message: None,
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+            total_bytes_fetched: 512,
+            total_records_processed: 100,
+            retry_count: 2,
+            append_data: true,
+            last_byte_position: 512,
+            supports_range: true,
+            is_local_region: false,
+        }
+    }
+
+    #[test]
+    fn test_from_model_maps_scalar_fields() {
+        let model = make_model();
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert_eq!(record.id, "id-abc");
+        assert_eq!(record.org, "myorg");
+        assert_eq!(record.name, "my-table");
+        assert_eq!(record.url, "https://example.com/data.csv");
+        assert_eq!(record.status, 0);
+        assert_eq!(record.created_at, 1_000_000);
+        assert_eq!(record.updated_at, 2_000_000);
+        assert_eq!(record.total_bytes_fetched, 512);
+        assert_eq!(record.total_records_processed, 100);
+        assert_eq!(record.retry_count, 2);
+        assert_eq!(record.last_byte_position, 512);
+    }
+
+    #[test]
+    fn test_from_model_maps_bool_fields() {
+        let model = make_model();
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert!(record.append_data);
+        assert!(record.supports_range);
+        assert!(!record.is_local_region);
+    }
+
+    #[test]
+    fn test_from_model_no_error_message() {
+        let model = make_model();
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert!(record.error_message.is_none());
+    }
+
+    #[test]
+    fn test_from_model_with_error_message() {
+        let mut model = make_model();
+        model.error_message = Some("connection refused".to_string());
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert_eq!(record.error_message, Some("connection refused".to_string()));
+    }
+
+    #[test]
+    fn test_from_model_is_local_region_true() {
+        let mut model = make_model();
+        model.is_local_region = true;
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert!(record.is_local_region);
+    }
 }

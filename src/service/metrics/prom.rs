@@ -1194,3 +1194,92 @@ async fn prom_ha_handler(
 
     _accept_record
 }
+
+#[cfg(test)]
+mod tests {
+    use promql_parser::{
+        label::{MatchOp, Matcher, Matchers},
+        parser::VectorSelector,
+    };
+
+    use super::*;
+
+    fn selector_with_name(name: &str) -> VectorSelector {
+        VectorSelector {
+            name: Some(name.to_string()),
+            matchers: Matchers {
+                matchers: vec![],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        }
+    }
+
+    fn selector_with_name_label(name: &str) -> VectorSelector {
+        VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![Matcher {
+                    name: "__name__".to_string(),
+                    op: MatchOp::Equal,
+                    value: name.to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        }
+    }
+
+    #[test]
+    fn test_try_into_metric_name_from_name_field() {
+        let sel = selector_with_name("my_metric");
+        assert_eq!(try_into_metric_name(&sel), Some("my_metric".to_string()));
+    }
+
+    #[test]
+    fn test_try_into_metric_name_from_name_label_matcher() {
+        let sel = selector_with_name_label("metric_via_label");
+        assert_eq!(
+            try_into_metric_name(&sel),
+            Some("metric_via_label".to_string())
+        );
+    }
+
+    #[test]
+    fn test_try_into_metric_name_none_when_no_name_or_name_label() {
+        let sel = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![Matcher {
+                    name: "job".to_string(),
+                    op: MatchOp::Equal,
+                    value: "myservice".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+        assert_eq!(try_into_metric_name(&sel), None);
+    }
+
+    #[test]
+    fn test_try_into_metric_name_name_field_takes_precedence() {
+        let sel = VectorSelector {
+            name: Some("direct_name".to_string()),
+            matchers: Matchers {
+                matchers: vec![Matcher {
+                    name: "__name__".to_string(),
+                    op: MatchOp::Equal,
+                    value: "label_name".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+        assert_eq!(try_into_metric_name(&sel), Some("direct_name".to_string()));
+    }
+}

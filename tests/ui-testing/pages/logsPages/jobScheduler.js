@@ -188,27 +188,42 @@ async exploreJob(trace_id) {
 
 
 async viewJobDetails(trace_id) {
-      // Click the "Get Jobs" button
-      await this.page.getByRole('button', { name: 'Get Jobs' }).click();
-    // Build the selector for the expand button
     const expandButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-expand-btn"]`;
     const moreDetailsTabSelector = '[data-test="tab-more_details"]';
+    const getJobsBtn = this.page.getByRole('button', { name: 'Get Jobs' });
 
-    // Wait for the expand button to be visible and click it
-    try {
-        await this.page.waitForSelector(expandButtonSelector, { timeout: 10000 }); // Adjust timeout as necessary
-        await this.page.locator(expandButtonSelector).click();
-    } catch (error) {
-        testLogger.error(`Error: Unable to find or click expand button for trace ID ${trace_id}.`, error);
-        throw new Error(`Expand button for trace ID ${trace_id} not found or not clickable.`);
+    // Retry: newly created jobs may not appear immediately in the list.
+    // Poll by clicking "Get Jobs" and waiting for the row to appear.
+    const maxRetries = 5;
+    let expandBtnFound = false;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        await getJobsBtn.click();
+        try {
+            await this.page.locator(expandButtonSelector).waitFor({ state: 'visible', timeout: 5000 });
+            expandBtnFound = true;
+            break;
+        } catch {
+            testLogger.warn(`Expand button for trace ID ${trace_id} not found on attempt ${attempt + 1}/${maxRetries}, retrying...`);
+            await this.page.waitForTimeout(2000);
+        }
+    }
+    if (!expandBtnFound) {
+        throw new Error(`Expand button for trace ID ${trace_id} not found after ${maxRetries} attempts.`);
     }
 
-    // Wait for the More Details tab to be visible and click it
+    // Click the expand button to reveal the expanded row
+    await this.page.locator(expandButtonSelector).click();
+
+    // Wait for and click the visible More Details tab.
+    // Multiple [data-test="tab-more_details"] exist in DOM (one per row via v-show),
+    // so we use :visible pseudo-class to avoid Playwright strict-mode violations.
     try {
-        await this.page.getByRole('cell', { name: 'Query / Function More Details' }).locator(moreDetailsTabSelector).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.getByRole('cell', { name: 'Query / Function More Details' }).locator(moreDetailsTabSelector).click();
+        const visibleTab = this.page.locator(`${moreDetailsTabSelector}:visible`);
+        await visibleTab.waitFor({ state: 'visible', timeout: 15000 });
+        await visibleTab.click();
     } catch (error) {
-        testLogger.error(`Error: Unable to find or click More Details tab for trace ID ${trace_id}.`, error);
+        const underlyingMsg = error instanceof Error ? error.message : String(error);
+        testLogger.error(`Error: Unable to find or click More Details tab for trace ID ${trace_id}: ${underlyingMsg}`);
         throw new Error(`More Details tab for trace ID ${trace_id} not found or not clickable.`);
     }
 

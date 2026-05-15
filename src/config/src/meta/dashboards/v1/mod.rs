@@ -530,4 +530,142 @@ mod tests {
             }
         "##]].assert_debug_eq(&dashboard);
     }
+
+    #[test]
+    fn test_aggregation_func_serde() {
+        let s = serde_json::to_string(&AggregationFunc::Count).unwrap();
+        assert_eq!(s, "\"count\"");
+        let s2 = serde_json::to_string(&AggregationFunc::CountDistinct).unwrap();
+        assert_eq!(s2, "\"count-distinct\"");
+        let back: AggregationFunc = serde_json::from_str(&s2).unwrap();
+        assert_eq!(back, AggregationFunc::CountDistinct);
+        let sum = serde_json::to_string(&AggregationFunc::Sum).unwrap();
+        assert_eq!(sum, "\"sum\"");
+    }
+
+    #[test]
+    fn test_aggregation_func_remaining_variants() {
+        let cases = [
+            (AggregationFunc::Histogram, "\"histogram\""),
+            (AggregationFunc::Min, "\"min\""),
+            (AggregationFunc::Max, "\"max\""),
+            (AggregationFunc::Avg, "\"avg\""),
+            (AggregationFunc::Median, "\"median\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: AggregationFunc = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_axis_item_skip_serializing_if_aggregation_function_none() {
+        let item = AxisItem {
+            label: "lbl".to_string(),
+            alias: "a".to_string(),
+            column: "col".to_string(),
+            color: None,
+            aggregation_function: None,
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("aggregation_function"));
+        assert!(!json.contains("aggregationFunction"));
+    }
+
+    #[test]
+    fn test_axis_item_with_aggregation_function_some() {
+        let item = AxisItem {
+            label: "lbl".to_string(),
+            alias: "a".to_string(),
+            column: "col".to_string(),
+            color: Some("#ff0000".to_string()),
+            aggregation_function: Some(AggregationFunc::Sum),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"sum\""));
+        let back: AxisItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.aggregation_function, Some(AggregationFunc::Sum));
+        assert_eq!(back.color, Some("#ff0000".to_string()));
+    }
+
+    #[test]
+    fn test_layout_is_static_rename() {
+        let layout = Layout {
+            x: 1,
+            y: 2,
+            w: 3,
+            h: 4,
+            i: 5,
+            panel_id: "p1".to_string(),
+            is_static: true,
+        };
+        let json = serde_json::to_string(&layout).unwrap();
+        assert!(json.contains("\"static\":true"));
+        let back: Layout = serde_json::from_str(&json).unwrap();
+        assert!(back.is_static);
+        assert_eq!(back.x, 1);
+    }
+
+    #[test]
+    fn test_variables_default_has_empty_list() {
+        let vars = Variables::default();
+        assert!(vars.list.is_empty());
+    }
+
+    #[test]
+    fn test_variable_list_optional_fields_default_none() {
+        let vl = VariableList {
+            type_field: "custom".to_string(),
+            name: "myvar".to_string(),
+            label: "My Var".to_string(),
+            query_data: None,
+            value: None,
+            options: None,
+        };
+        let json = serde_json::to_string(&vl).unwrap();
+        let back: VariableList = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.type_field, "custom");
+        assert!(back.query_data.is_none());
+        assert!(back.value.is_none());
+        assert!(back.options.is_none());
+    }
+
+    #[test]
+    fn test_panel_config_unit_none_absent() {
+        let cfg = PanelConfig {
+            title: "t".to_string(),
+            description: "d".to_string(),
+            show_legends: false,
+            legends_position: None,
+            promql_legend: None,
+            unit: None,
+            unit_custom: None,
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(!json.contains("unit"));
+    }
+
+    #[test]
+    fn test_panel_config_unit_some_present() {
+        let cfg = PanelConfig {
+            title: "t".to_string(),
+            description: "d".to_string(),
+            show_legends: false,
+            legends_position: None,
+            promql_legend: None,
+            unit: Some("bytes".to_string()),
+            unit_custom: Some("mb".to_string()),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("unit"));
+        assert!(json.contains("unit_custom"));
+    }
+
+    #[test]
+    fn test_datetime_now_has_zero_offset() {
+        let dt = datetime_now();
+        assert_eq!(dt.offset().local_minus_utc(), 0);
+    }
 }

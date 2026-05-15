@@ -123,7 +123,11 @@
     "version": "[バージョン]",
     "create": "作成",
     "resources": "リソース",
-    "updated_at": "更新日"
+    "updated_at": "更新日",
+    "error": "[エラー]",
+    "db": "[データベース]",
+    "discardChanges": "変更を破棄",
+    "unsavedChanges": "未保存の変更"
   },
   "search": {
     "metrics": "メトリクス",
@@ -390,7 +394,9 @@
     "autoRunEnabled": "自動実行有効",
     "selectStreamFirst": "最初にストリームを選択してください",
     "traces": "トレース",
-    "switchToLogs": "クリックしてログに戻る"
+    "switchToLogs": "クリックしてログに戻る",
+    "patternNoValuesAvailable": "使用可能な値はありません",
+    "selectLogStream": "ログストリームを選択"
   },
   "menu": {
     "home": "ホーム",
@@ -1142,7 +1148,8 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Pub/Subログ",
-    "oracle": "オラクル"
+    "oracle": "オラクル",
+    "aiLabel": "AI インテグレーション"
   },
   "dashboard": {
     "selectField": "フィールド",
@@ -2253,6 +2260,8 @@
     "editJson": "アラート JSON の編集",
     "additional_settings": "その他の設定",
     "alertNamePlaceholder": "アラート名",
+    "nameRequired": "アラート名は必須です。",
+    "nameNoSpecialChars": "アラート名に ':', '#', '?', '&', '%', 引用符、スペースは使用できません。代わりにアンダースコア (_) を使用してください。",
     "anomalyNamePlaceholder": "アノマリー名",
     "folder": "フォルダー",
     "selectStreamTypeFirst": "最初にストリームタイプを選択してください",
@@ -2299,7 +2308,8 @@
       "addNewDestination": "新しい目的地を追加",
       "destinationRequired": "少なくとも 1 つの目的地が必要です!",
       "disabledNotificationsInfo": "異常検出は引き続き実行され、結果が _anomalies ストリームに書き込まれます。異常が検出されたときにアラートを受け取るように通知を有効にします。"
-    }
+    },
+    "anomalyName": "アノマリー名"
   },
   "alert_templates": {
     "header": "テンプレート",
@@ -2901,7 +2911,52 @@
       "multiStepAgent": "マルチステップエージェント"
     },
     "noLogsAvailableForService": "このサービスで利用できるログはありません",
-    "spansTruncatedWarning": "{total} スパンのうち {count} を表示中 — トレースが不完全である可能性があります。時間範囲を狭めるか、管理者に連絡してスパン制限を増やしてください。"
+    "spansTruncatedWarning": "{total} スパンのうち {count} を表示中 — トレースが不完全である可能性があります。時間範囲を狭めるか、管理者に連絡してスパン制限を増やしてください。",
+    "servicesCatalog": {
+      "tabLabel": "サービスカタログ",
+      "title": "サービスカタログ",
+      "filterPlaceholder": "サービス名で絞り込み...",
+      "noServicesFound": "選択した時間範囲にサービスが見つかりません。",
+      "loading": "サービスを読み込んでいます...",
+      "columns": {
+        "serviceName": "サービス",
+        "status": "ステータス",
+        "requests": "リクエスト",
+        "errorRate": "エラー率",
+        "errors": "エラー",
+        "p50Latency": "50",
+        "p95Latency": "95",
+        "p99Latency": "99",
+        "avgLatency": "平均レイテンシー",
+        "lastSeen": "最後に見たもの",
+        "operations": "オペレーション"
+      },
+      "status": {
+        "healthy": "ヘルシー",
+        "warning": "警告",
+        "degraded": "劣化しました"
+      },
+      "viewTraces": "トレースを表示",
+      "exportCsv": "CSV をエクスポート",
+      "justNow": "たった今",
+      "minutesAgo": "{n} 分前",
+      "hoursAgo": "{n} 時間前",
+      "daysAgo": "{n} 日前"
+    },
+    "noErrorPresent": "このスパンにはエラーはありません",
+    "httpStatusCode": "HTTP ステータスコード",
+    "grpcStatusCode": "gRPC ステータスコード",
+    "dbResponseStatusCode": "DB レスポンスステータスコード",
+    "processExitCode": "プロセス終了コード",
+    "exceptionsWithCount": "例外 ({カウント})",
+    "typeLabel": "タイプ:",
+    "messageLabel": "メッセージ:",
+    "escapedLabel": "エスケープ:",
+    "stacktraceLabel": "スタックトレース:",
+    "copyStacktrace": "スタックトレースをコピー",
+    "noStacktraceAvailable": "スタックトレースはありません",
+    "stacktraceCopied": "スタックトレースをクリップボードにコピーしました",
+    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -3282,7 +3337,9 @@
     "noMetricsDescription": "選択した時間範囲では、この相関の指標は見つかりませんでした。",
     "errorRetrievingTraces": "トレースの取得中にエラーが発生しました。",
     "serviceGroupProtected": "サービスグループは削除できません。変更できるのはマップされたフィールドだけです。",
-    "noDataFound": "データが見つかりません"
+    "noDataFound": "データが見つかりません",
+    "isWorkloadType": "サービス識別子",
+    "isWorkloadTypeTooltip": "有効にすると、このグループがサービス (クラスター、名前空間、デプロイメントなど) を一意に識別するために使用されます。HTTP メソッドやデータベース名など、サービスを介した操作を記述するグループでは無効にします。"
   },
   "sreChat": {
     "emptyMessage": "アラートやインシデントについて何でも聞いてください",
@@ -3645,5 +3702,52 @@
     "clearAll": "すべてクリア",
     "clearAllTitle": "すべてのチャットをクリア",
     "clearAllMessage": "これにより、すべてのチャット履歴が完全に削除されます。このアクションは元に戻せません。"
+  },
+  "storage_settings": {
+    "tabLabel": "組織ストレージ",
+    "title": "組織ストレージ",
+    "notEnabled": "この組織では組織ストレージが有効になっていません",
+    "notConfigured": "この組織のデータ用のカスタムストレージプロバイダーを設定",
+    "configured": "設定済み",
+    "heroHeadline": "自分のストレージを持参して",
+    "heroSub": "独自のクラウドバケットを接続しても、データはインフラストラクチャに残り、完全に制御され、ロックインは発生しません。",
+    "configureStorage": "ストレージの設定",
+    "supportedProviders": "サポート対象プロバイダー",
+    "noStorageConfigured": "ストレージが設定されていません",
+    "routeDataDesc": "この組織のデータは、他の組織やグローバルデフォルトとは無関係に、専用のバケットにルーティングします。",
+    "perOrgIsolation": "組織ごとの分離",
+    "appliesImmediately": "新しいデータに直ちに適用",
+    "usesOrgCredentials": "組織を対象とした認証情報を使用する",
+    "updateStorage": "ストレージを更新",
+    "active": "アクティブ",
+    "bucketName": "バケット名",
+    "region": "領域",
+    "serverUrl": "サーバー URL",
+    "accessKey": "アクセスキー",
+    "secretKey": "シークレットキー",
+    "roleArn": "ロールアン",
+    "createdAt": "作成日",
+    "updatedAt": "更新日",
+    "featureOwnDataTitle": "データをエンドツーエンドで管理",
+    "featureOwnDataDesc": "取り込んだデータを自分のバケットに直接保存し、誰がアクセスできるかを完全に制御できます。",
+    "featureSecureTitle": "安全で規制に準拠",
+    "featureSecureDesc": "きめ細かなアクセスキーにより、機密データはインフラストラクチャに残ります。",
+    "goBack": "戻る",
+    "newStorageConfiguration": "新しいストレージ構成",
+    "selectProviderDesc": "この組織のデータを保存するクラウドストレージプロバイダーを選択してください。",
+    "bucketNameRequired": "バケット名が必要です",
+    "accessKeyRequired": "アクセスキーが必要です",
+    "secretKeyRequired": "シークレットキーが必要です",
+    "serverURLRequired": "サーバー URL が必要です",
+    "regionRequired": "地域が必要です",
+    "roleARNRequired": "ロール ARN が必要です",
+    "back": "戻る",
+    "continue": "続行",
+    "save": "[保存]",
+    "update": "[更新]",
+    "awsStsCloudInfo": "これは AWS sts を使用して役割を引き受け、操作を実行します。Openobserve AWS アカウントをこのロールの信頼できるエンティティタイプとして AWS コンソールに追加する必要があります。Openobserve チームに連絡して、アカウント情報を入手したり、アカウントの設定についてさらにサポートを受けたりしてください。",
+    "awsStsSelfHostedInfo": "これは AWS sts を使用して役割を引き受け、操作を実行します。インストール環境で、このロールにアクセスできる AWS 認証情報が設定されていることを確認してください。",
+    "externalIdRequired": "外部 ID が必要です",
+    "storageAccountRequired": "ストレージアカウント名が必要です"
   }
 }

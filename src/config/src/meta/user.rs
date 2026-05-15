@@ -427,4 +427,157 @@ mod tests {
             assert_eq!(UserRole::from_str("Admin").unwrap(), UserRole::Admin); // case sensitive
         }
     }
+
+    #[test]
+    fn test_user_role_is_service_account() {
+        assert!(UserRole::ServiceAccount.is_service_account());
+        assert!(UserRole::SreAgent.is_service_account());
+        assert!(!UserRole::Admin.is_service_account());
+        assert!(!UserRole::Viewer.is_service_account());
+        assert!(!UserRole::Root.is_service_account());
+    }
+
+    #[test]
+    fn test_user_role_get_label() {
+        assert_eq!(UserRole::Admin.get_label(), "Admin");
+        assert_eq!(UserRole::Root.get_label(), "Root");
+        assert_eq!(UserRole::Viewer.get_label(), "Viewer");
+        assert_eq!(UserRole::Editor.get_label(), "Editor");
+        assert_eq!(UserRole::User.get_label(), "User");
+        assert_eq!(UserRole::ServiceAccount.get_label(), "Service Account");
+        assert_eq!(UserRole::SreAgent.get_label(), "SRE Agent");
+    }
+
+    #[test]
+    fn test_user_role_is_valid_role() {
+        assert!(UserRole::is_valid_role("admin"));
+        assert!(UserRole::is_valid_role("root"));
+        assert!(UserRole::is_valid_role("viewer"));
+        assert!(UserRole::is_valid_role("editor"));
+        assert!(UserRole::is_valid_role("user"));
+        assert!(UserRole::is_valid_role("service_account"));
+        assert!(UserRole::is_valid_role("sre_agent"));
+        assert!(!UserRole::is_valid_role("Admin")); // case sensitive
+        assert!(!UserRole::is_valid_role("superadmin"));
+        assert!(!UserRole::is_valid_role(""));
+    }
+
+    #[test]
+    fn test_user_type_from_i16() {
+        assert_eq!(UserType::from(0_i16), UserType::Internal);
+        assert_eq!(UserType::from(1_i16), UserType::External);
+        assert_eq!(UserType::from(99_i16), UserType::Internal); // unknown → Internal
+    }
+
+    #[test]
+    fn test_user_type_into_i16() {
+        assert_eq!(i16::from(UserType::Internal), 0_i16);
+        assert_eq!(i16::from(UserType::External), 1_i16);
+    }
+
+    #[test]
+    fn test_user_type_is_external() {
+        assert!(!UserType::Internal.is_external());
+        assert!(UserType::External.is_external());
+    }
+
+    fn make_db_user() -> DBUser {
+        DBUser {
+            email: "alice@example.com".to_string(),
+            first_name: "Alice".to_string(),
+            last_name: "Smith".to_string(),
+            password: "hash".to_string(),
+            salt: "salt".to_string(),
+            organizations: vec![
+                UserOrg {
+                    name: "org1".to_string(),
+                    org_name: "Org One".to_string(),
+                    token: "tok1".to_string(),
+                    rum_token: None,
+                    role: UserRole::Admin,
+                },
+                UserOrg {
+                    name: "org2".to_string(),
+                    org_name: "Org Two".to_string(),
+                    token: "tok2".to_string(),
+                    rum_token: Some("rum2".to_string()),
+                    role: UserRole::Viewer,
+                },
+            ],
+            is_external: false,
+            password_ext: None,
+        }
+    }
+
+    #[test]
+    fn test_db_user_get_user_found() {
+        let db_user = make_db_user();
+        let user = db_user.get_user("org1".to_string()).unwrap();
+        assert_eq!(user.email, "alice@example.com");
+        assert_eq!(user.org, "org1");
+        assert!(matches!(user.role, UserRole::Admin));
+        assert_eq!(user.token, "tok1");
+    }
+
+    #[test]
+    fn test_db_user_get_user_not_found() {
+        let db_user = make_db_user();
+        assert!(db_user.get_user("org_none".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_db_user_get_user_empty_orgs() {
+        let mut db_user = make_db_user();
+        db_user.organizations.clear();
+        assert!(db_user.get_user("org1".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_db_user_get_all_users() {
+        let db_user = make_db_user();
+        let users = db_user.get_all_users();
+        assert_eq!(users.len(), 2);
+        assert!(users.iter().any(|u| u.org == "org1"));
+        assert!(users.iter().any(|u| u.org == "org2"));
+        // all share the same email
+        assert!(users.iter().all(|u| u.email == "alice@example.com"));
+    }
+
+    #[test]
+    fn test_db_user_get_all_users_empty() {
+        let mut db_user = make_db_user();
+        db_user.organizations.clear();
+        assert!(db_user.get_all_users().is_empty());
+    }
+
+    #[test]
+    fn test_user_role_sre_agent_display_and_from_str() {
+        // Display: SreAgent → "sre_agent"
+        assert_eq!(format!("{}", UserRole::SreAgent), "sre_agent");
+        // from_str: "sre_agent" → SreAgent
+        assert_eq!(UserRole::from_str("sre_agent").unwrap(), UserRole::SreAgent);
+    }
+
+    #[test]
+    fn test_user_role_from_i16_all_variants() {
+        assert_eq!(UserRole::from(0_i16), UserRole::Root);
+        assert_eq!(UserRole::from(1_i16), UserRole::Admin);
+        assert_eq!(UserRole::from(2_i16), UserRole::Editor);
+        assert_eq!(UserRole::from(3_i16), UserRole::Viewer);
+        assert_eq!(UserRole::from(4_i16), UserRole::User);
+        assert_eq!(UserRole::from(5_i16), UserRole::ServiceAccount);
+        assert_eq!(UserRole::from(6_i16), UserRole::SreAgent);
+        assert_eq!(UserRole::from(99_i16), UserRole::Admin); // unknown → Admin
+    }
+
+    #[test]
+    fn test_user_role_into_i16_all_variants() {
+        assert_eq!(i16::from(UserRole::Root), 0);
+        assert_eq!(i16::from(UserRole::Admin), 1);
+        assert_eq!(i16::from(UserRole::Editor), 2);
+        assert_eq!(i16::from(UserRole::Viewer), 3);
+        assert_eq!(i16::from(UserRole::User), 4);
+        assert_eq!(i16::from(UserRole::ServiceAccount), 5);
+        assert_eq!(i16::from(UserRole::SreAgent), 6);
+    }
 }

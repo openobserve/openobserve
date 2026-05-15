@@ -12,6 +12,7 @@ flamegraph.html
 /bin/
 /docs/
 /.claude/*
+/.agents/*
 
 # data
 /tmp/
@@ -63,3 +64,9 @@ tests/ui-testing/docs/test_generator/audit-reports/cloud-compatibility-audit-202
 tests/ui-testing/scripts/check-topology.js
 v0.70.0_release_gap_report.pdf
 tests/ui-testing/.env.old
+
+# Screenshots and test artifacts
+/test-results/
+/test-assist-results/
+/tests/ui-testing/test-output/
+**/debug-login-page.png

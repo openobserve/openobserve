@@ -81,3 +81,52 @@ impl TableProvider for NewUnionTable {
         Ok(vec![TableProviderFilterPushDown::Inexact; filters.len()])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use arrow_schema::{DataType, Field, Schema};
+    use datafusion::{
+        datasource::{TableProvider, TableType},
+        logical_expr::TableProviderFilterPushDown,
+        prelude::Expr,
+        scalar::ScalarValue,
+    };
+
+    use super::*;
+
+    fn test_schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![Field::new("val", DataType::Int64, false)]))
+    }
+
+    #[test]
+    fn test_schema_returns_correct_schema() {
+        let table = NewUnionTable::new(test_schema(), vec![]);
+        assert_eq!(table.schema().fields().len(), 1);
+        assert_eq!(table.schema().field(0).name(), "val");
+    }
+
+    #[test]
+    fn test_table_type_is_base() {
+        let table = NewUnionTable::new(test_schema(), vec![]);
+        assert_eq!(table.table_type(), TableType::Base);
+    }
+
+    #[test]
+    fn test_supports_filters_pushdown_empty() {
+        let table = NewUnionTable::new(test_schema(), vec![]);
+        let result = table.supports_filters_pushdown(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_supports_filters_pushdown_returns_inexact() {
+        let table = NewUnionTable::new(test_schema(), vec![]);
+        let dummy = Expr::Literal(ScalarValue::Boolean(Some(true)), None);
+        let filters = vec![&dummy];
+        let result = table.supports_filters_pushdown(&filters).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], TableProviderFilterPushDown::Inexact);
+    }
+}

@@ -37,7 +37,8 @@ const mockRouter = {
 };
 
 vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
+  useRoute: () => mockRouter.currentRoute.value,
 }));
 
 // Mock Quasar
@@ -120,7 +121,7 @@ describe("Custom Component", () => {
         "cloudwatchMetrics"
       ]);
       
-      expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP"]);
+      expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP", "ingestTracesFromOtel"]);
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
     });
   });
@@ -545,8 +546,8 @@ describe("Custom Component", () => {
         },
       });
       
-      // Should default to empty tabs or handle gracefully
-      expect(testWrapper.vm.tabs).toBe("");
+      // Unknown route defaults to 'ingestLogs' after the tab-persistence fix
+      expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
   });

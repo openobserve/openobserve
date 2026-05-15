@@ -36,24 +36,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-grey-7">
           Please start the registration process from AWS Marketplace.
         </p>
-        <q-btn
-          color="primary"
-          label="Go to Dashboard"
-          @click="goToDashboard"
+        <OButton
+          variant="primary"
+          size="sm-action"
           class="q-mt-lg"
-        />
+          @click="goToDashboard"
+        >Go to Dashboard</OButton>
       </div>
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
         <q-icon name="error" size="80px" color="negative" />
         <h5 class="q-mt-md">{{ errorMessage }}</h5>
-        <q-btn
-          color="primary"
-          label="Try Again"
-          @click="resetAndRetry"
+        <OButton
+          variant="primary"
+          size="sm-action"
           class="q-mt-lg"
-        />
+          @click="resetAndRetry"
+        >Try Again</OButton>
       </div>
 
       <!-- Org Selection/Creation -->
@@ -80,14 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mb-md"
                 :rules="[(val) => !!val || 'Organization name is required']"
               />
-              <q-btn
-                color="primary"
-                label="Create & Link"
+              <OButton
+                variant="primary"
+                size="sm-action"
+                block
                 @click="createNewOrgWithAws"
                 :loading="isProcessing"
-                :disable="!newOrgName"
-                class="full-width"
-              />
+                :disabled="!newOrgName"
+              >Create &amp; Link</OButton>
             </q-card-section>
           </q-card>
 
@@ -113,14 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dense
                 class="q-mb-md"
               />
-              <q-btn
-                color="primary"
-                label="Link AWS Billing"
+              <OButton
+                variant="primary"
+                size="sm-action"
+                block
                 @click="linkToExistingOrg"
                 :loading="isProcessing"
-                :disable="!selectedOrg"
-                class="full-width"
-              />
+                :disabled="!selectedOrg"
+              >Link AWS Billing</OButton>
             </q-card-section>
           </q-card>
         </div>
@@ -151,13 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-grey-7">
           Your AWS Marketplace subscription is now active.
         </p>
-        <q-btn
-          color="primary"
-          label="Go to Dashboard"
-          @click="goToDashboard"
+        <OButton
+          variant="primary"
+          size="sm-action"
           class="q-mt-lg"
-          size="lg"
-        />
+          @click="goToDashboard"
+        >Go to Dashboard</OButton>
       </div>
 
       <!-- Payment Failed State -->
@@ -168,12 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           There was an issue with your AWS Marketplace payment. Please check
           your AWS account or contact AWS support.
         </p>
-        <q-btn
-          color="primary"
-          label="Contact Support"
+        <OButton
+          as="a"
           href="mailto:support@openobserve.ai"
+          variant="primary"
+          size="sm-action"
           class="q-mt-lg"
-        />
+        >Contact Support</OButton>
       </div>
     </div>
   </div>
@@ -187,6 +187,7 @@ import { useQuasar } from "quasar";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 type SetupState =
   | "select_org"
@@ -199,6 +200,7 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
+  components: { OButton },
   setup() {
     const store = useStore();
     const router = useRouter();

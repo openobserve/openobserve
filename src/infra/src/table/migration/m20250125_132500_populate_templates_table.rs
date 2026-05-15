@@ -193,3 +193,49 @@ fn ksuid_from_hash(template: &meta_templates::Template, org_id: &str) -> svix_ks
     let hash = hasher.finalize();
     svix_ksuid::Ksuid::from_bytes(hash.into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_template(name: &str) -> meta_templates::Template {
+        meta_templates::Template {
+            name: name.to_string(),
+            body: String::new(),
+            is_default: None,
+            template_type: meta_templates::DestinationType::Http,
+            title: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_ksuid_from_hash_is_deterministic() {
+        let t = make_template("my-template");
+        let k1 = ksuid_from_hash(&t, "org1");
+        let k2 = ksuid_from_hash(&t, "org1");
+        assert_eq!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_ksuid_from_hash_different_orgs_differ() {
+        let t = make_template("my-template");
+        let k1 = ksuid_from_hash(&t, "org-a");
+        let k2 = ksuid_from_hash(&t, "org-b");
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_ksuid_from_hash_different_names_differ() {
+        let t1 = make_template("template-alpha");
+        let t2 = make_template("template-beta");
+        let k1 = ksuid_from_hash(&t1, "org1");
+        let k2 = ksuid_from_hash(&t2, "org1");
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_destination_type_default_is_http() {
+        let dt = meta_templates::DestinationType::default();
+        assert_eq!(dt, meta_templates::DestinationType::Http);
+    }
+}

@@ -189,4 +189,168 @@ mod tests {
         assert!(items.contains(&("city".to_string(), "NYC".to_string())));
         assert!(items.contains(&("city".to_string(), "LA".to_string())));
     }
+
+    fn make_schemas() -> HashMap<TableReference, Arc<SchemaCache>> {
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("city", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+        schemas
+    }
+
+    #[test]
+    fn test_partition_visitor_value_on_left_side() {
+        // value = field (value on left) — should be swapped to field = value
+        let sql = "SELECT * FROM users WHERE 'john' = name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        let users_table = TableReference::from("users");
+        let items = visitor.equal_items.get(&users_table).unwrap();
+        assert!(items.contains(&("name".to_string(), "john".to_string())));
+    }
+
+    #[test]
+    fn test_partition_visitor_no_where_clause() {
+        let sql = "SELECT * FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert!(visitor.equal_items.is_empty());
+    }
+
+    #[test]
+    fn test_partition_visitor_column_not_in_schema_ignored() {
+        let sql = "SELECT * FROM users WHERE unknown_col = 'x'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // unknown_col not in schema → should not be added
+        let users_table = TableReference::from("users");
+        let items = visitor.equal_items.get(&users_table);
+        assert!(items.map_or(true, |v| v.is_empty()));
+    }
+
+    #[test]
+    fn test_partition_visitor_negated_in_list_ignored() {
+        // NOT IN should NOT be captured
+        let sql = "SELECT * FROM users WHERE city NOT IN ('NYC', 'LA')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // NOT IN → negated=true branch → not captured
+        assert!(visitor.equal_items.is_empty());
+    }
+
+    #[test]
+    fn test_partition_visitor_compound_identifier_eq() {
+        // table.field = 'value' → CompoundIdentifier branch on the left side
+        let sql = "SELECT * FROM users WHERE users.name = 'alice'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        let users_table = TableReference::from("users");
+        let items = visitor.equal_items.get(&users_table).unwrap();
+        assert!(items.contains(&("name".to_string(), "alice".to_string())));
+    }
+
+    #[test]
+    fn test_partition_visitor_compound_identifier_eq_unknown_table_ignored() {
+        // unknown.field = 'value' → CompoundIdentifier, table not in schemas → ignored
+        let sql = "SELECT * FROM users WHERE other.name = 'alice'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // 'other' table not in schemas → nothing captured
+        assert!(visitor.equal_items.is_empty());
+    }
+
+    #[test]
+    fn test_partition_visitor_compound_identifier_in_list() {
+        // table.field IN (...) → CompoundIdentifier branch in InList
+        let sql = "SELECT * FROM users WHERE users.city IN ('NYC', 'LA')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        let users_table = TableReference::from("users");
+        let items = visitor.equal_items.get(&users_table).unwrap();
+        assert!(items.contains(&("city".to_string(), "NYC".to_string())));
+        assert!(items.contains(&("city".to_string(), "LA".to_string())));
+    }
+
+    #[test]
+    fn test_partition_visitor_ambiguous_field_in_multiple_tables_ignored() {
+        // field exists in 2 tables → count > 1 → ignored (no partition capture)
+        let sql = "SELECT * FROM users WHERE name = 'alice'";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut schemas = HashMap::new();
+        let schema1 = Schema::new(vec![Arc::new(Field::new("name", DataType::Utf8, false))]);
+        let schema2 = Schema::new(vec![Arc::new(Field::new("name", DataType::Utf8, false))]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema1)),
+        );
+        schemas.insert(
+            TableReference::from("accounts"),
+            Arc::new(SchemaCache::new(schema2)),
+        );
+
+        let mut visitor = PartitionColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // count == 2 (both tables have 'name') → not captured
+        assert!(visitor.equal_items.is_empty());
+    }
 }

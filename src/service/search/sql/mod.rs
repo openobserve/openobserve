@@ -417,3 +417,46 @@ fn parse_sampling_config(
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_re_only_select_matches_star() {
+        assert!(RE_ONLY_SELECT.is_match("select * from logs"));
+        assert!(RE_ONLY_SELECT.is_match("SELECT * FROM logs"));
+    }
+
+    #[test]
+    fn test_re_only_select_no_match_named_columns() {
+        assert!(!RE_ONLY_SELECT.is_match("select a, b from logs"));
+    }
+
+    #[test]
+    fn test_re_select_from_captures_columns() {
+        let sql = "SELECT a, b FROM logs";
+        assert!(RE_SELECT_FROM.is_match(sql));
+        if let Some(caps) = RE_SELECT_FROM.captures(sql) {
+            assert_eq!(caps.get(1).map(|m| m.as_str()), Some("a, b"));
+        }
+    }
+
+    #[test]
+    fn test_re_histogram_matches() {
+        assert!(RE_HISTOGRAM.is_match("histogram(_timestamp, '1 hour')"));
+        assert!(RE_HISTOGRAM.is_match("HISTOGRAM(ts,'5 minute')"));
+    }
+
+    #[test]
+    fn test_re_histogram_no_match() {
+        assert!(!RE_HISTOGRAM.is_match("count(_timestamp)"));
+    }
+
+    #[test]
+    fn test_parse_sampling_config_returns_none_in_oss() {
+        let query = SearchQuery::default();
+        let result = parse_sampling_config(&query, None, (0, 0), false);
+        assert!(result.is_none());
+    }
+}

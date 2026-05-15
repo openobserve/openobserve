@@ -960,3 +960,111 @@ async fn get_super_cluster_delete_status(
 
     Ok(response)
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::{StreamStats, StreamType};
+
+    use super::*;
+
+    fn make_stream(
+        name: &str,
+        doc_num: i64,
+        storage_size: f64,
+        compressed_size: f64,
+        index_size: f64,
+    ) -> meta::stream::Stream {
+        meta::stream::Stream {
+            name: name.to_string(),
+            storage_type: "s3".to_string(),
+            stream_type: StreamType::Logs,
+            stats: StreamStats {
+                doc_num,
+                storage_size,
+                compressed_size,
+                index_size,
+                ..Default::default()
+            },
+            schema: vec![],
+            uds_schema: vec![],
+            settings: Default::default(),
+            metrics_meta: None,
+            total_fields: 0,
+            pattern_associations: vec![],
+            is_derived: None,
+        }
+    }
+
+    #[test]
+    fn test_comparator_by_name_asc() {
+        let a = make_stream("alpha", 0, 0.0, 0.0, 0.0);
+        let b = make_stream("beta", 0, 0.0, 0.0, 0.0);
+        assert_eq!(stream_comparator(&a, &b, "name", true), Ordering::Less);
+        assert_eq!(stream_comparator(&b, &a, "name", true), Ordering::Greater);
+    }
+
+    #[test]
+    fn test_comparator_by_name_desc() {
+        let a = make_stream("alpha", 0, 0.0, 0.0, 0.0);
+        let b = make_stream("beta", 0, 0.0, 0.0, 0.0);
+        assert_eq!(stream_comparator(&a, &b, "name", false), Ordering::Greater);
+    }
+
+    #[test]
+    fn test_comparator_by_doc_num_asc() {
+        let a = make_stream("a", 100, 0.0, 0.0, 0.0);
+        let b = make_stream("b", 200, 0.0, 0.0, 0.0);
+        assert_eq!(stream_comparator(&a, &b, "doc_num", true), Ordering::Less);
+        assert_eq!(
+            stream_comparator(&b, &a, "doc_num", true),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn test_comparator_by_storage_size() {
+        let a = make_stream("a", 0, 1.0, 0.0, 0.0);
+        let b = make_stream("b", 0, 2.0, 0.0, 0.0);
+        assert_eq!(
+            stream_comparator(&a, &b, "storage_size", true),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_comparator_by_compressed_size() {
+        let a = make_stream("a", 0, 0.0, 5.0, 0.0);
+        let b = make_stream("b", 0, 0.0, 10.0, 0.0);
+        assert_eq!(
+            stream_comparator(&a, &b, "compressed_size", true),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_comparator_by_index_size() {
+        let a = make_stream("a", 0, 0.0, 0.0, 3.0);
+        let b = make_stream("b", 0, 0.0, 0.0, 7.0);
+        assert_eq!(
+            stream_comparator(&a, &b, "index_size", true),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_comparator_unknown_sort_falls_back_to_name() {
+        let a = make_stream("aardvark", 0, 0.0, 0.0, 0.0);
+        let b = make_stream("zebra", 0, 0.0, 0.0, 0.0);
+        assert_eq!(
+            stream_comparator(&a, &b, "unknown_field", true),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_comparator_equal_names() {
+        let a = make_stream("same", 0, 0.0, 0.0, 0.0);
+        let b = make_stream("same", 0, 0.0, 0.0, 0.0);
+        assert_eq!(stream_comparator(&a, &b, "name", true), Ordering::Equal);
+    }
+}

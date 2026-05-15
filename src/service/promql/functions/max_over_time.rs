@@ -62,6 +62,24 @@ mod tests {
     }
 
     #[test]
+    fn test_max_over_time_value_none_input() {
+        let result = max_over_time_test_helper(Value::None).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_max_over_time_invalid_input_returns_err() {
+        let result = max_over_time_test_helper(Value::Float(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_max_over_time_exec_empty_samples_returns_none() {
+        let func = MaxOverTimeFunc::new();
+        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
+    }
+
+    #[test]
     fn test_max_over_time_function() {
         // Create a range value with sample data
         let samples = vec![

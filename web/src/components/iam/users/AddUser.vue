@@ -257,26 +257,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex justify-start tw:mt-6">
-            <q-btn
-              v-close-popup
-              class="q-mr-md o2-secondary-button tw:h-[36px]"
-              :label="t('user.cancel')"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+          <div class="flex justify-start tw:mt-6 tw:gap-2">
+            <OButton
+              variant="outline"
+              size="sm-action"
               @click="$emit('cancel:hideform')"
               data-test="cancel-user-button"
-            />
-            <q-btn
-              class="o2-primary-button no-border tw:h-[36px]"
-              :label="t('user.save')"
+            >
+              {{ t('user.cancel') }}
+            </OButton>
+            <OButton
+              variant="primary"
+              size="sm-action"
               type="submit"
-              no-caps
-              flat
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
               data-test="save-user-button"
-            />
+            >
+              {{ t('user.save') }}
+            </OButton>
           </div>
         </q-form>
       </div>
@@ -293,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Ok" color="primary" @click="signout" />
+        <OButton variant="ghost-primary" @click="signout">Ok</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -301,6 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -332,6 +330,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
+  components: { OButton },
   props: {
     modelValue: {
       type: Object,

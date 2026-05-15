@@ -573,3 +573,76 @@ fn model_to_record(r: Model) -> ServiceRecord {
         last_seen: r.last_seen,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_json_object_sorts_keys() {
+        let val = serde_json::json!({"z": 1, "a": 2, "m": 3});
+        let normalized = normalize_json_object(val);
+        let keys: Vec<&str> = normalized
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(|s| s.as_str())
+            .collect();
+        assert_eq!(keys, vec!["a", "m", "z"]);
+    }
+
+    #[test]
+    fn test_normalize_json_object_non_object_passthrough() {
+        let val = serde_json::json!([1, 2, 3]);
+        let normalized = normalize_json_object(val.clone());
+        assert_eq!(normalized, val);
+    }
+
+    #[test]
+    fn test_normalize_json_object_null_passthrough() {
+        let val = serde_json::Value::Null;
+        let normalized = normalize_json_object(val);
+        assert_eq!(normalized, serde_json::Value::Null);
+    }
+
+    #[test]
+    fn test_union_stream_array_combines_without_duplicates() {
+        let existing = serde_json::json!(["a", "b"]);
+        let new = serde_json::json!(["b", "c"]);
+        let result = union_stream_array(&existing, &new);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 3);
+        let strs: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
+        assert!(strs.contains(&"a"));
+        assert!(strs.contains(&"b"));
+        assert!(strs.contains(&"c"));
+    }
+
+    #[test]
+    fn test_union_stream_array_empty_existing() {
+        let existing = serde_json::json!([]);
+        let new = serde_json::json!(["x", "y"]);
+        let result = union_stream_array(&existing, &new);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+    }
+
+    #[test]
+    fn test_union_stream_array_deduplicates_existing() {
+        let existing = serde_json::json!(["a", "a", "b"]);
+        let new = serde_json::json!([]);
+        let result = union_stream_array(&existing, &new);
+        let arr = result.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+    }
+
+    #[test]
+    fn test_service_record_new_sets_fields() {
+        let record = ServiceRecord::new("myorg", "mysvc", "setid1", serde_json::json!({"k": "v"}));
+        assert_eq!(record.org_id, "myorg");
+        assert_eq!(record.service_name, "mysvc");
+        assert_eq!(record.set_id, "setid1");
+        assert_eq!(record.last_seen, 0);
+        assert!(!record.id.is_empty());
+    }
+}

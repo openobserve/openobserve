@@ -82,6 +82,16 @@ export const createDashboardsContextProvider = (
         context.user_intent = 'view dashboard';
         context.dashboardName = currentDashboardData.data.title || '';
         context.tabId = route?.query?.tab || '';
+
+        // Look up tab name for better AI context
+        if (currentDashboardData.data.tabs && context.tabId) {
+          const activeTab = currentDashboardData.data.tabs.find(
+            (tab: any) => tab.tabId === context.tabId
+          );
+          if (activeTab?.name) {
+            context.tabName = activeTab.name;
+          }
+        }
       } else {
         // Fallback - likely viewing dashboard list or other dashboard operation
         context.user_intent = 'view dashboard';

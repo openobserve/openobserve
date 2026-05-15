@@ -220,4 +220,33 @@ mod tests {
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
+
+    #[test]
+    fn test_parse_json_request_valid_no_encoding() {
+        let json = create_valid_loki_json();
+        let result = parse_json_request(None, Bytes::from(json));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_json_request_valid_identity_encoding() {
+        let json = create_valid_loki_json();
+        let result = parse_json_request(Some("identity"), Bytes::from(json));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_json_request_unsupported_encoding_returns_error() {
+        let json = create_valid_loki_json();
+        let result = parse_json_request(Some("br"), Bytes::from(json));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, LokiError::UnsupportedContentEncoding { .. }));
+    }
+
+    #[test]
+    fn test_parse_json_request_invalid_json_returns_error() {
+        let result = parse_json_request(None, Bytes::from("not valid json"));
+        assert!(result.is_err());
+    }
 }

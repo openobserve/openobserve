@@ -115,8 +115,7 @@ describe('O2AIContextAddBtn', () => {
 
   it('has correct button attributes', () => {
     const button = wrapper.find('[data-test="o2-ai-context-add-btn"]');
-    expect(button.attributes('borderless')).toBe('true');
     expect(button.attributes('flat')).toBe(undefined);
-    expect(button.attributes('style')).toContain('border-radius: 100%');
+    expect(button.classes()).toContain('o2-ai-context-btn');
   });
 });

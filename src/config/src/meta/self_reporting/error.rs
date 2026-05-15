@@ -41,6 +41,7 @@ pub enum ErrorSource {
     SsoClaimParser(SsoClaimParserError),
     Search,
     Other,
+    OrgStorage(OrgStorageError),
 }
 
 impl Serialize for ErrorSource {
@@ -88,6 +89,11 @@ impl Serialize for ErrorSource {
                         &claims.truncate_utf8(PIPELINE_ERROR_MAX_SIZE),
                     )?;
                 }
+            }
+            ErrorSource::OrgStorage(ose) => {
+                state.serialize_field("error_source", "org_storage")?;
+                state.serialize_field("org_id", &ose.org_id)?;
+                state.serialize_field("error", &ose.error)?;
             }
         }
         state.end()
@@ -207,6 +213,12 @@ impl SsoClaimParserError {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrgStorageError {
+    pub org_id: String,
+    pub error: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,5 +262,201 @@ mod tests {
         };
         let val = json::to_string(&error_data);
         assert!(val.is_ok());
+    }
+
+    #[test]
+    fn test_error_source_alert_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Alert,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("alert"));
+    }
+
+    #[test]
+    fn test_error_source_dashboard_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Dashboard,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("dashboard"));
+    }
+
+    #[test]
+    fn test_error_source_ingestion_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Ingestion,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("ingestion"));
+    }
+
+    #[test]
+    fn test_error_source_search_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Search,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("search"));
+    }
+
+    #[test]
+    fn test_error_source_other_serialization() {
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Other,
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("other"));
+    }
+
+    #[test]
+    fn test_error_source_function_serialization() {
+        let fe = FunctionError::new("my_func".to_string(), "exec failed".to_string());
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Function(fe),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("function"));
+        assert!(val.contains("my_func"));
+    }
+
+    #[test]
+    fn test_pipeline_error_add_node_error() {
+        let mut pe = PipelineError::new("pid", "pname");
+        pe.add_node_error(
+            "node1".to_string(),
+            "function".to_string(),
+            "exec error".to_string(),
+            Some("fn1".to_string()),
+        );
+        pe.add_node_error(
+            "node1".to_string(),
+            "function".to_string(),
+            "another error".to_string(),
+            None,
+        );
+        assert_eq!(pe.node_errors.len(), 1);
+        let node = &pe.node_errors["node1"];
+        assert_eq!(node.error_count, 2);
+        assert_eq!(node.errors.len(), 2);
+    }
+
+    #[test]
+    fn test_sso_claim_parser_error_with_claims() {
+        let ce = SsoClaimParserError::new(
+            "fn".to_string(),
+            "parse_error".to_string(),
+            "bad input".to_string(),
+        )
+        .with_claims(r#"{"sub":"user1"}"#.to_string());
+        assert!(ce.claims_json.is_some());
+        assert!(ce.claims_json.unwrap().contains("user1"));
+    }
+
+    #[test]
+    fn test_sso_claim_parser_error_serialization_with_claims() {
+        let ce = SsoClaimParserError::new(
+            "my_fn".to_string(),
+            "exec_error".to_string(),
+            "vrl failed".to_string(),
+        )
+        .with_claims(r#"{"key":"val"}"#.to_string());
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::SsoClaimParser(ce),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("sso_claim_parser"));
+        assert!(val.contains("claims"));
+    }
+
+    #[test]
+    fn test_node_errors_new_and_add_error() {
+        let mut node = NodeErrors::new(
+            "n1".to_string(),
+            "transform".to_string(),
+            Some("fn_name".to_string()),
+        );
+        assert_eq!(node.error_count, 0);
+        node.add_error("err1".to_string());
+        node.add_error("err1".to_string()); // duplicate — deduped in HashSet
+        node.add_error("err2".to_string());
+        assert_eq!(node.error_count, 3);
+        assert_eq!(node.errors.len(), 2); // "err1" deduplicated
+    }
+
+    #[test]
+    fn test_pipeline_error_with_no_node_errors_serialization() {
+        let pe = PipelineError::new("pid2", "pname2");
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::Pipeline(pe),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(val.contains("pipeline"));
+        // node_errors empty → pipeline_node_errors NOT in output
+        assert!(!val.contains("pipeline_node_errors"));
+    }
+
+    #[test]
+    fn test_node_errors_function_name_none_absent_from_json() {
+        let node = NodeErrors::new("n1".to_string(), "transform".to_string(), None);
+        let json = serde_json::to_value(&node).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("function_name"));
+    }
+
+    #[test]
+    fn test_node_errors_function_name_some_present_in_json() {
+        let node = NodeErrors::new(
+            "n2".to_string(),
+            "function".to_string(),
+            Some("my_fn".to_string()),
+        );
+        let json = serde_json::to_value(&node).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("function_name"));
+        assert_eq!(obj["function_name"], serde_json::json!("my_fn"));
+    }
+
+    #[test]
+    fn test_pipeline_error_new_empty() {
+        let pe = PipelineError::new("p1", "Pipeline One");
+        assert_eq!(pe.pipeline_id, "p1");
+        assert_eq!(pe.pipeline_name, "Pipeline One");
+        assert!(pe.error.is_none());
+        assert!(pe.node_errors.is_empty());
+    }
+
+    #[test]
+    fn test_function_error_new() {
+        let fe = FunctionError::new("fn_name".to_string(), "some error".to_string());
+        assert_eq!(fe.function_name, "fn_name");
+        assert_eq!(fe.error, "some error");
+    }
+
+    #[test]
+    fn test_error_source_sso_no_claims_absent_from_serialization() {
+        let ce = SsoClaimParserError::new("fn".to_string(), "parse".to_string(), "bad".to_string());
+        let error_data = ErrorData {
+            _timestamp: 1,
+            stream_params: StreamParams::default(),
+            error_source: ErrorSource::SsoClaimParser(ce),
+        };
+        let val = json::to_string(&error_data).unwrap();
+        assert!(!val.contains("claims"));
     }
 }

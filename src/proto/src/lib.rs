@@ -33,3 +33,52 @@ impl cluster_rpc::KvItem {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kv_item_new_sets_key_and_value() {
+        let item = cluster_rpc::KvItem::new("my_key", "my_value");
+        assert_eq!(item.key, "my_key");
+        assert_eq!(item.value, "my_value");
+    }
+
+    #[test]
+    fn test_kv_item_new_empty_strings() {
+        let item = cluster_rpc::KvItem::new("", "");
+        assert_eq!(item.key, "");
+        assert_eq!(item.value, "");
+    }
+
+    #[test]
+    fn test_ingestion_data_from_empty_vec() {
+        let data = cluster_rpc::IngestionData::from(vec![]);
+        let decoded: Vec<serde_json::Value> = serde_json::from_slice(&data.data).unwrap();
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn test_ingestion_data_from_vec_roundtrips() {
+        let values = vec![
+            serde_json::json!({"level": "error", "count": 5}),
+            serde_json::json!({"level": "warn", "count": 10}),
+        ];
+        let data = cluster_rpc::IngestionData::from(values.clone());
+        let decoded: Vec<serde_json::Value> = serde_json::from_slice(&data.data).unwrap();
+        assert_eq!(decoded.len(), 2);
+        assert_eq!(decoded[0]["level"], "error");
+        assert_eq!(decoded[1]["count"], 10);
+    }
+
+    #[test]
+    fn test_ingestion_data_from_single_item() {
+        let values = vec![serde_json::json!({"key": "value"})];
+        let data = cluster_rpc::IngestionData::from(values);
+        assert!(!data.data.is_empty());
+        let decoded: Vec<serde_json::Value> = serde_json::from_slice(&data.data).unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0]["key"], "value");
+    }
+}

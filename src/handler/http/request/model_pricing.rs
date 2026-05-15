@@ -764,3 +764,279 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::model_pricing::{
+        ModelPricingDefinition, PricingSource, PricingTierDefinition,
+    };
+
+    use super::*;
+
+    // ── source_priority ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_source_priority_org_is_lowest() {
+        assert_eq!(source_priority(&PricingSource::Org), 0);
+    }
+
+    #[test]
+    fn test_source_priority_meta_org_is_middle() {
+        assert_eq!(source_priority(&PricingSource::MetaOrg), 1);
+    }
+
+    #[test]
+    fn test_source_priority_built_in_is_highest() {
+        assert_eq!(source_priority(&PricingSource::BuiltIn), 2);
+    }
+
+    // ── strip_leading_flags ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_strip_leading_flags_case_insensitive() {
+        assert_eq!(strip_leading_flags("(?i)claude-3"), "claude-3");
+    }
+
+    #[test]
+    fn test_strip_leading_flags_multiline_and_dotall() {
+        assert_eq!(strip_leading_flags("(?ms)test"), "test");
+    }
+
+    #[test]
+    fn test_strip_leading_flags_negate_flag() {
+        assert_eq!(strip_leading_flags("(?-i)test"), "test");
+    }
+
+    #[test]
+    fn test_strip_leading_flags_stacked_groups() {
+        assert_eq!(strip_leading_flags("(?i)(?m)pattern"), "pattern");
+    }
+
+    #[test]
+    fn test_strip_leading_flags_no_flags() {
+        assert_eq!(strip_leading_flags("gpt-4o"), "gpt-4o");
+    }
+
+    #[test]
+    fn test_strip_leading_flags_invalid_group_not_stripped() {
+        assert_eq!(strip_leading_flags("(?invalid)test"), "(?invalid)test");
+    }
+
+    #[test]
+    fn test_strip_leading_flags_empty_string() {
+        assert_eq!(strip_leading_flags(""), "");
+    }
+
+    // ── derive_test_string ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_derive_test_string_simple_pattern() {
+        assert_eq!(derive_test_string("(?i)claude-3-haiku"), "claude-3-haiku");
+    }
+
+    #[test]
+    fn test_derive_test_string_stops_at_optional_group() {
+        assert_eq!(
+            derive_test_string("(?i)gpt-4o(?:-\\d{4}[-\\d]*)?$"),
+            "gpt-4o"
+        );
+    }
+
+    #[test]
+    fn test_derive_test_string_stops_at_dollar() {
+        assert_eq!(
+            derive_test_string("(?i)claude-3-sonnet$"),
+            "claude-3-sonnet"
+        );
+    }
+
+    #[test]
+    fn test_derive_test_string_backslash_escape() {
+        assert_eq!(derive_test_string("(?i)gpt-3\\.5"), "gpt-3.5");
+    }
+
+    #[test]
+    fn test_derive_test_string_strips_caret_anchor() {
+        assert_eq!(derive_test_string("(?i)^model-name"), "model-name");
+    }
+
+    #[test]
+    fn test_derive_test_string_no_flags_plain_literal() {
+        assert_eq!(derive_test_string("my-model"), "my-model");
+    }
+
+    #[test]
+    fn test_derive_test_string_stops_at_dot_metachar() {
+        assert_eq!(derive_test_string("abc.def"), "abc");
+    }
+
+    #[test]
+    fn test_derive_test_string_stops_at_pipe() {
+        assert_eq!(derive_test_string("foo|bar"), "foo");
+    }
+
+    // ── validate_definition ───────────────────────────────────────────────────
+
+    fn default_tier() -> PricingTierDefinition {
+        PricingTierDefinition {
+            name: "default".to_string(),
+            condition: None,
+            prices: Default::default(),
+        }
+    }
+
+    fn valid_definition() -> ModelPricingDefinition {
+        ModelPricingDefinition {
+            name: "GPT-4o".to_string(),
+            match_pattern: "(?i)gpt-4o".to_string(),
+            tiers: vec![default_tier()],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_validate_definition_valid_passes() {
+        assert!(validate_definition(&valid_definition()).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_empty_name_fails() {
+        let mut def = valid_definition();
+        def.name = "   ".to_string();
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("Model name is required"));
+    }
+
+    #[test]
+    fn test_validate_definition_name_too_long_fails() {
+        let mut def = valid_definition();
+        def.name = "a".repeat(257);
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("256 characters or fewer"));
+    }
+
+    #[test]
+    fn test_validate_definition_name_exactly_256_passes() {
+        let mut def = valid_definition();
+        def.name = "a".repeat(256);
+        assert!(validate_definition(&def).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_empty_match_pattern_fails() {
+        let mut def = valid_definition();
+        def.match_pattern = "   ".to_string();
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("Match pattern is required"));
+    }
+
+    #[test]
+    fn test_validate_definition_match_pattern_too_long_fails() {
+        let mut def = valid_definition();
+        def.match_pattern = "a".repeat(513);
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("512 characters or fewer"));
+    }
+
+    #[test]
+    fn test_validate_definition_invalid_regex_fails() {
+        let mut def = valid_definition();
+        def.match_pattern = "[unclosed".to_string();
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("Invalid regex pattern"));
+    }
+
+    #[test]
+    fn test_validate_definition_empty_tiers_fails() {
+        let mut def = valid_definition();
+        def.tiers = vec![];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("At least one pricing tier is required"));
+    }
+
+    #[test]
+    fn test_validate_definition_all_conditional_tiers_fails() {
+        use config::meta::model_pricing::TierCondition;
+        let mut def = valid_definition();
+        def.tiers = vec![PricingTierDefinition {
+            name: "tier1".to_string(),
+            condition: Some(TierCondition {
+                usage_key: "input".to_string(),
+                value: 100.0,
+                ..Default::default()
+            }),
+            prices: Default::default(),
+        }];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("At least one tier must have no condition"));
+    }
+
+    #[test]
+    fn test_validate_definition_tier_empty_condition_usage_key_fails() {
+        use config::meta::model_pricing::TierCondition;
+        let mut def = valid_definition();
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "conditional".to_string(),
+                condition: Some(TierCondition {
+                    usage_key: "  ".to_string(),
+                    value: 1.0,
+                    ..Default::default()
+                }),
+                prices: Default::default(),
+            },
+            default_tier(),
+        ];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("empty usage_key"));
+    }
+
+    #[test]
+    fn test_validate_definition_tier_nan_condition_value_fails() {
+        use config::meta::model_pricing::TierCondition;
+        let mut def = valid_definition();
+        def.tiers = vec![
+            PricingTierDefinition {
+                name: "cond".to_string(),
+                condition: Some(TierCondition {
+                    usage_key: "input".to_string(),
+                    value: f64::NAN,
+                    ..Default::default()
+                }),
+                prices: Default::default(),
+            },
+            default_tier(),
+        ];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("finite number"));
+    }
+
+    #[test]
+    fn test_validate_definition_nan_price_fails() {
+        let mut def = valid_definition();
+        let mut tier = default_tier();
+        tier.prices.insert("input".to_string(), f64::NAN);
+        def.tiers = vec![tier];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains("finite number"));
+    }
+
+    #[test]
+    fn test_validate_definition_negative_price_fails() {
+        let mut def = valid_definition();
+        let mut tier = default_tier();
+        tier.prices.insert("input".to_string(), -0.001);
+        def.tiers = vec![tier];
+        let err = validate_definition(&def).unwrap_err();
+        assert!(err.contains(">= 0"));
+    }
+
+    #[test]
+    fn test_validate_definition_zero_price_passes() {
+        let mut def = valid_definition();
+        let mut tier = default_tier();
+        tier.prices.insert("input".to_string(), 0.0);
+        def.tiers = vec![tier];
+        assert!(validate_definition(&def).is_ok());
+    }
+}

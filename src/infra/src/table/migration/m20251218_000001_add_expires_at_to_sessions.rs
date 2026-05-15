@@ -103,3 +103,18 @@ enum Sessions {
     Table,
     ExpiresAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20251218_000001_add_expires_at_to_sessions"
+        );
+    }
+}

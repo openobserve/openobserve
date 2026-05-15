@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -42,31 +42,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn
-            icon="list_alt"
+          <OButton
+            variant="ghost"
+            size="icon-sm"
             :title="t('queries.queryList')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="listSchema(props)"
             data-test="queryList-btn"
-          />
-          <q-btn
-            :icon="outlinedCancel"
+            @click="listSchema(props)"
+          >
+            <List class="tw:size-4" />
+          </OButton>
+          <OButton
+            variant="ghost-destructive"
+            size="icon-sm"
             :title="t('queries.cancelQuery')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            style="color: red"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
             data-test="cancelQuery-btn"
-          />
+            @click="confirmDeleteAction(props)"
+          >
+            <X class="tw:size-4" />
+          </OButton>
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -81,17 +74,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #bottom="scope">
-        <q-btn
+        <OButton
           data-test="qm-multiple-cancel-query-btn"
-          class="o2-secondary-button no-border tw:h-[36px]"
-          outline
-          flat
-          padding="sm lg"
-          :disable="selectedRowsModel?.length === 0"
+          variant="outline-destructive"
+          size="sm-action"
+          :disabled="selectedRowsModel?.length === 0"
           @click="handleMultiQueryCancel"
-          no-caps
-          :label="t('queries.cancelQuery')"
-        />
+        >
+          {{ t('queries.cancelQuery') }}
+        </OButton>
         <q-space />
         <div style="width: auto">
           <q-table-pagination
@@ -113,12 +104,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
       data-test="list-schema-dialog"
     >
-      <QueryList :schemaData="schemaData" />
+      <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </q-dialog>
   </div>
 </template>
 
 <script lang="ts">
+
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
@@ -128,13 +120,15 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { List, X } from 'lucide-vue-next';
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 
 // TODO OK : Define types and interfaces for data properties.
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData },
+  components: { QueryList, QTablePagination, NoData, OButton, List, X },
   props: {
     rows: {
       type: Array,

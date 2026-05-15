@@ -24,13 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
+          <OTabs
             v-model="ingestiontabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
+            orientation="vertical"
           >
-            <q-route-tab
+            <ORouteTab
               name="curl"
               :to="{
                 name: 'curl',
@@ -40,9 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               icon="data_object"
               label="Curl"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="filebeat"
               :to="{
                 name: 'filebeat',
@@ -52,10 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
               label="Filebeat"
-              content-class="tab_content"
             />
-            <q-route-tab
-              default
+            <ORouteTab
               name="fluentbit"
               :to="{
                 name: 'fluentbit',
@@ -65,9 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
               label="FluentBit"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="fluentd"
               :to="{
                 name: 'fluentd',
@@ -77,9 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
               label="Fluentd"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="vector"
               :to="{
                 name: 'vector',
@@ -89,9 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/vector.png')"
               label="Vector"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="ingestLogsFromOtel"
               :to="{
                 name: 'ingestLogsFromOtel',
@@ -101,9 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
               label="OTEL Collector"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="logstash"
               :to="{
                 name: 'logstash',
@@ -113,9 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
               label="Logstash"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="syslogNg"
               :to="{
                 name: 'syslogNg',
@@ -125,9 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               icon="plagiarism"
               label="Syslog-ng"
-              content-class="tab_content"
             />
-          </q-tabs>
+          </OTabs>
         </div>
       </div>
     </template>
@@ -149,6 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -158,9 +150,11 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestLogs",
+  components: { OTabs, OTab, ORouteTab },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -174,7 +168,7 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
-    const ingestiontabs = ref("");
+    const ingestiontabs = ref(resolveTab("ingestLogs", router.currentRoute.value.name as string, "curl"));
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );
@@ -285,10 +279,10 @@ export default defineComponent({
 </style>
 <style lang="scss">
 .ingestionPage {
-  .q-tab-panel {
+  .o-tab-panel {
     padding: 0 !important;
     .tab_content {
-      .q-tab__label {
+      .o-tab__label {
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;

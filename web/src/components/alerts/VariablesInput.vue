@@ -24,34 +24,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>
         Variable
       </span>
-          <q-btn
-          style="color: #A0A0A0;"
-              no-caps
-              padding="xs"
-              class=""
-              size="sm"
-              flat
-              icon="info_outline"
+          <OButton
+          variant="ghost-muted"
+              size="icon-sm"
             >
+              <q-icon name="info_outline" />
               <q-tooltip>
               Variables are used to pass data from the alert to the destination.
             </q-tooltip>
-          </q-btn>
+          </OButton>
         </div>
     <template v-if="!variables.length">
       <div class="flex justify-between items-center tw:ml-auto">
 
-        <q-btn
+        <OButton
           data-test="alert-variables-add-btn"
           size="sm"
-          class="text-bold no-border o2-secondary-button tw:h-[36px]"
-          flat
-          no-caps
+          variant="outline"
           @click="addVariable"
         >
         <q-icon name="add" />
         <span>Add Variable</span>
-      </q-btn>
+      </OButton>
       </div>
     </template>
     <template v-else>
@@ -86,33 +80,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-2 q-ml-none">
-          <q-btn
+          <OButton
             data-test="alert-variables-delete-variable-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('alert_templates.edit')"
             @click="removeVariable(variable)"
-          />
-          <q-btn
+          >
+            <q-icon :name="outlinedDelete" />
+          </OButton>
+          <OButton
             data-test="alert-variables-add-variable-btn"
             v-if="index === variables.length - 1"
-            icon="add"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('alert_templates.edit')"
             @click="addVariable"
-          />
+          >
+            <q-icon name="add" />
+          </OButton>
         </div>
       </div>
     </template>
@@ -123,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18n } from "vue-i18n";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const props = defineProps({
   variables: {
@@ -155,11 +144,6 @@ const addVariable = () => {
 }
 
 .variables-input {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
 }
 
 .input-bg-dark .q-field__control{

@@ -27,8 +27,8 @@ use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
     Attribute, AttributeValue, Attributes, GetOptions, GetResult, ListResult, MultipartUpload,
-    ObjectMeta, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, WriteMultipart,
-    path::Path,
+    ObjectMeta, ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
+    WriteMultipart, path::Path,
 };
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
@@ -46,7 +46,8 @@ static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::defau
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
-    fn get_account(&self, file: &str) -> Option<String>;
+    fn get_account(&self, org_id: &str, file: &str) -> Option<String>;
+    async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>);
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult>;
     async fn put_opts(
         &self,
@@ -82,11 +83,11 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     ) -> Result<Vec<Bytes>>;
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
     async fn delete(&self, account: &str, location: &Path) -> Result<()>;
-    fn delete_stream(
+    async fn delete_stream(
         &self,
         account: &str,
         locations: BoxStream<'static, Result<Path>>,
-    ) -> BoxStream<'static, Result<Path>>;
+    ) -> Result<Vec<Path>>;
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>>;
     fn list_with_offset(
         &self,
@@ -102,6 +103,10 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     async fn rename_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
 }
 
+fn get_org_storage_key(org_id: &str) -> String {
+    format!("{org_id}:default")
+}
+
 pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     let files = MULTI_ACCOUNTS
         .list(account, Some(&prefix.into()))
@@ -112,8 +117,13 @@ pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     Ok(files)
 }
 
-pub fn get_account(file: &str) -> Option<String> {
-    MULTI_ACCOUNTS.get_account(file)
+pub fn get_account(org_id: &str, file: &str) -> Option<String> {
+    MULTI_ACCOUNTS.get_account(org_id, file)
+}
+
+pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
+    let key = get_org_storage_key(org_id);
+    MULTI_ACCOUNTS.add_account(key, acc).await;
 }
 
 pub async fn get(account: &str, file: &str) -> Result<GetResult> {
@@ -244,17 +254,13 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             let files = futures::stream::iter(files)
                 .map(|file| Ok(Path::from(file)))
                 .boxed();
-            match MULTI_ACCOUNTS
-                .delete_stream(&account, files)
-                .try_collect::<Vec<Path>>()
-                .await
-            {
-                Ok(deleted) => {
-                    log::debug!("Deleted objects: {deleted:?}");
+            match MULTI_ACCOUNTS.delete_stream(&account, files).await {
+                Ok(files) => {
+                    log::debug!("Deleted objects: {files:?}");
                     if columns.len() > 2 && columns[0] == "files" {
                         metrics::STORAGE_WRITE_REQUESTS
                             .with_label_values(&[columns[1], columns[2], "remote"])
-                            .inc_by(deleted.len() as u64);
+                            .inc_by(files.len() as u64);
                     }
                 }
                 Err(e) => {
@@ -411,5 +417,55 @@ impl From<Error> for object_store::Error {
                 source.to_string(),
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_display_out_of_range() {
+        let e = Error::OutOfRange("test".to_string());
+        assert_eq!(e.to_string(), "Out of range: test");
+    }
+
+    #[test]
+    fn test_error_display_bad_range() {
+        let e = Error::BadRange("invalid".to_string());
+        assert_eq!(e.to_string(), "Bad range: invalid");
+    }
+
+    #[test]
+    fn test_get_stream_from_file_valid() {
+        let path = Path::from("files/default/logs/olympics/2023/08/21/08/00/a.parquet");
+        let stream = get_stream_from_file(&path);
+        assert_eq!(stream, Some("olympics".to_string()));
+    }
+
+    #[test]
+    fn test_get_stream_from_file_too_short_returns_none() {
+        let path = Path::from("files/default/logs");
+        assert_eq!(get_stream_from_file(&path), None);
+    }
+
+    #[test]
+    fn test_get_stream_from_file_wrong_prefix_returns_none() {
+        let path = Path::from("notfiles/default/logs/olympics/2023/08/21/08/00/a.parquet");
+        assert_eq!(get_stream_from_file(&path), None);
+    }
+
+    #[test]
+    fn test_bytes_size_in_mb_empty() {
+        let b = bytes::Bytes::new();
+        assert_eq!(bytes_size_in_mb(&b), 0.0);
+    }
+
+    #[test]
+    fn test_bytes_size_in_mb_one_mb() {
+        let data = vec![0u8; 1024 * 1024];
+        let b = bytes::Bytes::from(data);
+        let result = bytes_size_in_mb(&b);
+        assert!((result - 1.0).abs() < 1e-9);
     }
 }

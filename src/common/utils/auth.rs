@@ -357,6 +357,8 @@ where
             // - /org/settings (v1 settings API)
             // - /org/settings/logo, /org/settings/text (logo/text endpoints)
             // - /org/settings/v2/... (v2 multi-level settings API)
+            // - /org/storage deals with GET/POST/PUT for org storage, and should follow settings
+            //   rbac
             //
             // Settings v2 API paths:
             // - GET /{org_id}/settings/v2/{key} - get setting
@@ -365,7 +367,7 @@ where
             // - POST /{org_id}/settings/v2/user/{user_id} - set user setting
             // - DELETE /{org_id}/settings/v2/org/{key} - delete org setting
             // - DELETE /{org_id}/settings/v2/user/{user_id}/{key} - delete user setting
-            if path_columns[1].eq("settings") {
+            if path_columns[1].eq("settings") || path_columns[1].eq("storage") {
                 if method.eq("POST") || method.eq("DELETE") {
                     method = "PUT".to_string();
                 }
@@ -390,11 +392,16 @@ where
             // this will take format of settings:{org_id} or pipelines:{org_id} etc
             let key = if path_columns[1].eq("invites") {
                 "users"
-            } else if ((path_columns[1].eq("rename") || path_columns[1].eq("extend_trial_period"))
+            } else if ((path_columns[1].eq("rename")
+                || path_columns[1].eq("extend_trial_period")
+                || path_columns[1].eq("enable_org_storage"))
                 && method.eq("PUT"))
                 || path_columns[1].eq("external_contract")
             {
                 "organizations"
+            } else if path_columns[1].eq("storage") {
+                // org storage needs permission on settings
+                "settings"
             } else {
                 path_columns[1]
             };
@@ -402,6 +409,7 @@ where
             // for organization api changes we need perms on _all_{org}
             let entity = match (key, path_columns[1]) {
                 ("organizations", "extend_trial_period") => "_all__meta".to_string(),
+                ("organizations", "enable_org_storage") => "_all__meta".to_string(),
                 ("organizations", "external_contract") => "_all__meta".to_string(),
                 ("organizations", "organizations") => {
                     // Special case: assume_service_account endpoint should check org:_all__meta
@@ -1881,5 +1889,35 @@ mod tests {
         // Too short a path should not match
         let path: Vec<&str> = "v2/default/trigger".split('/').collect();
         assert_eq!(resolve_write_method("PATCH", &path), "PUT");
+    }
+
+    #[test]
+    fn test_build_basic_auth_header_format() {
+        use base64::Engine as _;
+        let header = build_basic_auth_header("user@example.com", "mytoken");
+        assert!(header.starts_with("Basic "));
+        let encoded = header.strip_prefix("Basic ").unwrap();
+        let decoded = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, "user@example.com:mytoken");
+    }
+
+    #[test]
+    fn test_build_basic_auth_header_empty_fields() {
+        use base64::Engine as _;
+        let header = build_basic_auth_header("", "");
+        assert!(header.starts_with("Basic "));
+        let encoded = header.strip_prefix("Basic ").unwrap();
+        let decoded = String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decoded, ":");
     }
 }

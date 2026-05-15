@@ -85,6 +85,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_sum_value_none_input() {
+        let ts = 1640995200;
+        let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
+        let result = sum(&None, Value::None, &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_sum_invalid_input_returns_err() {
+        let ts = 1640995200;
+        let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
+        let result = sum(&None, Value::Float(1.0), &eval_ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_sum_empty_matrix_returns_none() {
+        let ts = 1640995200;
+        let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());
+        let result = sum(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
     fn test_sum_range_function() {
         // Create test matrix data with multiple series and timestamps
         let labels1 = vec![

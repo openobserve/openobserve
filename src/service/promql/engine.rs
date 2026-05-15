@@ -3426,4 +3426,21 @@ mod tests {
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
     }
+
+    #[test]
+    fn test_get_offset_modifier_none() {
+        assert_eq!(get_offset_modifier(None), 0);
+    }
+
+    #[test]
+    fn test_get_offset_modifier_positive() {
+        let result = get_offset_modifier(Some(Offset::Pos(Duration::from_secs(60))));
+        assert_eq!(result, 60_000_000); // 60s in micros
+    }
+
+    #[test]
+    fn test_get_offset_modifier_negative() {
+        let result = get_offset_modifier(Some(Offset::Neg(Duration::from_secs(30))));
+        assert_eq!(result, -30_000_000); // -30s in micros
+    }
 }

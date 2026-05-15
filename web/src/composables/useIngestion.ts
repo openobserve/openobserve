@@ -19,7 +19,7 @@ import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 
 const useIngestion = () => {
   const store = useStore();
-  
+
   const endpoint: any = ref({
     url: "",
     host: "",
@@ -107,7 +107,8 @@ Access Key: [BASIC_PASSCODE]`;
 Access Key: [BASIC_PASSCODE]`;
 
   const languagesDocURLs = {
-    python: "https://openobserve.ai/blog/handling-errors-with-opentelemetry-python",
+    python:
+      "https://openobserve.ai/blog/handling-errors-with-opentelemetry-python",
     dotnettracing: "https://short.openobserve.ai/dotnet-tracing",
     dotnetlogs: "https://short.openobserve.ai/dotnet-logging",
     nodejs: "https://short.openobserve.ai/languages/nodejs",
@@ -128,6 +129,10 @@ Access Key: [BASIC_PASSCODE]`;
     heroku: "https://short.openobserve.ai/heroku",
   };
 
+  const aiContent = `OPENOBSERVE_URL=${endpoint.value.url}
+OPENOBSERVE_ORG=${store.state.selectedOrganization.identifier}
+OPENOBSERVE_AUTH_TOKEN=Basic [BASIC_PASSCODE]`;
+
   return {
     endpoint,
     databaseContent,
@@ -146,6 +151,7 @@ Access Key: [BASIC_PASSCODE]`;
     languagesDocURLs,
     othersContent,
     othersDocURLs,
+    aiContent,
   };
 };
 

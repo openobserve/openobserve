@@ -102,7 +102,7 @@ describe('Functions.vue', () => {
             template: '<div class="q-tabs" :class="$attrs.class"><slot /></div>',
             props: ['modelValue', 'indicatorColor', 'inlineLabel', 'vertical'],
           },
-          'q-route-tab': { 
+          'q-route-tab': {
             template: '<div class="q-route-tab" :class="{ active: name === activeTab }">{{ label }}</div>',
             props: ['name', 'to', 'label', 'contentClass'],
             inject: {
@@ -110,6 +110,25 @@ describe('Functions.vue', () => {
                 default: 'functions',
               },
             },
+          },
+          OTabs: {
+            template: '<div class="o-tabs" :class="$attrs.class"><slot /></div>',
+            props: ['modelValue', 'orientation'],
+            emits: ['update:modelValue'],
+          },
+          ORouteTab: {
+            template: '<div class="o-route-tab">{{ label }}</div>',
+            props: ['name', 'to', 'label', 'icon'],
+          },
+          OButton: {
+            name: 'OButton',
+            template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot name="icon-left" /><slot /></button>',
+            props: ['variant', 'size', 'disabled', 'class'],
+            emits: ['click'],
+          },
+          OTab: {
+            template: '<div class="o-tab">{{ label }}</div>',
+            props: ['name', 'label', 'icon'],
           },
           'RouterView': MockRouterView,
         },
@@ -136,7 +155,7 @@ describe('Functions.vue', () => {
       expect(wrapper.find('.q-page').exists()).toBe(true);
       expect(wrapper.find('.q-splitter').exists()).toBe(true);
       // The tabs now use 'card-container' class instead of 'functions-tabs'
-      expect(wrapper.find('.q-tabs.card-container').exists()).toBe(true);
+      expect(wrapper.find('.card-container').exists()).toBe(true);
     });
 
     it('should initialize with correct default values', async () => {
@@ -144,7 +163,8 @@ describe('Functions.vue', () => {
       
       expect((wrapper.vm as any).splitterModel).toBe(220);
       expect((wrapper.vm as any).showSidebar).toBe(true);
-      expect((wrapper.vm as any).activeTab).toBe('streamPipelines');
+      // The test router navigates to 'functionList', which maps to 'functions' via routeToFunctionsTab
+      expect((wrapper.vm as any).activeTab).toBe('functions');
     });
 
     it('should render the collapse/expand button', async () => {
@@ -161,7 +181,7 @@ describe('Functions.vue', () => {
 
       expect((wrapper.vm as any).showSidebar).toBe(true);
       // The tabs now use 'card-container' class instead of 'functions-tabs'
-      expect(wrapper.find('.q-tabs.card-container').exists()).toBe(true);
+      expect(wrapper.find('.card-container').exists()).toBe(true);
     });
 
     it('should collapse sidebar when collapse button is clicked', async () => {

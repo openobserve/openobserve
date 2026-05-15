@@ -140,4 +140,52 @@ mod tests {
         let stats = get_stream_stats("nexus", "default", StreamType::Logs);
         assert_eq!(stats.doc_num, 5000);
     }
+
+    #[test]
+    fn test_remove_stream_stats() {
+        let val = StreamStats {
+            doc_num: 42,
+            ..Default::default()
+        };
+        set_stream_stats("remove_test_org", "remove_stream", StreamType::Logs, val);
+        let before = get_stream_stats("remove_test_org", "remove_stream", StreamType::Logs);
+        assert_eq!(before.doc_num, 42);
+
+        remove_stream_stats("remove_test_org", "remove_stream", StreamType::Logs);
+        let after = get_stream_stats("remove_test_org", "remove_stream", StreamType::Logs);
+        assert_eq!(after.doc_num, 0); // defaults to 0 after removal
+    }
+
+    #[test]
+    fn test_remove_stream_stats_nonexistent_is_noop() {
+        // removing a key that doesn't exist should not panic
+        remove_stream_stats(
+            "nonexistent_org_xyz",
+            "nonexistent_stream",
+            StreamType::Logs,
+        );
+    }
+
+    #[test]
+    fn test_incr_stream_stats_invalid_path_returns_error() {
+        let meta = FileMeta {
+            records: 10,
+            ..Default::default()
+        };
+        let result = incr_stream_stats("too/short/path", &meta);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_incr_stream_stats_zero_records_is_noop() {
+        let meta = FileMeta {
+            records: 0, // zero records → early return Ok(())
+            ..Default::default()
+        };
+        let result = incr_stream_stats(
+            "files/incr_org/logs/incr_stream/2024/01/01/00/abc_1.parquet",
+            &meta,
+        );
+        assert!(result.is_ok());
+    }
 }

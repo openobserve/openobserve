@@ -23,6 +23,10 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 
 const defaultObject = {
@@ -164,6 +168,7 @@ const defaultObject = {
       expandedSpans: [] as String[],
       showSpanDetails: false,
       selectedLogStreams: [] as String[],
+      correlationProps: null as any,
     },
   },
 };
@@ -187,6 +192,8 @@ const useTraces = () => {
   const store = useStore();
   const router = useRouter();
   const $q = useQuasar();
+
+  const { loadSemanticGroups } = useServiceCorrelation();
 
   const resetSearchObj = () => {
     // delete searchObj.data;
@@ -334,10 +341,10 @@ const useTraces = () => {
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
     let query: string = isSpan
-      ? `${spanIdField}='${span.spanId || span.span_id}' ${
-          traceId ? `AND ${traceIdField}='${traceId}'` : ""
+      ? `${quoteSqlIdentifierIfNeeded(String(spanIdField))}='${span.spanId || span.span_id}' ${
+          traceId ? `AND ${quoteSqlIdentifierIfNeeded(String(traceIdField))}='${traceId}'` : ""
         }`
-      : `${traceIdField}='${traceId}'`;
+      : `${quoteSqlIdentifierIfNeeded(String(traceIdField))}='${traceId}'`;
 
     if (query) query = b64EncodeStandard(query) as string;
 
@@ -420,6 +427,14 @@ const useTraces = () => {
     });
   };
 
+  const getOrSetServiceColor = (serviceName: string): string => {
+    if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+      const colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+      searchObj.meta.serviceColors[serviceName] = getSpanColorHex(colorIndex);
+    }
+    return searchObj.meta.serviceColors[serviceName];
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
 
@@ -437,11 +452,11 @@ const useTraces = () => {
         duration: trace.duration || 0,
         services: {} as Record<string, { count: number; duration: number }>,
         zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        llm_usage_details_input: trace.llm_usage_tokens_input,
-        llm_usage_details_output: trace.llm_usage_tokens_output,
-        llm_usage_details_total: trace.llm_usage_tokens_total,
-        llm_cost_details_total: trace.llm_usage_cost_total,
-        llm_input: trace.llm_input || {},
+        gen_ai_usage_input_tokens: trace.gen_ai_usage_input_tokens,
+        gen_ai_usage_output_tokens: trace.gen_ai_usage_output_tokens,
+        gen_ai_usage_total_tokens: trace.gen_ai_usage_total_tokens,
+        gen_ai_usage_cost: trace.gen_ai_usage_cost,
+        gen_ai_input_messages: trace.gen_ai_input_messages,
       };
 
       // Build per-trace service span count and duration map
@@ -464,6 +479,51 @@ const useTraces = () => {
     });
   };
 
+  const navigateToCorrelatedLogs = async (correlationProps: any) => {
+    const conditions = new Map<string, string>();
+    const usedGroups = new Set<string>();
+
+    const semanticGroups = await loadSemanticGroups();
+    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+
+    for (const streamInfo of correlationProps.logStreams) {
+      const filters = streamInfo.filters ?? {};
+      for (const [field, value] of Object.entries(filters)) {
+        if (!value || value === SELECT_ALL_VALUE || field.startsWith("_"))
+          continue;
+        const groupId = fieldToGroupId.get(field.toLowerCase()) ?? field;
+        if (usedGroups.has(groupId)) continue;
+        usedGroups.add(groupId);
+
+        const escapedValue = String(value).replace(/'/g, "''");
+        conditions.set(groupId, `${quoteSqlIdentifierIfNeeded(field)} = '${escapedValue}'`);
+      }
+    }
+
+    const queryString = Array.from(conditions.values()).join(" and ");
+    const encodedQuery = b64EncodeUnicode(queryString);
+    const streamNames = correlationProps.logStreams.map((s: any) => s.stream_name).join(",");
+
+    store.dispatch("logs/setIsInitialized", false);
+    await nextTick();
+
+    router.push({
+      path: "/logs",
+      query: {
+        stream: streamNames,
+        sql_mode: "false",
+        query: encodedQuery,
+        from: String(correlationProps.timeRange.startTime),
+        to: String(correlationProps.timeRange.endTime),
+        stream_type: "logs",
+        org_identifier: store.state.selectedOrganization.identifier,
+        type: "trace_explorer",
+        quick_mode: "false",
+        show_histogram: "true",
+      },
+    });
+  };
+
   return {
     searchObj,
     resetSearchObj,
@@ -473,9 +533,11 @@ const useTraces = () => {
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
+    navigateToCorrelatedLogs,
     tracesShareURL,
     formatTracesMetaData,
     setServiceColors,
+    getOrSetServiceColor,
   };
 };
 

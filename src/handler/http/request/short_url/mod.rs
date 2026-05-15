@@ -144,3 +144,20 @@ pub async fn retrieve(
         redirect.redirect_http()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_retrieve_query_deserialize_with_type() {
+        let q: RetrieveQuery = serde_json::from_str(r#"{"type":"ui"}"#).unwrap();
+        assert_eq!(q.type_param.as_deref(), Some("ui"));
+    }
+
+    #[test]
+    fn test_retrieve_query_deserialize_without_type() {
+        let q: RetrieveQuery = serde_json::from_str(r#"{}"#).unwrap();
+        assert!(q.type_param.is_none());
+    }
+}

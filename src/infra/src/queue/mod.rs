@@ -154,3 +154,63 @@ impl Message {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn test_builder_default_has_no_max_age() {
+        let cfg = QueueConfigBuilder::new().build();
+        assert!(cfg.max_age.is_none());
+    }
+
+    #[test]
+    fn test_builder_default_impl_equals_new() {
+        let a = QueueConfigBuilder::new().build();
+        let b = QueueConfigBuilder::default().build();
+        assert!(a.max_age.is_none());
+        assert!(b.max_age.is_none());
+        // Both should have the same defaults
+        assert!(matches!(a.retention_policy, RetentionPolicy::Limits));
+        assert!(matches!(b.retention_policy, RetentionPolicy::Limits));
+    }
+
+    #[test]
+    fn test_builder_set_max_age() {
+        let cfg = QueueConfigBuilder::new()
+            .max_age(Duration::from_secs(3600))
+            .build();
+        assert_eq!(cfg.max_age, Some(Duration::from_secs(3600)));
+    }
+
+    #[test]
+    fn test_builder_set_retention_policy_interest() {
+        let cfg = QueueConfigBuilder::new()
+            .retention_policy(RetentionPolicy::Interest)
+            .build();
+        assert!(matches!(cfg.retention_policy, RetentionPolicy::Interest));
+    }
+
+    #[test]
+    fn test_builder_set_storage_type_memory() {
+        let cfg = QueueConfigBuilder::new()
+            .storage_type(StorageType::Memory)
+            .build();
+        assert!(matches!(cfg.storage_type, StorageType::Memory));
+    }
+
+    #[test]
+    fn test_builder_chained() {
+        let cfg = QueueConfigBuilder::new()
+            .max_age(Duration::from_secs(60))
+            .retention_policy(RetentionPolicy::Limits)
+            .storage_type(StorageType::File)
+            .build();
+        assert_eq!(cfg.max_age, Some(Duration::from_secs(60)));
+        assert!(matches!(cfg.retention_policy, RetentionPolicy::Limits));
+        assert!(matches!(cfg.storage_type, StorageType::File));
+    }
+}

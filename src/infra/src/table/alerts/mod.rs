@@ -728,3 +728,136 @@ enum Alerts {
     Table,
     Name,
 }
+
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike as _;
+
+    use super::*;
+    use crate::table::entity::alerts::Model;
+
+    fn make_model(id: &str) -> Model {
+        Model {
+            id: id.to_string(),
+            org: "myorg".to_string(),
+            folder_id: "folder-1".to_string(),
+            name: "Test Alert".to_string(),
+            stream_type: "logs".to_string(),
+            stream_name: "default".to_string(),
+            is_real_time: false,
+            destinations: serde_json::json!(["dest-1"]),
+            template: None,
+            context_attributes: None,
+            row_template: None,
+            row_template_type: 0, // String
+            description: None,
+            enabled: true,
+            tz_offset: 0,
+            last_triggered_at: None,
+            last_satisfied_at: None,
+            query_type: 0, // Custom
+            query_conditions: None,
+            query_sql: None,
+            query_promql: None,
+            query_promql_condition: None,
+            query_aggregation: None,
+            query_vrl_function: None,
+            query_search_event_type: None,
+            query_multi_time_range: None,
+            trigger_threshold_operator: ">".to_string(),
+            trigger_period_seconds: 900, // 15 min × 60
+            trigger_threshold_count: 100,
+            trigger_frequency_type: 1, // Seconds
+            trigger_frequency_seconds: 300,
+            trigger_frequency_cron: None,
+            trigger_frequency_cron_timezone: None,
+            trigger_silence_seconds: 3600, // 60 min × 60
+            trigger_tolerance_seconds: None,
+            owner: None,
+            last_edited_by: None,
+            updated_at: None,
+            align_time: false,
+            dedup_enabled: false,
+            dedup_time_window_minutes: None,
+            dedup_config: None,
+            creates_incident: false,
+        }
+    }
+
+    #[test]
+    fn test_try_from_model_valid() {
+        let id = Ksuid::new(None, None).to_string();
+        let alert = MetaAlert::try_from(make_model(&id)).unwrap();
+        assert_eq!(alert.name, "Test Alert");
+        assert_eq!(alert.org_id, "myorg");
+        assert!(alert.enabled);
+        assert!(!alert.creates_incident);
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_ksuid() {
+        assert!(MetaAlert::try_from(make_model("not-a-ksuid")).is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_stream_type() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.stream_type = "invalid_stream".to_string();
+        assert!(MetaAlert::try_from(m).is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_operator() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.trigger_threshold_operator = "INVALID".to_string();
+        assert!(MetaAlert::try_from(m).is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_period_seconds_to_minutes() {
+        let id = Ksuid::new(None, None).to_string();
+        let alert = MetaAlert::try_from(make_model(&id)).unwrap();
+        assert_eq!(alert.trigger_condition.period, 15); // 900 / 60
+    }
+
+    #[test]
+    fn test_try_from_model_silence_seconds_to_minutes() {
+        let id = Ksuid::new(None, None).to_string();
+        let alert = MetaAlert::try_from(make_model(&id)).unwrap();
+        assert_eq!(alert.trigger_condition.silence, 60); // 3600 / 60
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_query_type() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.query_type = 99;
+        assert!(MetaAlert::try_from(m).is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_frequency_type() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.trigger_frequency_type = 99;
+        assert!(MetaAlert::try_from(m).is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_creates_incident() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut m = make_model(&id);
+        m.creates_incident = true;
+        let alert = MetaAlert::try_from(m).unwrap();
+        assert!(alert.creates_incident);
+    }
+
+    #[test]
+    fn test_try_from_model_destinations_parsed() {
+        let id = Ksuid::new(None, None).to_string();
+        let alert = MetaAlert::try_from(make_model(&id)).unwrap();
+        assert_eq!(alert.destinations, vec!["dest-1"]);
+    }
+}

@@ -559,3 +559,48 @@ pub async fn set_job_start(
         Err(e) => orm_err!(format!("set job start error: {e}")),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Filter, MetaColumn};
+    use crate::table::search_job::common::{OperatorType, Value};
+
+    #[test]
+    fn test_filter_new_with_string_value() {
+        let f = Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string("id-1"));
+        assert!(matches!(f.left, MetaColumn::Id));
+        assert!(matches!(f.operator, OperatorType::Equal));
+        assert!(matches!(&f.right, Value::String(s) if s == "id-1"));
+    }
+
+    #[test]
+    fn test_filter_new_with_i64_gt() {
+        let f = Filter::new(
+            MetaColumn::StartTime,
+            OperatorType::GreaterThan,
+            Value::i64(100),
+        );
+        assert!(matches!(f.left, MetaColumn::StartTime));
+        assert!(matches!(f.operator, OperatorType::GreaterThan));
+        assert!(matches!(f.right, Value::I64(v) if v == 100));
+    }
+
+    #[test]
+    fn test_filter_new_with_lt() {
+        let f = Filter::new(MetaColumn::EndTime, OperatorType::LessThan, Value::i64(500));
+        assert!(matches!(f.left, MetaColumn::EndTime));
+        assert!(matches!(f.operator, OperatorType::LessThan));
+    }
+
+    #[test]
+    fn test_filter_clone() {
+        let f = Filter::new(
+            MetaColumn::Status,
+            OperatorType::Equal,
+            Value::string("done"),
+        );
+        let c = f.clone();
+        assert!(matches!(c.left, MetaColumn::Status));
+        assert!(matches!(&c.right, Value::String(s) if s == "done"));
+    }
+}

@@ -83,3 +83,13 @@ impl MetricsService for MetricsIngester {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metrics_ingester_default() {
+        let _server = MetricsIngester::default();
+    }
+}

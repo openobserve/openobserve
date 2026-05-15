@@ -134,3 +134,20 @@ pub async fn create_table_index() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sqlite_schema_history_new() {
+        let s = SqliteSchemaHistory::new();
+        drop(s);
+    }
+
+    #[test]
+    fn test_sqlite_schema_history_default() {
+        let s = SqliteSchemaHistory::default();
+        drop(s);
+    }
+}

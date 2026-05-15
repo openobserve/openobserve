@@ -23,11 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :id="editorId"
     />
     <!-- AI Icon Button -->
-    <q-btn
+    <OButton
       v-if="showAiIcon && !disableAi"
-      round
-      flat
-      size="sm"
+      variant="sidebar-toggle"
+      size="icon-toolbar"
       class="ai-icon-button"
       :class="nlpMode ? 'ai-icon-active' : ''"
       @click="toggleNlpMode"
@@ -42,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
         }}
       </q-tooltip>
-    </q-btn>
+    </OButton>
   </div>
 </template>
 
@@ -80,9 +79,11 @@ import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   inheritAttrs: false,
+  components: { OButton },
   props: {
     editorId: {
       type: String,
@@ -111,6 +112,14 @@ export default defineComponent({
     readOnly: {
       type: Boolean,
       default: false,
+    },
+    showLineNumbers: {
+      type: Boolean,
+      default: true,
+    },
+    stickyScroll: {
+      type: Boolean,
+      default: true,
     },
     language: {
       type: String,
@@ -659,7 +668,7 @@ export default defineComponent({
         folding: enableCodeFolding.value,
         wordWrap: "on",
         automaticLayout: true,
-        lineNumbers: "on",
+        lineNumbers: props.showLineNumbers ? "on" : "off",
         lineNumbersMinChars: 0,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
@@ -682,6 +691,9 @@ export default defineComponent({
         minimap: { enabled: false },
         readOnly: props.readOnly,
         renderValidationDecorations: "on",
+        stickyScroll: {
+          enabled: props.stickyScroll,
+        },
       });
 
       editorObj.onDidChangeModelContent(
@@ -840,6 +852,16 @@ export default defineComponent({
       () => props.readOnly,
       () => {
         editorObj?.updateOptions({ readOnly: props.readOnly });
+      },
+    );
+
+    // update lineNumbers when prop value changes
+    watch(
+      () => props.showLineNumbers,
+      () => {
+        editorObj?.updateOptions({
+          lineNumbers: props.showLineNumbers ? "on" : "off",
+        });
       },
     );
 

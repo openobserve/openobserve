@@ -54,3 +54,18 @@ enum Folders {
     Table,
     CreatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20241116_000002_drop_folders_created_at_column"
+        );
+    }
+}

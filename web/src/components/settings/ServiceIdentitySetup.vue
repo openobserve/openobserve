@@ -15,410 +15,652 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full service-identity-setup q-mt-sm" :class="{ 'sis-dark': store.state.theme === 'dark' }">
+  <div
+    class="tw:w-full service-identity-setup q-mt-sm"
+    :class="{ 'sis-dark': store.state.theme === 'dark' }"
+  >
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="tw:flex tw:flex-col tw:gap-4 tw:py-4">
       <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
       <q-skeleton type="rect" height="56px" class="tw:rounded-lg" />
-      <q-skeleton type="rect" height="40px" width="160px" class="tw:rounded-lg" />
+      <q-skeleton
+        type="rect"
+        height="40px"
+        width="160px"
+        class="tw:rounded-lg"
+      />
     </div>
 
     <div v-else>
       <!-- Section 1: Service Configuration -->
-      <div class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
+      <div
+        class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
         style="border: 1px solid var(--o2-border-color)"
       >
         <div class="tw:p-3 tw:flex tw:flex-col tw:gap-3">
-
-        <!-- Service name source banner -->
-        <div
-          class="tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
-          :class="serviceNameDetected
-            ? (store.state.theme === 'dark' ? 'tw:bg-sky-900/10 tw:border-sky-300/30' : 'tw:bg-sky-50/80 tw:border-sky-200')
-            : (store.state.theme === 'dark' ? 'tw:bg-amber-900/10 tw:border-amber-800/30' : 'tw:bg-amber-50/80 tw:border-amber-200')"
-        >
-        <!-- Collapsed row -->
-        <div
-          class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
-          @click="serviceNameExpanded = !serviceNameExpanded"
-        >
-          <q-icon
-            :name="serviceNameDetected ? 'check_circle' : 'warning'"
-            size="18px"
-            :color="serviceNameDetected ? 'positive' : undefined"
-            :class="serviceNameDetected ? '' : 'tw:text-amber-500'"
-          />
-          <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
-            <template v-if="serviceNameDetected">
-              Service name detected from
-              <span class="tw:font-bold tw:text-primary">Service</span>
-              field alias
-              <span class="tw:text-xs tw:opacity-60">({{ detectedServiceFields.length + unseenServiceFields.length }})</span>
-            </template>
-            <template v-else>
-              <span class="tw:font-semibold">{{ t("settings.correlation.serviceNameNotDetected") }}</span>
-            </template>
-          </div>
-          <q-icon
-            :name="serviceNameExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
-            size="18px"
-            class="tw:opacity-40 tw:shrink-0"
-          />
-        </div>
-
-        <!-- Expanded detail -->
-        <div v-if="serviceNameExpanded" class="tw:px-3 tw:pb-3 tw:pt-2 tw:border-t"
-          :class="serviceNameDetected
-            ? (store.state.theme === 'dark' ? 'tw:border-sky-300/30' : 'tw:border-sky-200')
-            : (store.state.theme === 'dark' ? 'tw:border-amber-800/30' : 'tw:border-amber-200')"
-        >
-          <!-- Inner card -->
-          <div class="tw:rounded-lg tw:p-2.5"
-            :class="store.state.theme === 'dark' ? 'tw:bg-grey-9/60' : 'tw:bg-grey-1'"
+          <!-- Service name source banner -->
+          <div
+            v-if="!serviceOptional"
+            class="tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
+            :class="
+              serviceNameDetected
+                ? store.state.theme === 'dark'
+                  ? 'tw:bg-sky-900/10 tw:border-sky-300/30'
+                  : 'tw:bg-sky-50/80 tw:border-sky-200'
+                : store.state.theme === 'dark'
+                  ? 'tw:bg-amber-900/10 tw:border-amber-800/30'
+                  : 'tw:bg-amber-50/80 tw:border-amber-200'
+            "
           >
-            <div class="tw:text-xs tw:font-medium tw:mb-2"
-              :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'"
+            <!-- Collapsed row -->
+            <div
+              class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
+              @click="serviceNameExpanded = !serviceNameExpanded"
             >
-              {{ t("settings.correlation.serviceNameExpandedHelp") }}
+              <q-icon
+                :name="serviceNameDetected ? 'check_circle' : 'warning'"
+                size="18px"
+                :color="serviceNameDetected ? 'positive' : undefined"
+                :class="serviceNameDetected ? '' : 'tw:text-amber-500'"
+              />
+              <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
+                <template v-if="serviceNameDetected">
+                  Service name detected from
+                  <span class="tw:font-bold tw:text-primary">Service</span>
+                  field alias
+                  <span class="tw:text-xs tw:opacity-60"
+                    >({{
+                      detectedServiceFields.length + unseenServiceFields.length
+                    }})</span
+                  >
+                </template>
+                <template v-else>
+                  <span class="tw:font-semibold">{{
+                    t("settings.correlation.serviceNameNotDetected")
+                  }}</span>
+                </template>
+              </div>
+              <q-icon
+                :name="
+                  serviceNameExpanded
+                    ? 'keyboard_arrow_up'
+                    : 'keyboard_arrow_down'
+                "
+                size="18px"
+                class="tw:opacity-40 tw:shrink-0"
+              />
             </div>
 
-            <!-- Field pills -->
-            <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-3">
-              <!-- Detected fields (with stream type dots) -->
-              <div
-                v-for="field in detectedServiceFields"
-                :key="field.name"
-                class="tw:inline-flex tw:items-center tw:gap-1.5 tw:px-2.5 tw:py-1 tw:rounded-md tw:font-mono tw:text-xs tw:font-medium"
-                style="border: 1px solid var(--o2-border-color)"
-                :class="store.state.theme === 'dark'
-                  ? 'tw:bg-grey-8 tw:text-grey-2'
-                  : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'"
-              >
-                <div class="tw:flex tw:items-center tw:gap-0.5 tw:mr-0.5">
-                  <span
-                    v-for="st in field.streamTypes"
-                    :key="st"
-                    class="tw:w-1.5 tw:h-1.5 tw:rounded-full"
-                    :class="{
-                      'tw:bg-blue-500': st === 'logs',
-                      'tw:bg-orange-500': st === 'traces',
-                      'tw:bg-green-500': st === 'metrics',
-                    }"
-                    :title="st"
-                  />
-                </div>
-                {{ field.name }}
-              </div>
-
-              <!-- Configured but not yet seen (grey pills) -->
-              <div
-                v-for="field in unseenServiceFields"
-                :key="field"
-                class="tw:inline-flex tw:items-center tw:px-2.5 tw:py-1 tw:rounded-md tw:border-dashed tw:font-mono tw:text-xs"
-                style="border: 1px dashed var(--o2-border-color)"
-                :class="store.state.theme === 'dark'
-                  ? 'tw:text-grey-6'
-                  : 'tw:text-grey-5'"
-                :title="t('settings.correlation.serviceNameConfiguredNotSeen')"
-              >
-                {{ field }}
-              </div>
-            </div>
-
-            <!-- Legend row -->
-            <div class="tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-2">
-              <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-3 tw:text-[10px]"
-                :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
-              >
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-blue-500" />
-                  {{ t("settings.correlation.foundInLogs") }}
-                </div>
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-orange-500" />
-                  {{ t("settings.correlation.foundInTraces") }}
-                </div>
-                <div class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-green-500" />
-                  {{ t("settings.correlation.foundInMetrics") }}
-                </div>
-                <div v-if="unseenServiceFields.length > 0" class="tw:flex tw:items-center tw:gap-1">
-                  <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:border tw:border-dashed tw:border-grey-4" />
-                  {{ t("settings.correlation.serviceNameConfiguredNotSeen") }}
-                </div>
-              </div>
-
-              <!-- Customize link -->
-              <a
-                class="config-link-btn tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline"
-                @click.prevent="emit('navigate-to-aliases', 'service')"
-              >
-                {{ t('settings.correlation.customizeFieldMappings') }}
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Field Mapping Dialog -->
-      <q-dialog v-model="showFieldMappingDialog">
-        <q-card style="min-width: 480px; max-width: 600px" class="tw:rounded-xl">
-          <q-card-section class="tw:flex tw:items-center tw:justify-between tw:pb-2">
-            <div>
-              <div class="text-h6">{{ t("settings.correlation.customizeFieldMappings") }}</div>
-              <div class="tw:text-xs tw:mt-1"
-                :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
-              >
-                {{ t("settings.correlation.fieldMappingDialogHelp") }}
-              </div>
-            </div>
-            <q-btn flat round dense icon="close" v-close-popup />
-          </q-card-section>
-
-          <q-separator />
-
-          <q-card-section class="tw:pt-4">
-            <TagInput
-              :model-value="editableServiceFields"
-              @update:model-value="editableServiceFields = $event"
-              :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
-              label=""
-            />
-          </q-card-section>
-
-          <q-separator />
-
-          <q-card-actions align="right" class="tw:px-4 tw:py-3">
-            <q-btn
-              flat no-caps
-              :label="t('common.cancel')"
-              v-close-popup
-            />
-            <q-btn
-              unelevated no-caps color="primary"
-              :label="t('common.save')"
-              :loading="savingFieldMappings"
-              @click="saveFieldMappings"
-            />
-          </q-card-actions>
-        </q-card>
-      </q-dialog>
-
-      <!-- Disambiguation Fields -->
-      <div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
-          <span class="tw:font-bold tw:text-sm">{{ t('settings.correlation.distinguishByLabel') }}</span>
-          <span class="tw:flex-1"><q-separator /></span>
-        </div>
-        <div class="tw:text-xs tw:mb-3"
-          :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
-        >
-          {{ t("settings.correlation.distinguishByHelp") }}
-        </div>
-
-        <!-- Empty state: nothing configured anywhere -->
-        <div
-          v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-          class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-3 tw:px-4 tw:rounded-md tw:border tw:border-dashed"
-          :class="store.state.theme === 'dark' ? 'tw:border-grey-7 tw:bg-grey-9/40' : 'tw:border-grey-4 tw:bg-grey-1'"
-        >
-          <q-icon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
-          <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'">
-            No fields configured yet
-          </span>
-          <q-btn
-            no-caps dense size="sm" icon="add"
-            :label="t('settings.correlation.addField')"
-            class="o2-secondary-button tw:h-[28px] tw:mt-1"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            data-test="service-identity-add-distinguish-btn"
-            @click="addingToEnv = activeEnvironment"
-          />
-        </div>
-
-        <!-- All configured env groups -->
-        <div v-else class="tw:flex tw:flex-col tw:gap-2">
-          <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
-          <div v-if="isAutoSuggested" class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:rounded-md tw:text-xs"
-            :class="store.state.theme === 'dark' ? 'tw:bg-blue-900/15 tw:text-blue-300' : 'tw:bg-blue-50 tw:text-blue-700'"
-          >
-            <q-icon name="auto_awesome" size="14px" class="tw:shrink-0 tw:mt-0.5" />
-            <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
-          </div>
-
-          <!-- One row per configured env -->
-          <template v-for="(envKey, envIdx) in allConfiguredEnvs" :key="envKey">
-            <!-- Environment label -->
-            <div v-if="allConfiguredEnvs.length > 1" class="tw:flex tw:items-center tw:gap-2 tw:mt-1"
-              :class="{ 'tw:pt-2 tw:border-t': envIdx > 0 }"
+            <!-- Expanded detail -->
+            <div
+              v-if="serviceNameExpanded"
+              class="tw:px-3 tw:pb-3 tw:pt-2 tw:border-t"
+              :class="
+                serviceNameDetected
+                  ? store.state.theme === 'dark'
+                    ? 'tw:border-sky-300/30'
+                    : 'tw:border-sky-200'
+                  : store.state.theme === 'dark'
+                    ? 'tw:border-amber-800/30'
+                    : 'tw:border-amber-200'
+              "
             >
-              <span class="tw:text-[10px] tw:font-bold"
-                :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
-              >
-                {{ getIdentitySetLabel(envKey) }}
-              </span>
-            </div>
-
-            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-              <!-- Pills for this env's fields -->
+              <!-- Inner card -->
               <div
-                v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(Boolean)"
-                :key="fieldId"
-                class="tw:flex tw:items-center tw:gap-1 tw:pl-3 tw:pr-1 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:transition-colors"
-                style="border: 1px solid var(--o2-border-color)"
-                :class="store.state.theme === 'dark'
-                  ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
-                  : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'"
+                class="tw:rounded-lg tw:p-2.5"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-grey-9/60'
+                    : 'tw:bg-grey-1'
+                "
               >
-                <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
-                <q-tooltip v-if="getFieldCardinalityTooltip(fieldId)" anchor="top middle" self="bottom middle" class="tw:text-xs">
-                  {{ getFieldCardinalityTooltip(fieldId) }}
-                </q-tooltip>
-                <q-btn
-                  flat round dense size="xs" icon="cancel"
-                  :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-6'"
-                  @click="removeFieldByIdFromEnv(envKey, fieldId)"
-                />
-              </div>
-
-              <!-- Inline add select for this group -->
-              <template v-if="addingToEnv === envKey">
-                <q-select
-                  ref="addFieldSelectRef"
-                  v-model="addFieldValue"
-                  :options="getAddFieldOptionsForEnv(envKey)"
-                  option-label="label"
-                  option-value="value"
-                  emit-value map-options
-                  use-input input-debounce="0"
-                  dense borderless
-                  :placeholder="t('settings.correlation.selectField')"
-                  style="min-width: 220px"
-                  data-test="service-identity-add-distinguish-btn"
-                  @filter="onAddFieldFilter"
-                  @update:model-value="onAddFieldToEnv(envKey, $event)"
+                <div
+                  class="tw:text-xs tw:font-medium tw:mb-2"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:text-grey-4'
+                      : 'tw:text-grey-7'
+                  "
                 >
-                  <template #option="scope">
-                    <q-item v-bind="scope.itemProps">
-                      <q-item-section>
-                        <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                          {{ scope.opt.label }}
-                          <q-badge v-if="scope.opt.cardinalityLabel"
-                            :color="scope.opt.cardinalityColor"
-                            outline
-                            :label="scope.opt.cardinalityLabel"
-                            class="tw:text-[10px]"
-                          />
-                          <q-badge v-if="scope.opt.recommended" color="positive" outline label="recommended" class="tw:text-[10px]" />
-                        </q-item-label>
-                        <q-item-label caption class="tw:flex tw:items-center tw:gap-2">
-                          <span v-if="scope.opt.uniqueValues">{{ scope.opt.uniqueValues }} unique values</span>
-                          <span v-if="scope.opt.streamTypes">{{ scope.opt.streamTypes.join(', ') }}</span>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
+                  {{ t("settings.correlation.serviceNameExpandedHelp") }}
+                </div>
+
+                <!-- Field pills -->
+                <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-3">
+                  <!-- Detected fields (with stream type dots) -->
+                  <div
+                    v-for="field in detectedServiceFields"
+                    :key="field.name"
+                    class="tw:inline-flex tw:items-center tw:gap-1.5 tw:px-2.5 tw:py-1 tw:rounded-md tw:font-mono tw:text-xs tw:font-medium"
+                    style="border: 1px solid var(--o2-border-color)"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:bg-grey-8 tw:text-grey-2'
+                        : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                    "
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-0.5 tw:mr-0.5">
+                      <span
+                        v-for="st in field.streamTypes"
+                        :key="st"
+                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full"
+                        :class="{
+                          'tw:bg-blue-500': st === 'logs',
+                          'tw:bg-orange-500': st === 'traces',
+                          'tw:bg-green-500': st === 'metrics',
+                        }"
+                        :title="st"
+                      />
+                    </div>
+                    {{ field.name }}
+                  </div>
+
+                  <!-- Configured but not yet seen (grey pills) -->
+                  <div
+                    v-for="field in unseenServiceFields"
+                    :key="field"
+                    class="tw:inline-flex tw:items-center tw:px-2.5 tw:py-1 tw:rounded-md tw:border-dashed tw:font-mono tw:text-xs"
+                    style="border: 1px dashed var(--o2-border-color)"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-6'
+                        : 'tw:text-grey-5'
+                    "
+                    :title="
+                      t('settings.correlation.serviceNameConfiguredNotSeen')
+                    "
+                  >
+                    {{ field }}
+                  </div>
+                </div>
+
+                <!-- Legend row -->
+                <div
+                  class="tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-2"
+                >
+                  <div
+                    class="tw:flex tw:flex-wrap tw:items-center tw:gap-3 tw:text-[10px]"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-5'
+                        : 'tw:text-grey-6'
+                    "
+                  >
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <span
+                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-blue-500"
+                      />
+                      {{ t("settings.correlation.foundInLogs") }}
+                    </div>
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <span
+                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-orange-500"
+                      />
+                      {{ t("settings.correlation.foundInTraces") }}
+                    </div>
+                    <div class="tw:flex tw:items-center tw:gap-1">
+                      <span
+                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-green-500"
+                      />
+                      {{ t("settings.correlation.foundInMetrics") }}
+                    </div>
+                    <div
+                      v-if="unseenServiceFields.length > 0"
+                      class="tw:flex tw:items-center tw:gap-1"
+                    >
+                      <span
+                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:border tw:border-dashed tw:border-grey-4"
+                      />
+                      {{
+                        t("settings.correlation.serviceNameConfiguredNotSeen")
+                      }}
+                    </div>
+                  </div>
+
+                  <!-- Customize link -->
+                  <a
+                    class="config-link-btn tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline"
+                    @click.prevent="emit('navigate-to-aliases', 'service')"
+                  >
+                    {{ t("settings.correlation.customizeFieldMappings") }}
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Field Mapping Dialog -->
+          <q-dialog v-model="showFieldMappingDialog">
+            <q-card
+              style="min-width: 480px; max-width: 600px"
+              class="tw:rounded-xl"
+            >
+              <q-card-section
+                class="tw:flex tw:items-center tw:justify-between tw:pb-2"
+              >
+                <div>
+                  <div class="text-h6">
+                    {{ t("settings.correlation.customizeFieldMappings") }}
+                  </div>
+                  <div
+                    class="tw:text-xs tw:mt-1"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-5'
+                        : 'tw:text-grey-6'
+                    "
+                  >
+                    {{ t("settings.correlation.fieldMappingDialogHelp") }}
+                  </div>
+                </div>
+                <OButton variant="ghost" size="icon" v-close-popup>
+                  <q-icon name="close" size="14px" />
+                </OButton>
+              </q-card-section>
+
+              <q-separator />
+
+              <q-card-section class="tw:pt-4">
+                <TagInput
+                  :model-value="editableServiceFields"
+                  @update:model-value="editableServiceFields = $event"
+                  :placeholder="
+                    t('settings.correlation.fieldMappingPlaceholder')
+                  "
+                  label=""
+                />
+              </q-card-section>
+
+              <q-separator />
+
+              <q-card-actions align="right" class="tw:px-4 tw:py-3">
+                <div class="tw:flex tw:gap-2">
+                  <OButton variant="outline" size="sm-action" v-close-popup>
+                    {{ t("common.cancel") }}
+                  </OButton>
+                  <OButton
+                    variant="primary"
+                    size="sm-action"
+                    :loading="savingFieldMappings"
+                    @click="saveFieldMappings"
+                  >
+                    {{ t("common.save") }}
+                  </OButton>
+                </div>
+              </q-card-actions>
+            </q-card>
+          </q-dialog>
+
+          <!-- Service Optional toggle -->
+          <div data-test="service-identity-service-optional" class="tw:mb-3">
+            <q-toggle
+              data-test="service-identity-service-optional-btn"
+              v-model="serviceOptional"
+              :label="t('settings.correlation.serviceOptionalLabel')"
+              size="sm"
+              dense
+              class="tw:text-[13px] tw:font-semibold"
+            />
+            <div
+              class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-6'
+              "
+            >
+              {{ t("settings.correlation.serviceOptionalHelp") }}
+            </div>
+          </div>
+
+          <!-- Disambiguation Fields -->
+          <div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
+              <span class="tw:font-bold tw:text-sm">{{
+                t("settings.correlation.distinguishByLabel")
+              }}</span>
+              <span class="tw:flex-1"><q-separator /></span>
+            </div>
+            <div
+              class="tw:text-xs tw:mb-3"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-6'
+              "
+            >
+              {{ t("settings.correlation.distinguishByHelp") }}
+            </div>
+
+            <!-- Empty state: nothing configured anywhere -->
+            <div
+              v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
+              class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-3 tw:px-4 tw:rounded-md tw:border tw:border-dashed"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:border-grey-7 tw:bg-grey-9/40'
+                  : 'tw:border-grey-4 tw:bg-grey-1'
+              "
+            >
+              <q-icon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
+              <span
+                class="tw:text-sm tw:font-medium"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-grey-4'
+                    : 'tw:text-grey-7'
+                "
+              >
+                No fields configured yet
+              </span>
+              <OButton
+                variant="outline"
+                size="sm"
+                class="tw:mt-1"
+                data-test="service-identity-add-distinguish-btn"
+                @click="addingToEnv = activeEnvironment"
+              >
+                <template #icon-left
+                  ><q-icon name="add" size="14px"
+                /></template>
+                {{ t("settings.correlation.addField") }}
+              </OButton>
+            </div>
+
+            <!-- All configured env groups -->
+            <div v-else class="tw:flex tw:flex-col tw:gap-2">
+              <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
+              <div
+                v-if="isAutoSuggested"
+                class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:rounded-md tw:text-xs"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-blue-900/15 tw:text-blue-300'
+                    : 'tw:bg-blue-50 tw:text-blue-700'
+                "
+              >
+                <q-icon
+                  name="auto_awesome"
+                  size="14px"
+                  class="tw:shrink-0 tw:mt-0.5"
+                />
+                <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
+              </div>
+
+              <!-- One row per configured env -->
+              <template
+                v-for="(envKey, envIdx) in allConfiguredEnvs"
+                :key="envKey"
+              >
+                <!-- Environment label -->
+                <div
+                  v-if="allConfiguredEnvs.length > 1"
+                  class="tw:flex tw:items-center tw:gap-2 tw:mt-1"
+                  :class="{ 'tw:pt-2 tw:border-t': envIdx > 0 }"
+                >
+                  <span
+                    class="tw:text-[10px] tw:font-bold"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-5'
+                        : 'tw:text-grey-6'
+                    "
+                  >
+                    {{ getIdentitySetLabel(envKey) }}
+                  </span>
+                </div>
+
+                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                  <!-- Pills for this env's fields -->
+                  <div
+                    v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(
+                      Boolean,
+                    )"
+                    :key="fieldId"
+                    class="tw:flex tw:items-center tw:gap-1 tw:pl-3 tw:pr-1 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:transition-colors"
+                    style="border: 1px solid var(--o2-border-color)"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
+                        : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                    "
+                  >
+                    <span>{{
+                      getGroupByValue(fieldId)?.display ?? fieldId
+                    }}</span>
+                    <q-tooltip
+                      v-if="getFieldCardinalityTooltip(fieldId)"
+                      anchor="top middle"
+                      self="bottom middle"
+                      class="tw:text-xs"
+                    >
+                      {{ getFieldCardinalityTooltip(fieldId) }}
+                    </q-tooltip>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-circle"
+                      @click="removeFieldByIdFromEnv(envKey, fieldId)"
+                    >
+                      <q-icon name="cancel" size="12px" />
+                    </OButton>
+                  </div>
+
+                  <!-- Inline add select for this group -->
+                  <template v-if="addingToEnv === envKey">
+                    <q-select
+                      ref="addFieldSelectRef"
+                      v-model="addFieldValue"
+                      :options="getAddFieldOptionsForEnv(envKey)"
+                      option-label="label"
+                      option-value="value"
+                      emit-value
+                      map-options
+                      use-input
+                      input-debounce="0"
+                      dense
+                      borderless
+                      :placeholder="t('settings.correlation.selectField')"
+                      style="min-width: 220px"
+                      data-test="service-identity-add-distinguish-btn"
+                      @filter="onAddFieldFilter"
+                      @update:model-value="onAddFieldToEnv(envKey, $event)"
+                    >
+                      <template #option="scope">
+                        <q-item v-bind="scope.itemProps">
+                          <q-item-section>
+                            <q-item-label
+                              class="tw:flex tw:items-center tw:gap-2"
+                            >
+                              {{ scope.opt.label }}
+                              <q-badge
+                                v-if="scope.opt.cardinalityLabel"
+                                :color="scope.opt.cardinalityColor"
+                                outline
+                                :label="scope.opt.cardinalityLabel"
+                                class="tw:text-[10px]"
+                              />
+                              <q-badge
+                                v-if="scope.opt.recommended"
+                                color="positive"
+                                outline
+                                label="recommended"
+                                class="tw:text-[10px]"
+                              />
+                            </q-item-label>
+                            <q-item-label
+                              caption
+                              class="tw:flex tw:items-center tw:gap-2"
+                            >
+                              <span v-if="scope.opt.uniqueValues"
+                                >{{ scope.opt.uniqueValues }} unique
+                                values</span
+                              >
+                              <span v-if="scope.opt.streamTypes">{{
+                                scope.opt.streamTypes.join(", ")
+                              }}</span>
+                            </q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </template>
+                    </q-select>
+                    <OButton
+                      variant="ghost"
+                      size="icon"
+                      @click="
+                        addingToEnv = '';
+                        addFieldValue = '';
+                      "
+                    >
+                      <q-icon name="close" size="14px" />
+                    </OButton>
                   </template>
-                </q-select>
-                <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="addingToEnv = ''; addFieldValue = ''" />
+
+                  <!-- + Add field button -->
+                  <OButton
+                    v-else-if="
+                      (setDistinguishBy[envKey] ?? []).filter(Boolean).length <
+                      5
+                    "
+                    variant="outline"
+                    size="sm"
+                    @click="addingToEnv = envKey"
+                  >
+                    <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
+                    {{ t("settings.correlation.addField") }}
+                    <q-tooltip
+                      anchor="top middle"
+                      self="bottom middle"
+                      class="tw:text-xs tw:max-w-[240px]"
+                    >
+                      {{ t("settings.correlation.addFieldTooltip") }}
+                    </q-tooltip>
+                  </OButton>
+                </div>
               </template>
 
-              <!-- + Add field button -->
-              <q-btn
-                v-else-if="(setDistinguishBy[envKey] ?? []).filter(Boolean).length < 5"
-                flat no-caps dense size="sm"
-                :label="t('settings.correlation.addField')"
-                class="o2-secondary-button tw:h-[28px]"
-                :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                @click="addingToEnv = envKey"
+              <!-- Adding to a new env (not yet in the list) -->
+              <template
+                v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)"
               >
-                <q-tooltip anchor="top middle" self="bottom middle" class="tw:text-xs tw:max-w-[240px]">
-                  {{ t("settings.correlation.addFieldTooltip") }}
-                </q-tooltip>
-              </q-btn>
+                <div
+                  class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
+                  style="border-top: 1px solid var(--o2-border-color)"
+                >
+                  <q-select
+                    ref="addFieldSelectRef"
+                    v-model="addFieldValue"
+                    :options="getAddFieldOptionsForEnv(addingToEnv)"
+                    option-label="label"
+                    option-value="value"
+                    emit-value
+                    map-options
+                    use-input
+                    input-debounce="0"
+                    dense
+                    borderless
+                    :placeholder="t('settings.correlation.selectField')"
+                    style="min-width: 220px"
+                    data-test="service-identity-add-distinguish-btn"
+                    @filter="onAddFieldFilter"
+                    @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
+                  >
+                    <template #option="scope">
+                      <q-item v-bind="scope.itemProps">
+                        <q-item-section>
+                          <q-item-label
+                            class="tw:flex tw:items-center tw:gap-2"
+                          >
+                            {{ scope.opt.label }}
+                            <q-badge
+                              v-if="scope.opt.cardinalityLabel"
+                              :color="scope.opt.cardinalityColor"
+                              outline
+                              :label="scope.opt.cardinalityLabel"
+                              class="tw:text-[10px]"
+                            />
+                            <q-badge
+                              v-if="scope.opt.recommended"
+                              color="positive"
+                              outline
+                              label="recommended"
+                              class="tw:text-[10px]"
+                            />
+                          </q-item-label>
+                          <q-item-label
+                            caption
+                            class="tw:flex tw:items-center tw:gap-2"
+                          >
+                            <span v-if="scope.opt.uniqueValues"
+                              >{{ scope.opt.uniqueValues }} unique values</span
+                            >
+                            <span v-if="scope.opt.streamTypes">{{
+                              scope.opt.streamTypes.join(", ")
+                            }}</span>
+                          </q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </template>
+                  </q-select>
+                  <OButton
+                    variant="ghost"
+                    size="icon"
+                    @click="
+                      addingToEnv = '';
+                      addFieldValue = '';
+                    "
+                  >
+                    <q-icon name="close" size="14px" />
+                  </OButton>
+                </div>
+              </template>
 
-            </div>
-          </template>
-
-          <!-- Adding to a new env (not yet in the list) -->
-          <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
-            <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
-              style="border-top: 1px solid var(--o2-border-color)"
-            >
-              <q-select
-                ref="addFieldSelectRef"
-                v-model="addFieldValue"
-                :options="getAddFieldOptionsForEnv(addingToEnv)"
-                option-label="label"
-                option-value="value"
-                emit-value map-options
-                use-input input-debounce="0"
-                dense borderless
-                :placeholder="t('settings.correlation.selectField')"
-                style="min-width: 220px"
-                data-test="service-identity-add-distinguish-btn"
-                @filter="onAddFieldFilter"
-                @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
+              <!-- Add group + Save — bottom row -->
+              <div
+                v-if="!addingToEnv"
+                class="tw:flex tw:items-center tw:justify-between tw:mt-2"
               >
-                <template #option="scope">
-                  <q-item v-bind="scope.itemProps">
-                    <q-item-section>
-                      <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                        {{ scope.opt.label }}
-                        <q-badge v-if="scope.opt.cardinalityLabel"
-                          :color="scope.opt.cardinalityColor"
-                          outline
-                          :label="scope.opt.cardinalityLabel"
-                          class="tw:text-[10px]"
-                        />
-                        <q-badge v-if="scope.opt.recommended" color="positive" outline label="recommended" class="tw:text-[10px]" />
-                      </q-item-label>
-                      <q-item-label caption class="tw:flex tw:items-center tw:gap-2">
-                        <span v-if="scope.opt.uniqueValues">{{ scope.opt.uniqueValues }} unique values</span>
-                        <span v-if="scope.opt.streamTypes">{{ scope.opt.streamTypes.join(', ') }}</span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-              <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="addingToEnv = ''; addFieldValue = ''" />
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  @click="addingToEnv = generateGroupId()"
+                >
+                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
+                  {{ t("settings.correlation.addGroup") }}
+                  <q-tooltip
+                    anchor="top middle"
+                    self="bottom middle"
+                    class="tw:text-xs tw:max-w-[240px]"
+                  >
+                    {{ t("settings.correlation.addGroupTooltip") }}
+                  </q-tooltip>
+                </OButton>
+                <OButton
+                  variant="primary"
+                  size="sm-action"
+                  :loading="saving"
+                  :disabled="saving || !isDirty"
+                  data-test="service-identity-save-btn"
+                  @click="saveConfig"
+                >
+                  {{ t("settings.correlation.saveIdentityConfig") }}
+                </OButton>
+              </div>
             </div>
-          </template>
-
-          <!-- Add group + Save — bottom row -->
-          <div v-if="!addingToEnv" class="tw:flex tw:items-center tw:justify-between tw:mt-2">
-            <q-btn
-              flat no-caps dense size="sm"
-              :label="t('settings.correlation.addGroup')"
-              class="o2-secondary-button tw:h-[28px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              @click="addingToEnv = generateGroupId()"
-            >
-              <q-tooltip anchor="top middle" self="bottom middle" class="tw:text-xs tw:max-w-[240px]">
-                {{ t("settings.correlation.addGroupTooltip") }}
-              </q-tooltip>
-            </q-btn>
-            <q-btn
-              no-caps dense
-              :label="t('settings.correlation.saveIdentityConfig')"
-              :loading="saving"
-              :disable="saving || !isDirty"
-              class="o2-primary-button tw:h-[32px]"
-              data-test="service-identity-save-btn"
-              @click="saveConfig"
-            />
           </div>
         </div>
+        <!-- /padding -->
       </div>
-
-        </div><!-- /padding -->
-      </div><!-- /Service Configuration card -->
+      <!-- /Service Configuration card -->
 
       <!-- Section 3: Workload Detection -->
-      <div v-if="workloadDetectedGroups.length > 0" class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
+      <div
+        v-if="workloadDetectedGroups.length > 0"
+        class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
         style="border: 1px solid var(--o2-border-color)"
       >
         <!-- Section header -->
-        <div class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
+        <div
+          class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
           <q-icon name="radar" size="18px" class="tw:text-teal-6" />
@@ -428,7 +670,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsible: Workload detected using fields (N) -->
         <div
           class="tw:mx-3 tw:mt-3 tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
-          :class="store.state.theme === 'dark' ? 'tw:bg-sky-900/10 tw:border-sky-300/30' : 'tw:bg-sky-50/80 tw:border-sky-200'"
+          :class="
+            store.state.theme === 'dark'
+              ? 'tw:bg-sky-900/10 tw:border-sky-300/30'
+              : 'tw:bg-sky-50/80 tw:border-sky-200'
+          "
         >
           <div
             class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
@@ -437,30 +683,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="check_circle" size="18px" color="positive" />
             <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
               Workload detected using fields
-              <span class="tw:text-xs tw:opacity-60">({{ trackedAliasIds.length }})</span>
+              <span class="tw:text-xs tw:opacity-60"
+                >({{ trackedAliasIds.length }})</span
+              >
             </div>
             <q-icon
-              :name="trackedAliasExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
+              :name="
+                trackedAliasExpanded
+                  ? 'keyboard_arrow_up'
+                  : 'keyboard_arrow_down'
+              "
               size="18px"
               class="tw:opacity-40 tw:shrink-0"
             />
           </div>
 
-          <div v-if="trackedAliasExpanded" class="tw:px-3 tw:pb-3 tw:pt-2 tw:border-t"
-            :class="store.state.theme === 'dark' ? 'tw:border-sky-300/30' : 'tw:border-sky-200'"
+          <div
+            v-if="trackedAliasExpanded"
+            class="tw:px-3 tw:pb-3 tw:pt-2 tw:border-t"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:border-sky-300/30'
+                : 'tw:border-sky-200'
+            "
           >
-            <div class="tw:rounded-lg tw:p-2.5"
-              :class="store.state.theme === 'dark' ? 'tw:bg-grey-9/60' : 'tw:bg-grey-1'"
+            <div
+              class="tw:rounded-lg tw:p-2.5"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:bg-grey-9/60'
+                  : 'tw:bg-grey-1'
+              "
             >
-              <div class="tw:text-xs tw:mb-3"
-                :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
+              <div
+                class="tw:text-xs tw:mb-3"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-grey-5'
+                    : 'tw:text-grey-6'
+                "
               >
-                Only these field alias groups are used for workload detection and recommendations.
-                Fields not in this list will not influence service discovery results. Cannot be empty.
+                Only these field alias groups are used for workload detection
+                and recommendations. Fields not in this list will not influence
+                service discovery results. Cannot be empty.
                 <a
                   class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
-                >Go to Field Aliases</a>
+                  >Go to Field Aliases</a
+                >
                 to configure individual field mappings.
               </div>
               <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
@@ -470,16 +740,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="alias.id"
                   class="tw:flex tw:items-center tw:gap-1 tw:pl-3 tw:pr-1 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:transition-colors"
                   style="border: 1px solid var(--o2-border-color)"
-                  :class="store.state.theme === 'dark'
-                    ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
-                    : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
+                      : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                  "
                 >
                   <span>{{ alias.label }}</span>
-                  <q-btn
-                    flat round dense size="xs" icon="cancel"
-                    :color="store.state.theme === 'dark' ? 'grey-5' : 'grey-6'"
-                    @click="trackedAliasIds = trackedAliasIds.filter(id => id !== alias.id)"
-                  />
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    @click="
+                      trackedAliasIds = trackedAliasIds.filter(
+                        (id) => id !== alias.id,
+                      )
+                    "
+                  >
+                    <q-icon name="cancel" size="12px" />
+                  </OButton>
                 </div>
                 <!-- Inline add select -->
                 <template v-if="addingTrackedAlias">
@@ -489,76 +767,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="trackedAliasAddOptions"
                     option-label="label"
                     option-value="value"
-                    emit-value map-options
-                    use-input input-debounce="0"
-                    dense borderless
+                    emit-value
+                    map-options
+                    use-input
+                    input-debounce="0"
+                    dense
+                    borderless
                     placeholder="Select alias group"
                     style="min-width: 220px"
                     @update:model-value="onAddTrackedAlias($event)"
                   />
-                  <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="addingTrackedAlias = false; addTrackedAliasValue = ''" />
+                  <OButton
+                    variant="ghost"
+                    size="icon"
+                    @click="
+                      addingTrackedAlias = false;
+                      addTrackedAliasValue = '';
+                    "
+                  >
+                    <q-icon name="close" size="14px" />
+                  </OButton>
                 </template>
                 <!-- Add field button -->
-                <q-btn
+                <OButton
                   v-else
-                  flat no-caps dense size="sm"
-                  label="Add field"
-                  class="o2-secondary-button tw:h-[28px]"
-                  :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                  variant="outline"
+                  size="sm"
                   @click="addingTrackedAlias = true"
-                />
+                >
+                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
+                  Add field
+                </OButton>
               </div>
               <div class="tw:flex tw:justify-end tw:mt-3">
-                <q-btn
-                  no-caps dense
-                  :label="t('settings.correlation.saveIdentityConfig')"
+                <OButton
+                  variant="primary"
+                  size="sm-action"
                   :loading="saving"
-                  :disable="saving || !isDirty"
-                  class="o2-primary-button tw:h-[32px]"
+                  :disabled="saving || !isDirty"
                   @click="saveConfig"
-                />
+                >
+                  {{ t("settings.correlation.saveIdentityConfig") }}
+                </OButton>
               </div>
             </div>
           </div>
         </div>
 
         <div class="tw:px-4 tw:pt-3 tw:pb-1">
-        <div class="tw:text-xs"
-          :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'"
-        >
-          We discovered these deployment patterns in your streams. Use them to configure service correlation.
-          <a
-            class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle"
-            @click.prevent="emit('navigate-to-services')"
-          >Go to Services</a>
-          <span>to see the actual discovered services.</span>
-        </div>
+          <div
+            class="tw:text-xs"
+            :class="
+              store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'
+            "
+          >
+            We discovered these deployment patterns in your streams. Use them to
+            configure service correlation.
+            <a
+              class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle"
+              @click.prevent="emit('navigate-to-services')"
+              >Go to Services</a
+            >
+            <span>to see the actual discovered services.</span>
+          </div>
         </div>
 
         <!-- Environment Tabs (Chrome-style) -->
-        <div class="tw:flex tw:items-end tw:gap-0 tw:px-4"
+        <div
+          class="tw:flex tw:items-end tw:gap-0 tw:px-4"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
             class="tw:relative tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-all tw:text-xs tw:font-medium tw:min-w-[70px] tw:text-center tw:rounded-t-lg tw:border tw:border-b-0"
-            :class="activeEnvironment === env.key
-              ? (store.state.theme === 'dark'
-                ? 'tw:text-grey-1'
-                : 'tw:text-grey-9')
-              : (store.state.theme === 'dark'
-                ? 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-3'
-                : 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-7')
+            :class="
+              activeEnvironment === env.key
+                ? store.state.theme === 'dark'
+                  ? 'tw:text-grey-1'
+                  : 'tw:text-grey-9'
+                : store.state.theme === 'dark'
+                  ? 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-3'
+                  : 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-7'
             "
-            :style="activeEnvironment === env.key
-              ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--o2-card-bg-solid); border-color: var(--o2-border-color);'
-              : ''"
+            :style="
+              activeEnvironment === env.key
+                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--o2-card-bg-solid); border-color: var(--o2-border-color);'
+                : ''
+            "
             @click="activeEnvironment = env.key"
           >
             {{ env.label }}
             <span
-              v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
+              v-if="
+                (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
+              "
               class="tw:absolute tw:top-1 tw:right-1 tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-positive"
               :title="`${(setDistinguishBy[env.key] ?? []).filter(Boolean).length} field(s) configured`"
             />
@@ -566,119 +869,222 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Tab content panel — connects to active tab -->
-        <div v-if="primaryDim" class="tw:overflow-hidden tw:px-4 tw:pt-4 tw:pb-2">
+        <div
+          v-if="primaryDim"
+          class="tw:overflow-hidden tw:px-4 tw:pt-4 tw:pb-2"
+        >
           <!-- Stat cards -->
           <div class="tw:flex tw:items-stretch tw:gap-3">
-          <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
-            <!-- Plus connector between cards -->
-            <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-              <q-icon name="add" size="16px" class="tw:text-grey-5" />
-            </div>
+            <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
+              <!-- Plus connector between cards -->
+              <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
+                <q-icon name="add" size="16px" class="tw:text-grey-5" />
+              </div>
 
-            <!-- Dim card -->
-            <div class="dim-stat-card tw:flex-1 tw:min-w-0 tw:rounded-lg tw:p-3"
-              :style="store.state.theme === 'dark' ? card.theme.borderDark : card.theme.borderLight"
-            >
-              <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                <q-icon :name="card.theme.icon" size="14px" :class="card.theme.iconClass" />
-                <span class="tw:text-[11px] tw:font-medium"
-                  :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
-                >{{ card.label }}</span>
-                <span class="tw:text-lg tw:font-bold tw:ml-auto" :class="card.theme.countClass">{{ card.count }}</span>
+              <!-- Dim card -->
+              <div
+                class="dim-stat-card tw:flex-1 tw:min-w-0 tw:rounded-lg tw:p-3"
+                :style="
+                  store.state.theme === 'dark'
+                    ? card.theme.borderDark
+                    : card.theme.borderLight
+                "
+              >
+                <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                  <q-icon
+                    :name="card.theme.icon"
+                    size="14px"
+                    :class="card.theme.iconClass"
+                  />
+                  <span
+                    class="tw:text-[11px] tw:font-medium"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-4'
+                        : 'tw:text-grey-6'
+                    "
+                    >{{ card.label }}</span
+                  >
+                  <span
+                    class="tw:text-lg tw:font-bold tw:ml-auto"
+                    :class="card.theme.countClass"
+                    >{{ card.count }}</span
+                  >
+                </div>
+                <div class="dim-stat-pills tw:flex tw:flex-wrap tw:gap-1">
+                  <span
+                    v-for="val in card.values.slice(0, 5)"
+                    :key="val"
+                    class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? card.theme.pillDark
+                        : card.theme.pillLight
+                    "
+                    :title="val"
+                    @click.stop="openInsightDialogByIdx(val, idx)"
+                    ><span class="tw:truncate">{{ val }}</span
+                    ><span
+                      v-if="card.dim"
+                      class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
+                      ><span
+                        v-for="st in getValueStreamTypes(
+                          card.dim.group_id,
+                          val,
+                        )"
+                        :key="st"
+                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
+                        :class="{
+                          'tw:bg-blue-500': st === 'logs',
+                          'tw:bg-orange-500': st === 'traces',
+                          'tw:bg-green-500': st === 'metrics',
+                        }" /></span
+                  ></span>
+                  <span
+                    v-if="card.values.length > 5"
+                    class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-4'
+                        : 'tw:text-grey-6'
+                    "
+                    >+{{ card.values.length - 5 }}
+                    <q-menu anchor="bottom left" self="top left">
+                      <div
+                        class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
+                        :class="
+                          store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''
+                        "
+                      >
+                        <span
+                          v-for="val in card.values.slice(5)"
+                          :key="val"
+                          class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                          :class="
+                            store.state.theme === 'dark'
+                              ? card.theme.pillDark
+                              : card.theme.pillLight
+                          "
+                          :title="val"
+                          v-close-popup
+                          @click.stop="openInsightDialogByIdx(val, idx)"
+                          ><span class="tw:truncate">{{ val }}</span
+                          ><span
+                            v-if="card.dim"
+                            class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
+                            ><span
+                              v-for="st in getValueStreamTypes(
+                                card.dim.group_id,
+                                val,
+                              )"
+                              :key="st"
+                              class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
+                              :class="{
+                                'tw:bg-blue-500': st === 'logs',
+                                'tw:bg-orange-500': st === 'traces',
+                                'tw:bg-green-500': st === 'metrics',
+                              }" /></span
+                        ></span>
+                      </div>
+                    </q-menu>
+                  </span>
+                </div>
               </div>
-              <div class="dim-stat-pills tw:flex tw:flex-wrap tw:gap-1">
-                <span
-                  v-for="val in card.values.slice(0, 5)"
-                  :key="val"
-                  class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
-                  :class="store.state.theme === 'dark' ? card.theme.pillDark : card.theme.pillLight"
-                  :title="val"
-                  @click.stop="openInsightDialogByIdx(val, idx)"
-                ><span class="tw:truncate">{{ val }}</span><span v-if="card.dim" class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"><span
-                    v-for="st in getValueStreamTypes(card.dim.group_id, val)" :key="st"
-                    class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
-                    :class="{ 'tw:bg-blue-500': st === 'logs', 'tw:bg-orange-500': st === 'traces', 'tw:bg-green-500': st === 'metrics' }"
-                  /></span></span>
-                <span
-                  v-if="card.values.length > 5"
-                  class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
-                  :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
-                >+{{ card.values.length - 5 }}
-                  <q-menu anchor="bottom left" self="top left">
-                    <div class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''"
-                    >
-                      <span
-                        v-for="val in card.values.slice(5)"
-                        :key="val"
-                        class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
-                        :class="store.state.theme === 'dark' ? card.theme.pillDark : card.theme.pillLight"
-                        :title="val"
-                        v-close-popup
-                        @click.stop="openInsightDialogByIdx(val, idx)"
-                      ><span class="tw:truncate">{{ val }}</span><span v-if="card.dim" class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"><span
-                          v-for="st in getValueStreamTypes(card.dim.group_id, val)" :key="st"
-                          class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
-                          :class="{ 'tw:bg-blue-500': st === 'logs', 'tw:bg-orange-500': st === 'traces', 'tw:bg-green-500': st === 'metrics' }"
-                        /></span></span>
-                    </div>
-                  </q-menu>
-                </span>
-              </div>
-            </div>
-          </template>
+            </template>
           </div>
 
           <!-- Stream type legend -->
           <div class="tw:flex tw:items-center tw:gap-3 tw:mt-2 tw:ml-1">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
-              :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-5'"
+            <div
+              class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-5'
+              "
             >
-              <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-blue-500" />
+              <span
+                class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-blue-500"
+              />
               <span>Found in Logs</span>
             </div>
-            <div class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
-              :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-5'"
+            <div
+              class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-5'
+              "
             >
-              <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-orange-500" />
+              <span
+                class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-orange-500"
+              />
               <span>Found in Traces</span>
             </div>
-            <div class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
-              :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-5'"
+            <div
+              class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-5'
+              "
             >
-              <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-green-500" />
+              <span
+                class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-green-500"
+              />
               <span>Found in Metrics</span>
             </div>
           </div>
-
         </div>
 
         <!-- Recommended Configuration -->
         <div
-          v-if="suggestedConfig && activeEnvGroups.length > 0 && !suggestionDismissed && !suggestionAlreadyApplied"
+          v-if="
+            suggestedConfig &&
+            activeEnvGroups.length > 0 &&
+            !suggestionDismissed &&
+            !suggestionAlreadyApplied
+          "
           class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2.5"
-          :class="store.state.theme === 'dark' ? 'tw:bg-grey-9/30' : 'tw:bg-grey-1/30'"
+          :class="
+            store.state.theme === 'dark' ? 'tw:bg-grey-9/30' : 'tw:bg-grey-1/30'
+          "
         >
-          <div class="tw:flex-1 tw:min-w-0 tw:text-xs tw:truncate"
-            :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'"
+          <div
+            class="tw:flex-1 tw:min-w-0 tw:text-xs tw:truncate"
+            :class="
+              store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'
+            "
           >
-            <span class="tw:font-bold"
-              :class="store.state.theme === 'dark' ? 'tw:text-grey-2' : 'tw:text-grey-8'"
-            >Recommended:</span>
-            {{ ' ' }}Use
-            <span class="tw:font-semibold">{{ suggestedConfig.distinguish_by.map(id => getGroupByValue(id)?.display ?? id).join(' + ') }}</span>
-            — covers {{ activeEnvCoverage ?? '–' }}% of your telemetry.
+            <span
+              class="tw:font-bold"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-2'
+                  : 'tw:text-grey-8'
+              "
+              >Recommended:</span
+            >
+            {{ " " }}Use
+            <span class="tw:font-semibold">{{
+              suggestedConfig.distinguish_by
+                .map((id) => getGroupByValue(id)?.display ?? id)
+                .join(" + ")
+            }}</span>
+            — covers {{ activeEnvCoverage ?? "–" }}% of your telemetry.
           </div>
           <div class="tw:shrink-0 tw:flex tw:items-center tw:gap-1">
-            <q-btn
-              no-caps dense flat size="sm" class="o2-secondary-button"
-              label="Apply"
-              @click="applySuggestion"
-            />
-            <q-btn flat round dense icon="cancel" size="xs"
+            <OButton variant="outline" size="sm" @click="applySuggestion">
+              Apply
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
               class="tw:opacity-40 hover:tw:opacity-100"
               @click="dismissSuggestion"
-            />
+            >
+              <q-icon name="cancel" size="14px" />
+            </OButton>
           </div>
         </div>
 
@@ -692,11 +1098,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-card
             :style="{ width: insightPanelWidth, maxWidth: '90vw' }"
             class="tw:flex tw:flex-col tw:h-full"
-            :class="store.state.theme === 'dark' ? 'tw:!bg-grey-10' : 'tw:!bg-white'"
+            :class="
+              store.state.theme === 'dark' ? 'tw:!bg-grey-10' : 'tw:!bg-white'
+            "
           >
             <!-- Header -->
-            <q-card-section class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b tw:shrink-0 q-ma-none"
-              :class="store.state.theme === 'dark' ? 'tw:border-grey-8' : 'tw:border-grey-3'"
+            <q-card-section
+              class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-b tw:shrink-0 q-ma-none"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:border-grey-8'
+                  : 'tw:border-grey-3'
+              "
             >
               <div class="tw:flex-1 tw:min-w-0">
                 <div class="tw:text-[16px] tw:flex tw:items-center">
@@ -706,76 +1119,172 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
                       store.state.theme === 'dark'
                         ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                        : 'tw:text-blue-600 tw:bg-blue-50'
+                        : 'tw:text-blue-600 tw:bg-blue-50',
                     ]"
                   >
                     {{ insightData.title }}
-                    <q-tooltip v-if="insightData.title.length > 25" class="tw:text-xs">
+                    <q-tooltip
+                      v-if="insightData.title.length > 25"
+                      class="tw:text-xs"
+                    >
                       {{ insightData.title }}
                     </q-tooltip>
                   </span>
                 </div>
-                <div v-if="!(insightData as any).isCardLevel && insightData.coverage !== null"
+                <div
+                  v-if="
+                    !(insightData as any).isCardLevel &&
+                    insightData.coverage !== null
+                  "
                   class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
-                  :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:text-grey-4'
+                      : 'tw:text-grey-6'
+                  "
                 >
-                  <q-icon name="verified" size="14px" class="tw:text-positive" />
-                  <span>{{ insightData.coverage }}% of services
-                    <span v-if="insightData.count !== null && insightData.total !== null">({{ insightData.count }}/{{ insightData.total }})</span>
+                  <q-icon
+                    name="verified"
+                    size="14px"
+                    class="tw:text-positive"
+                  />
+                  <span
+                    >{{ insightData.coverage }}% of services
+                    <span
+                      v-if="
+                        insightData.count !== null && insightData.total !== null
+                      "
+                      >({{ insightData.count }}/{{ insightData.total }})</span
+                    >
                   </span>
                 </div>
               </div>
-              <q-btn v-close-popup round flat dense icon="cancel" size="sm" />
+              <OButton variant="ghost" size="icon" v-close-popup>
+                <q-icon name="cancel" size="14px" />
+              </OButton>
             </q-card-section>
 
             <!-- Content area — flex column so dimension columns fill remaining height -->
-            <q-card-section class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:px-4 tw:py-3 q-ma-none">
+            <q-card-section
+              class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:px-4 tw:py-3 q-ma-none"
+            >
               <!-- Stream contribution chart (single-value only) -->
-              <template v-if="!(insightData as any).isCardLevel && (insightData as any).streamDetails?.length > 0">
+              <template
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  (insightData as any).streamDetails?.length > 0
+                "
+              >
                 <div class="tw:mb-3 tw:shrink-0">
-                  <div class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
-                    :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-5'"
-                  >Stream Sources</div>
-                  <div style="height: 40vh; min-height: 180px;">
+                  <div
+                    class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-5'
+                        : 'tw:text-grey-5'
+                    "
+                  >
+                    Stream Sources
+                  </div>
+                  <div style="height: 40vh; min-height: 180px">
                     <CustomChartRenderer :data="insightChartData.options" />
                   </div>
                   <!-- Legend -->
-                  <div class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2">
-                    <div v-for="sd in (insightData as any).streamDetails" :key="sd.streamType"
+                  <div
+                    class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2"
+                  >
+                    <div
+                      v-for="sd in (insightData as any).streamDetails"
+                      :key="sd.streamType"
                       class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
-                      :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-grey-4'
+                          : 'tw:text-grey-6'
+                      "
                     >
-                      <span class="tw:w-2 tw:h-2 tw:rounded-full"
-                        :class="{ 'tw:bg-blue-500': sd.streamType === 'logs', 'tw:bg-orange-500': sd.streamType === 'traces', 'tw:bg-green-500': sd.streamType === 'metrics' }"
+                      <span
+                        class="tw:w-2 tw:h-2 tw:rounded-full"
+                        :class="{
+                          'tw:bg-blue-500': sd.streamType === 'logs',
+                          'tw:bg-orange-500': sd.streamType === 'traces',
+                          'tw:bg-green-500': sd.streamType === 'metrics',
+                        }"
                       />
                       <span class="tw:capitalize">{{ sd.streamType }}</span>
-                      <span class="tw:font-medium">{{ sd.streamNames.length }}</span>
+                      <span class="tw:font-medium">{{
+                        sd.streamNames.length
+                      }}</span>
                     </div>
                   </div>
                 </div>
               </template>
 
-              <q-separator :class="store.state.theme === 'dark' ? 'tw:!bg-grey-8' : ''" class="tw:mb-3 tw:shrink-0" />
+              <q-separator
+                :class="store.state.theme === 'dark' ? 'tw:!bg-grey-8' : ''"
+                class="tw:mb-3 tw:shrink-0"
+              />
 
               <!-- Card-level: all values with bars -->
-              <template v-if="(insightData as any).isCardLevel && insightData.children.length > 0">
-                <div class="tw:text-[11px] tw:font-medium tw:mb-3"
-                  :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-5'"
-                >All values ({{ insightData.children.length }})</div>
+              <template
+                v-if="
+                  (insightData as any).isCardLevel &&
+                  insightData.children.length > 0
+                "
+              >
+                <div
+                  class="tw:text-[11px] tw:font-medium tw:mb-3"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:text-grey-5'
+                      : 'tw:text-grey-5'
+                  "
+                >
+                  All values ({{ insightData.children.length }})
+                </div>
                 <div class="tw:flex tw:flex-col tw:gap-2.5">
-                  <div v-for="child in insightData.children" :key="child.name" class="tw:flex tw:flex-col tw:gap-1">
-                    <div class="tw:flex tw:items-center tw:justify-between tw:text-xs">
-                      <span class="tw:truncate tw:min-w-0 tw:font-medium">{{ child.name }}</span>
-                      <span class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
-                        :class="store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-6'"
-                      >{{ child.count }} {{ insightData.childCountLabel }}</span>
-                    </div>
-                    <div class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-grey-8' : 'tw:bg-grey-2'"
+                  <div
+                    v-for="child in insightData.children"
+                    :key="child.name"
+                    class="tw:flex tw:flex-col tw:gap-1"
+                  >
+                    <div
+                      class="tw:flex tw:items-center tw:justify-between tw:text-xs"
                     >
-                      <div class="tw:h-full tw:rounded-full tw:transition-all"
-                        :class="insightDialogLevel === 'primary' ? 'tw:bg-blue-5' : insightDialogLevel === 'secondary' ? 'tw:bg-teal-5' : 'tw:bg-purple-5'"
-                        :style="{ width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%` }"
+                      <span class="tw:truncate tw:min-w-0 tw:font-medium">{{
+                        child.name
+                      }}</span>
+                      <span
+                        class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'tw:text-grey-4'
+                            : 'tw:text-grey-6'
+                        "
+                        >{{ child.count }}
+                        {{ insightData.childCountLabel }}</span
+                      >
+                    </div>
+                    <div
+                      class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:bg-grey-8'
+                          : 'tw:bg-grey-2'
+                      "
+                    >
+                      <div
+                        class="tw:h-full tw:rounded-full tw:transition-all"
+                        :class="
+                          insightDialogLevel === 'primary'
+                            ? 'tw:bg-blue-5'
+                            : insightDialogLevel === 'secondary'
+                              ? 'tw:bg-teal-5'
+                              : 'tw:bg-purple-5'
+                        "
+                        :style="{
+                          width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
+                        }"
                       />
                     </div>
                   </div>
@@ -783,46 +1292,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Single-value: related dimension columns (read-only) -->
-              <template v-if="!(insightData as any).isCardLevel && (insightData as any).relatedDimensions?.length > 0">
+              <template
+                v-if="
+                  !(insightData as any).isCardLevel &&
+                  (insightData as any).relatedDimensions?.length > 0
+                "
+              >
                 <!-- Explanation -->
-                <div class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
-                  :class="store.state.theme === 'dark' ? 'tw:bg-grey-9 tw:text-grey-5' : 'tw:bg-blue-1/40 tw:text-grey-6'"
+                <div
+                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:bg-grey-9 tw:text-grey-5'
+                      : 'tw:bg-blue-1/40 tw:text-grey-6'
+                  "
                 >
                   <q-icon name="info" size="14px" />
-                  <span>These are the related <strong>{{ formatDimLabels((insightData as any).relatedDimensions) }}</strong> values co-occurring with <strong>{{ insightData.title }}</strong>.</span>
+                  <span
+                    >These are the related
+                    <strong>{{
+                      formatDimLabels((insightData as any).relatedDimensions)
+                    }}</strong>
+                    values co-occurring with
+                    <strong>{{ insightData.title }}</strong
+                    >.</span
+                  >
                 </div>
                 <div class="tw:flex tw:flex-1 tw:min-h-0 tw:py-3">
                   <div
-                    v-for="(dim, dimIdx) in (insightData as any).relatedDimensions"
+                    v-for="(dim, dimIdx) in (insightData as any)
+                      .relatedDimensions"
                     :key="dim.label + dimIdx"
                     class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:px-3"
                     :class="[
                       dimIdx > 0
-                        ? (store.state.theme === 'dark' ? 'tw:border-l tw:border-grey-8' : 'tw:border-l tw:border-grey-3')
-                        : ''
+                        ? store.state.theme === 'dark'
+                          ? 'tw:border-l tw:border-grey-8'
+                          : 'tw:border-l tw:border-grey-3'
+                        : '',
                     ]"
                   >
-                    <div class="tw:text-[13px] tw:font-bold tw:mb-2"
-                      :class="store.state.theme === 'dark' ? 'tw:text-grey-3' : 'tw:text-grey-8'"
-                    >{{ dim.label }} <span class="tw:font-normal" :class="store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-5'">({{ dim.values.length }})</span></div>
-                    <div class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0">
+                    <div
+                      class="tw:text-[13px] tw:font-bold tw:mb-2"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-grey-3'
+                          : 'tw:text-grey-8'
+                      "
+                    >
+                      {{ dim.label }}
+                      <span
+                        class="tw:font-normal"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'tw:text-grey-5'
+                            : 'tw:text-grey-5'
+                        "
+                        >({{ dim.values.length }})</span
+                      >
+                    </div>
+                    <div
+                      class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0"
+                    >
                       <span
                         v-for="dVal in dim.values"
                         :key="dVal"
                         class="tw:text-[13px] tw:py-1 tw:px-2.5 tw:rounded-md tw:border tw:truncate tw:shrink-0"
                         :class="{
-                          'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3': dim.color === 'teal' && store.state.theme === 'dark',
-                          'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8': dim.color === 'teal' && store.state.theme !== 'dark',
-                          'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3': dim.color === 'purple' && store.state.theme === 'dark',
-                          'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8': dim.color === 'purple' && store.state.theme !== 'dark',
-                          'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3': dim.color === 'blue' && store.state.theme === 'dark',
-                          'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8': dim.color === 'blue' && store.state.theme !== 'dark',
+                          'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3':
+                            dim.color === 'teal' &&
+                            store.state.theme === 'dark',
+                          'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8':
+                            dim.color === 'teal' &&
+                            store.state.theme !== 'dark',
+                          'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3':
+                            dim.color === 'purple' &&
+                            store.state.theme === 'dark',
+                          'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8':
+                            dim.color === 'purple' &&
+                            store.state.theme !== 'dark',
+                          'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3':
+                            dim.color === 'blue' &&
+                            store.state.theme === 'dark',
+                          'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8':
+                            dim.color === 'blue' &&
+                            store.state.theme !== 'dark',
                         }"
                         :title="dVal"
-                      >{{ dVal }}</span>
-                      <span v-if="dim.values.length === 0" class="tw:text-xs tw:italic"
-                        :class="store.state.theme === 'dark' ? 'tw:text-grey-6' : 'tw:text-grey-5'"
-                      >No values</span>
+                        >{{ dVal }}</span
+                      >
+                      <span
+                        v-if="dim.values.length === 0"
+                        class="tw:text-xs tw:italic"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'tw:text-grey-6'
+                            : 'tw:text-grey-5'
+                        "
+                        >No values</span
+                      >
                     </div>
                   </div>
                 </div>
@@ -830,7 +1398,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-card-section>
           </q-card>
         </q-dialog>
-
       </div>
 
       <!-- Section 3: Warnings -->
@@ -844,67 +1411,123 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="warning" color="warning" />
           </template>
           <div class="tw:flex tw:flex-col tw:gap-1">
-            <div
-              v-for="(warn, idx) in warnings"
-              :key="idx"
-              class="tw:text-sm"
-            >
+            <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
               {{ warn }}
             </div>
           </div>
         </q-banner>
       </div>
 
-
       <!-- Field Details Dialog -->
-      <q-dialog v-model="detailsDialogVisible" @hide="preselectedValue = ''; popupPrimaryValue = ''; popupColumnSelections = []">
-        <q-card style="width: 760px; max-width: 95vw;">
+      <q-dialog
+        v-model="detailsDialogVisible"
+        @hide="
+          preselectedValue = '';
+          popupPrimaryValue = '';
+          popupColumnSelections = [];
+        "
+      >
+        <q-card style="width: 760px; max-width: 95vw">
           <q-card-section class="row items-center q-pb-none">
             <div class="text-h6 tw:flex tw:items-center tw:gap-2">
               {{ primaryDim?.display }}
-              <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey">: {{ popupPrimaryValue }}</span>
+              <span v-if="popupPrimaryValue" class="text-subtitle2 text-grey"
+                >: {{ popupPrimaryValue }}</span
+              >
             </div>
             <q-space />
-            <q-btn icon="close" flat round dense v-close-popup />
+            <OButton variant="ghost" size="icon" v-close-popup>
+              <q-icon name="close" size="14px" />
+            </OButton>
           </q-card-section>
 
-          <q-card-section class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
+          <q-card-section
+            class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t"
+          >
             <!-- Header section with cardinality details -->
             <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
               <span class="tw:font-medium">Cardinality:</span>
-              <q-badge :color="cardinalityColor(dimensionAnalytics[primaryDim?.group_id]?.cardinality_class || 'Unknown')" rounded class="tw:px-2">
-                {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }} unique values
+              <q-badge
+                :color="
+                  cardinalityColor(
+                    dimensionAnalytics[primaryDim?.group_id]
+                      ?.cardinality_class || 'Unknown',
+                  )
+                "
+                rounded
+                class="tw:px-2"
+              >
+                {{
+                  dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0
+                }}
+                unique values
               </q-badge>
-              <q-badge outline :color="cardinalityColor(dimensionAnalytics[primaryDim?.group_id]?.cardinality_class || 'Unknown')">
-                {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality_class || 'Unknown' }}
+              <q-badge
+                outline
+                :color="
+                  cardinalityColor(
+                    dimensionAnalytics[primaryDim?.group_id]
+                      ?.cardinality_class || 'Unknown',
+                  )
+                "
+              >
+                {{
+                  dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                  "Unknown"
+                }}
               </q-badge>
             </div>
-            
+
             <!-- Two-pane Layout for Streams and Values -->
-            <div 
-              v-if="selectedFieldAnalytics?.sample_values && Object.keys(selectedFieldAnalytics.sample_values).length" 
+            <div
+              v-if="
+                selectedFieldAnalytics?.sample_values &&
+                Object.keys(selectedFieldAnalytics.sample_values).length
+              "
               class="tw:flex tw:h-[300px]"
             >
               <!-- Left Pane: Streams List -->
-              <div class="tw:w-1/3 tw:border-r tw:bg-grey-1 dark:tw:bg-dark tw:flex tw:flex-col">
+              <div
+                class="tw:w-1/3 tw:border-r tw:bg-grey-1 dark:tw:bg-dark tw:flex tw:flex-col"
+              >
                 <!-- Static column header — never scrolls, never gets covered -->
                 <div
                   class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
-                  :style="{ backgroundColor: store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee' }"
+                  :style="{
+                    backgroundColor:
+                      store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
+                  }"
                 >
-                  <span>{{ selectedStreamType || ['logs', 'metrics', 'traces'].find(t => selectedFieldAnalytics.sample_values[t]) }}</span>
+                  <span>{{
+                    selectedStreamType ||
+                    ["logs", "metrics", "traces"].find(
+                      (t) => selectedFieldAnalytics.sample_values[t],
+                    )
+                  }}</span>
                   <span class="tw:text-grey-5">Streams</span>
                 </div>
 
                 <!-- Scrollable content -->
                 <div class="tw:overflow-y-auto tw:flex-1">
                   <!-- Filtered to one type: no section header needed -->
-                  <template v-if="selectedStreamType && selectedFieldAnalytics.sample_values[selectedStreamType]">
+                  <template
+                    v-if="
+                      selectedStreamType &&
+                      selectedFieldAnalytics.sample_values[selectedStreamType]
+                    "
+                  >
                     <div
-                      v-for="streamName in Object.keys(selectedFieldAnalytics.sample_values[selectedStreamType])"
+                      v-for="streamName in Object.keys(
+                        selectedFieldAnalytics.sample_values[
+                          selectedStreamType
+                        ],
+                      )"
                       :key="streamName"
                       class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
-                      :class="{ 'tw:bg-primary/20 tw:text-primary tw:font-medium': activeStreamId === streamName }"
+                      :class="{
+                        'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                          activeStreamId === streamName,
+                      }"
                       @click="activeStreamId = streamName"
                     >
                       {{ streamName }}
@@ -914,22 +1537,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
                   <template v-else>
                     <template
-                      v-for="(typeName, typeIdx) in ['logs', 'metrics', 'traces'].filter(t => selectedFieldAnalytics.sample_values[t])"
+                      v-for="(typeName, typeIdx) in [
+                        'logs',
+                        'metrics',
+                        'traces',
+                      ].filter((t) => selectedFieldAnalytics.sample_values[t])"
                       :key="typeName"
                     >
                       <div
                         v-if="typeIdx > 0"
                         class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-grey-5 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
-                        :style="{ backgroundColor: store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee' }"
+                        :style="{
+                          backgroundColor:
+                            store.state.theme === 'dark'
+                              ? '#1d1d1d'
+                              : '#eeeeee',
+                        }"
                       >
                         {{ typeName }}
                       </div>
                       <div
-                        v-for="streamName in Object.keys(selectedFieldAnalytics.sample_values[typeName])"
+                        v-for="streamName in Object.keys(
+                          selectedFieldAnalytics.sample_values[typeName],
+                        )"
                         :key="typeName + '-' + streamName"
                         class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
-                        :class="{ 'tw:bg-primary/20 tw:text-primary tw:font-medium': activeStreamId === streamName && activeStreamType === typeName }"
-                        @click="activeStreamId = streamName; activeStreamType = typeName"
+                        :class="{
+                          'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                            activeStreamId === streamName &&
+                            activeStreamType === typeName,
+                        }"
+                        @click="
+                          activeStreamId = streamName;
+                          activeStreamType = typeName;
+                        "
                       >
                         {{ streamName }}
                       </div>
@@ -941,7 +1582,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Right Pane: N-1 hierarchy columns -->
               <div
                 class="tw:flex-1 tw:flex tw:overflow-x-auto"
-                :style="{ backgroundColor: store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff' }"
+                :style="{
+                  backgroundColor:
+                    store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff',
+                }"
               >
                 <div
                   v-for="(col, colIdx) in popupColumns"
@@ -951,7 +1595,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:sticky tw:top-0 tw:z-10 tw:border-b"
-                    :style="{ backgroundColor: store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee' }"
+                    :style="{
+                      backgroundColor:
+                        store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
+                    }"
                   >
                     {{ col.display }}
                   </div>
@@ -960,35 +1607,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="val in getPopupColumnValues(colIdx)"
                       :key="val"
                       class="tw:px-3 tw:py-2 tw:rounded tw:border tw:transition-colors tw:cursor-pointer tw:font-mono tw:truncate"
-                      :style="popupColumnSelections[colIdx] === val
-                        ? {}
-                        : { backgroundColor: store.state.theme === 'dark' ? '#2d2d2d' : '#f5f5f5', borderColor: store.state.theme === 'dark' ? '#444' : '#e0e0e0' }"
-                      :class="popupColumnSelections[colIdx] === val
-                        ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
-                        : ''"
+                      :style="
+                        popupColumnSelections[colIdx] === val
+                          ? {}
+                          : {
+                              backgroundColor:
+                                store.state.theme === 'dark'
+                                  ? '#2d2d2d'
+                                  : '#f5f5f5',
+                              borderColor:
+                                store.state.theme === 'dark'
+                                  ? '#444'
+                                  : '#e0e0e0',
+                            }
+                      "
+                      :class="
+                        popupColumnSelections[colIdx] === val
+                          ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
+                          : ''
+                      "
                       @click="selectPopupColumnValue(colIdx, val)"
                     >
                       {{ val }}
                     </div>
-                    <div v-if="getPopupColumnValues(colIdx).length === 0" class="tw:text-grey-5 tw:text-xs tw:italic tw:p-2">
+                    <div
+                      v-if="getPopupColumnValues(colIdx).length === 0"
+                      class="tw:text-grey-5 tw:text-xs tw:italic tw:p-2"
+                    >
                       No values
                     </div>
                   </div>
                 </div>
                 <!-- Fallback when no ranked dims beyond the selected field -->
-                <div v-if="popupColumns.length === 0" class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-grey-5 tw:text-sm tw:italic">
+                <div
+                  v-if="popupColumns.length === 0"
+                  class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-grey-5 tw:text-sm tw:italic"
+                >
                   No additional dimensions detected.
                 </div>
               </div>
             </div>
-            
+
             <div v-else class="text-grey tw:italic tw:p-4 tw:text-center">
               No sample data available for this field.
             </div>
           </q-card-section>
         </q-card>
       </q-dialog>
-
     </div>
   </div>
 </template>
@@ -1001,6 +1666,9 @@ import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { clearIdentityConfigCache } from "@/utils/identityConfig";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { Plus } from "lucide-vue-next";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1056,25 +1724,25 @@ const suggestionDismissed = ref(false);
 const dimensionAnalytics = ref<Record<string, DimensionAnalytics>>({});
 
 /** Section 2: pill-based field configuration */
-const addingToEnv = ref<string>('');
-const addFieldValue = ref('');
+const addingToEnv = ref<string>("");
+const addFieldValue = ref("");
 const addingTrackedAlias = ref(false);
-const addTrackedAliasValue = ref('');
+const addTrackedAliasValue = ref("");
 const addTrackedAliasSelectRef = ref<any>(null);
-const addFieldFilter = ref('');
+const addFieldFilter = ref("");
 
 /** All env keys that have at least one configured field, ordered by detected env order */
 const allConfiguredEnvs = computed(() => {
-  const envOrder = detectedEnvironments.value.map(e => e.key);
+  const envOrder = detectedEnvironments.value.map((e) => e.key);
   const configured = new Set(
     Object.entries(setDistinguishBy.value)
       .filter(([, fields]) => fields.filter(Boolean).length > 0)
-      .map(([key]) => key)
+      .map(([key]) => key),
   );
   // Sort by detected environment order, then append any not in that list
   return [
-    ...envOrder.filter(k => configured.has(k)),
-    ...[...configured].filter(k => !envOrder.includes(k)),
+    ...envOrder.filter((k) => configured.has(k)),
+    ...[...configured].filter((k) => !envOrder.includes(k)),
   ];
 });
 
@@ -1088,12 +1756,15 @@ const suggestionAlreadyApplied = computed(() => {
   if (!suggestedConfig.value?.distinguish_by?.length) return false;
   const suggested = [...suggestedConfig.value.distinguish_by].sort();
   const current = [...configuredFields.value].sort();
-  return suggested.length === current.length && suggested.every((v, i) => v === current[i]);
+  return (
+    suggested.length === current.length &&
+    suggested.every((v, i) => v === current[i])
+  );
 });
 
 /** Display label for the active environment tab */
 const activeEnvLabel = computed(() =>
-  getIdentitySetLabel(activeEnvironment.value)
+  getIdentitySetLabel(activeEnvironment.value),
 );
 
 /** Field Details Dialog State */
@@ -1147,12 +1818,23 @@ const currentIdentityConfig = ref<ServiceIdentityConfig | null>(null);
 /** Tracked alias group IDs — limits which groups are written to discovered service records */
 const trackedAliasIds = ref<string[]>([]);
 
+/** When true, correlation matches streams without requiring the `service` dimension */
+const serviceOptional = ref<boolean>(false);
+
 // Computed value for the right pane based on selected stream
 const activeStreamValues = computed(() => {
-  if (!selectedFieldAnalytics.value?.sample_values || !activeStreamId.value || !activeStreamType.value) {
+  if (
+    !selectedFieldAnalytics.value?.sample_values ||
+    !activeStreamId.value ||
+    !activeStreamType.value
+  ) {
     return [];
   }
-  return selectedFieldAnalytics.value.sample_values[activeStreamType.value]?.[activeStreamId.value] || [];
+  return (
+    selectedFieldAnalytics.value.sample_values[activeStreamType.value]?.[
+      activeStreamId.value
+    ] || []
+  );
 });
 
 /** Active environment tab - auto-selects first detected environment */
@@ -1160,25 +1842,24 @@ const activeEnvironment = ref<string>("");
 
 /** Map of group_id first segment -> environment key (shared from serviceStreamEnvs util) */
 
-
 /** Environments from the identity config, filtered to only show those with actual detected data */
 const detectedEnvironments = computed(() => {
   const sets = currentIdentityConfig.value?.sets;
   if (!sets?.length) return [];
 
   // Filter sets to only show those with actual detected workload data
-  const filteredSets = sets.filter(set => {
+  const filteredSets = sets.filter((set) => {
     // Check if this environment has workload groups with detected fields
     // Use the workloadDetectedGroups logic which filters availableGroups by cardinality > 0
     const workloadGroups = workloadDetectedGroups.value;
 
     // Map environment names to the types of workload groups they should contain
     const environmentPatterns: Record<string, RegExp[]> = {
-      'kubernetes': [/^k8s/i, /kubernetes/i],
-      'k8s': [/^k8s/i, /kubernetes/i],
-      'aws': [/^aws/i],
-      'azure': [/^azure/i],
-      'gcp': [/^gcp/i]
+      kubernetes: [/^k8s/i, /kubernetes/i],
+      k8s: [/^k8s/i, /kubernetes/i],
+      aws: [/^aws/i],
+      azure: [/^azure/i],
+      gcp: [/^gcp/i],
     };
 
     const patterns = environmentPatterns[set.id.toLowerCase()] || [];
@@ -1187,13 +1868,16 @@ const detectedEnvironments = computed(() => {
     if (patterns.length === 0) return true;
 
     // Check if any workload groups match this environment's patterns
-    return workloadGroups.some(group =>
-      patterns.some(pattern => pattern.test(group.group_id) || pattern.test(group.display))
+    return workloadGroups.some((group) =>
+      patterns.some(
+        (pattern) =>
+          pattern.test(group.group_id) || pattern.test(group.display),
+      ),
     );
   });
 
   return filteredSets
-    .map(set => ({ key: set.id, label: set.label }))
+    .map((set) => ({ key: set.id, label: set.label }))
     .sort((a, b) => a.label.localeCompare(b.label));
 });
 
@@ -1206,10 +1890,10 @@ const activeEnvGroups = computed(() => {
 
   if (!activeEnvironment.value || activeEnvironment.value === "all") {
     // For "all" tab: show all configured distinguish_by fields from all sets
-    configuredFieldIds = sets.flatMap(set => set.distinguish_by || []);
+    configuredFieldIds = sets.flatMap((set) => set.distinguish_by || []);
   } else {
     // For specific environment tab: show only fields for that set
-    const activeSet = sets.find(set => set.id === activeEnvironment.value);
+    const activeSet = sets.find((set) => set.id === activeEnvironment.value);
     configuredFieldIds = activeSet?.distinguish_by || [];
   }
 
@@ -1217,7 +1901,9 @@ const activeEnvGroups = computed(() => {
   // Remove duplicates and sort alphabetically for consistent display
   const uniqueFieldIds = [...new Set(configuredFieldIds)];
   const groups = uniqueFieldIds
-    .map(fieldId => availableGroups.value.find(group => group.group_id === fieldId))
+    .map((fieldId) =>
+      availableGroups.value.find((group) => group.group_id === fieldId),
+    )
     .filter((group): group is FoundGroup => group !== undefined);
 
   // Sort groups by display name for consistent ordering
@@ -1225,28 +1911,39 @@ const activeEnvGroups = computed(() => {
 });
 
 /** Auto-select first detected environment when data loads */
-watch(detectedEnvironments, (envs) => {
-  if (envs.length > 0 && !envs.some(e => e.key === activeEnvironment.value)) {
-    activeEnvironment.value = envs[0].key;
-  }
-}, { immediate: true });
+watch(
+  detectedEnvironments,
+  (envs) => {
+    if (
+      envs.length > 0 &&
+      !envs.some((e) => e.key === activeEnvironment.value)
+    ) {
+      activeEnvironment.value = envs[0].key;
+    }
+  },
+  { immediate: true },
+);
 
 /** Ensure activeEnvironment is never invalid */
-watch(activeEnvironment, (env) => {
-  // Prevent "all" or empty values that cause save issues
-  if (!env || env === "all") {
-    const validEnvironments = detectedEnvironments.value;
-    if (validEnvironments.length > 0) {
-      activeEnvironment.value = validEnvironments[0].key;
+watch(
+  activeEnvironment,
+  (env) => {
+    // Prevent "all" or empty values that cause save issues
+    if (!env || env === "all") {
+      const validEnvironments = detectedEnvironments.value;
+      if (validEnvironments.length > 0) {
+        activeEnvironment.value = validEnvironments[0].key;
+      }
     }
-  }
-}, { immediate: true });
+  },
+  { immediate: true },
+);
 
 /** Reset suggestion + add state when switching tabs */
 watch(activeEnvironment, () => {
   suggestionDismissed.value = false;
-  addingToEnv.value = '';
-  addFieldValue.value = '';
+  addingToEnv.value = "";
+  addFieldValue.value = "";
 });
 
 /** Re-show recommendation when user changes fields away from the suggested config */
@@ -1260,9 +1957,11 @@ watch(configuredFields, () => {
 const activeEnvCoverage = computed(() => {
   if (!totalServices.value || activeEnvGroups.value.length === 0) return null;
   const coverages = activeEnvGroups.value
-    .map(g => {
+    .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
-      return dim ? Math.round((dim.service_count / totalServices.value) * 100) : null;
+      return dim
+        ? Math.round((dim.service_count / totalServices.value) * 100)
+        : null;
     })
     .filter((v): v is number => v !== null);
   if (!coverages.length) return null;
@@ -1271,15 +1970,13 @@ const activeEnvCoverage = computed(() => {
 
 /** Available groups filtered to only include ones with actual detected workload data */
 const workloadDetectedGroups = computed(() => {
-  return availableGroups.value.filter(group => {
+  return availableGroups.value.filter((group) => {
     const dim = dimensionAnalytics.value[group.group_id];
     // Only include groups that have dimension analytics with meaningful cardinality
     // This excludes empty groups like AWS/Azure/Kubernetes with 0 detected fields
     return dim && dim.cardinality > 0;
   });
 });
-
-
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
@@ -1314,60 +2011,79 @@ async function saveFieldMappings() {
 
 /** The FoundGroup for the "service" group (used for stream type chips) */
 const serviceGroup = computed<FoundGroup | undefined>(() =>
-  availableGroups.value.find((g) => g.group_id === "service")
+  availableGroups.value.find((g) => g.group_id === "service"),
 );
-const serviceGroupDisplay = computed(() => serviceGroup.value?.display ?? "Service");
-const serviceGroupStreamTypes = computed(() => serviceGroup.value?.stream_types ?? []);
+const serviceGroupDisplay = computed(
+  () => serviceGroup.value?.display ?? "Service",
+);
+const serviceGroupStreamTypes = computed(
+  () => serviceGroup.value?.stream_types ?? [],
+);
 
 /** Service name banner: expanded/collapsed toggle */
 const serviceNameExpanded = ref(false);
 
 /** Color themes for up to 5 dimension stat cards */
 const DIM_CARD_THEMES = [
-  { // blue
-    icon: 'cloud',
-    iconClass: 'tw:text-blue-5',
-    countClass: 'tw:text-blue-6',
-    borderDark: 'border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)',
-    borderLight: 'border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.05)',
-    pillDark: 'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3',
-    pillLight: 'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8',
+  {
+    // blue
+    icon: "cloud",
+    iconClass: "tw:text-blue-5",
+    countClass: "tw:text-blue-6",
+    borderDark:
+      "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
+    borderLight:
+      "border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.05)",
+    pillDark: "tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3",
+    pillLight: "tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8",
   },
-  { // teal
-    icon: 'folder_open',
-    iconClass: 'tw:text-teal-5',
-    countClass: 'tw:text-teal-6',
-    borderDark: 'border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)',
-    borderLight: 'border: 1px solid rgba(20,184,166,0.3); background: rgba(20,184,166,0.05)',
-    pillDark: 'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3',
-    pillLight: 'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8',
+  {
+    // teal
+    icon: "folder_open",
+    iconClass: "tw:text-teal-5",
+    countClass: "tw:text-teal-6",
+    borderDark:
+      "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
+    borderLight:
+      "border: 1px solid rgba(20,184,166,0.3); background: rgba(20,184,166,0.05)",
+    pillDark: "tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3",
+    pillLight: "tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8",
   },
-  { // purple
-    icon: 'widgets',
-    iconClass: 'tw:text-purple-5',
-    countClass: 'tw:text-purple-6',
-    borderDark: 'border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)',
-    borderLight: 'border: 1px solid rgba(168,85,247,0.3); background: rgba(168,85,247,0.05)',
-    pillDark: 'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3',
-    pillLight: 'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8',
+  {
+    // purple
+    icon: "widgets",
+    iconClass: "tw:text-purple-5",
+    countClass: "tw:text-purple-6",
+    borderDark:
+      "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
+    borderLight:
+      "border: 1px solid rgba(168,85,247,0.3); background: rgba(168,85,247,0.05)",
+    pillDark: "tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3",
+    pillLight: "tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8",
   },
-  { // amber
-    icon: 'lan',
-    iconClass: 'tw:text-amber-5',
-    countClass: 'tw:text-amber-6',
-    borderDark: 'border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)',
-    borderLight: 'border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.05)',
-    pillDark: 'tw:bg-amber-10/30 tw:border-amber-9/50 tw:text-amber-3',
-    pillLight: 'tw:bg-amber-1/50 tw:border-amber-2 tw:text-amber-8',
+  {
+    // amber
+    icon: "lan",
+    iconClass: "tw:text-amber-5",
+    countClass: "tw:text-amber-6",
+    borderDark:
+      "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
+    borderLight:
+      "border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.05)",
+    pillDark: "tw:bg-amber-10/30 tw:border-amber-9/50 tw:text-amber-3",
+    pillLight: "tw:bg-amber-1/50 tw:border-amber-2 tw:text-amber-8",
   },
-  { // rose
-    icon: 'hub',
-    iconClass: 'tw:text-red-4',
-    countClass: 'tw:text-red-5',
-    borderDark: 'border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)',
-    borderLight: 'border: 1px solid rgba(244,63,94,0.3); background: rgba(244,63,94,0.05)',
-    pillDark: 'tw:bg-red-10/30 tw:border-red-9/50 tw:text-red-3',
-    pillLight: 'tw:bg-red-1/50 tw:border-red-2 tw:text-red-8',
+  {
+    // rose
+    icon: "hub",
+    iconClass: "tw:text-red-4",
+    countClass: "tw:text-red-5",
+    borderDark:
+      "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
+    borderLight:
+      "border: 1px solid rgba(244,63,94,0.3); background: rgba(244,63,94,0.05)",
+    pillDark: "tw:bg-red-10/30 tw:border-red-9/50 tw:text-red-3",
+    pillLight: "tw:bg-red-1/50 tw:border-red-2 tw:text-red-8",
   },
 ] as const;
 
@@ -1416,16 +2132,16 @@ const workloadSummary = computed(() => {
   return {
     dims: dimSummaries,
     // Backward-compat accessors used by insightData
-    primaryLabel: dimSummaries[0]?.label ?? '',
-    primarySingularLabel: dimSummaries[0]?.singularLabel ?? '',
+    primaryLabel: dimSummaries[0]?.label ?? "",
+    primarySingularLabel: dimSummaries[0]?.singularLabel ?? "",
     primaryCount: dimSummaries[0]?.count ?? 0,
     primaryValues,
-    secondaryLabel: dimSummaries[1]?.label ?? '',
-    secondarySingularLabel: dimSummaries[1]?.singularLabel ?? '',
+    secondaryLabel: dimSummaries[1]?.label ?? "",
+    secondarySingularLabel: dimSummaries[1]?.singularLabel ?? "",
     secondaryCount: dimSummaries[1]?.count ?? 0,
     secondaryValues: Array.from(allSecondaryVals),
-    tertiaryLabel: dimSummaries[2]?.label ?? '',
-    tertiarySingularLabel: dimSummaries[2]?.singularLabel ?? '',
+    tertiaryLabel: dimSummaries[2]?.label ?? "",
+    tertiarySingularLabel: dimSummaries[2]?.singularLabel ?? "",
     tertiaryCount: dimSummaries[2]?.count ?? 0,
     tertiaryValues: Array.from(allTertiaryVals),
   };
@@ -1433,36 +2149,47 @@ const workloadSummary = computed(() => {
 
 /** Dynamic dim cards — built from workloadSummary.dims + themes */
 const dimCards = computed(() => {
-  const levels: Array<'primary' | 'secondary' | 'tertiary'> = ['primary', 'secondary', 'tertiary'];
+  const levels: Array<"primary" | "secondary" | "tertiary"> = [
+    "primary",
+    "secondary",
+    "tertiary",
+  ];
   return workloadSummary.value.dims
     .map((s, i) => ({
       dim: s.dim,
       theme: DIM_CARD_THEMES[i] ?? DIM_CARD_THEMES[0],
-      level: levels[i] ?? ('tertiary' as const),
+      level: levels[i] ?? ("tertiary" as const),
       label: s.singularLabel,
       count: s.count,
       values: s.values,
     }))
-    .filter(c => c.count > 0 || c.values.length > 0);
+    .filter((c) => c.count > 0 || c.values.length > 0);
 });
 
 /** Open insight dialog by card index */
 function openInsightDialogByIdx(value: string, idx: number) {
-  const levels: Array<'primary' | 'secondary' | 'tertiary'> = ['primary', 'secondary', 'tertiary'];
-  openInsightDialog(value, levels[idx] ?? 'tertiary');
+  const levels: Array<"primary" | "secondary" | "tertiary"> = [
+    "primary",
+    "secondary",
+    "tertiary",
+  ];
+  openInsightDialog(value, levels[idx] ?? "tertiary");
 }
 
 /** Workload insight popup state */
 const insightDialogOpen = ref(false);
-const insightDialogValue = ref('');
-const insightDialogLevel = ref<'primary' | 'secondary' | 'tertiary'>('primary');
+const insightDialogValue = ref("");
+const insightDialogLevel = ref<"primary" | "secondary" | "tertiary">("primary");
 /** Tracks selected pill per dimension column for drill-down filtering (dimIdx → selected value) */
 const insightSelectedDim = ref<Record<number, string>>({});
 
-function openInsightDialog(value: string, level: 'primary' | 'secondary' | 'tertiary') {
+function openInsightDialog(
+  value: string,
+  level: "primary" | "secondary" | "tertiary",
+) {
   insightDialogValue.value = value;
   insightDialogLevel.value = level;
-  insightSelectedDim.value = {};  // Reset drill-down selections
+  insightSelectedDim.value = {}; // Reset drill-down selections
   insightDialogOpen.value = true;
 
   // Auto-select the first row in the first dimension column
@@ -1508,7 +2235,8 @@ function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
   const prevDim = dimensions[prevIdx];
   if (prevDim?.groupId && dim.groupId) {
     const prevAnalytics = dimensionAnalytics.value[prevDim.groupId];
-    const filtered = prevAnalytics?.value_children?.[prevSelected]?.[dim.groupId] ?? [];
+    const filtered =
+      prevAnalytics?.value_children?.[prevSelected]?.[dim.groupId] ?? [];
     if (filtered.length > 0) return filtered.slice().sort();
   }
 
@@ -1519,29 +2247,29 @@ function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
 /** Format a list of labels into proper English: "A", "A or B", "A, B, or C" */
 function formatSelectableLabels(dims: any[]): string {
   const labels = dims.slice(0, -1).map((d: any) => d.label);
-  if (labels.length === 0) return '';
+  if (labels.length === 0) return "";
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
-  return labels.slice(0, -1).join(', ') + ', or ' + labels[labels.length - 1];
+  return labels.slice(0, -1).join(", ") + ", or " + labels[labels.length - 1];
 }
 
 /** Format all dimension labels into proper English: "A", "A and B", "A, B, and C" */
 function formatDimLabels(dims: any[]): string {
   const labels = dims.map((d: any) => d.label);
-  if (labels.length === 0) return '';
+  if (labels.length === 0) return "";
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return labels.slice(0, -1).join(', ') + ', and ' + labels[labels.length - 1];
+  return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
 }
 
 /** Returns inline style for selected dimension pill — subtle primary highlight */
 function getDimSelectedStyle(_color: string): Record<string, string> {
-  const isDark = store.state.theme === 'dark';
+  const isDark = store.state.theme === "dark";
   return {
-    backgroundColor: isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)',
-    borderColor: isDark ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.4)',
-    color: isDark ? '#93c5fd' : '#1d4ed8',
-    fontWeight: '600',
+    backgroundColor: isDark ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.1)",
+    borderColor: isDark ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.4)",
+    color: isDark ? "#93c5fd" : "#1d4ed8",
+    fontWeight: "600",
   };
 }
 
@@ -1550,19 +2278,22 @@ const insightData = computed(() => {
   const val = insightDialogValue.value;
   const level = insightDialogLevel.value;
   const cards = primaryDimCards.value;
-  const isCardLevel = val === '';
+  const isCardLevel = val === "";
 
-  if (level === 'primary') {
+  if (level === "primary") {
     const group = primaryDim.value;
     const dim = group ? dimensionAnalytics.value[group.group_id] : null;
 
     if (isCardLevel) {
       // Card-level: show ALL primary values with their secondary/tertiary counts
       const allValues = Object.keys(cards);
-      const children = allValues.map(pVal => {
+      const children = allValues.map((pVal) => {
         const card = cards[pVal];
         const secondaryCount = card?.childValues?.length ?? 0;
-        const tertiaryCount = Object.values(card?.tertiaryValues ?? {}).reduce((sum, arr) => sum + arr.length, 0);
+        const tertiaryCount = Object.values(card?.tertiaryValues ?? {}).reduce(
+          (sum, arr) => sum + arr.length,
+          0,
+        );
         return { name: pVal, count: secondaryCount, tertiaryCount };
       });
       children.sort((a, b) => b.count - a.count);
@@ -1572,11 +2303,15 @@ const insightData = computed(() => {
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
-        childLabel: '',
-        childCountLabel: secondaryDim.value ? pluralize(secondaryDim.value.display).toLowerCase() : '',
-        tertiaryCountLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display).toLowerCase() : '',
+        childLabel: "",
+        childCountLabel: secondaryDim.value
+          ? pluralize(secondaryDim.value.display).toLowerCase()
+          : "",
+        tertiaryCountLabel: tertiaryDim.value
+          ? pluralize(tertiaryDim.value.display).toLowerCase()
+          : "",
         children,
-        maxChildCount: Math.max(...children.map(c => c.count), 1),
+        maxChildCount: Math.max(...children.map((c) => c.count), 1),
         isCardLevel: true,
       };
     }
@@ -1586,15 +2321,23 @@ const insightData = computed(() => {
     const count = dim?.value_counts?.[val] ?? null;
     const total = dim?.service_count ?? null;
 
-    const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
+    const streamDetails = group
+      ? getValueStreamDetails(group.group_id, val)
+      : [];
 
     // Build dimension columns (no stream columns — chart handles that)
-    const relatedDimensions: { label: string; level: string; color: string; values: string[]; groupId?: string }[] = [];
+    const relatedDimensions: {
+      label: string;
+      level: string;
+      color: string;
+      values: string[];
+      groupId?: string;
+    }[] = [];
     if (card && secondaryDim.value) {
       relatedDimensions.push({
         label: secondaryDim.value.display,
-        level: 'secondary',
-        color: 'teal',
+        level: "secondary",
+        color: "teal",
         values: card.childValues,
         groupId: secondaryDim.value.group_id,
       });
@@ -1606,8 +2349,8 @@ const insightData = computed(() => {
         }
         relatedDimensions.push({
           label: tertiaryDim.value.display,
-          level: 'tertiary',
-          color: 'purple',
+          level: "tertiary",
+          color: "purple",
           values: [...allTertiary].sort(),
           groupId: tertiaryDim.value.group_id,
         });
@@ -1618,20 +2361,27 @@ const insightData = computed(() => {
     const children: { name: string; count: number }[] = [];
     if (card && secondaryDim.value) {
       for (const cv of card.childValues) {
-        children.push({ name: cv, count: card.tertiaryValues[cv]?.length ?? 0 });
+        children.push({
+          name: cv,
+          count: card.tertiaryValues[cv]?.length ?? 0,
+        });
       }
       children.sort((a, b) => b.count - a.count);
     }
     return {
       title: val,
-      subtitle: group?.display ?? '',
+      subtitle: group?.display ?? "",
       coverage,
       count,
       total,
-      childLabel: secondaryDim.value ? pluralize(secondaryDim.value.display) : '',
-      childCountLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display).toLowerCase() : '',
+      childLabel: secondaryDim.value
+        ? pluralize(secondaryDim.value.display)
+        : "",
+      childCountLabel: tertiaryDim.value
+        ? pluralize(tertiaryDim.value.display).toLowerCase()
+        : "",
       children,
-      maxChildCount: Math.max(...children.map(c => c.count), 1),
+      maxChildCount: Math.max(...children.map((c) => c.count), 1),
       relatedDimensions,
       isCardLevel: false,
       streamTypes: group ? getValueStreamTypes(group.group_id, val) : [],
@@ -1639,14 +2389,14 @@ const insightData = computed(() => {
     };
   }
 
-  if (level === 'secondary') {
+  if (level === "secondary") {
     const group = secondaryDim.value;
     const dim = group ? dimensionAnalytics.value[group.group_id] : null;
 
     if (isCardLevel) {
       // Card-level: show ALL secondary values with their tertiary counts
       const allVals = workloadSummary.value.secondaryValues;
-      const children = allVals.map(sVal => {
+      const children = allVals.map((sVal) => {
         const tertiaryVals = getSecondaryTertiaryValues(sVal);
         // Find which primaries contain this secondary
         let parentCount = 0;
@@ -1662,11 +2412,15 @@ const insightData = computed(() => {
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
-        childLabel: '',
-        childCountLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display).toLowerCase() : '',
-        parentCountLabel: primaryDim.value ? pluralize(primaryDim.value.display).toLowerCase() : '',
+        childLabel: "",
+        childCountLabel: tertiaryDim.value
+          ? pluralize(tertiaryDim.value.display).toLowerCase()
+          : "",
+        parentCountLabel: primaryDim.value
+          ? pluralize(primaryDim.value.display).toLowerCase()
+          : "",
         children,
-        maxChildCount: Math.max(...children.map(c => c.count), 1),
+        maxChildCount: Math.max(...children.map((c) => c.count), 1),
         isCardLevel: true,
       };
     }
@@ -1680,13 +2434,21 @@ const insightData = computed(() => {
     }
     const tertiaryVals = getSecondaryTertiaryValues(val);
 
-    const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
-    const relatedDimensions: { label: string; level: string; color: string; values: string[]; groupId?: string }[] = [];
+    const streamDetails = group
+      ? getValueStreamDetails(group.group_id, val)
+      : [];
+    const relatedDimensions: {
+      label: string;
+      level: string;
+      color: string;
+      values: string[];
+      groupId?: string;
+    }[] = [];
     if (primaryDim.value && parents.length > 0) {
       relatedDimensions.push({
         label: primaryDim.value.display,
-        level: 'primary',
-        color: 'blue',
+        level: "primary",
+        color: "blue",
         values: parents.sort(),
         groupId: primaryDim.value.group_id,
       });
@@ -1694,8 +2456,8 @@ const insightData = computed(() => {
     if (tertiaryDim.value && tertiaryVals.length > 0) {
       relatedDimensions.push({
         label: tertiaryDim.value.display,
-        level: 'tertiary',
-        color: 'purple',
+        level: "tertiary",
+        color: "purple",
         values: tertiaryVals,
         groupId: tertiaryDim.value.group_id,
       });
@@ -1703,15 +2465,19 @@ const insightData = computed(() => {
 
     return {
       title: val,
-      subtitle: group?.display ?? '',
+      subtitle: group?.display ?? "",
       coverage,
       count,
       total,
-      childLabel: primaryDim.value ? `Found in ${pluralize(primaryDim.value.display).toLowerCase()}` : '',
-      childCountLabel: '',
-      children: parents.map(p => ({ name: p, count: 0 })),
+      childLabel: primaryDim.value
+        ? `Found in ${pluralize(primaryDim.value.display).toLowerCase()}`
+        : "",
+      childCountLabel: "",
+      children: parents.map((p) => ({ name: p, count: 0 })),
       maxChildCount: 1,
-      tertiaryLabel: tertiaryDim.value ? pluralize(tertiaryDim.value.display) : '',
+      tertiaryLabel: tertiaryDim.value
+        ? pluralize(tertiaryDim.value.display)
+        : "",
       tertiaryValues: tertiaryVals,
       relatedDimensions,
       isCardLevel: false,
@@ -1727,7 +2493,7 @@ const insightData = computed(() => {
   if (isCardLevel) {
     // Card-level: show ALL tertiary values with their locations
     const allVals = workloadSummary.value.tertiaryValues;
-    const children = allVals.map(tVal => {
+    const children = allVals.map((tVal) => {
       const locs = getTertiaryLocations(tVal);
       return { name: tVal, count: locs.length };
     });
@@ -1738,10 +2504,10 @@ const insightData = computed(() => {
       coverage: null,
       count: null,
       total: dim?.service_count ?? null,
-      childLabel: '',
-      childCountLabel: 'locations',
+      childLabel: "",
+      childCountLabel: "locations",
       children,
-      maxChildCount: Math.max(...children.map(c => c.count), 1),
+      maxChildCount: Math.max(...children.map((c) => c.count), 1),
       isCardLevel: true,
     };
   }
@@ -1752,23 +2518,33 @@ const insightData = computed(() => {
   const locations = getTertiaryLocations(val);
 
   const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
-  const relatedDimensions: { label: string; level: string; color: string; values: string[]; groupId?: string }[] = [];
+  const relatedDimensions: {
+    label: string;
+    level: string;
+    color: string;
+    values: string[];
+    groupId?: string;
+  }[] = [];
   if (primaryDim.value && locations.length > 0) {
-    const uniquePrimaries = [...new Set(locations.map(l => l.primary))].sort();
+    const uniquePrimaries = [
+      ...new Set(locations.map((l) => l.primary)),
+    ].sort();
     relatedDimensions.push({
       label: primaryDim.value.display,
-      level: 'primary',
-      color: 'blue',
+      level: "primary",
+      color: "blue",
       values: uniquePrimaries,
       groupId: primaryDim.value.group_id,
     });
   }
   if (secondaryDim.value && locations.length > 0) {
-    const uniqueSecondaries = [...new Set(locations.map(l => l.secondary))].sort();
+    const uniqueSecondaries = [
+      ...new Set(locations.map((l) => l.secondary)),
+    ].sort();
     relatedDimensions.push({
       label: secondaryDim.value.display,
-      level: 'secondary',
-      color: 'teal',
+      level: "secondary",
+      color: "teal",
       values: uniqueSecondaries,
       groupId: secondaryDim.value.group_id,
     });
@@ -1776,12 +2552,12 @@ const insightData = computed(() => {
 
   return {
     title: val,
-    subtitle: group?.display ?? '',
+    subtitle: group?.display ?? "",
     coverage,
     count,
     total,
-    childLabel: 'Runs in',
-    childCountLabel: '',
+    childLabel: "Runs in",
+    childCountLabel: "",
     children: [] as { name: string; count: number }[],
     maxChildCount: 1,
     locations,
@@ -1797,22 +2573,27 @@ const insightData = computed(() => {
 const insightPanelWidth = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return '480px';
-  if (colCount === 3) return '640px';
-  return '800px'; // 4+
+  if (colCount <= 2) return "480px";
+  if (colCount === 3) return "640px";
+  return "800px"; // 4+
 });
 
-const STREAM_TYPE_COLORS: Record<string, string> = { logs: '#3b82f6', traces: '#f59e0b', metrics: '#22c55e' };
+const STREAM_TYPE_COLORS: Record<string, string> = {
+  logs: "#3b82f6",
+  traces: "#f59e0b",
+  metrics: "#22c55e",
+};
 
 const insightChartData = computed(() => {
   if (!insightDialogOpen.value) return { options: {} };
 
-  const isDark = store.state.theme === 'dark';
+  const isDark = store.state.theme === "dark";
   const data = insightData.value;
-  const streamDetails: { streamType: string; streamNames: string[] }[] = (data as any).streamDetails ?? [];
+  const streamDetails: { streamType: string; streamNames: string[] }[] =
+    (data as any).streamDetails ?? [];
 
   // Build pie data from stream details: each slice = one stream type, value = number of streams
-  const pieData = streamDetails.map(sd => ({
+  const pieData = streamDetails.map((sd) => ({
     name: sd.streamType.charAt(0).toUpperCase() + sd.streamType.slice(1),
     value: sd.streamNames.length,
     streamNames: sd.streamNames,
@@ -1823,66 +2604,84 @@ const insightChartData = computed(() => {
   return {
     options: {
       tooltip: {
-        trigger: 'item',
+        trigger: "item",
         enterable: true,
         appendToBody: true,
         confine: false,
         textStyle: {
-          color: isDark ? '#fff' : '#000',
+          color: isDark ? "#fff" : "#000",
           fontSize: 12,
         },
-        backgroundColor: isDark ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,1)',
-        extraCssText: 'max-height: 240px; overflow-y: auto;',
+        backgroundColor: isDark ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+        extraCssText: "max-height: 240px; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
           const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
           if (!names.length) return header;
-          const list = names.map(n =>
-            `<div style="padding:1px 0;padding-left:14px;font-size:11px;">${n}</div>`
-          ).join('');
-          return header + '<div style="margin-top:4px;">' + list + '</div>';
+          const list = names
+            .map(
+              (n) =>
+                `<div style="padding:1px 0;padding-left:14px;font-size:11px;">${n}</div>`,
+            )
+            .join("");
+          return header + '<div style="margin-top:4px;">' + list + "</div>";
         },
       },
-      color: streamDetails.map(sd => STREAM_TYPE_COLORS[sd.streamType] ?? '#9ca3af'),
-      series: [{
-        type: 'pie',
-        radius: ['50%', '78%'],
-        center: ['50%', '50%'],
-        avoidLabelOverlap: true,
-        itemStyle: {
-          borderRadius: 4,
-          borderColor: isDark ? '#111827' : '#fff',
-          borderWidth: 2,
-        },
-        label: { show: false },
-        emphasis: {
+      color: streamDetails.map(
+        (sd) => STREAM_TYPE_COLORS[sd.streamType] ?? "#9ca3af",
+      ),
+      series: [
+        {
+          type: "pie",
+          radius: ["50%", "78%"],
+          center: ["50%", "50%"],
+          avoidLabelOverlap: true,
+          itemStyle: {
+            borderRadius: 4,
+            borderColor: isDark ? "#111827" : "#fff",
+            borderWidth: 2,
+          },
           label: { show: false },
-          itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.2)' },
+          emphasis: {
+            label: { show: false },
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: "rgba(0, 0, 0, 0.2)",
+            },
+          },
+          data: pieData,
         },
-        data: pieData,
-      }],
-      graphic: totalStreams > 0 ? [{
-        type: 'text',
-        left: 'center',
-        top: 'center',
-        style: {
-          text: `${totalStreams}`,
-          fontSize: 22,
-          fontWeight: 'bold',
-          fill: isDark ? '#e5e7eb' : '#1f2937',
-          textAlign: 'center',
-        },
-        subtextStyle: {
-          text: 'streams',
-          fontSize: 10,
-        },
-      }] : [],
+      ],
+      graphic:
+        totalStreams > 0
+          ? [
+              {
+                type: "text",
+                left: "center",
+                top: "center",
+                style: {
+                  text: `${totalStreams}`,
+                  fontSize: 22,
+                  fontWeight: "bold",
+                  fill: isDark ? "#e5e7eb" : "#1f2937",
+                  textAlign: "center",
+                },
+                subtextStyle: {
+                  text: "streams",
+                  fontSize: 10,
+                },
+              },
+            ]
+          : [],
     },
   };
 });
 
 /** Unique field names actually found in data (from service_field_sources) with their stream types */
-const detectedServiceFields = computed<{ name: string; streamTypes: string[] }[]>(() => {
+const detectedServiceFields = computed<
+  { name: string; streamTypes: string[] }[]
+>(() => {
   if (serviceFieldSources.value.length > 0) {
     return serviceFieldSources.value
       .map((s) => ({ name: s.field_name, streamTypes: s.stream_types }))
@@ -1917,12 +2716,15 @@ const unseenServiceFields = computed<string[]>(() => {
 const serviceFieldSummary = computed(() => {
   const fields = detectedServiceFields.value;
   const shown = fields.slice(0, 2).map((f) => f.name);
-  const remaining = fields.length - shown.length + unseenServiceFields.value.length;
+  const remaining =
+    fields.length - shown.length + unseenServiceFields.value.length;
   return { shown, remaining };
 });
 
 /** Whether service name field is detected in any stream */
-const serviceNameDetected = computed(() => detectedServiceFields.value.length > 0);
+const serviceNameDetected = computed(
+  () => detectedServiceFields.value.length > 0,
+);
 
 /** Currently selected field analytics mapping */
 const selectedFieldAnalytics = computed(() => {
@@ -1942,13 +2744,16 @@ function getPopupColumnValues(colIndex: number): string[] {
     // Filter by primary value if selected
     if (popupPrimaryValue.value) {
       const analytics = dimensionAnalytics.value[primaryDim.value.group_id];
-      return analytics?.value_children?.[popupPrimaryValue.value]?.[col.group_id] ?? [];
+      return (
+        analytics?.value_children?.[popupPrimaryValue.value]?.[col.group_id] ??
+        []
+      );
     }
     // No primary selected — union all secondary values
     const analytics = dimensionAnalytics.value[primaryDim.value.group_id];
     const all = new Set<string>();
     for (const children of Object.values(analytics?.value_children ?? {})) {
-      for (const v of (children[col.group_id] ?? [])) all.add(v);
+      for (const v of children[col.group_id] ?? []) all.add(v);
     }
     return [...all].sort();
   }
@@ -1960,7 +2765,7 @@ function getPopupColumnValues(colIndex: number): string[] {
   if (!prevSelection) {
     const all = new Set<string>();
     for (const children of Object.values(prevAnalytics?.value_children ?? {})) {
-      for (const v of (children[col.group_id] ?? [])) all.add(v);
+      for (const v of children[col.group_id] ?? []) all.add(v);
     }
     return [...all].sort();
   }
@@ -1979,9 +2784,9 @@ function selectPopupColumnValue(colIndex: number, val: string) {
 
 /** Calculate the total total number of services (used as denominator for coverage) */
 const totalServices = computed(() => {
-  const serviceDim = dimensionAnalytics.value['service'];
+  const serviceDim = dimensionAnalytics.value["service"];
   if (serviceDim) return serviceDim.service_count;
-  
+
   // Fallback: use the max service count across all dimensions
   let max = 0;
   for (const key in dimensionAnalytics.value) {
@@ -2007,26 +2812,36 @@ const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
   if (env === "kubernetes" || env === "k8s") {
     envType = "Kubernetes";
     description = "Kubernetes fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value.filter(g => g.group_id.startsWith('k8s-')).map(g => g.group_id);
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("k8s-"))
+      .map((g) => g.group_id);
   } else if (env === "aws") {
-    const isEcs = activeEnvGroups.value.some(g => g.group_id.startsWith('aws-ecs-'));
+    const isEcs = activeEnvGroups.value.some((g) =>
+      g.group_id.startsWith("aws-ecs-"),
+    );
     envType = isEcs ? "AWS ECS" : "AWS";
     description = `${envType} fields detected in your telemetry data.`;
-    evidenceGroups = activeEnvGroups.value.filter(g => g.group_id.startsWith('aws-')).map(g => g.group_id);
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("aws-"))
+      .map((g) => g.group_id);
   } else if (env === "gcp") {
     envType = "GCP";
     description = "GCP fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value.filter(g => g.group_id.startsWith('gcp-')).map(g => g.group_id);
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("gcp-"))
+      .map((g) => g.group_id);
   } else if (env === "azure") {
     envType = "Azure";
     description = "Azure fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value.filter(g => g.group_id.startsWith('azure-')).map(g => g.group_id);
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("azure-"))
+      .map((g) => g.group_id);
   }
 
   return {
     environment_type: envType,
     description: description,
-    evidence_groups: evidenceGroups.slice(0, 3)
+    evidence_groups: evidenceGroups.slice(0, 3),
   };
 });
 
@@ -2044,25 +2859,32 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
 
   // Cardinality preference rank (lower = better for disambiguation)
   const CARD_RANK: Record<string, number> = {
-    VeryLow: 1, Low: 2, Medium: 3, High: 4, VeryHigh: 5,
+    VeryLow: 1,
+    Low: 2,
+    Medium: 3,
+    High: 4,
+    VeryHigh: 5,
   };
 
   // Score each group in the active environment using actual analytics data
   const scored = envGroups
-    .map(g => {
+    .map((g) => {
       const a = analytics[g.group_id];
       // Prefer dimensionAnalytics cardinality_class; fall back to available_groups field
       const cardClass = a?.cardinality_class ?? g.cardinality_class ?? "Medium";
       const cardRank = CARD_RANK[cardClass] ?? 3;
       // Coverage = fraction of services that carry this field
-      const coverage = a && totalServices.value > 0
-        ? Math.round((a.service_count / totalServices.value) * 100)
-        : (g.recommended ? 100 : 0);
+      const coverage =
+        a && totalServices.value > 0
+          ? Math.round((a.service_count / totalServices.value) * 100)
+          : g.recommended
+            ? 100
+            : 0;
       const streamCount = g.stream_types?.length ?? 0;
       return { id: g.group_id, cardRank, cardClass, coverage, streamCount };
     })
     // Exclude high-cardinality fields (they make bad disambiguation keys)
-    .filter(s => s.cardRank <= 3)
+    .filter((s) => s.cardRank <= 3)
     // Prefer fields that appear across multiple stream types (more reliable for correlation)
     .sort((a, b) => {
       if (a.cardRank !== b.cardRank) return a.cardRank - b.cardRank;
@@ -2072,27 +2894,36 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
 
   if (scored.length === 0) return null;
 
-  const suggested = scored.slice(0, 3).map(s => s.id);
+  const suggested = scored.slice(0, 3).map((s) => s.id);
 
   // Build evidence string from actual numbers
   const top = scored.slice(0, suggested.length);
   const bestCard = top[0]?.cardClass ?? "";
-  const minCoverage = Math.min(...top.map(s => s.coverage));
-  const allStreamTypes = [...new Set(top.flatMap(s => {
-    const g = envGroups.find(g => g.group_id === s.id);
-    return g?.stream_types ?? [];
-  }))];
+  const minCoverage = Math.min(...top.map((s) => s.coverage));
+  const allStreamTypes = [
+    ...new Set(
+      top.flatMap((s) => {
+        const g = envGroups.find((g) => g.group_id === s.id);
+        return g?.stream_types ?? [];
+      }),
+    ),
+  ];
 
   const parts: string[] = [];
   if (bestCard) parts.push(`${bestCard} cardinality`);
   if (minCoverage > 0) parts.push(`${minCoverage}% coverage`);
   if (allStreamTypes.length > 1) {
-    parts.push(`across ${allStreamTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ')}`);
+    parts.push(
+      `across ${allStreamTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(", ")}`,
+    );
   }
 
   return {
     distinguish_by: suggested,
-    reason: parts.length > 0 ? `${parts.join(' · ')} — ideal for service disambiguation` : "Recommended based on field coverage in your streams.",
+    reason:
+      parts.length > 0
+        ? `${parts.join(" · ")} — ideal for service disambiguation`
+        : "Recommended based on field coverage in your streams.",
   };
 });
 
@@ -2107,20 +2938,27 @@ const suggestedConfig = computed<SuggestedConfig | null>(() => {
 const rankedDims = computed<FoundGroup[]>(() => {
   const groups = activeEnvGroups.value;
   if (!groups.length) return [];
-  
+
   return [...groups].sort((a, b) => {
     // 1. Prefer dimensionAnalytics cardinality
     const aCard = dimensionAnalytics.value[a.group_id]?.cardinality;
     const bCard = dimensionAnalytics.value[b.group_id]?.cardinality;
     if (aCard !== undefined && bCard !== undefined) return aCard - bCard;
-    
+
     // 2. Fallback to available_groups unique_values
     const aUV = a.unique_values ?? 999;
     const bUV = b.unique_values ?? 999;
     if (aUV !== bUV) return aUV - bUV;
-    
+
     // 3. Fallback to cardinality_class heuristic
-    const cardRank: Record<string, number> = { "VeryLow": 1, "Low": 2, "Medium": 3, "High": 4, "VeryHigh": 5, "Unknown": 6 };
+    const cardRank: Record<string, number> = {
+      VeryLow: 1,
+      Low: 2,
+      Medium: 3,
+      High: 4,
+      VeryHigh: 5,
+      Unknown: 6,
+    };
     const aCR = cardRank[a.cardinality_class || "Unknown"] || 6;
     const bCR = cardRank[b.cardinality_class || "Unknown"] || 6;
     return aCR - bCR;
@@ -2128,7 +2966,9 @@ const rankedDims = computed<FoundGroup[]>(() => {
 });
 
 const primaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[0]);
-const secondaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[1]);
+const secondaryDim = computed<FoundGroup | undefined>(
+  () => rankedDims.value[1],
+);
 const tertiaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[2]);
 
 /**
@@ -2151,18 +2991,29 @@ const hierarchyLabel = computed<string | null>(() => {
  * Each entry has childValues: the co-occurring values of the secondary dim.
  * Falls back to using available_groups cardinality_class/unique_values if analytics is empty.
  */
-const primaryDimCards = computed<Record<string, { childValues: string[]; tertiaryValues: Record<string, string[]> }>>(() => {
+const primaryDimCards = computed<
+  Record<
+    string,
+    { childValues: string[]; tertiaryValues: Record<string, string[]> }
+  >
+>(() => {
   const primary = primaryDim.value;
   if (!primary) return {};
   const analytics = dimensionAnalytics.value[primary.group_id];
   const secondary = secondaryDim.value;
   const tertiary = tertiaryDim.value;
 
-  const result: Record<string, { childValues: string[]; tertiaryValues: Record<string, string[]> }> = {};
+  const result: Record<
+    string,
+    { childValues: string[]; tertiaryValues: Record<string, string[]> }
+  > = {};
 
   // Find primary values to show as cards
   let primaryValues: string[] = [];
-  if (analytics?.value_children && Object.keys(analytics.value_children).length > 0) {
+  if (
+    analytics?.value_children &&
+    Object.keys(analytics.value_children).length > 0
+  ) {
     primaryValues = Object.keys(analytics.value_children);
   } else {
     primaryValues = getGroupValues(primary);
@@ -2177,46 +3028,53 @@ const primaryDimCards = computed<Record<string, { childValues: string[]; tertiar
   // Sort cards by per-value coverage descending (most common value first)
   if (analytics?.value_counts) {
     const counts = analytics.value_counts;
-    primaryValues = [...primaryValues].sort((a, b) => (counts[b] ?? 0) - (counts[a] ?? 0));
+    primaryValues = [...primaryValues].sort(
+      (a, b) => (counts[b] ?? 0) - (counts[a] ?? 0),
+    );
   }
 
   // Cap at 20 cards to prevent UI lag
   for (const val of primaryValues.slice(0, 20)) {
     const childMap = analytics?.value_children?.[val];
-    const childValues = secondary ? (childMap?.[secondary.group_id] ?? []).slice().sort() : [];
-    
+    const childValues = secondary
+      ? (childMap?.[secondary.group_id] ?? []).slice().sort()
+      : [];
+
     const tertiaryValues: Record<string, string[]> = {};
     if (tertiary && secondary) {
       for (const sVal of childValues) {
         const sAnalytics = dimensionAnalytics.value[secondary.group_id];
         if (sAnalytics?.value_children?.[sVal]) {
-           tertiaryValues[sVal] = (sAnalytics.value_children[sVal][tertiary.group_id] ?? []).slice().sort();
+          tertiaryValues[sVal] = (
+            sAnalytics.value_children[sVal][tertiary.group_id] ?? []
+          )
+            .slice()
+            .sort();
         }
       }
     }
     result[val] = { childValues, tertiaryValues };
   }
-  
+
   return result;
 });
 
-
 /** Default tracked alias options shown when analytics data is not yet loaded */
 const DEFAULT_TRACKED_OPTIONS = [
-  { label: 'K8s Cluster', value: 'k8s-cluster' },
-  { label: 'K8s Namespace', value: 'k8s-namespace' },
-  { label: 'K8s Deployment', value: 'k8s-deployment' },
-  { label: 'K8s StatefulSet', value: 'k8s-statefulset' },
-  { label: 'K8s DaemonSet', value: 'k8s-daemonset' },
-  { label: 'K8s Pod Name', value: 'k8s-pod-name' },
-  { label: 'AWS ECS Cluster', value: 'aws-ecs-cluster' },
-  { label: 'AWS ECS Task', value: 'aws-ecs-task' },
-  { label: 'Cloud Account', value: 'cloud-account' },
-  { label: 'Region', value: 'region' },
-  { label: 'Environment', value: 'environment' },
-  { label: 'Host', value: 'host' },
-  { label: 'Service Namespace', value: 'service-namespace' },
-  { label: 'Service Version', value: 'service-version' },
+  { label: "K8s Cluster", value: "k8s-cluster" },
+  { label: "K8s Namespace", value: "k8s-namespace" },
+  { label: "K8s Deployment", value: "k8s-deployment" },
+  { label: "K8s StatefulSet", value: "k8s-statefulset" },
+  { label: "K8s DaemonSet", value: "k8s-daemonset" },
+  { label: "K8s Pod Name", value: "k8s-pod-name" },
+  { label: "AWS ECS Cluster", value: "aws-ecs-cluster" },
+  { label: "AWS ECS Task", value: "aws-ecs-task" },
+  { label: "Cloud Account", value: "cloud-account" },
+  { label: "Region", value: "region" },
+  { label: "Environment", value: "environment" },
+  { label: "Host", value: "host" },
+  { label: "Service Namespace", value: "service-namespace" },
+  { label: "Service Version", value: "service-version" },
 ];
 
 /**
@@ -2226,10 +3084,13 @@ const DEFAULT_TRACKED_OPTIONS = [
 const trackedAliasOptions = computed(() => {
   const groups = availableGroups.value;
   if (groups.length > 0) {
-    return groups.map((g: FoundGroup) => ({
-      label: g.display,
-      value: g.group_id,
-    }));
+    // Backend rejects "service" — it is always tracked implicitly
+    return groups
+      .filter((g: FoundGroup) => g.group_id !== "service")
+      .map((g: FoundGroup) => ({
+        label: g.display,
+        value: g.group_id,
+      }));
   }
   return DEFAULT_TRACKED_OPTIONS;
 });
@@ -2239,35 +3100,42 @@ const trackedAliasOptions = computed(() => {
  * All tracked alias IDs are included - if no label is found, uses a formatted version of the ID.
  */
 const resolvedTrackedAliases = computed(() => {
-  const allOptions = [
-    ...trackedAliasOptions.value,
-    ...DEFAULT_TRACKED_OPTIONS,
-  ];
-  const labelMap = new Map(allOptions.map(o => [o.value, o.label]));
+  const allOptions = [...trackedAliasOptions.value, ...DEFAULT_TRACKED_OPTIONS];
+  const labelMap = new Map(allOptions.map((o) => [o.value, o.label]));
 
-  return [...trackedAliasIds.value].map(id => {
-    let label = labelMap.get(id);
-    if (!label) {
-      // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
-      label = id.split('-').map(part =>
-        part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
-      ).join(' ');
-      console.warn(`[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`);
-    }
-    return { id, label };
-  }).sort((a, b) => a.label.localeCompare(b.label));
+  return [...trackedAliasIds.value]
+    .map((id) => {
+      let label = labelMap.get(id);
+      if (!label) {
+        // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
+        label = id
+          .split("-")
+          .map(
+            (part) =>
+              part.charAt(0).toUpperCase() + part.slice(1).toLowerCase(),
+          )
+          .join(" ");
+        console.warn(
+          `[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`,
+        );
+      }
+      return { id, label };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 });
 
 /** Options for the tracked alias add-picker — excludes already-selected IDs */
 const trackedAliasAddOptions = computed(() =>
-  trackedAliasOptions.value.filter(o => !trackedAliasIds.value.includes(o.value))
+  trackedAliasOptions.value.filter(
+    (o) => !trackedAliasIds.value.includes(o.value),
+  ),
 );
 
 function onAddTrackedAlias(value: string) {
   if (value && !trackedAliasIds.value.includes(value)) {
     trackedAliasIds.value = [...trackedAliasIds.value, value];
   }
-  addTrackedAliasValue.value = '';
+  addTrackedAliasValue.value = "";
   addingTrackedAlias.value = false;
 }
 
@@ -2281,16 +3149,24 @@ function getGroupByValue(value: string): FoundGroup | undefined {
   // If no exact match, try case-insensitive fallback
   if (!group) {
     const lowerValue = value.toLowerCase();
-    group = availableGroups.value.find((g) => g.group_id.toLowerCase() === lowerValue);
+    group = availableGroups.value.find(
+      (g) => g.group_id.toLowerCase() === lowerValue,
+    );
   }
 
   // Fall back to semanticGroups prop for display name when not in analytics data
   if (!group && props.semanticGroups) {
     const alias = props.semanticGroups.find(
-      (a) => a.id === value || a.id.toLowerCase() === value.toLowerCase()
+      (a) => a.id === value || a.id.toLowerCase() === value.toLowerCase(),
     );
     if (alias) {
-      return { group_id: value, display: alias.display, stream_types: [], aliases: {}, recommended: false };
+      return {
+        group_id: value,
+        display: alias.display,
+        stream_types: [],
+        aliases: {},
+        recommended: false,
+      };
     }
   }
 
@@ -2309,7 +3185,7 @@ function deduplicateAndSortGroups(groups: FoundGroup[]): FoundGroup[] {
 
   // 1. Deduplicate by group_id (keep first occurrence)
   const seen = new Set<string>();
-  const deduplicated = groups.filter(group => {
+  const deduplicated = groups.filter((group) => {
     if (seen.has(group.group_id)) {
       return false; // Skip duplicate
     }
@@ -2375,7 +3251,12 @@ function streamTypeColor(streamType: string): string {
 function pluralize(val: string): string {
   if (!val) return "";
   if (val.toLowerCase().endsWith("y")) return val.slice(0, -1) + "ies";
-  if (val.toLowerCase().endsWith("sh") || val.toLowerCase().endsWith("ch") || val.toLowerCase().endsWith("s")) return val + "es";
+  if (
+    val.toLowerCase().endsWith("sh") ||
+    val.toLowerCase().endsWith("ch") ||
+    val.toLowerCase().endsWith("s")
+  )
+    return val + "es";
   return val + "s";
 }
 
@@ -2386,7 +3267,7 @@ function cardinalityColor(cardClass: string): string {
     Low: "positive",
     Medium: "warning",
     High: "negative",
-    VeryHigh: "negative"
+    VeryHigh: "negative",
   };
   return map[cardClass] ?? "grey";
 }
@@ -2394,7 +3275,11 @@ function cardinalityColor(cardClass: string): string {
 /** Get the best available cardinality class for a group */
 function getEffectiveCardinalityClass(group?: FoundGroup): string {
   if (!group) return "Unknown";
-  return dimensionAnalytics.value[group.group_id]?.cardinality_class || group.cardinality_class || "Unknown";
+  return (
+    dimensionAnalytics.value[group.group_id]?.cardinality_class ||
+    group.cardinality_class ||
+    "Unknown"
+  );
 }
 
 /** Get which stream types a specific value was found in for a dimension group */
@@ -2414,7 +3299,10 @@ function getValueStreamTypes(groupId: string, value: string): string[] {
 }
 
 /** Get detailed stream info: which stream type + which stream names contain this value */
-function getValueStreamDetails(groupId: string, value: string): { streamType: string; streamNames: string[] }[] {
+function getValueStreamDetails(
+  groupId: string,
+  value: string,
+): { streamType: string; streamNames: string[] }[] {
   const dim = dimensionAnalytics.value[groupId];
   if (!dim?.sample_values) return [];
   const result: { streamType: string; streamNames: string[] }[] = [];
@@ -2455,7 +3343,10 @@ function getGroupCoverage(group: FoundGroup): number | null {
  * e.g., getValueCoverage(k8s-cluster, "staging") → 70 means 70% of K8s services are in staging.
  * This is the "within-group" breakdown, not global coverage.
  */
-function getValueCoverage(group: FoundGroup | undefined, value: string): number | null {
+function getValueCoverage(
+  group: FoundGroup | undefined,
+  value: string,
+): number | null {
   if (!group) return null;
   const dim = dimensionAnalytics.value[group.group_id];
   if (!dim?.value_counts || !dim.service_count) return null;
@@ -2478,7 +3369,9 @@ function getSecondaryTertiaryValues(secondaryVal: string): string[] {
 }
 
 /** For a tertiary dim value, find all cluster→namespace locations where it runs */
-function getTertiaryLocations(tertiaryVal: string): { primary: string; secondary: string }[] {
+function getTertiaryLocations(
+  tertiaryVal: string,
+): { primary: string; secondary: string }[] {
   const cards = primaryDimCards.value;
   const locations: { primary: string; secondary: string }[] = [];
   for (const [pVal, card] of Object.entries(cards)) {
@@ -2495,7 +3388,9 @@ function getTertiaryLocations(tertiaryVal: string): { primary: string; secondary
 
 /** Generate a unique group ID for a manually-added group */
 function generateGroupId(): string {
-  const existing = Object.keys(setDistinguishBy.value).filter(k => k.startsWith('custom-'));
+  const existing = Object.keys(setDistinguishBy.value).filter((k) =>
+    k.startsWith("custom-"),
+  );
   const next = existing.length + 1;
   return `custom-${next}`;
 }
@@ -2505,7 +3400,7 @@ function removeFieldByIdFromEnv(envKey: string, fieldId: string) {
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,
-    [envKey]: current.filter(id => id !== fieldId),
+    [envKey]: current.filter((id) => id !== fieldId),
   };
 }
 
@@ -2516,8 +3411,10 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
   const count = dim?.cardinality ?? group?.unique_values;
   const cardClass = dim?.cardinality_class ?? group?.cardinality_class;
   if (count == null) return null;
-  const formatted = cardClass ? cardClass.replace(/([a-z])([A-Z])/g, '$1 $2') : '';
-  const classLabel = formatted ? ` (${formatted} cardinality)` : '';
+  const formatted = cardClass
+    ? cardClass.replace(/([a-z])([A-Z])/g, "$1 $2")
+    : "";
+  const classLabel = formatted ? ` (${formatted} cardinality)` : "";
   return `${count} unique values${classLabel} — fewer values = better for grouping`;
 }
 
@@ -2526,19 +3423,29 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
  * We track this so we can show an inline hint only on first setup.
  */
 const isAutoSuggested = computed(() => {
-  return !currentIdentityConfig.value?.sets?.length && allConfiguredEnvs.value.length > 0;
+  return (
+    !currentIdentityConfig.value?.sets?.length &&
+    allConfiguredEnvs.value.length > 0
+  );
 });
 
 /** Options for the inline "add field" select for a specific env */
 function getAddFieldOptionsForEnv(envKey: string) {
   // Exclude fields already added in the current env AND all other envs
-  const allUsedFields = Object.values(setDistinguishBy.value).flat().filter(Boolean);
+  const allUsedFields = Object.values(setDistinguishBy.value)
+    .flat()
+    .filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
   const needle = addFieldFilter.value.toLowerCase();
   return availableGroups.value
-    .filter(g => !used.has(g.group_id))
-    .filter(g => !needle || g.display.toLowerCase().includes(needle) || g.group_id.toLowerCase().includes(needle))
-    .map(g => {
+    .filter((g) => !used.has(g.group_id))
+    .filter(
+      (g) =>
+        !needle ||
+        g.display.toLowerCase().includes(needle) ||
+        g.group_id.toLowerCase().includes(needle),
+    )
+    .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
       return {
@@ -2548,7 +3455,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
         recommended: g.recommended,
         uniqueValues: dim?.cardinality ?? g.unique_values ?? null,
         cardinalityLabel: cardClass,
-        cardinalityColor: cardClass ? cardinalityColor(cardClass) : 'grey',
+        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "grey",
       };
     });
 }
@@ -2562,25 +3469,26 @@ function onAddFieldFilter(val: string, update: (fn: () => void) => void) {
 /** Called when user picks a field in the inline select for a specific env */
 function onAddFieldToEnv(envKey: string, val: string) {
   if (!val) return;
-  addFieldFilter.value = '';
+  addFieldFilter.value = "";
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,
     [envKey]: [...current.filter(Boolean), val],
   };
-  addFieldValue.value = '';
-  addingToEnv.value = '';
+  addFieldValue.value = "";
+  addingToEnv.value = "";
 }
 
 function applySuggestion() {
   if (suggestedConfig.value?.distinguish_by?.length) {
     distinguishBy.value = [...suggestedConfig.value.distinguish_by];
   }
-  addingToEnv.value = '';
+  addingToEnv.value = "";
   suggestionDismissed.value = true;
   $q.notify({
-    type: 'positive',
-    message: 'Recommended configuration applied. Click "Save Configuration" to save.',
+    type: "positive",
+    message:
+      'Recommended configuration applied. Click "Save Configuration" to save.',
     timeout: 3000,
   });
 }
@@ -2608,7 +3516,11 @@ function removeDisambiguationField(idx: number) {
   distinguishBy.value = current;
 }
 
-function openFieldDetails(field: FoundGroup, streamType: string = "", value: string = "") {
+function openFieldDetails(
+  field: FoundGroup,
+  streamType: string = "",
+  value: string = "",
+) {
   selectedField.value = field;
   selectedStreamType.value = streamType;
   activeStreamId.value = "";
@@ -2619,13 +3531,17 @@ function openFieldDetails(field: FoundGroup, streamType: string = "", value: str
 
   // Determine clicked field's position in the hierarchy and pre-select accordingly
   if (value && primaryDim.value) {
-    const fieldIdx = rankedDims.value.findIndex(d => d.group_id === field.group_id);
+    const fieldIdx = rankedDims.value.findIndex(
+      (d) => d.group_id === field.group_id,
+    );
     if (fieldIdx === 0) {
       // Clicked on primary dim (e.g. cluster) — set as primary value
       popupPrimaryValue.value = value;
     } else if (fieldIdx > 0) {
       // Clicked on secondary/tertiary — pre-select in the matching column (fieldIdx - 1)
-      const selections: (string | null)[] = new Array(rankedDims.value.length - 1).fill(null);
+      const selections: (string | null)[] = new Array(
+        rankedDims.value.length - 1,
+      ).fill(null);
       selections[fieldIdx - 1] = value;
       popupColumnSelections.value = selections;
     }
@@ -2635,7 +3551,8 @@ function openFieldDetails(field: FoundGroup, streamType: string = "", value: str
   if (selectedFieldAnalytics.value?.sample_values) {
     const sampleValues = selectedFieldAnalytics.value.sample_values;
     const types = Object.keys(sampleValues);
-    const typeToUse = streamType && types.includes(streamType) ? streamType : types[0];
+    const typeToUse =
+      streamType && types.includes(streamType) ? streamType : types[0];
 
     if (typeToUse) {
       activeStreamType.value = typeToUse;
@@ -2648,7 +3565,7 @@ function openFieldDetails(field: FoundGroup, streamType: string = "", value: str
 
       const streamName = matchingStream
         ? matchingStream[0]
-        : streamEntries[0]?.[0] ?? "";
+        : (streamEntries[0]?.[0] ?? "");
 
       activeStreamId.value = streamName;
     }
@@ -2659,7 +3576,9 @@ function openFieldDetails(field: FoundGroup, streamType: string = "", value: str
   // Scroll the highlighted value into view after the dialog renders
   if (value) {
     nextTick(() => {
-      const el = valuesScrollContainer.value?.querySelector(`[data-val="${CSS.escape(value)}"]`);
+      const el = valuesScrollContainer.value?.querySelector(
+        `[data-val="${CSS.escape(value)}"]`,
+      );
       el?.scrollIntoView({ block: "center", behavior: "smooth" });
     });
   }
@@ -2675,6 +3594,9 @@ const isDirty = computed(() => {
   if (savedTracked.length !== currentTracked.length) return true;
   if (savedTracked.some((id, i) => id !== currentTracked[i])) return true;
 
+  // Compare service_optional flag
+  if ((saved?.service_optional ?? false) !== serviceOptional.value) return true;
+
   // Compare setDistinguishBy against saved sets
   const savedSets: Record<string, string[]> = {};
   for (const set of saved?.sets ?? []) {
@@ -2682,7 +3604,10 @@ const isDirty = computed(() => {
   }
   const currentSets = setDistinguishBy.value;
 
-  const allIds = new Set([...Object.keys(savedSets), ...Object.keys(currentSets)]);
+  const allIds = new Set([
+    ...Object.keys(savedSets),
+    ...Object.keys(currentSets),
+  ]);
   for (const id of allIds) {
     const savedFields = savedSets[id] ?? [];
     const currentFields = (currentSets[id] ?? []).filter(Boolean);
@@ -2699,9 +3624,11 @@ async function loadData() {
   loading.value = true;
   try {
     // 1. Load Analytics (which now includes available_groups)
-    const analyticsRes = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
+    const analyticsRes = await serviceStreamsService.getDimensionAnalytics(
+      props.orgIdentifier,
+    );
     const summary: DimensionAnalyticsSummary = analyticsRes.data;
-    
+
     // Apply frontend deduplication and consistent sorting as safety net
     const rawGroups = summary.available_groups ?? [];
     const dedupedGroups = deduplicateAndSortGroups(rawGroups);
@@ -2709,14 +3636,19 @@ async function loadData() {
     serviceFieldSources.value = summary.service_field_sources ?? [];
 
     if (summary.dimensions) {
-      dimensionAnalytics.value = summary.dimensions.reduce((acc, dim) => {
-        acc[dim.dimension_name] = dim;
-        return acc;
-      }, {} as Record<string, DimensionAnalytics>);
+      dimensionAnalytics.value = summary.dimensions.reduce(
+        (acc, dim) => {
+          acc[dim.dimension_name] = dim;
+          return acc;
+        },
+        {} as Record<string, DimensionAnalytics>,
+      );
     }
 
     // 2. Load Current Config
-    const configRes = await serviceStreamsService.getIdentityConfig(props.orgIdentifier);
+    const configRes = await serviceStreamsService.getIdentityConfig(
+      props.orgIdentifier,
+    );
     currentIdentityConfig.value = configRes.data;
 
     // Populate per-set distinguish_by and labels from the loaded config
@@ -2732,11 +3664,18 @@ async function loadData() {
     }
 
     // Populate tracked alias IDs from loaded config
-    trackedAliasIds.value = currentIdentityConfig.value?.tracked_alias_ids ?? [];
+    trackedAliasIds.value =
+      currentIdentityConfig.value?.tracked_alias_ids ?? [];
+
+    // Populate service_optional flag from loaded config (defaults to false)
+    serviceOptional.value =
+      currentIdentityConfig.value?.service_optional ?? false;
 
     // 3. Initial suggestion for active env if no config exists for it
     // Guard: skip if activeEnvironment is the placeholder "all" key (set before real config loads)
-    const realSetIds = new Set((currentIdentityConfig.value?.sets ?? []).map(s => s.id));
+    const realSetIds = new Set(
+      (currentIdentityConfig.value?.sets ?? []).map((s) => s.id),
+    );
     if (
       activeEnvironment.value &&
       activeEnvironment.value !== "all" &&
@@ -2744,9 +3683,10 @@ async function loadData() {
       !setDistinguishBy.value[activeEnvironment.value]?.length &&
       suggestedConfig.value?.distinguish_by?.length
     ) {
-      setDistinguishBy.value[activeEnvironment.value] = [...suggestedConfig.value.distinguish_by];
+      setDistinguishBy.value[activeEnvironment.value] = [
+        ...suggestedConfig.value.distinguish_by,
+      ];
     }
-
   } catch (err: any) {
     console.error("Failed to load workload detection data:", err);
     $q.notify({
@@ -2761,13 +3701,18 @@ async function loadData() {
 
 async function loadAnalytics() {
   try {
-    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
+    const res = await serviceStreamsService.getDimensionAnalytics(
+      props.orgIdentifier,
+    );
     const summary: DimensionAnalyticsSummary = res.data;
     if (summary.dimensions) {
-      dimensionAnalytics.value = summary.dimensions.reduce((acc, dim) => {
-        acc[dim.dimension_name] = dim;
-        return acc;
-      }, {} as Record<string, DimensionAnalytics>);
+      dimensionAnalytics.value = summary.dimensions.reduce(
+        (acc, dim) => {
+          acc[dim.dimension_name] = dim;
+          return acc;
+        },
+        {} as Record<string, DimensionAnalytics>,
+      );
     }
   } catch (err) {
     console.error("Failed to load dimension analytics:", err);
@@ -2781,7 +3726,10 @@ async function saveConfig() {
     // Preserve API-provided labels from loaded config, fall back to ID itself for new sets.
     // Filter out invalid IDs like "all" that can cause duplication issues.
     const sets: IdentitySet[] = Object.entries(setDistinguishBy.value)
-      .filter(([id, fields]) => id !== "all" && id !== "" && fields.filter(Boolean).length > 0)
+      .filter(
+        ([id, fields]) =>
+          id !== "all" && id !== "" && fields.filter(Boolean).length > 0,
+      )
       .map(([id, fields]) => ({
         id,
         label: setLabels.value[id] ?? id,
@@ -2793,7 +3741,7 @@ async function saveConfig() {
         type: "warning",
         message: t(
           "settings.correlation.identityConfigNoSets",
-          "Configure at least one identity set before saving."
+          "Configure at least one identity set before saving.",
         ),
         timeout: 3000,
       });
@@ -2809,9 +3757,31 @@ async function saveConfig() {
       return;
     }
 
-    const payload: ServiceIdentityConfig = { sets, tracked_alias_ids: trackedAliasIds.value };
+    // "service" is always tracked implicitly by the backend; strip it to avoid 400.
+    // Also drop orphan ids that no longer correspond to any known group (e.g. the
+    // group was deleted from Field Mappings after being added to tracked aliases).
+    const knownGroupIds = new Set([
+      ...availableGroups.value.map(g => g.group_id),
+      ...trackedAliasOptions.value.map(o => o.value),
+    ]);
+    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(id =>
+      id !== "service" && knownGroupIds.has(id)
+    );
+    const payload: ServiceIdentityConfig = {
+      sets,
+      tracked_alias_ids: sanitizedTrackedAliasIds,
+      service_optional: serviceOptional.value,
+    };
 
-    await serviceStreamsService.saveIdentityConfig(props.orgIdentifier, payload);
+    await serviceStreamsService.saveIdentityConfig(
+      props.orgIdentifier,
+      payload,
+    );
+
+    // Invalidate the shared identity-config cache so other parts of the app
+    // (logs/traces correlation) pick up the new config immediately instead of
+    // waiting up to 5 minutes for the TTL to expire.
+    clearIdentityConfigCache(props.orgIdentifier);
 
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;
@@ -2887,5 +3857,4 @@ onMounted(() => {
     background: rgba(96, 165, 250, 0.22);
   }
 }
-
 </style>

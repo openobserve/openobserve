@@ -123,7 +123,11 @@
     "create": "작성",
     "redirectingHome": "{countdown} 초 내에 홈으로 리디렉션하는 중...",
     "resources": "리소스",
-    "updated_at": "업데이트 날짜"
+    "updated_at": "업데이트 날짜",
+    "error": "오류",
+    "db": "데이터베이스",
+    "discardChanges": "변경 내용 취소",
+    "unsavedChanges": "저장되지 않은 변경 사항"
   },
   "search": {
     "selectIndex": "스트림 우선 선택",
@@ -390,7 +394,9 @@
     "autoRunEnabled": "자동 실행 활성화",
     "selectStreamFirst": "먼저 스트림을 선택하세요",
     "traces": "트레이스",
-    "switchToLogs": "로그로 다시 전환하려면 클릭"
+    "switchToLogs": "로그로 다시 전환하려면 클릭",
+    "patternNoValuesAvailable": "사용할 수 있는 값 없음",
+    "selectLogStream": "로그 스트림 선택"
   },
   "menu": {
     "home": "홈",
@@ -1125,7 +1131,8 @@
     "nginx": "Nginx",
     "apache": "아파치",
     "iis": "입니다",
-    "pubsub": "게시/구독 로그"
+    "pubsub": "게시/구독 로그",
+    "aiLabel": "AI 통합"
   },
   "dashboard": {
     "selectField": "필드",
@@ -2234,6 +2241,8 @@
     "importedFromAnomalyPattern": "비정상적인 로그 패턴으로 미리 채워진 경고 — 긴급 설정 검토",
     "additional_settings": "추가 설정",
     "alertNamePlaceholder": "알림 이름",
+    "nameRequired": "알림 이름은 필수입니다.",
+    "nameNoSpecialChars": "알림 이름에 ':', '#', '?', '&', '%', 따옴표 또는 공백을 사용할 수 없습니다. 대신 밑줄 (_)을 사용하세요.",
     "anomalyNamePlaceholder": "예외 항목 이름",
     "folder": "폴더",
     "selectStreamTypeFirst": "먼저 스트림 유형을 선택합니다.",
@@ -2280,7 +2289,8 @@
       "addNewDestination": "새 목적지 추가",
       "destinationRequired": "목적지가 하나 이상 필요합니다!",
       "disabledNotificationsInfo": "예외 항목 탐지는 계속 실행되고 결과를 _anomalies 스트림에 기록합니다.이상 징후가 감지되면 알림을 받을 수 있도록 하세요."
-    }
+    },
+    "anomalyName": "예외 항목 이름"
   },
   "alert_templates": {
     "header": "템플릿",
@@ -2891,7 +2901,52 @@
       "multiStepAgent": "멀티스텝 에이전트"
     },
     "noLogsAvailableForService": "이 서비스에 사용할 수 있는 로그가 없습니다.",
-    "spansTruncatedWarning": "{total} 범위의 {count} 를 표시합니다. 추적이 불완전할 수 있습니다.시간 범위를 좁히거나 관리자에게 문의하여 범위 제한을 늘리십시오."
+    "spansTruncatedWarning": "{total} 범위의 {count} 를 표시합니다. 추적이 불완전할 수 있습니다.시간 범위를 좁히거나 관리자에게 문의하여 범위 제한을 늘리십시오.",
+    "servicesCatalog": {
+      "tabLabel": "서비스 카탈로그",
+      "title": "서비스 카탈로그",
+      "filterPlaceholder": "서비스 이름별 필터링...",
+      "noServicesFound": "선택한 시간 범위에서 서비스를 찾을 수 없습니다.",
+      "loading": "서비스 로드 중...",
+      "columns": {
+        "serviceName": "서비스",
+        "status": "상태",
+        "requests": "요청",
+        "errorRate": "오류율",
+        "errors": "오류",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "평균 지연 시간",
+        "lastSeen": "마지막으로 본",
+        "operations": "오퍼레이션"
+      },
+      "status": {
+        "healthy": "건강한",
+        "warning": "경고",
+        "degraded": "저하됨"
+      },
+      "viewTraces": "트레이스 보기",
+      "exportCsv": "CSV 내보내기",
+      "justNow": "바로 지금",
+      "minutesAgo": "{n} m 전",
+      "hoursAgo": "{n} 시간 전",
+      "daysAgo": "{n} 일 전"
+    },
+    "noErrorPresent": "이 스팬에는 오류가 없습니다.",
+    "httpStatusCode": "HTTP 상태 코드",
+    "grpcStatusCode": "gRPC 상태 코드",
+    "dbResponseStatusCode": "DB 응답 상태 코드",
+    "processExitCode": "프로세스 종료 코드",
+    "exceptionsWithCount": "예외 ({개수})",
+    "typeLabel": "유형:",
+    "messageLabel": "메시지:",
+    "escapedLabel": "탈출:",
+    "stacktraceLabel": "스택 트레이스:",
+    "copyStacktrace": "스택 트레이스 복사",
+    "noStacktraceAvailable": "스택트레이스를 사용할 수 없음",
+    "stacktraceCopied": "스택트레이스를 클립보드에 복사했습니다.",
+    "stacktraceCopyFailed": "스택 트레이스를 복사하지 못했습니다."
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -3293,7 +3348,9 @@
     "noMetricsDescription": "선택한 시간 범위에서 이 상관 관계에 대한 메트릭을 찾을 수 없습니다.",
     "errorRetrievingTraces": "추적을 가져오는 동안 오류가 발생했습니다.",
     "serviceGroupProtected": "서비스 그룹은 제거할 수 없습니다.매핑된 필드만 수정할 수 있습니다.",
-    "noDataFound": "데이터를 찾을 수 없음"
+    "noDataFound": "데이터를 찾을 수 없음",
+    "isWorkloadType": "서비스 식별자",
+    "isWorkloadTypeTooltip": "활성화되면 이 그룹은 서비스 (예: 클러스터, 네임스페이스, 배포) 를 고유하게 식별하는 데 사용됩니다.HTTP 메서드 또는 데이터베이스 이름과 같이 서비스를 통한 작업을 설명하는 그룹에 대해서는 사용하지 않도록 설정합니다."
   },
   "sreChat": {
     "emptyMessage": "경고 및 사고에 대해 무엇이든 물어보세요.",
@@ -3656,5 +3713,52 @@
     "clearAll": "모두 지우기",
     "clearAllTitle": "모든 채팅 지우기",
     "clearAllMessage": "이렇게 하면 모든 채팅 기록이 영구적으로 삭제됩니다.이 작업은 취소할 수 없습니다."
+  },
+  "storage_settings": {
+    "tabLabel": "조직 스토리지",
+    "title": "조직 스토리지",
+    "notEnabled": "조직 저장소가 이 조직에 대해 활성화되지 않았습니다.",
+    "notConfigured": "이 조직의 데이터에 대한 사용자 지정 저장소 제공자 구성",
+    "configured": "구성된",
+    "heroHeadline": "나만의 스토리지를 가지고 오세요",
+    "heroSub": "자체 클라우드 버킷을 연결하면 데이터가 인프라에 그대로 유지됩니다. 완전한 제어가 가능하고 종속되지 않습니다.",
+    "configureStorage": "스토리지 구성",
+    "supportedProviders": "지원되는 제공업체",
+    "noStorageConfigured": "스토리지가 구성되지 않음",
+    "routeDataDesc": "이 조직의 데이터를 다른 조직 및 글로벌 기본값과 독립적으로 전용 버킷으로 라우팅합니다.",
+    "perOrgIsolation": "조직별 격리",
+    "appliesImmediately": "새 데이터에 즉시 적용",
+    "usesOrgCredentials": "조직 범위의 자격 증명 사용",
+    "updateStorage": "스토리지 업데이트",
+    "active": "유효한",
+    "bucketName": "버킷 이름",
+    "region": "부위",
+    "serverUrl": "서버 URL",
+    "accessKey": "액세스 키",
+    "secretKey": "시크릿 키",
+    "roleArn": "역할 실행",
+    "createdAt": "에서 생성됨",
+    "updatedAt": "에 업데이트됨",
+    "featureOwnDataTitle": "데이터를 처음부터 끝까지 소유하세요",
+    "featureOwnDataDesc": "수집된 데이터를 자체 버킷에 직접 저장하고 누가 데이터에 액세스할 수 있는지 완벽하게 제어할 수 있습니다.",
+    "featureSecureTitle": "보안 및 규정 준수",
+    "featureSecureDesc": "세밀한 액세스 키를 사용하면 중요한 데이터가 인프라에 그대로 유지됩니다.",
+    "goBack": "뒤로 이동",
+    "newStorageConfiguration": "새 스토리지 구성",
+    "selectProviderDesc": "이 조직의 데이터를 저장할 클라우드 저장소 공급자를 선택합니다.",
+    "bucketNameRequired": "버킷 이름이 필요합니다",
+    "accessKeyRequired": "액세스 키가 필요합니다",
+    "secretKeyRequired": "비밀 키가 필요합니다",
+    "serverURLRequired": "서버 URL이 필요합니다.",
+    "regionRequired": "지역은 필수입니다.",
+    "roleARNRequired": "역할 ARN이 필요합니다.",
+    "back": "뒤로",
+    "continue": "계속",
+    "save": "저장",
+    "update": "업데이트",
+    "awsStsCloudInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.OpenObserve AWS 계정을 AWS 콘솔에서 이 역할의 신뢰할 수 있는 개체 유형으로 추가해야 합니다.계정 정보를 얻거나 이 정보를 설정하는 데 도움이 더 필요하면 OpenObserve 팀에 문의하십시오.",
+    "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오.",
+    "externalIdRequired": "외부 ID가 필요합니다.",
+    "storageAccountRequired": "스토리지 계정 이름이 필요합니다"
   }
 }

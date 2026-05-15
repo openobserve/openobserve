@@ -95,6 +95,31 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn test_cast_to_arr_impl_wrong_arg_count_errors() {
+        // Two args instead of one
+        let arr1 = StringArray::from(vec!["[1,2,3]"]);
+        let arr2 = StringArray::from(vec!["[4,5]"]);
+        let args = [
+            ColumnarValue::Array(Arc::new(arr1)),
+            ColumnarValue::Array(Arc::new(arr2)),
+        ];
+        assert!(cast_to_arr_impl(&args).is_err());
+    }
+
+    #[test]
+    fn test_cast_to_arr_impl_invalid_json_returns_null() {
+        let arr = StringArray::from(vec!["not-json"]);
+        let args = [ColumnarValue::Array(Arc::new(arr))];
+        let result = cast_to_arr_impl(&args).unwrap();
+        if let ColumnarValue::Array(out) = result {
+            use arrow::array::Array;
+            assert!(out.is_null(0));
+        } else {
+            panic!("expected array result");
+        }
+    }
+
     // Helper function to run a single test case
     async fn run_single_test(log_line: &str, expected_output: Vec<&str>, nullable: bool) {
         let sqls = [("select cast_to_arr(log) as ret from t", expected_output)];

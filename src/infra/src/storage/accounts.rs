@@ -13,25 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::ops::Range;
+use std::{
+    ops::Range,
+    sync::{Arc, LazyLock as Lazy},
+};
 
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, is_local_disk_storage, utils::hash::Sum64};
-use futures::stream::BoxStream;
+use futures::{TryStreamExt, stream::BoxStream};
 use hashbrown::{HashMap, HashSet};
 use object_store::{
     GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
     ObjectStoreExt as ObjStoreExt, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
     path::Path,
 };
+use tokio::sync::Mutex;
 
 use crate::storage::{ObjectStoreExt, get_stream_from_file, remote::StorageConfig};
 
 const DEFAULT_ACCOUNT: &str = "default";
 
+static ADD_ACCOUNT_LOCK: Lazy<Arc<Mutex<()>>> = Lazy::new(|| Arc::new(Mutex::new(())));
+
+// The reason accounts has the type like this is
+// 1. arc swap so we can add a new store dynamically and swap the whole map with new map with store
+//    added
+//  also, arcswap has better read perf compared to rwlock or mutex, and this is read on a very hot
+// path,  the write/swap itself should be very rare op, so arcswap is preferable
+// 2. Because, we need to duplicate the list, we need to clone the existing object, but ObjectStore
+//    trait does
+//  not provide Clone, so instead we wrap it up in Arc, so we can clone it
 pub struct StorageClientFactory {
-    accounts: HashMap<String, Box<dyn ObjectStore>>,
+    accounts: ArcSwap<HashMap<String, Arc<Box<dyn ObjectStore>>>>,
     stream_strategy: StreamStrategy,
     only_default: bool,
 }
@@ -58,33 +73,64 @@ impl StorageClientFactory {
 
     pub fn new_with_config(config: &config::S3, local_mode: bool) -> Self {
         let (stream_strategy, accounts) = parse_storage_config(config);
-        let mut storage = Self {
-            accounts: HashMap::with_capacity(accounts.len()),
-            only_default: accounts.len() == 1,
-            stream_strategy,
-        };
+        let mut temp: HashMap<String, Arc<Box<dyn ObjectStore>>> =
+            HashMap::with_capacity(accounts.len());
+        let mut only_default = accounts.len() == 1;
 
         if local_mode {
             std::fs::create_dir_all(&get_config().common.data_stream_dir)
                 .expect("create stream data dir success");
-            storage.accounts.insert(
+            temp.insert(
                 DEFAULT_ACCOUNT.to_string(),
-                Box::<super::local::Local>::default(),
+                Arc::new(Box::<super::local::Local>::default()),
             );
             // local storage only has one account
-            storage.only_default = true;
+            only_default = true;
         } else {
             for (name, config) in accounts {
-                storage
-                    .accounts
-                    .insert(name, Box::new(super::remote::Remote::new(config)));
+                temp.insert(name, Arc::new(Box::new(super::remote::Remote::new(config))));
             }
         }
-        storage
+
+        Self {
+            accounts: ArcSwap::from_pointee(temp),
+            only_default,
+            stream_strategy,
+        }
+    }
+
+    // here we use external locking to make sure the account is added correctly
+    // ObjectStore trait does not implement clone itself, so we wrap it up in
+    // arc so we can clone it.
+    // arcswap allows atomic swapping, but does not let us atomically mutate the values
+    // which means we need to swap with a complete new value. Without a lock,
+    // there is a chance that two concurrent add requests from two different orgs
+    // would clone the existing, add their own store, and whichever one swaps the last wins,
+    // effectively erasing one org's storage.
+    // Additionally adding a org level account is a very rare event, so we can take the cost
+    // of a full on lock, and basically guarantee that even with concurrent requests,
+    // both of the new stores will get added properly.
+    pub async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>) {
+        let lock = ADD_ACCOUNT_LOCK.clone();
+        let lock = lock.lock().await;
+        let r = self.accounts.load_full();
+        let mut temp = HashMap::with_capacity(r.len() + 1);
+        for (k, v) in r.iter() {
+            temp.insert(k.clone(), v.clone());
+        }
+        temp.insert(key, Arc::new(acc));
+        self.accounts.swap(Arc::new(temp));
+        drop(lock);
     }
 
     /// Get the account name for the path by the given strategy.
-    pub fn get_name_by_path(&self, path: &Path) -> Option<String> {
+    pub fn get_name_by_path(&self, org_id: &str, path: &Path) -> Option<String> {
+        // org level storage will override any other strategy, so check that first
+        // if found, return that account name else continue with flow for other strategies
+        if crate::table::org_storage_providers::get_for_org_from_cache(org_id).is_some() {
+            return Some(super::get_org_storage_key(org_id));
+        }
+
         if self.only_default {
             return None;
         }
@@ -109,14 +155,16 @@ impl StorageClientFactory {
 
     /// Get the client for the given name.
     /// If the name is not found, return the default client.
-    pub fn get_client_by_name(&self, name: &str) -> &dyn ObjectStore {
+    pub fn get_client_by_name(&self, name: &str) -> Arc<Box<dyn ObjectStore>> {
         if !name.is_empty()
-            && let Some(client) = self.accounts.get(name)
+            && let Some(client) = self.accounts.load().get(name).cloned()
         {
             return client;
         }
         self.accounts
+            .load()
             .get(DEFAULT_ACCOUNT)
+            .cloned()
             .expect("default object store account not found")
     }
 }
@@ -250,8 +298,12 @@ impl StreamStrategy {
 
 #[async_trait]
 impl ObjectStoreExt for StorageClientFactory {
-    fn get_account(&self, file: &str) -> Option<String> {
-        self.get_name_by_path(&file.into())
+    fn get_account(&self, org_id: &str, file: &str) -> Option<String> {
+        self.get_name_by_path(org_id, &file.into())
+    }
+
+    async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>) {
+        self.add_account(key, acc).await;
     }
 
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult> {
@@ -333,12 +385,15 @@ impl ObjectStoreExt for StorageClientFactory {
         self.get_client_by_name(account).delete(location).await
     }
 
-    fn delete_stream(
+    async fn delete_stream(
         &self,
         account: &str,
         locations: BoxStream<'static, Result<Path>>,
-    ) -> BoxStream<'static, Result<Path>> {
-        self.get_client_by_name(account).delete_stream(locations)
+    ) -> Result<Vec<Path>> {
+        self.get_client_by_name(account)
+            .delete_stream(locations)
+            .try_collect::<Vec<Path>>()
+            .await
     }
 
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
@@ -412,8 +467,8 @@ mod tests {
         let config = base_s3_config();
         let factory = StorageClientFactory::new_with_config(&config, true);
         assert!(factory.only_default);
-        assert_eq!(factory.accounts.len(), 1);
-        assert!(factory.accounts.contains_key("default"));
+        assert_eq!(factory.accounts.load().len(), 1);
+        assert!(factory.accounts.load().contains_key("default"));
         assert!(matches!(factory.stream_strategy, StreamStrategy::Default));
     }
 
@@ -431,7 +486,7 @@ mod tests {
 
         let factory = StorageClientFactory::new_with_config(&config, true);
         assert!(factory.only_default);
-        assert_eq!(factory.accounts.len(), 1); // includes "default" 
+        assert_eq!(factory.accounts.load().len(), 1); // includes "default" 
     }
 
     #[test]
@@ -439,8 +494,8 @@ mod tests {
         let config = base_s3_config();
         let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(factory.only_default);
-        assert_eq!(factory.accounts.len(), 1);
-        assert!(factory.accounts.contains_key("default"));
+        assert_eq!(factory.accounts.load().len(), 1);
+        assert!(factory.accounts.load().contains_key("default"));
         assert!(matches!(factory.stream_strategy, StreamStrategy::Default));
     }
 
@@ -459,7 +514,7 @@ mod tests {
 
         let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(!factory.only_default);
-        assert_eq!(factory.accounts.len(), 3); // includes "default"
+        assert_eq!(factory.accounts.load().len(), 3); // includes "default"
         assert!(matches!(
             factory.stream_strategy,
             StreamStrategy::FileHash(_)
@@ -481,7 +536,7 @@ mod tests {
 
         let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(!factory.only_default);
-        assert_eq!(factory.accounts.len(), 3); // includes "default"
+        assert_eq!(factory.accounts.load().len(), 3); // includes "default"
         assert!(matches!(
             factory.stream_strategy,
             StreamStrategy::StreamHash(_)
@@ -503,7 +558,7 @@ mod tests {
 
         let factory = StorageClientFactory::new_with_config(&config, false);
         assert!(!factory.only_default);
-        assert_eq!(factory.accounts.len(), 3); // includes "default"
+        assert_eq!(factory.accounts.load().len(), 3); // includes "default"
         match &factory.stream_strategy {
             StreamStrategy::Stream(map) => {
                 assert_eq!(map.get("stream1").unwrap(), "acc1");
@@ -536,5 +591,32 @@ mod tests {
         config.bucket_prefix = "p1,p2".to_string();
         config.stream_strategy = "stream1:acc3".to_string(); // acc3 does not exist
         StorageClientFactory::new_with_config(&config, false);
+    }
+
+    #[test]
+    fn test_get_value_by_idx_normal() {
+        let vals = ["a", "b", "c"];
+        assert_eq!(get_value_by_idx(&vals, 0), "a");
+        assert_eq!(get_value_by_idx(&vals, 1), "b");
+        assert_eq!(get_value_by_idx(&vals, 2), "c");
+    }
+
+    #[test]
+    fn test_get_value_by_idx_empty_slice() {
+        assert_eq!(get_value_by_idx(&[], 0), "");
+    }
+
+    #[test]
+    fn test_get_value_by_idx_index_out_of_bounds() {
+        let vals = ["x"];
+        assert_eq!(get_value_by_idx(&vals, 5), "");
+    }
+
+    #[test]
+    fn test_storage_client_factory_debug_and_display() {
+        let config = base_s3_config();
+        let factory = StorageClientFactory::new_with_config(&config, true);
+        assert_eq!(format!("{factory}"), "storage for StorageClientFactory");
+        assert_eq!(format!("{factory:?}"), "storage for StorageClientFactory");
     }
 }

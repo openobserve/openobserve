@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <add-to-dashboard
         @save="addPanelToDashboard"
+        @cancel="showAddToDashboardDialog = false"
         :dashboardPanelData="dashboardPanelData"
       />
     </q-dialog>
@@ -153,7 +154,6 @@ export default defineComponent({
       "bar",
       "h-bar",
       "line",
-      "stacked",
       "scatter",
       "table",
     ];

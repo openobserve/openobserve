@@ -450,6 +450,13 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         return Err(DashboardError::DashboardNotFound);
     };
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    if let Err(e) = infra::coordinator::dashboards::emit_delete_event(org_id, dashboard_id).await {
+        log::error!("[Dashboard] error emitting coordinator delete event for {dashboard_id}: {e}");
+    }
+    crate::common::infra::config::DASHBOARD_ID_TO_ORG
+        .write()
+        .await
+        .remove(dashboard_id);
     distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
     remove_ownership(
         org_id,
@@ -612,6 +619,15 @@ async fn put(
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
     let dash = table::dashboards::put(org_id, folder_id, new_folder_id, dashboard, false).await?;
+    if let Some(id) = dash.dashboard_id() {
+        if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
+            log::error!("[Dashboard] error emitting coordinator put event for {id}: {e}");
+        }
+        crate::common::infra::config::DASHBOARD_ID_TO_ORG
+            .write()
+            .await
+            .insert(id.to_string(), org_id.to_string());
+    }
     Ok(dash)
 }
 
@@ -1027,4 +1043,59 @@ async fn filter_permitted_dashboards(
         })
         .collect();
     Ok(permitted_dashboards)
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::dashboards::v8;
+
+    use super::*;
+
+    fn make_panel(i: i64, x: i64, y: i64, w: i64, h: i64) -> v8::Panel {
+        let mut p: v8::Panel = serde_json::from_str(
+            r#"{"id":"","type":"bar","title":"","description":"","config":{"show_legends":false,"legends_position":null},"queries":[]}"#
+        ).unwrap();
+        p.id = format!("p{i}");
+        p.layout = Some(v8::Layout { x, y, w, h, i });
+        p
+    }
+
+    #[test]
+    fn test_compute_panel_layout_empty_panels() {
+        let layout = compute_panel_layout(&[], None, None);
+        assert_eq!(layout.x, 0);
+        assert_eq!(layout.y, 0);
+        assert_eq!(layout.w, 96);
+        assert_eq!(layout.h, 18);
+        assert_eq!(layout.i, 1);
+    }
+
+    #[test]
+    fn test_compute_panel_layout_custom_size_empty() {
+        let layout = compute_panel_layout(&[], Some(48), Some(10));
+        assert_eq!(layout.w, 48);
+        assert_eq!(layout.h, 10);
+    }
+
+    #[test]
+    fn test_compute_panel_layout_places_below_when_no_room() {
+        // Panel at x=0, y=0, w=192 — takes full row width
+        let panels = vec![make_panel(1, 0, 0, 192, 18)];
+        let layout = compute_panel_layout(&panels, None, None);
+        // No room to the right, should place below (y = 0 + 18 = 18)
+        assert_eq!(layout.y, 18);
+        assert_eq!(layout.x, 0);
+        assert_eq!(layout.i, 2);
+    }
+
+    #[test]
+    fn test_compute_panel_layout_places_right_when_room() {
+        // Panel at x=0, y=0, w=96 — leaves room on the right
+        let panels = vec![make_panel(1, 0, 0, 96, 18)];
+        let layout = compute_panel_layout(&panels, Some(96), None);
+        // Room to the right: x = 96, y = 0
+        assert_eq!(layout.x, 96);
+        assert_eq!(layout.y, 0);
+        assert_eq!(layout.i, 2);
+    }
 }

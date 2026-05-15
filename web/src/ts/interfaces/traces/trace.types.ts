@@ -8,7 +8,7 @@ import { type Span, type EnrichedSpan, type SpanStatus } from './span.types';
 /**
  * Search mode for the traces explorer
  */
-export type TraceSearchMode = "traces" | "spans" | "service-graph";
+export type TraceSearchMode = "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog";
 
 /**
  * Trace - Collection of spans representing a single request

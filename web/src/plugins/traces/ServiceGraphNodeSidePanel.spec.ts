@@ -136,8 +136,58 @@ function mountPanel(
         TelemetryCorrelationDashboard: {
           template: '<div data-test="stub-telemetry" />',
         },
-        // Render dropdown content inline so data-test items are always queryable
-        QBtnDropdown: { template: "<div><slot /><slot name='default' /></div>" },
+        // Render ODropdown content inline so data-test items are always queryable
+        ODropdown: {
+          name: "ODropdown",
+          template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+          emits: ["update:open"],
+          props: ["open", "side", "align", "sideOffset"],
+        },
+        ODropdownItem: {
+          name: "ODropdownItem",
+          template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+          emits: ["select"],
+        },
+        // OTabs stub — Reka UI-based, needs stub to avoid context errors
+        OTabs: {
+          name: "OTabs",
+          template: '<div class="o-tabs-stub" v-bind="$attrs"><slot /></div>',
+          props: ["modelValue", "dense", "align"],
+          emits: ["update:modelValue"],
+        },
+        OTab: {
+          name: "OTab",
+          template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+          props: ["name", "label", "style"],
+        },
+        // OTabPanels: provide reactive context via setup()
+        OTabPanels: {
+          name: "OTabPanels",
+          template: '<div class="o-tab-panels-stub"><slot /></div>',
+          props: ["modelValue", "animated", "keepAlive"],
+          emits: ["update:modelValue"],
+          setup(props) {
+            const { computed, provide } = require("vue");
+            const ctx = computed(() => ({ modelValue: props.modelValue }));
+            provide("tabPanelsCtx", ctx);
+            return {};
+          },
+        },
+        OTabPanel: {
+          name: "OTabPanel",
+          // v-bind="$attrs" forwards data-test; renders only when active
+          template: '<div v-if="isActive" v-bind="$attrs" class="o-tab-panel-stub"><slot /></div>',
+          props: ["name", "padding", "layout", "stretch"],
+          setup(props) {
+            const { inject, computed } = require("vue");
+            const ctx = inject("tabPanelsCtx", { value: { modelValue: null } });
+            const isActive = computed(() => {
+              const mv = ctx?.value?.modelValue ?? ctx?.modelValue ?? null;
+              return mv === props.name;
+            });
+            return { isActive };
+          },
+        },
       },
     },
     props: {
@@ -698,6 +748,204 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(notifyMock).not.toHaveBeenCalledWith(
         expect.objectContaining({ type: "warning" }),
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // isDurationColumn helper
+  // -------------------------------------------------------------------------
+
+  describe("isDurationColumn helper", () => {
+    beforeEach(() => {
+      wrapper = mountPanel();
+    });
+
+    it("should return true for p99", () => {
+      expect(wrapper.vm.isDurationColumn("p99")).toBe(true);
+    });
+
+    it("should return true for p95", () => {
+      expect(wrapper.vm.isDurationColumn("p95")).toBe(true);
+    });
+
+    it("should return true for p75", () => {
+      expect(wrapper.vm.isDurationColumn("p75")).toBe(true);
+    });
+
+    it("should return false for p50", () => {
+      expect(wrapper.vm.isDurationColumn("p50")).toBe(false);
+    });
+
+    it("should return false for requests", () => {
+      expect(wrapper.vm.isDurationColumn("requests")).toBe(false);
+    });
+
+    it("should return false for operation", () => {
+      expect(wrapper.vm.isDurationColumn("operation")).toBe(false);
+    });
+
+    it("should return false for empty string", () => {
+      expect(wrapper.vm.isDurationColumn("")).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // sortBy / sortOrder initial state
+  // -------------------------------------------------------------------------
+
+  describe("sort state initial defaults", () => {
+    beforeEach(() => {
+      wrapper = mountPanel();
+    });
+
+    it("should default sortBy to empty string", () => {
+      expect(wrapper.vm.sortBy).toBe("");
+    });
+
+    it("should default sortOrder to empty string", () => {
+      expect(wrapper.vm.sortOrder).toBe("");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // handleSortChange
+  // -------------------------------------------------------------------------
+
+  describe("handleSortChange", () => {
+    beforeEach(() => {
+      wrapper = mountPanel();
+    });
+
+    it("should set sortBy to the provided field when called with asc order", () => {
+      wrapper.vm.handleSortChange("p99", "asc");
+      expect(wrapper.vm.sortBy).toBe("p99");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+    });
+
+    it("should set sortOrder to desc when provided", () => {
+      wrapper.vm.handleSortChange("requests", "desc");
+      expect(wrapper.vm.sortBy).toBe("requests");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+
+    it("should update both sortBy and sortOrder when called multiple times", () => {
+      wrapper.vm.handleSortChange("operation", "asc");
+      expect(wrapper.vm.sortBy).toBe("operation");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+
+      wrapper.vm.handleSortChange("p95", "desc");
+      expect(wrapper.vm.sortBy).toBe("p95");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // sortedOperationsTableRows
+  // -------------------------------------------------------------------------
+
+  describe("sortedOperationsTableRows", () => {
+    const mockOperationsHits = [
+      {
+        operation_name: "GET /api/users",
+        request_count: 100,
+        error_count: 5,
+        p50_latency: 10000,
+        p75_latency: 20000,
+        p95_latency: 50000,
+        p99_latency: 80000,
+      },
+      {
+        operation_name: "POST /api/orders",
+        request_count: 200,
+        error_count: 10,
+        p50_latency: 5000,
+        p75_latency: 15000,
+        p95_latency: 30000,
+        p99_latency: 120000,
+      },
+      {
+        operation_name: "GET /api/products",
+        request_count: 50,
+        error_count: 0,
+        p50_latency: 20000,
+        p75_latency: 40000,
+        p95_latency: 80000,
+        p99_latency: 150000,
+      },
+    ];
+
+    describe("when operations are loaded", () => {
+      beforeEach(async () => {
+        vi.mocked(searchService.search).mockResolvedValue({
+          data: { hits: mockOperationsHits },
+        } as any);
+        wrapper = mountPanel({ streamFilter: "default" });
+        await flushPromises();
+      });
+
+      it("should return unsorted rows when sortBy is empty", () => {
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows).toHaveLength(3);
+        expect(rows[0].operation).toBe("GET /api/users");
+        expect(rows[1].operation).toBe("POST /api/orders");
+        expect(rows[2].operation).toBe("GET /api/products");
+      });
+
+      it("should sort by p99 ascending when sortBy is p99 and sortOrder is asc", () => {
+        wrapper.vm.handleSortChange("p99", "asc");
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows[0].p99).toBe(80000);
+        expect(rows[1].p99).toBe(120000);
+        expect(rows[2].p99).toBe(150000);
+      });
+
+      it("should sort by p99 descending when sortBy is p99 and sortOrder is desc", () => {
+        wrapper.vm.handleSortChange("p99", "desc");
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows[0].p99).toBe(150000);
+        expect(rows[1].p99).toBe(120000);
+        expect(rows[2].p99).toBe(80000);
+      });
+
+      it("should sort by operation alphabetically ascending", () => {
+        wrapper.vm.handleSortChange("operation", "asc");
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows[0].operation).toBe("GET /api/products");
+        expect(rows[1].operation).toBe("GET /api/users");
+        expect(rows[2].operation).toBe("POST /api/orders");
+      });
+
+      it("should sort by requests numerically descending", () => {
+        wrapper.vm.handleSortChange("requests", "desc");
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows[0].requests).toBe(200);
+        expect(rows[1].requests).toBe(100);
+        expect(rows[2].requests).toBe(50);
+      });
+
+      it("should sort by errors numerically ascending", () => {
+        wrapper.vm.handleSortChange("errors", "asc");
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows[0].errors).toBe(0);
+        expect(rows[1].errors).toBe(5);
+        expect(rows[2].errors).toBe(10);
+      });
+    });
+
+    describe("when operations are empty", () => {
+      beforeEach(async () => {
+        vi.mocked(searchService.search).mockResolvedValue({
+          data: { hits: [] },
+        } as any);
+        wrapper = mountPanel({ streamFilter: "default" });
+        await flushPromises();
+      });
+
+      it("should return an empty array without error when sortBy is set", () => {
+        wrapper.vm.handleSortChange("p99", "asc");
+        const rows = wrapper.vm.sortedOperationsTableRows;
+        expect(rows).toHaveLength(0);
+      });
     });
   });
 });

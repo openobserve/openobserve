@@ -400,6 +400,44 @@ impl Default for NewEmptyExecCountVisitor {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use datafusion::physical_optimizer::PhysicalOptimizerRule;
+
+    use super::*;
+
+    #[test]
+    fn test_remote_scan_rule_name() {
+        let rule = RemoteScanRule::new_test(HashMap::new(), false);
+        assert_eq!(rule.name(), "RemoteScanRule");
+    }
+
+    #[test]
+    fn test_remote_scan_rule_schema_check() {
+        let rule = RemoteScanRule::new_test(HashMap::new(), false);
+        assert!(rule.schema_check());
+    }
+
+    #[test]
+    fn test_table_name_visitor_new_initial_state() {
+        let v = TableNameVisitor::new();
+        assert!(v.table_name.is_none());
+        assert!(!v.has_remote_scan);
+    }
+
+    #[test]
+    fn test_new_empty_exec_count_visitor_new_starts_at_zero() {
+        let v = NewEmptyExecCountVisitor::new();
+        assert_eq!(v.get_count(), 0);
+    }
+
+    #[test]
+    fn test_new_empty_exec_count_visitor_default_starts_at_zero() {
+        let v = NewEmptyExecCountVisitor::default();
+        assert_eq!(v.get_count(), 0);
+    }
+}
+
 impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 

@@ -417,4 +417,50 @@ mod tests {
         assert_eq!(metadata.offset, 100);
         assert_eq!(metadata.length, 50);
     }
+
+    #[test]
+    fn test_blob_metadata_skip_fields_absent_when_none_empty() {
+        let metadata = BlobMetadata::default();
+        let json = serde_json::to_value(&metadata).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("compression_codec"));
+        assert!(!obj.contains_key("properties"));
+    }
+
+    #[test]
+    fn test_blob_metadata_skip_fields_present_when_set() {
+        let mut props = HashMap::new();
+        props.insert("k".to_string(), "v".to_string());
+        let metadata = BlobMetadata {
+            compression_codec: Some(CompressionCodec::Zstd),
+            properties: props,
+            ..BlobMetadata::default()
+        };
+        let json = serde_json::to_value(&metadata).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("compression_codec"));
+        assert!(obj.contains_key("properties"));
+    }
+
+    #[test]
+    fn test_puffin_meta_properties_absent_when_empty() {
+        let meta = PuffinMeta {
+            blobs: vec![],
+            properties: HashMap::new(),
+        };
+        let json = serde_json::to_value(&meta).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("properties"));
+    }
+
+    #[test]
+    fn test_puffin_meta_properties_present_when_nonempty() {
+        let mut props = HashMap::new();
+        props.insert("writer".to_string(), "openobserve".to_string());
+        let meta = PuffinMeta {
+            blobs: vec![],
+            properties: props,
+        };
+        let json = serde_json::to_value(&meta).unwrap();
+        assert!(json.as_object().unwrap().contains_key("properties"));
+    }
 }

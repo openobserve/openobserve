@@ -230,3 +230,93 @@ pub fn relations_to_delete(
         .map(|e| (e.report_id.clone(), e.dashboard_id.clone()))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::dashboards::reports::{
+        ReportDashboard as MetaReportDashboard, ReportEmailAttachmentType, ReportMediaType,
+        ReportTimerange,
+    };
+
+    use super::*;
+
+    fn make_existing(
+        report_id: &str,
+        dashboard_id: &str,
+        dashboard_snowflake_id: &str,
+        folder_snowflake_id: &str,
+    ) -> queries::JoinReportDashboardFolderResults {
+        queries::JoinReportDashboardFolderResults {
+            report_id: report_id.to_string(),
+            report_dashboard_tab_names: serde_json::json!([]),
+            report_dashboard_variables: serde_json::json!([]),
+            report_dashboard_timerange: serde_json::json!({}),
+            report_dashboard_report_type: 0,
+            report_dashboard_email_attachment_type: 0,
+            report_dashboard_attachment_dimensions: None,
+            dashboard_id: dashboard_id.to_string(),
+            dashboard_snowflake_id: dashboard_snowflake_id.to_string(),
+            dashboard_folder_id: "fk1".to_string(),
+            dashboard_folder_snowflake_id: folder_snowflake_id.to_string(),
+        }
+    }
+
+    fn make_desired(dashboard: &str, folder: &str) -> MetaReportDashboard {
+        MetaReportDashboard {
+            dashboard: dashboard.to_string(),
+            folder: folder.to_string(),
+            tabs: vec![],
+            variables: vec![],
+            timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
+        }
+    }
+
+    #[test]
+    fn test_relations_to_delete_empty_existing() {
+        let result = relations_to_delete(&[], &[make_desired("dash1", "folder1")]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_relations_to_delete_empty_desired_removes_all() {
+        let existing = vec![
+            make_existing("r1", "dk1", "dash1", "f1"),
+            make_existing("r1", "dk2", "dash2", "f2"),
+        ];
+        let result = relations_to_delete(&existing, &[]);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_relations_to_delete_matching_kept() {
+        let existing = vec![make_existing("r1", "dk1", "dash1", "folder1")];
+        let desired = vec![make_desired("dash1", "folder1")];
+        let result = relations_to_delete(&existing, &desired);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_relations_to_delete_partial_match() {
+        let existing = vec![
+            make_existing("r1", "dk1", "dash1", "f1"),
+            make_existing("r1", "dk2", "dash2", "f2"),
+        ];
+        let desired = vec![make_desired("dash1", "f1")];
+        let result = relations_to_delete(&existing, &desired);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], ("r1".to_string(), "dk2".to_string()));
+    }
+
+    #[test]
+    fn test_relations_to_delete_folder_mismatch_counts_as_deletion() {
+        // Same dashboard but different folder — not a match, should be deleted.
+        let existing = vec![make_existing("r1", "dk1", "dash1", "folder_old")];
+        let desired = vec![make_desired("dash1", "folder_new")];
+        let result = relations_to_delete(&existing, &desired);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], ("r1".to_string(), "dk1".to_string()));
+    }
+}

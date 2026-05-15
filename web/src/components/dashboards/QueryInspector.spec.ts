@@ -499,9 +499,9 @@ describe("QueryInspector", () => {
 
       const html = "<span>test query</span>";
       wrapper.vm.searchQuery = "";
-      const result = wrapper.vm.highlightSearch(html);
+      const result = wrapper.vm.highlightSearch(html, false);
 
-      expect(result).toBe(html);
+      expect(result).toBe("&lt;span&gt;test query&lt;/span&gt;");
     });
 
     it("should highlight matching text", async () => {
@@ -547,10 +547,10 @@ describe("QueryInspector", () => {
 
       const html = '<span class="test">query</span>';
       wrapper.vm.searchQuery = "class";
-      const result = wrapper.vm.highlightSearch(html);
+      const result = wrapper.vm.highlightSearch(html, true);
 
-      // Should not highlight "class" inside the tag attribute
-      expect(result).toBe(html);
+      // In colorized mode (sanitized HTML), should not highlight inside tag attributes
+      expect(result).not.toContain("<mark");
     });
 
     it("should return html unchanged for empty html", async () => {
@@ -570,7 +570,7 @@ describe("QueryInspector", () => {
       wrapper.vm.searchQuery = "test";
       const result = wrapper.vm.highlightSearch(null);
 
-      expect(result).toBe(null);
+      expect(result).toBe("");
     });
 
     it("should handle regex errors gracefully", async () => {
@@ -580,15 +580,18 @@ describe("QueryInspector", () => {
       const html = "test query";
       wrapper.vm.searchQuery = "test";
 
-      // Mock a regex that might throw
-      const spy = vi.spyOn(String.prototype, 'replace').mockImplementationOnce(() => {
+      // Mock RegExp constructor to throw, simulating a regex error in the highlight path
+      const OriginalRegExp = global.RegExp;
+      const spy = vi.spyOn(global, 'RegExp').mockImplementationOnce(() => {
         throw new Error("Regex error");
       });
 
-      const result = wrapper.vm.highlightSearch(html);
+      const result = wrapper.vm.highlightSearch(html, false);
 
-      expect(result).toBe(html);
+      // Falls back to safely-escaped html when regex fails
+      expect(result).toBe("test query");
       spy.mockRestore();
+      global.RegExp = OriginalRegExp;
     });
   });
 
@@ -634,8 +637,8 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const copyButtons = wrapper.findAll('[data-test="q-btn"]');
-      const copyButton = copyButtons.find((btn: any) => btn.text().includes("Copy"));
+      const allButtons = wrapper.findAll('button');
+      const copyButton = allButtons.find((btn: any) => btn.text().includes("Copy"));
 
       if (copyButton) {
         await copyButton.trigger('click');
@@ -648,14 +651,14 @@ describe("QueryInspector", () => {
       await flushPromises();
 
       // Find all copy buttons and click the one for executed query
-      const copyButtons = wrapper.findAll('[data-test="q-btn"]');
+      // OButton renders as native <button> elements with text "Copy"
+      const allButtons = wrapper.findAll('button');
+      const copyButtons = allButtons.filter(btn => btn.text().includes("Copy"));
 
       // There should be multiple copy buttons (one for originalQuery, one for query per query item)
       // Find the button that would copy the executed query
       for (const btn of copyButtons) {
-        if (btn.text().includes("Copy")) {
-          await btn.trigger('click');
-        }
+        await btn.trigger('click');
       }
 
       // Verify clipboard writeText was called

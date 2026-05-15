@@ -101,3 +101,20 @@ impl ExtensionPlanner for DeduplicationExecPlanner {
         Ok(Some(Arc::new(deduplication_exec)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_openobserve_query_planner_new() {
+        let planner = OpenobserveQueryPlanner::new();
+        let _: &OpenobserveQueryPlanner = &planner;
+    }
+
+    #[test]
+    fn test_deduplication_exec_planner_new() {
+        let planner = DeduplicationExecPlanner::new();
+        let _: &DeduplicationExecPlanner = &planner;
+    }
+}

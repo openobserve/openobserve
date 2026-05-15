@@ -161,6 +161,17 @@ pub async fn save(
                 if endpoint.url.is_empty() {
                     return Err(DestinationError::EmptyUrl);
                 }
+                // SSRF protection: validate the URL (incl. DNS resolution) before
+                // persisting so the alert fire path can't be tricked into reading
+                // internal services via a destination saved with a malicious URL.
+                if let Err(e) =
+                    crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+                        &endpoint.url,
+                    )
+                    .await
+                {
+                    return Err(DestinationError::SsrfBlocked(e));
+                }
             }
             DestinationType::Sns(aws_sns) => {
                 if aws_sns.sns_topic_arn.is_empty() || aws_sns.aws_region.is_empty() {
@@ -171,6 +182,14 @@ pub async fn save(
         Module::Pipeline { endpoint, .. } => {
             if endpoint.url.is_empty() {
                 return Err(DestinationError::EmptyUrl);
+            }
+            if let Err(e) =
+                crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
+                    &endpoint.url,
+                )
+                .await
+            {
+                return Err(DestinationError::SsrfBlocked(e));
             }
         }
     }

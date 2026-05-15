@@ -21,14 +21,14 @@ limitations under the License.
           {{ t('alerts.destinationPreview') }} - {{ getDestinationTypeName(type) }}
         </div>
         <q-space />
-        <q-btn
-          icon="close"
-          flat
-          round
-          dense
+        <OButton
+          variant="ghost"
+          size="icon-circle-sm"
           data-test="preview-close-button"
           @click="isOpen = false"
-        />
+        >
+          <q-icon name="close" />
+        </OButton>
       </q-card-section>
 
       <q-separator />
@@ -69,7 +69,7 @@ limitations under the License.
                   <strong>Threshold Exceeded:</strong> greater than 80%
                 </div>
                 <div class="slack-actions">
-                  <button class="slack-button">View in OpenObserve</button>
+                  <OButton variant="preview-slack">View in OpenObserve</OButton>
                 </div>
               </div>
             </div>
@@ -110,7 +110,7 @@ limitations under the License.
               </div>
             </div>
             <div class="teams-actions">
-              <button class="teams-button">View in OpenObserve</button>
+              <OButton variant="preview-teams">View in OpenObserve</OButton>
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ limitations under the License.
                 <span class="detail-value">{{ getCurrentTime() }}</span>
               </div>
             </div>
-            <button class="email-button">View in OpenObserve</button>
+            <OButton variant="preview-email">View in OpenObserve</OButton>
           </div>
         </div>
 
@@ -248,28 +248,28 @@ limitations under the License.
               </div>
             </div>
             <div class="opsgenie-actions">
-              <button>View in OpenObserve</button>
+              <OButton variant="preview-action">View in OpenObserve</OButton>
             </div>
           </div>
         </div>
       </q-card-section>
 
       <q-card-actions align="center">
-        <q-btn
+        <OButton
           data-test="preview-copy-button"
-          label="Copy Template"
-          icon="content_copy"
-          outline
-          no-caps
+          variant="outline"
+          size="sm"
           @click="copyTemplate"
-        />
-        <q-btn
+        >
+          <template #icon-left><q-icon name="content_copy" /></template>
+          Copy Template
+        </OButton>
+        <OButton
           data-test="preview-close-button"
-          label="Close"
-          flat
-          no-caps
+          variant="ghost"
+          size="sm"
           @click="isOpen = false"
-        />
+        >Close</OButton>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -279,6 +279,7 @@ limitations under the License.
 import { computed } from 'vue';
 import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
+import OButton from '@/lib/core/Button/OButton.vue';
 
 const props = defineProps({
   modelValue: {

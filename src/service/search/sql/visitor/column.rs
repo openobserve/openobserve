@@ -286,4 +286,186 @@ mod tests {
         // Should extract columns, group by, order by, and detect aggregate function
         assert!(column_visitor.is_wildcard);
     }
+
+    fn make_schemas() -> HashMap<TableReference, Arc<SchemaCache>> {
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("name", DataType::Utf8, false)),
+            Arc::new(Field::new("age", DataType::Int32, false)),
+            Arc::new(Field::new("status", DataType::Utf8, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("users"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+        schemas
+    }
+
+    #[test]
+    fn test_column_visitor_direct_wildcard() {
+        let sql = "SELECT * FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert!(visitor.is_wildcard);
+    }
+
+    #[test]
+    fn test_column_visitor_is_distinct() {
+        let sql = "SELECT DISTINCT name FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert!(visitor.is_distinct);
+    }
+
+    #[test]
+    fn test_column_visitor_columns_alias() {
+        let sql = "SELECT name AS n, age AS a FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert!(
+            visitor
+                .columns_alias
+                .iter()
+                .any(|(expr, alias)| expr == "name" && alias == "n")
+        );
+        assert!(
+            visitor
+                .columns_alias
+                .iter()
+                .any(|(expr, alias)| expr == "age" && alias == "a")
+        );
+    }
+
+    #[test]
+    fn test_column_visitor_limit_and_offset() {
+        let sql = "SELECT * FROM users LIMIT 100 OFFSET 50";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(visitor.limit, Some(100));
+        assert_eq!(visitor.offset, Some(50));
+    }
+
+    #[test]
+    fn test_column_visitor_order_by_desc() {
+        let sql = "SELECT name FROM users ORDER BY age DESC";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(visitor.order_by, vec![("age".to_string(), OrderBy::Desc)]);
+    }
+
+    #[test]
+    fn test_column_visitor_no_tests_when_no_schema_match() {
+        let sql = "SELECT unknown_col FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // unknown_col not in schema → columns map empty
+        let users_ref = TableReference::from("users");
+        assert!(
+            visitor
+                .columns
+                .get(&users_ref)
+                .map_or(true, |s| s.is_empty())
+        );
+    }
+
+    #[test]
+    fn test_column_visitor_compound_identifier() {
+        // table.field style → CompoundIdentifier branch in pre_visit_expr
+        let sql = "SELECT users.name, users.age FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        let users_ref = TableReference::from("users");
+        let columns = visitor.columns.get(&users_ref).unwrap();
+        assert!(columns.contains("name"));
+        assert!(columns.contains("age"));
+    }
+
+    #[test]
+    fn test_column_visitor_order_by_compound_expr_skipped() {
+        // ORDER BY expression with multiple fields → field_names.len() != 1 → order_by skipped
+        let sql = "SELECT name FROM users ORDER BY name, age";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        // Both single-field order_by expressions captured
+        assert_eq!(visitor.order_by.len(), 2);
+        assert!(
+            visitor
+                .order_by
+                .iter()
+                .any(|(f, _)| f == "name" || f == "age")
+        );
+    }
+
+    #[test]
+    fn test_column_visitor_limit_no_explicit_offset_defaults_to_zero() {
+        // LIMIT with no OFFSET → offset defaults to 0
+        let sql = "SELECT * FROM users LIMIT 5";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(visitor.limit, Some(5));
+        assert_eq!(visitor.offset, Some(0));
+    }
 }

@@ -452,10 +452,6 @@ pub async fn merge_by_stream(
     // do partition by partition key
     let mut partition_files_with_size: HashMap<String, Vec<FileKey>> = HashMap::default();
     for file in files {
-        // skip the files which already reach the max_file_size * 95%
-        if file.meta.original_size > cfg.compact.max_file_size as i64 * 95 / 100 {
-            continue;
-        }
         let file_name = file.key.clone();
         let prefix = file_name[..file_name.rfind('/').unwrap()].to_string();
         let partition = partition_files_with_size.entry(prefix).or_default();
@@ -913,7 +909,8 @@ pub async fn merge_files(
                 log::debug!("merge_files {new_file_key} file_data::disk::set success");
             }
 
-            let account = storage::get_account(&new_file_key).unwrap_or_default();
+            // TODO: check how compliance will interact with org storage
+            let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
             if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
                 storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
             } else {
@@ -923,13 +920,14 @@ pub async fn merge_files(
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                 // generate inverted index
                 generate_inverted_index(
+                    org_id,
                     &new_file_key,
                     &full_text_search_fields,
                     &index_fields,
                     &retain_file_list,
                     &mut new_file_meta,
                     latest_schema.clone(),
-                    &buf,
+                    buf,
                 )
                 .await?;
             }
@@ -959,7 +957,8 @@ pub async fn merge_files(
                     log::debug!("merge_files {new_file_key} file_data::disk::set success");
                 }
 
-                let account = storage::get_account(&new_file_key).unwrap_or_default();
+                // TODO: check how compliance will interact with org storage
+                let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
                 if cfg.s3.feature_force_infrequent_access && storage_type.is_compliance() {
                     storage::put_with_compliance(&account, &new_file_key, buf.clone()).await?;
                 } else {
@@ -969,13 +968,14 @@ pub async fn merge_files(
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
                     // generate inverted index
                     generate_inverted_index(
+                        org_id,
                         &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
                         &retain_file_list,
                         &mut new_file_meta,
                         latest_schema.clone(),
-                        &buf,
+                        buf,
                     )
                     .await?;
                 }
@@ -999,19 +999,22 @@ pub async fn merge_files(
     Ok((new_files, retain_file_list))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn generate_inverted_index(
+    org_id: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
     retain_file_list: &[FileKey],
     new_file_meta: &mut FileMeta,
     latest_schema: Arc<Schema>,
-    buf: &Bytes,
+    buf: Bytes,
 ) -> Result<(), anyhow::Error> {
     let file_format = get_config().common.file_format;
     let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
+        org_id,
         new_file_key,
         full_text_search_fields,
         index_fields,
@@ -1912,5 +1915,1088 @@ mod tests {
 
         assert!(result.is_ok());
         // Result depends on whether Metrics support_index() returns true
+    }
+
+    // ── Additional sort_by_time_range edge-case tests ────────────────────────
+
+    /// Two files share the same min_ts but have different max_ts values.
+    /// The file with the smaller max_ts ends first; the second file starts at
+    /// the same time and thus overlaps → they must land in different groups.
+    #[test]
+    fn test_sort_by_time_range_same_min_ts_different_max_ts() {
+        let files = vec![
+            create_file_key("file_a.parquet", 1000, 3000, 1024),
+            create_file_key("file_b.parquet", 1000, 2000, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"file_a.parquet"));
+        assert!(keys.contains(&"file_b.parquet"));
+        // Both share min_ts=1000, so they overlap: each ends up in its own group.
+        // Consecutive elements in the output must not have a later file whose
+        // min_ts < the predecessor's max_ts within the same group-chain.
+        // We just verify the invariant: result preserves all files.
+        assert_eq!(result.len(), 2);
+    }
+
+    /// All files are completely overlapping (same time range).
+    /// Every file goes into a separate group; total count must be preserved.
+    #[test]
+    fn test_sort_by_time_range_all_identical_ranges() {
+        let files = vec![
+            create_file_key("file1.parquet", 500, 1500, 1024),
+            create_file_key("file2.parquet", 500, 1500, 512),
+            create_file_key("file3.parquet", 500, 1500, 2048),
+            create_file_key("file4.parquet", 500, 1500, 768),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 4);
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"file1.parquet"));
+        assert!(keys.contains(&"file2.parquet"));
+        assert!(keys.contains(&"file3.parquet"));
+        assert!(keys.contains(&"file4.parquet"));
+    }
+
+    /// Files whose min_ts == max_ts == 0 (zero timestamps).
+    #[test]
+    fn test_sort_by_time_range_zero_timestamps() {
+        let files = vec![
+            create_file_key("file1.parquet", 0, 0, 1024),
+            create_file_key("file2.parquet", 0, 1000, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        // First file is whichever has min_ts=0; both should survive.
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"file1.parquet"));
+        assert!(keys.contains(&"file2.parquet"));
+    }
+
+    /// Two non-overlapping groups: group A has files [1000,2000] and [2000,3000];
+    /// group B has files [1500,2500] and [2500,3500].  The algorithm must
+    /// produce exactly 4 files in the output.
+    #[test]
+    fn test_sort_by_time_range_two_interleaved_groups() {
+        // After sort by min_ts:
+        //   A1: [1000,2000], B1: [1500,2500], A2: [2000,3000], B2: [2500,3500]
+        // A1 opens group-0.  B1 overlaps A1 (1500 < 2000) → opens group-1.
+        // A2: min_ts=2000 >= group-0's last max=2000 → fits group-0.
+        // B2: min_ts=2500 >= group-1's last max=2500 → fits group-1.
+        let files = vec![
+            create_file_key("A1.parquet", 1000, 2000, 1024),
+            create_file_key("B1.parquet", 1500, 2500, 1024),
+            create_file_key("A2.parquet", 2000, 3000, 1024),
+            create_file_key("B2.parquet", 2500, 3500, 1024),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 4);
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"A1.parquet"));
+        assert!(keys.contains(&"A2.parquet"));
+        assert!(keys.contains(&"B1.parquet"));
+        assert!(keys.contains(&"B2.parquet"));
+        // Group-0 chain: A1 then A2 (adjacent).  Verify they appear consecutively.
+        let a1_pos = result.iter().position(|f| f.key == "A1.parquet").unwrap();
+        let a2_pos = result.iter().position(|f| f.key == "A2.parquet").unwrap();
+        assert_eq!(
+            a2_pos,
+            a1_pos + 1,
+            "A1 and A2 should be in the same group (consecutive)"
+        );
+    }
+
+    /// A chain of files where each one's min_ts equals the previous file's max_ts
+    /// (strictly adjacent, no gap).  All should end up in one group.
+    #[test]
+    fn test_sort_by_time_range_strictly_adjacent_chain() {
+        let files = vec![
+            create_file_key("f1.parquet", 100, 200, 512),
+            create_file_key("f3.parquet", 300, 400, 512),
+            create_file_key("f2.parquet", 200, 300, 512),
+            create_file_key("f4.parquet", 400, 500, 512),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 4);
+        // All are adjacent (min_ts == prev max_ts) so they chain into one group.
+        assert_eq!(result[0].key, "f1.parquet");
+        assert_eq!(result[1].key, "f2.parquet");
+        assert_eq!(result[2].key, "f3.parquet");
+        assert_eq!(result[3].key, "f4.parquet");
+    }
+
+    /// A single file where min_ts == max_ts (point-in-time, zero-width range).
+    #[test]
+    fn test_sort_by_time_range_single_point_file() {
+        let files = vec![create_file_key("point.parquet", 42, 42, 256)];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].key, "point.parquet");
+        assert_eq!(result[0].meta.min_ts, 42);
+        assert_eq!(result[0].meta.max_ts, 42);
+    }
+
+    // ── Additional generate_inverted_idx_recordbatch edge-case tests ─────────
+
+    /// Stream types that return false from `support_index()` must always yield None.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_non_index_stream_type() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])),
+                Arc::new(Int64Array::from(vec![1000i64])),
+            ],
+        )
+        .unwrap();
+
+        let batches = vec![batch];
+        let full_text_search_fields = vec!["message".to_string()];
+        let index_fields: Vec<String> = vec![];
+
+        // EnrichmentTables does not support indexing.
+        let result = generate_inverted_idx_recordbatch(
+            schema.clone(),
+            &batches,
+            StreamType::EnrichmentTables,
+            &full_text_search_fields,
+            &index_fields,
+        );
+        assert!(result.is_ok());
+        assert!(
+            result.unwrap().is_none(),
+            "EnrichmentTables should return None (no index support)"
+        );
+
+        // ServiceGraph does not support indexing.
+        let batch2 = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])),
+                Arc::new(Int64Array::from(vec![1000i64])),
+            ],
+        )
+        .unwrap();
+        let result2 = generate_inverted_idx_recordbatch(
+            schema.clone(),
+            &[batch2],
+            StreamType::ServiceGraph,
+            &full_text_search_fields,
+            &index_fields,
+        );
+        assert!(result2.is_ok());
+        assert!(
+            result2.unwrap().is_none(),
+            "ServiceGraph should return None (no index support)"
+        );
+
+        // Filelist does not support indexing.
+        let batch3 = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])),
+                Arc::new(Int64Array::from(vec![1000i64])),
+            ],
+        )
+        .unwrap();
+        let result3 = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch3],
+            StreamType::Filelist,
+            &full_text_search_fields,
+            &index_fields,
+        );
+        assert!(result3.is_ok());
+        assert!(
+            result3.unwrap().is_none(),
+            "Filelist should return None (no index support)"
+        );
+    }
+
+    /// When `full_text_search_fields` is empty and `index_fields` is empty the
+    /// function falls back to `SQL_FULL_TEXT_SEARCH_FIELDS`.  If none of those
+    /// default names are present in the schema either, the result is None.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_default_fts_fallback_no_match() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Schema has only a custom column and _timestamp – none of the default
+        // FTS fields (log, message, msg, content, data, body, json, error).
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("custom_col", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["v1", "v2"])),
+                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &[], // empty → falls back to SQL_FULL_TEXT_SEARCH_FIELDS
+            &[], // empty index_fields too
+        );
+
+        assert!(result.is_ok());
+        // None of the default FTS fields match, so inverted_idx_columns becomes
+        // empty after retain, and the function should return None.
+        assert!(
+            result.unwrap().is_none(),
+            "No default FTS field match should produce None"
+        );
+    }
+
+    /// When `full_text_search_fields` is empty but a default FTS field IS present
+    /// in the schema, the function should produce a valid RecordBatch.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_default_fts_fallback_with_match() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // "log" is one of the default SQL_FULL_TEXT_SEARCH_FIELDS.
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("log", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["line1", "line2"])),
+                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &[], // empty → falls back to SQL_FULL_TEXT_SEARCH_FIELDS
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(rb.is_some(), "Default FTS field 'log' should produce Some");
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 2);
+        // Columns: "log" + "_timestamp"
+        assert_eq!(rb.num_columns(), 2);
+    }
+
+    /// When `_timestamp` is explicitly listed in `full_text_search_fields`, it
+    /// must not be added a second time (dedup).  The final batch should still
+    /// contain only ONE `_timestamp` column.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_timestamp_in_fts_fields_dedup() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])),
+                Arc::new(Int64Array::from(vec![5000i64])),
+            ],
+        )
+        .unwrap();
+
+        // Explicitly include _timestamp in fts_fields to exercise the dedup path.
+        let full_text_search_fields = vec![
+            "message".to_string(),
+            TIMESTAMP_COL_NAME.to_string(), // duplicate that should be deduped
+        ];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &full_text_search_fields,
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(rb.is_some());
+        let rb = rb.unwrap();
+        // Columns: message + _timestamp (no duplicate _timestamp column).
+        assert_eq!(rb.num_columns(), 2);
+        // Verify _timestamp column appears exactly once.
+        let ts_count = rb
+            .schema()
+            .fields()
+            .iter()
+            .filter(|f| f.name() == TIMESTAMP_COL_NAME)
+            .count();
+        assert_eq!(ts_count, 1, "_timestamp must appear exactly once");
+    }
+
+    /// A single-element batch vector exercises the `len() == 1` fast-path that
+    /// avoids `concat_batches` and returns the batch directly.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_single_batch_fast_path() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("body", DataType::Utf8, true),
+            Field::new("level", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["body text"])),
+                Arc::new(StringArray::from(vec!["warn"])),
+                Arc::new(Int64Array::from(vec![9999i64])),
+            ],
+        )
+        .unwrap();
+
+        // "body" is a default SQL_FULL_TEXT_SEARCH_FIELDS entry.
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch], // exactly one batch
+            StreamType::Logs,
+            &["body".to_string()],
+            &["level".to_string()],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(rb.is_some());
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 1);
+        // Columns: body + level + _timestamp (sorted, deduped)
+        assert_eq!(rb.num_columns(), 3);
+    }
+
+    /// When the batch has columns but the selected index columns are missing
+    /// (because `inverted_idx_columns` only matches `_timestamp`), the result
+    /// must be None rather than a single-column batch.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_only_timestamp_after_filter() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("irrelevant", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["x"])),
+                Arc::new(Int64Array::from(vec![100i64])),
+            ],
+        )
+        .unwrap();
+
+        // Ask for a field that IS in the schema but is the timestamp itself,
+        // plus another that does not exist.
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &[TIMESTAMP_COL_NAME.to_string()], // only _timestamp passes retain
+            &[],
+        );
+
+        assert!(result.is_ok());
+        // inverted_idx_columns after retain would contain _timestamp, then the
+        // "push _timestamp if absent" step is skipped (it's already there), so
+        // the final batch has exactly 1 column (_timestamp only) → returns None.
+        assert!(
+            result.unwrap().is_none(),
+            "Batch with only _timestamp column should return None"
+        );
+    }
+
+    /// Traces stream type supports indexing, so the function proceeds normally.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_traces_stream_type() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("msg", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["span-data"])),
+                Arc::new(Int64Array::from(vec![777i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Traces, // supports indexing
+            &["msg".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(
+            rb.is_some(),
+            "Traces should produce Some when field matches"
+        );
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 1);
+        assert_eq!(rb.num_columns(), 2); // msg + _timestamp
+    }
+
+    /// Verify the column order in the output: `inverted_idx_columns` is sorted
+    /// and deduped, so the schema fields of the produced batch must respect that
+    /// alphabetical ordering (excluding the appended `_timestamp`).
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_column_sort_order() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Provide fields in reverse alphabetical order to confirm output is sorted.
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("zebra", DataType::Utf8, true),
+            Field::new("apple", DataType::Utf8, true),
+            Field::new("mango", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["z"])),
+                Arc::new(StringArray::from(vec!["a"])),
+                Arc::new(StringArray::from(vec!["m"])),
+                Arc::new(Int64Array::from(vec![1i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &[
+                "zebra".to_string(),
+                "apple".to_string(),
+                "mango".to_string(),
+            ],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap().expect("should produce Some");
+        let rb_schema = rb.schema();
+        let field_names: Vec<&str> = rb_schema
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .collect();
+        // Expected sorted order: apple, mango, zebra, then _timestamp appended at end.
+        assert_eq!(field_names[0], "apple");
+        assert_eq!(field_names[1], "mango");
+        assert_eq!(field_names[2], "zebra");
+        assert_eq!(field_names[3], TIMESTAMP_COL_NAME);
+    }
+
+    /// Three-batch concat path: ensure all rows survive concatenation.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_three_batches_concat() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("error", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let make_batch = |msg: &str, ts: i64| {
+            RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(StringArray::from(vec![msg])) as _,
+                    Arc::new(Int64Array::from(vec![ts])) as _,
+                ],
+            )
+            .unwrap()
+        };
+
+        let batches = vec![
+            make_batch("err1", 100),
+            make_batch("err2", 200),
+            make_batch("err3", 300),
+        ];
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &batches,
+            StreamType::Logs,
+            &["error".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap().expect("should produce Some");
+        // "error" is also a default FTS field, but because we supply fts_fields
+        // explicitly the result should include it plus _timestamp.
+        assert_eq!(rb.num_rows(), 3); // one row per batch, concatenated
+        assert_eq!(rb.num_columns(), 2); // error + _timestamp
+    }
+
+    // ── sort_by_time_range: additional branch-coverage tests ─────────────────
+
+    /// Two files that don't overlap and have a gap between them.  The second
+    /// file's min_ts is strictly greater than the first file's max_ts, so both
+    /// land in the same chain (group-0) and appear in order.
+    #[test]
+    fn test_sort_by_time_range_two_non_overlapping_with_gap() {
+        let files = vec![
+            create_file_key("early.parquet", 1000, 2000, 512),
+            create_file_key("late.parquet", 5000, 6000, 512),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].key, "early.parquet");
+        assert_eq!(result[1].key, "late.parquet");
+    }
+
+    /// Files presented in strictly descending min_ts order.  After the internal
+    /// sort by min_ts the algorithm must produce the same output as if they had
+    /// been given in ascending order.
+    #[test]
+    fn test_sort_by_time_range_descending_input_order() {
+        let files = vec![
+            create_file_key("f4.parquet", 4000, 5000, 512),
+            create_file_key("f3.parquet", 3000, 4000, 512),
+            create_file_key("f2.parquet", 2000, 3000, 512),
+            create_file_key("f1.parquet", 1000, 2000, 512),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 4);
+        // Adjacent chain: all files should appear sorted by min_ts.
+        assert_eq!(result[0].key, "f1.parquet");
+        assert_eq!(result[1].key, "f2.parquet");
+        assert_eq!(result[2].key, "f3.parquet");
+        assert_eq!(result[3].key, "f4.parquet");
+    }
+
+    /// File where min_ts == max_ts == i64::MIN (boundary value).
+    #[test]
+    fn test_sort_by_time_range_min_i64_timestamps() {
+        let files = vec![
+            create_file_key("a.parquet", i64::MIN, i64::MIN, 256),
+            create_file_key("b.parquet", i64::MIN, 0, 256),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"a.parquet"));
+        assert!(keys.contains(&"b.parquet"));
+    }
+
+    /// A file whose min_ts is greater than its max_ts (malformed / inverted range).
+    /// The algorithm must still return all files without panicking.
+    #[test]
+    fn test_sort_by_time_range_inverted_range_no_panic() {
+        let files = vec![
+            create_file_key("good.parquet", 1000, 3000, 512),
+            create_file_key("bad.parquet", 5000, 2000, 512), // inverted: min > max
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"good.parquet"));
+        assert!(keys.contains(&"bad.parquet"));
+    }
+
+    /// Many fully-overlapping files create as many groups as there are files.
+    /// Verify that the total count is always preserved regardless of input size.
+    #[test]
+    fn test_sort_by_time_range_ten_fully_overlapping_files() {
+        let files: Vec<FileKey> = (0..10)
+            .map(|i| create_file_key(&format!("f{i}.parquet"), 0, 1000, 256))
+            .collect();
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 10, "All files must be preserved");
+    }
+
+    /// Non-overlapping files interleaved with overlapping ones.
+    /// Ensures multiple groups can be built simultaneously and
+    /// files correctly land in the first group that can accept them.
+    #[test]
+    fn test_sort_by_time_range_mixed_overlap_and_gaps() {
+        // After sort by min_ts:
+        //  A: [100, 200], B: [150, 300], C: [200, 400], D: [300, 500], E: [600, 700]
+        // Group-0 starts with A.
+        // B (min=150 < A.max=200) → new group-1.
+        // C (min=200 >= A.max=200) → fits group-0 (A chain extends to max=400).
+        // D (min=300 < C.max=400) in group-0 fails; min=300 >= B.max=300 → fits group-1.
+        // E (min=600 >= C.max=400) → fits group-0.
+        let files = vec![
+            create_file_key("A.parquet", 100, 200, 512),
+            create_file_key("B.parquet", 150, 300, 512),
+            create_file_key("C.parquet", 200, 400, 512),
+            create_file_key("D.parquet", 300, 500, 512),
+            create_file_key("E.parquet", 600, 700, 512),
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 5);
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"A.parquet"));
+        assert!(keys.contains(&"B.parquet"));
+        assert!(keys.contains(&"C.parquet"));
+        assert!(keys.contains(&"D.parquet"));
+        assert!(keys.contains(&"E.parquet"));
+    }
+
+    // ── generate_inverted_idx_recordbatch: additional branch-coverage tests ───
+
+    /// StreamType::Metadata supports indexing (same as Logs/Traces).
+    /// A valid FTS field in the schema must produce Some.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_metadata_stream_type() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["meta-event"])),
+                Arc::new(Int64Array::from(vec![1234i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Metadata, // supports indexing
+            &["message".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(
+            rb.is_some(),
+            "Metadata stream should produce Some when field matches"
+        );
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 1);
+        assert_eq!(rb.num_columns(), 2); // message + _timestamp
+    }
+
+    /// StreamType::Metrics supports indexing.  Providing explicit FTS fields
+    /// that exist in the schema must produce a valid RecordBatch (not None).
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_metrics_stream_produces_some() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("label", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["cpu_usage"])),
+                Arc::new(Int64Array::from(vec![9000i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Metrics, // also supports indexing
+            &["label".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(
+            rb.is_some(),
+            "Metrics supports indexing, so a matching field should produce Some"
+        );
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 1);
+        assert_eq!(rb.num_columns(), 2); // label + _timestamp
+    }
+
+    /// A batch where the batch's schema has the requested field but the column
+    /// name has different casing — `index_of` is case-sensitive, so it will
+    /// fail to find the column and produce an empty selection → result is None.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_case_sensitive_field_miss() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Schema has "Message" (capital M), but we request "message" (lowercase).
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("Message", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["hello"])),
+                Arc::new(Int64Array::from(vec![100i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &["message".to_string()], // lowercase — won't match "Message"
+            &[],
+        );
+
+        assert!(result.is_ok());
+        // "message" is not found in schema fields (case-sensitive) → inverted_idx_columns
+        // becomes empty after retain → returns None early.
+        assert!(
+            result.unwrap().is_none(),
+            "Case mismatch should prevent field from being retained"
+        );
+    }
+
+    /// A batch with zero rows (but correct schema) must still produce a valid
+    /// (albeit empty) RecordBatch when the fields match.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_zero_row_batch() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("content", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        // Explicitly build a zero-row batch.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(Vec::<&str>::new())),
+                Arc::new(Int64Array::from(Vec::<i64>::new())),
+            ],
+        )
+        .unwrap();
+        assert_eq!(batch.num_rows(), 0);
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &["content".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        // The function does not check num_rows, only column count.
+        // "content" + "_timestamp" gives 2 columns → Some returned.
+        assert!(
+            rb.is_some(),
+            "Zero-row batch with valid fields should produce Some"
+        );
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 0);
+        assert_eq!(rb.num_columns(), 2); // content + _timestamp
+    }
+
+    /// Providing only `index_fields` (no FTS fields) for a Logs stream should
+    /// work: the columns are selected from the batch schema and returned.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_index_fields_only_logs() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("request_id", DataType::Utf8, true),
+            Field::new("status_code", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["req-1", "req-2"])),
+                Arc::new(StringArray::from(vec!["200", "500"])),
+                Arc::new(Int64Array::from(vec![1000i64, 2000i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &[], // no FTS fields → falls back to SQL defaults; none match
+            &["request_id".to_string(), "status_code".to_string()],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap();
+        assert!(rb.is_some(), "index_fields present should produce Some");
+        let rb = rb.unwrap();
+        assert_eq!(rb.num_rows(), 2);
+        // request_id + status_code + _timestamp = 3 columns
+        assert_eq!(rb.num_columns(), 3);
+    }
+
+    /// Confirm that when `inverted_idx_columns` would be empty after the retain
+    /// step (no schema field matches at all), the function returns None before
+    /// entering the per-batch loop — exercising the early-return branch.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_empty_columns_early_return() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Schema has only fields that are NOT in SQL_FULL_TEXT_SEARCH_FIELDS and
+        // are not supplied as FTS or index fields.
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("alpha", DataType::Utf8, true),
+            Field::new("beta", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a"])),
+                Arc::new(StringArray::from(vec!["b"])),
+                Arc::new(Int64Array::from(vec![1i64])),
+            ],
+        )
+        .unwrap();
+
+        // Request fields that don't exist in the schema at all.
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &["nonexistent_fts".to_string()],
+            &["nonexistent_idx".to_string()],
+        );
+
+        assert!(result.is_ok());
+        assert!(
+            result.unwrap().is_none(),
+            "No schema field match should yield None (early return)"
+        );
+    }
+
+    /// When the same field name appears in both `full_text_search_fields` AND
+    /// `index_fields`, `dedup` must collapse it so the output batch column
+    /// appears exactly once.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_fts_and_index_overlap_dedup() {
+        use arrow::array::{Int64Array, StringArray};
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("tag", DataType::Utf8, true),
+            Field::new("host", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["web", "db"])),
+                Arc::new(StringArray::from(vec!["host-1", "host-2"])),
+                Arc::new(Int64Array::from(vec![100i64, 200i64])),
+            ],
+        )
+        .unwrap();
+
+        // "tag" appears in both lists; "host" only in index_fields.
+        let result = generate_inverted_idx_recordbatch(
+            schema,
+            &[batch],
+            StreamType::Logs,
+            &["tag".to_string()],
+            &["tag".to_string(), "host".to_string()],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap().expect("should produce Some");
+        // After dedup: [host, tag] (sorted) + _timestamp = 3 columns.
+        assert_eq!(rb.num_columns(), 3);
+        // "tag" must appear exactly once.
+        let tag_count = rb
+            .schema()
+            .fields()
+            .iter()
+            .filter(|f| f.name() == "tag")
+            .count();
+        assert_eq!(tag_count, 1, "tag must be deduped to exactly one column");
+        assert_eq!(rb.num_rows(), 2);
+    }
+
+    /// When the batch's own schema is a subset of the inverted_idx_columns list
+    /// (some requested columns are absent from the batch), the missing columns
+    /// are silently skipped via `filter_map`.  The result must only contain
+    /// the fields that the batch actually has.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_partial_batch_schema_match() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Stream schema knows about "present" and "absent".
+        let stream_schema = Arc::new(Schema::new(vec![
+            Field::new("present", DataType::Utf8, true),
+            Field::new("absent", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        // But the actual batch only has "present" and _timestamp.
+        let batch_schema = Arc::new(Schema::new(vec![
+            Field::new("present", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            batch_schema,
+            vec![
+                Arc::new(StringArray::from(vec!["here"])),
+                Arc::new(Int64Array::from(vec![42i64])),
+            ],
+        )
+        .unwrap();
+
+        // Pass the stream schema (which includes "absent") but a batch that
+        // doesn't have it — exercises the filter_map miss path.
+        let result = generate_inverted_idx_recordbatch(
+            stream_schema,
+            &[batch],
+            StreamType::Logs,
+            &["present".to_string(), "absent".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result
+            .unwrap()
+            .expect("should produce Some because 'present' matched");
+        // Only "present" + _timestamp survive (absent was not in the batch schema).
+        assert_eq!(rb.num_columns(), 2);
+        let rb_schema = rb.schema();
+        let col_names: Vec<&str> = rb_schema
+            .fields()
+            .iter()
+            .map(|f| f.name().as_str())
+            .collect();
+        assert!(col_names.contains(&"present"));
+        assert!(col_names.contains(&TIMESTAMP_COL_NAME));
+        assert!(!col_names.contains(&"absent"));
+    }
+
+    /// Two batches with different schemas (first has "msg", second has "body").
+    /// Because `inverted_idx_columns` is built from the *stream* schema and both
+    /// fields are present there, but the per-batch `filter_map` only picks what
+    /// each batch actually has.  After concat the rows from each batch survive.
+    #[test]
+    fn test_generate_inverted_idx_recordbatch_two_batches_different_schemas() {
+        use arrow::array::{Int64Array, StringArray};
+
+        // Stream schema knows about both columns.
+        let stream_schema = Arc::new(Schema::new(vec![
+            Field::new("msg", DataType::Utf8, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+        ]));
+
+        // Both batches use the same schema here for simplicity (the column-
+        // miss path is already tested above); this exercises the two-batch concat.
+        let batch1 = RecordBatch::try_new(
+            stream_schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["first"])),
+                Arc::new(Int64Array::from(vec![10i64])),
+            ],
+        )
+        .unwrap();
+
+        let batch2 = RecordBatch::try_new(
+            stream_schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["second", "third"])),
+                Arc::new(Int64Array::from(vec![20i64, 30i64])),
+            ],
+        )
+        .unwrap();
+
+        let result = generate_inverted_idx_recordbatch(
+            stream_schema,
+            &[batch1, batch2],
+            StreamType::Logs,
+            &["msg".to_string()],
+            &[],
+        );
+
+        assert!(result.is_ok());
+        let rb = result.unwrap().expect("should produce Some");
+        assert_eq!(rb.num_rows(), 3); // 1 + 2
+        assert_eq!(rb.num_columns(), 2); // msg + _timestamp
+    }
+
+    /// Verify `sort_by_time_range` with exactly two files where the second
+    /// file's min_ts equals the first file's max_ts — the boundary condition
+    /// `min_ts >= max_ts` in the group-fit predicate.
+    #[test]
+    fn test_sort_by_time_range_exact_boundary_two_files() {
+        let files = vec![
+            create_file_key("first.parquet", 1000, 2000, 512),
+            create_file_key("second.parquet", 2000, 3000, 512), // min == prev max
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        // min_ts(second) == max_ts(first), so `file.meta.min_ts >= f.meta.max_ts`
+        // evaluates to true → second file joins first file's group.
+        assert_eq!(result[0].key, "first.parquet");
+        assert_eq!(result[1].key, "second.parquet");
+    }
+
+    /// A file whose min_ts is one less than the previous group's max_ts must
+    /// NOT join that group (it overlaps by 1 microsecond).
+    #[test]
+    fn test_sort_by_time_range_one_unit_overlap() {
+        let files = vec![
+            create_file_key("first.parquet", 1000, 2000, 512),
+            create_file_key("overlap.parquet", 1999, 3000, 512), // 1999 < 2000
+        ];
+        let result = sort_by_time_range(files);
+        assert_eq!(result.len(), 2);
+        // overlap.parquet must be in a different group from first.parquet.
+        // The first element should be first.parquet (lower min_ts).
+        assert_eq!(result[0].key, "first.parquet");
+        // Both files must appear; overlap.parquet goes to a new group.
+        let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
+        assert!(keys.contains(&"overlap.parquet"));
     }
 }

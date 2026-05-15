@@ -128,3 +128,27 @@ enum RateLimitRules {
     Threshold,
     CreatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_ratelimit_table_contains_name() {
+        let sql = create_ratelimit_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("rate_limit_rules"));
+    }
+
+    #[test]
+    fn test_resource_key_idx_contains_name() {
+        let sql = create_ratelimit_resource_key_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(RESOURCE_KEY));
+    }
+
+    #[test]
+    fn test_resource_key_constant() {
+        assert_eq!(RESOURCE_KEY, "rkey_idx");
+    }
+}

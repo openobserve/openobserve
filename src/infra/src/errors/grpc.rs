@@ -49,3 +49,76 @@ impl From<DataFusionError> for Error {
         Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use datafusion::error::DataFusionError;
+
+    use super::*;
+
+    #[test]
+    fn test_from_datafusion_schema_no_field_named() {
+        let df_err =
+            DataFusionError::Plan("Schema error: No field named `missing_col`".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchFieldNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_parquet_not_found() {
+        let df_err = DataFusionError::Plan("parquet not found on disk".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound)
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_parquet_file_not_found() {
+        let df_err = DataFusionError::Plan("parquet file not found".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound)
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_invalid_function() {
+        let df_err = DataFusionError::Plan("Invalid function my_udf".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_generic_error_falls_through_to_sql_execute() {
+        let df_err = DataFusionError::Plan("some unrecognized error".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_incompatible_data_types_extracts_field_name() {
+        let df_err = DataFusionError::Plan(
+            "Incompatible data types for field myField. Expected Int64 but got Utf8".to_string(),
+        );
+        let err = Error::from(df_err);
+        match err {
+            Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field)) => {
+                // The parsing extracts the substring after the first space in "for field <name>."
+                assert_eq!(field, "field myField");
+            }
+            _ => panic!("expected SearchFieldHasNoCompatibleDataType"),
+        }
+    }
+}

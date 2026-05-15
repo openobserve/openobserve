@@ -1256,22 +1256,21 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         msg
     };
 
-    // Block SSRF: validate the destination URL before making any outbound request.
-    // The test_http_destination handler validates on save/test, but the URL could
-    // have been stored before the guard was introduced, or modified directly in DB.
-    if let Err(e) = SsrfGuard::validate_url_with_config(&endpoint.url) {
+    // Block SSRF: validate the destination URL (including DNS resolution) before
+    // making any outbound request. The client is built through `build_safe_client`
+    // so that redirect targets and per-connect DNS resolution are re-validated.
+    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
         return Err(anyhow::anyhow!(
             "Destination URL blocked by SSRF guard: {e}"
         ));
     }
 
-    let client = if endpoint.skip_tls_verify {
-        reqwest::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .build()?
+    let builder = if endpoint.skip_tls_verify {
+        reqwest::Client::builder().danger_accept_invalid_certs(true)
     } else {
-        reqwest::Client::new()
+        reqwest::Client::builder()
     };
+    let client = crate::common::utils::ssrf_guard::build_safe_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let mut req = match endpoint.method {
         HTTPType::POST => client.post(url),
@@ -1826,7 +1825,8 @@ async fn process_dest_template(
     }
 
     for (key, value) in vars.iter() {
-        if resp.contains(&format!("{{{key}}}")) {
+        // Match both bare `{key}` and length-suffixed `{key:N}` forms.
+        if resp.contains(&format!("{{{key}}}")) || resp.contains(&format!("{{{key}:")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
             process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")), is_email);
         }
@@ -1934,24 +1934,36 @@ fn extract_limit_with_prefix(tpl: &str, prefix: &str) -> Option<usize> {
 }
 
 fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
-    let pattern = "{".to_owned() + var_name + "}";
-    if tpl.contains(&pattern) {
-        *tpl = tpl.replace(&pattern, &var_val.to_string_with_length(0, is_email));
-        return;
-    }
-    let pattern = "{".to_owned() + var_name + ":";
-    if let Some(start) = tpl.find(&pattern) {
-        // find } start from position v
-        let p = start + pattern.len();
-        if let Some(end) = tpl[p..].find('}') {
-            let len = tpl[p..p + end].parse::<usize>().unwrap_or_default();
-            if len > 0 {
-                *tpl = tpl.replace(
-                    &tpl[start..p + end + 1],
-                    &var_val.to_string_with_length(len, is_email),
-                );
-            }
+    // 1) Handle every `{var:N}` occurrence first. We scan left-to-right and advance `cursor` past
+    //    each match so we don't loop forever on inputs that can't be parsed (e.g. `{var:abc}`) and
+    //    so multiple distinct lengths in the same template (`{msg:100}` and `{msg:200}`) are all
+    //    replaced.
+    let prefix = format!("{{{var_name}:");
+    let mut cursor = 0usize;
+    while let Some(rel_start) = tpl[cursor..].find(&prefix) {
+        let start = cursor + rel_start;
+        let num_start = start + prefix.len();
+        let Some(end_offset) = tpl[num_start..].find('}') else {
+            break;
+        };
+        let num_end = num_start + end_offset;
+        let full_end = num_end + 1; // include the closing `}`
+        let len = tpl[num_start..num_end].parse::<usize>().unwrap_or_default();
+        if len > 0 {
+            let replacement = var_val.to_string_with_length(len, is_email);
+            tpl.replace_range(start..full_end, &replacement);
+            cursor = start + replacement.len();
+        } else {
+            // Invalid/zero length — skip past this occurrence to avoid an
+            // infinite loop, but leave the original substring untouched.
+            cursor = full_end;
         }
+    }
+
+    // 2) Then handle every bare `{var}` occurrence.
+    let bare = format!("{{{var_name}}}");
+    if tpl.contains(&bare) {
+        *tpl = tpl.replace(&bare, &var_val.to_string_with_length(0, is_email));
     }
 }
 
@@ -3377,5 +3389,549 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[0]["user"], "Alice");
         assert_eq!(arr[1]["user"], "Bob");
+    }
+
+    // ── update_cron_expression ──────────────────────────────────────────────
+
+    #[test]
+    fn test_update_cron_expression_no_star_prefix() {
+        // Does not start with '*' → unchanged
+        let cron_exp = "30 * * * * *";
+        let result = update_cron_expression(cron_exp, 15);
+        assert_eq!(result, "30 * * * * *");
+    }
+
+    #[test]
+    fn test_update_cron_expression_empty_string() {
+        // Empty string starts with '*'? No, it is empty → unchanged
+        let result = update_cron_expression("", 10);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_update_cron_expression_star_only() {
+        // "*" alone — after split on '*' rest is "" which trims to ""
+        let result = update_cron_expression("*", 7);
+        assert_eq!(result, "7 ");
+    }
+
+    #[test]
+    fn test_update_cron_expression_leading_whitespace_not_star() {
+        // Leading space means it does NOT start with '*'
+        let cron_exp = " * * * * *";
+        let result = update_cron_expression(cron_exp, 5);
+        // trim() removes leading space, but the trimmed string starts with '*'
+        assert_eq!(result, "5 * * * *");
+    }
+
+    #[test]
+    fn test_update_cron_expression_zero_seconds() {
+        let result = update_cron_expression("* */5 * * * *", 0);
+        assert_eq!(result, "0 */5 * * * *");
+    }
+
+    // ── format_variable_value ──────────────────────────────────────────────
+
+    #[test]
+    fn test_format_variable_value_single_quote() {
+        assert_eq!(format_variable_value("'".to_string()), "\\\\'");
+    }
+
+    #[test]
+    fn test_format_variable_value_soh_stx_us() {
+        // \x01 SOH, \x02 STX, \x1f US — each has a dedicated arm
+        assert_eq!(format_variable_value("\x01".to_string()), "\\u{1}");
+        assert_eq!(format_variable_value("\x02".to_string()), "\\u{2}");
+        assert_eq!(format_variable_value("\x1f".to_string()), "\\u{1f}");
+    }
+
+    #[test]
+    fn test_format_variable_value_mixed_unicode_and_control() {
+        let input = "hi\x01\x02\x1fthere";
+        let result = format_variable_value(input.to_string());
+        assert_eq!(result, "hi\\u{1}\\u{2}\\u{1f}there");
+    }
+
+    #[test]
+    fn test_format_variable_value_all_printable_ascii() {
+        let input = "Hello, World! 123";
+        assert_eq!(format_variable_value(input.to_string()), input);
+    }
+
+    // ── is_json_value_position ─────────────────────────────────────────────
+
+    #[test]
+    fn test_is_json_value_position_not_after_colon() {
+        // Pattern present but not preceded by ':'
+        assert!(!is_json_value_position(
+            r#"some "{rows}" text"#,
+            r#""{rows}""#
+        ));
+    }
+
+    #[test]
+    fn test_is_json_value_position_followed_by_other_char() {
+        // Preceded by ':' but followed by a regular char, not ',' or '}'
+        assert!(!is_json_value_position(
+            r#""k": "{rows}" "other""#,
+            r#""{rows}""#
+        ));
+    }
+
+    #[test]
+    fn test_is_json_value_position_pattern_absent() {
+        assert!(!is_json_value_position(r#""k": "value"}"#, r#""{rows}""#));
+    }
+
+    #[test]
+    fn test_is_json_value_position_valid_with_closing_brace() {
+        assert!(is_json_value_position(r#""k": "{rows}"}"#, r#""{rows}""#));
+    }
+
+    // ── check_json_context_with_prefix ────────────────────────────────────
+
+    #[test]
+    fn test_check_json_context_with_prefix_non_numeric_suffix() {
+        // Prefix found but the part between prefix and `}"` is not a number
+        let tpl = r#""data": "{rows:abc}""#;
+        assert!(!check_json_context_with_prefix(tpl, "\"{rows:"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_prefix_no_closing() {
+        // Prefix present but no `}"` terminator
+        let tpl = r#""data": "{rows:3"#;
+        assert!(!check_json_context_with_prefix(tpl, "\"{rows:"));
+    }
+
+    #[test]
+    fn test_check_json_context_with_prefix_valid() {
+        let tpl = r#""data": "{rows:5}"}"#;
+        assert!(check_json_context_with_prefix(tpl, "\"{rows:"));
+    }
+
+    // ── extract_limit_with_prefix ──────────────────────────────────────────
+
+    #[test]
+    fn test_extract_limit_with_prefix_no_prefix() {
+        assert_eq!(
+            extract_limit_with_prefix(r#""data": "{rows}""#, "\"{rows:"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_limit_with_prefix_non_numeric() {
+        // The value between prefix and `}"` is not a valid usize
+        assert_eq!(
+            extract_limit_with_prefix(r#""data": "{rows:xyz}""#, "\"{rows:"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_limit_with_prefix_zero() {
+        // "0" parses to 0 as usize
+        assert_eq!(
+            extract_limit_with_prefix(r#""data": "{rows:0}""#, "\"{rows:"),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_extract_rows_limit_large_number() {
+        assert_eq!(extract_rows_limit(r#""data": "{rows:1000}""#), Some(1000));
+    }
+
+    // ── process_variable_replace edge cases ───────────────────────────────
+
+    #[test]
+    fn test_process_variable_replace_with_zero_length_spec() {
+        // {msg:0} → len is 0, which means no-op truncation (len guard: len > 0)
+        let mut tpl = "Message: {msg:0}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello"), false);
+        // len == 0 parsed → no replacement (the guard `if len > 0` is false)
+        assert_eq!(tpl, "Message: {msg:0}");
+    }
+
+    #[test]
+    fn test_process_variable_replace_length_exceeds_value() {
+        // Requested length larger than actual value length → full value
+        let mut tpl = "Data: {val:100}".to_string();
+        process_variable_replace(&mut tpl, "val", &VarValue::Str("short"), false);
+        assert_eq!(tpl, "Data: short");
+    }
+
+    #[test]
+    fn test_process_variable_replace_email_separator() {
+        let values = vec![json!("a"), json!("b"), json!("c")];
+        let mut tpl = "Items: {rows}".to_string();
+        process_variable_replace(&mut tpl, "rows", &VarValue::JsonArray(&values), true);
+        // email=true → empty separator
+        assert_eq!(tpl, "Items: abc");
+    }
+
+    // ── VarValue edge cases ────────────────────────────────────────────────
+
+    #[test]
+    fn test_var_value_str_to_string_exact_length() {
+        let val = VarValue::Str("abcde");
+        assert_eq!(val.to_string_with_length(5, false), "abcde");
+    }
+
+    #[test]
+    fn test_var_value_json_array_empty_to_string() {
+        let empty: Vec<Value> = vec![];
+        let val = VarValue::JsonArray(&empty);
+        assert_eq!(val.to_string_with_length(0, false), "");
+        assert_eq!(val.to_string_with_length(5, false), "");
+    }
+
+    #[test]
+    fn test_var_value_json_null_and_bool() {
+        let values = vec![json!(null), json!(true), json!(false)];
+        let val = VarValue::JsonArray(&values);
+        let result = val.to_string_with_length(3, false);
+        // null → "null", true → "true", false → "false" (JSON serialisation)
+        assert!(result.contains("null"));
+        assert!(result.contains("true"));
+        assert!(result.contains("false"));
+    }
+
+    // ── get_row_column_map with non-string values ──────────────────────────
+
+    #[test]
+    fn test_get_row_column_map_null_value() {
+        let mut row = Map::new();
+        row.insert("field".to_string(), json!(null));
+        let result = get_row_column_map(&[row]);
+        // null is not string / not f64 → value.to_string() → "null"
+        assert!(result.get("field").unwrap().contains("null"));
+    }
+
+    #[test]
+    fn test_get_row_column_map_bool_value() {
+        let mut row = Map::new();
+        row.insert("active".to_string(), json!(true));
+        let result = get_row_column_map(&[row]);
+        assert!(result.get("active").unwrap().contains("true"));
+    }
+
+    #[test]
+    fn test_get_row_column_map_integer_value() {
+        let mut row = Map::new();
+        row.insert("count".to_string(), json!(42u64));
+        let result = get_row_column_map(&[row]);
+        // integers serialize as floats via as_f64: "42" or "42.0" depending on variant
+        let set = result.get("count").unwrap();
+        assert!(!set.is_empty());
+    }
+
+    // ── get_alert_start_end_time additional branches ───────────────────────
+
+    #[test]
+    fn test_get_alert_start_end_time_use_given_time_no_start() {
+        // use_given_time=true, start_time=None → falls back to rows_end_time - period
+        let vars = HashMap::new();
+        let period = 10i64; // 10 minutes
+        let rows_end_time = 1_000_000_000i64;
+        let (start, end) = get_alert_start_end_time(&vars, period, rows_end_time, None, true);
+        assert_eq!(end, rows_end_time);
+        let expected_start = rows_end_time
+            - Duration::try_minutes(period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        assert_eq!(start, expected_start);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_only_min_time() {
+        // Only zo_sql_min_time set, no max or timestamp.
+        // alert_end_time stays 0 → falls back to rows_end_time.
+        // Then end-start < 1 minute → start is reset to end - period_micros.
+        let mut vars = HashMap::new();
+        let mut min_times = HashSet::new();
+        min_times.insert("5000000".to_string());
+        vars.insert("zo_sql_min_time".to_string(), min_times);
+
+        let period = 5i64;
+        let rows_end_time = 10_000_000i64;
+        let one_min_us = Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let period_us = Duration::try_minutes(period)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        let (start, end) = get_alert_start_end_time(&vars, period, rows_end_time, None, false);
+        // end: alert_end_time==0 → rows_end_time
+        assert_eq!(end, rows_end_time);
+        // end - start must be >= 1 minute (code resets start when it's too small)
+        assert!(end - start >= one_min_us);
+        // with start_time=None the reset puts start = end - period_us
+        assert_eq!(start, end - period_us);
+    }
+
+    #[test]
+    fn test_get_alert_start_end_time_only_max_time() {
+        // Only zo_sql_max_time set. Use a value that parses cleanly (no underscores in string).
+        let mut vars = HashMap::new();
+        let mut max_times = HashSet::new();
+        // 9 million microseconds — write without underscores so .parse::<i64>() succeeds
+        max_times.insert("9000000".to_string());
+        vars.insert("zo_sql_max_time".to_string(), max_times);
+
+        let period = 2i64; // 2 minutes
+        let rows_end_time = 10_000_000i64;
+        let one_min_us = Duration::try_minutes(1)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let period_us = Duration::try_minutes(period)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+
+        let (start, end) = get_alert_start_end_time(&vars, period, rows_end_time, None, false);
+        // end = max_time + 1 minute = 9_000_000 + 60_000_000 = 69_000_000
+        let expected_end = 9_000_000 + one_min_us;
+        assert_eq!(end, expected_end);
+        // end - start = period_us (reset because range < 1 min before adding 1 min)
+        // Actually end-start = 69_000_000 - start. The code resets when end-start < one_min_us.
+        // 69_000_000 - 9_000_000 = 60_000_000 = exactly one_min_us, NOT < one_min_us → no reset.
+        // So start stays at alert_start_time=0 → reset to end - period_us.
+        assert_eq!(start, expected_end - period_us);
+    }
+
+    // ── AlertError Display ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_alert_error_display_messages() {
+        assert_eq!(
+            AlertError::AlertNameMissing.to_string(),
+            "Alert name is required"
+        );
+        assert_eq!(
+            AlertError::AlertDestinationMissing.to_string(),
+            "Alert destinations is required"
+        );
+        assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
+        assert_eq!(
+            AlertError::SqlMissingQuery.to_string(),
+            "Alert with SQL mode should have a query"
+        );
+        assert_eq!(
+            AlertError::PromqlMissingQuery.to_string(),
+            "Alert with PromQL mode should have a query"
+        );
+        assert_eq!(
+            AlertError::SqlContainsSelectStar.to_string(),
+            "Alert with SQL can not contain SELECT * in the SQL query"
+        );
+        assert_eq!(
+            AlertError::RealtimeMissingCustomQuery.to_string(),
+            "Realtime alert should use Custom query type"
+        );
+        assert_eq!(
+            AlertError::AlertIdMissing.to_string(),
+            "Alert ID is required"
+        );
+        assert_eq!(
+            AlertError::AlertNameContainsForwardSlash.to_string(),
+            "Alert name cannot contain '/'"
+        );
+    }
+
+    #[test]
+    fn test_alert_error_display_with_params() {
+        let e = AlertError::AlertDestinationNotFound {
+            dest: "slack_channel".to_string(),
+        };
+        assert_eq!(e.to_string(), "Alert destination slack_channel not found");
+
+        let e = AlertError::StreamNotFound {
+            stream_name: "my_stream".to_string(),
+        };
+        assert_eq!(e.to_string(), "Stream my_stream not found");
+
+        let e = AlertError::AlertTemplateNotFound {
+            template: "default_tpl".to_string(),
+        };
+        assert_eq!(e.to_string(), "Alert template default_tpl not found");
+
+        let e = AlertError::PeriodExceedsMaxQueryRange {
+            max_query_range_hours: 24,
+            stream_name: "events".to_string(),
+        };
+        assert!(e.to_string().contains("24"));
+        assert!(e.to_string().contains("events"));
+
+        let e = AlertError::SendNotificationError {
+            error_message: "timeout".to_string(),
+        };
+        assert_eq!(e.to_string(), "timeout");
+
+        let e = AlertError::PermissionDenied;
+        assert_eq!(e.to_string(), "Permission denied");
+
+        let e = AlertError::UserNotFound;
+        assert_eq!(e.to_string(), "User not found");
+
+        let e = AlertError::CreateFolderNotFound;
+        assert_eq!(
+            e.to_string(),
+            "Error creating alert in folder that cannot be found"
+        );
+    }
+
+    // ── has_spread_rows additional branches ───────────────────────────────
+
+    #[test]
+    fn test_has_spread_rows_with_and_without_limit() {
+        // Both forms detected
+        assert!(has_spread_rows(r#""{...rows}""#));
+        assert!(has_spread_rows(r#""{...rows:5}""#));
+        // Neither form
+        assert!(!has_spread_rows(r#""{rows}""#));
+        assert!(!has_spread_rows("no rows here"));
+    }
+
+    // ── check_json_context spread patterns ────────────────────────────────
+
+    #[test]
+    fn test_check_json_context_spread_with_limit_not_in_json_pos() {
+        // "{...rows:3}" preceded by text prefix — not pure JSON value position
+        assert!(!check_json_context(r#""data": "prefix {rows:3}""#, "rows"));
+    }
+
+    #[test]
+    fn test_check_json_context_spread_different_var() {
+        // spread pattern for a different variable name
+        assert!(check_json_context(r#""fields": "{...items}"}"#, "items"));
+        // should not match "rows"
+        assert!(!check_json_context(r#""fields": "{...items}"}"#, "rows"));
+    }
+
+    // ── {var:N} length-suffix bug fixes (regression tests) ────────────────
+
+    /// Bug 2 (`process_variable_replace`): a template that contains *only*
+    /// `{var:N}` (no bare `{var}`) must still get truncated.
+    #[test]
+    fn test_process_variable_replace_only_length_form() {
+        let mut tpl = "stack: {exception_stacktrace:5}".to_string();
+        process_variable_replace(
+            &mut tpl,
+            "exception_stacktrace",
+            &VarValue::Str("NullPointerException at line 42"),
+            false,
+        );
+        assert_eq!(tpl, "stack: NullP");
+    }
+
+    /// Bug 2: when both `{var}` and `{var:N}` appear in the same template,
+    /// both forms must be replaced (the old code returned early after the
+    /// bare-form replacement, leaving `{var:N}` untouched).
+    #[test]
+    fn test_process_variable_replace_both_forms_same_template() {
+        let mut tpl = "full={msg} short={msg:5}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello world"), false);
+        assert_eq!(tpl, "full=hello world short=hello");
+    }
+
+    /// Two distinct length suffixes for the same variable in one template.
+    #[test]
+    fn test_process_variable_replace_multiple_length_specs() {
+        let mut tpl = "a={msg:3} b={msg:7}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("abcdefghij"), false);
+        assert_eq!(tpl, "a=abc b=abcdefg");
+    }
+
+    /// Multiple occurrences of the same `{var:N}` are all replaced.
+    #[test]
+    fn test_process_variable_replace_repeated_length_spec() {
+        let mut tpl = "x={msg:3} y={msg:3}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("abcdef"), false);
+        assert_eq!(tpl, "x=abc y=abc");
+    }
+
+    /// Malformed `{var:abc}` (non-numeric length) must not loop forever and
+    /// must leave the original substring untouched.
+    #[test]
+    fn test_process_variable_replace_invalid_length_is_skipped() {
+        let mut tpl = "bad={msg:abc} good={msg:5}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello world"), false);
+        assert_eq!(tpl, "bad={msg:abc} good=hello");
+    }
+
+    /// `{var:0}` is treated as no-op truncation (preserves prior behavior).
+    #[test]
+    fn test_process_variable_replace_zero_length_then_bare() {
+        let mut tpl = "z={msg:0} b={msg}".to_string();
+        process_variable_replace(&mut tpl, "msg", &VarValue::Str("hello"), false);
+        // {msg:0} is left as-is; {msg} is replaced.
+        assert_eq!(tpl, "z={msg:0} b=hello");
+    }
+
+    /// Bug 1 (`process_dest_template` guard): when the destination template
+    /// contains *only* `{field:N}` (no bare `{field}`), the row-derived value
+    /// must still be substituted with truncation. Mirrors the user's Lark
+    /// card template scenario.
+    #[tokio::test]
+    async fn test_process_dest_template_length_only_field() {
+        let dest_tpl = r#"{"text": "stacktrace: {exception_stacktrace:10}"}"#;
+        let rows_tpl_val = vec![Value::String(
+            "exception_stacktrace=NullPointerException at line 42".to_string(),
+        )];
+        let mut row = Map::new();
+        row.insert(
+            "exception_stacktrace".to_string(),
+            json!("NullPointerException at line 42"),
+        );
+        let rows = vec![row];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["text"], "stacktrace: NullPointe");
+    }
+
+    /// Bug 1 + Bug 2 combined: destination template containing both `{field}`
+    /// and `{field:N}` for the *same* variable. Both must be replaced.
+    #[tokio::test]
+    async fn test_process_dest_template_both_forms_same_field() {
+        let dest_tpl = r#"{"full": "{msg}", "short": "{msg:5}"}"#;
+        let rows_tpl_val = vec![Value::String("msg=hello world".to_string())];
+        let mut row = Map::new();
+        row.insert("msg".to_string(), json!("hello world"));
+        let rows = vec![row];
+
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+        };
+
+        let result =
+            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
+                .await;
+
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["full"], "hello world");
+        assert_eq!(parsed["short"], "hello");
     }
 }

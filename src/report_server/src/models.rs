@@ -100,4 +100,55 @@ mod tests {
             serde_json::from_str(&json_using_alias).unwrap();
         assert_eq!(email_details, email_details_from_alias);
     }
+
+    #[test]
+    fn test_report_dashboard_variable_id_absent_when_none() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: None,
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("id"));
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_id_present_when_some() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: Some("abc123".to_string()),
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(json.as_object().unwrap().contains_key("id"));
+        assert_eq!(json["id"], "abc123");
+    }
+
+    #[test]
+    fn test_report_timerange_default() {
+        let tr = ReportTimerange::default();
+        assert_eq!(tr.range_type, ReportTimerangeType::Relative);
+        assert_eq!(tr.period, "1w");
+        assert_eq!(tr.from, 0);
+        assert_eq!(tr.to, 0);
+    }
+
+    #[test]
+    fn test_report_timerange_type_serde_roundtrip() {
+        let rel = serde_json::to_string(&ReportTimerangeType::Relative).unwrap();
+        let abs = serde_json::to_string(&ReportTimerangeType::Absolute).unwrap();
+        assert_eq!(rel, "\"relative\"");
+        assert_eq!(abs, "\"absolute\"");
+        let back_rel: ReportTimerangeType = serde_json::from_str(&rel).unwrap();
+        let back_abs: ReportTimerangeType = serde_json::from_str(&abs).unwrap();
+        assert_eq!(back_rel, ReportTimerangeType::Relative);
+        assert_eq!(back_abs, ReportTimerangeType::Absolute);
+    }
+
+    #[test]
+    fn test_report_type_variants() {
+        assert_eq!(ReportType::PDF, ReportType::PDF);
+        assert_ne!(ReportType::PDF, ReportType::Cache);
+        assert_eq!(ReportType::Cache, ReportType::Cache);
+    }
 }

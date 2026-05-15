@@ -163,3 +163,43 @@ pub async fn clear() -> Result<(), errors::Error> {
 pub async fn is_empty() -> Result<bool, errors::Error> {
     Ok(len().await? == 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::ai::PromptType;
+
+    use super::*;
+
+    fn make_model(r#type: &str) -> Model {
+        Model {
+            r#type: r#type.to_string(),
+            content: "You are a helpful assistant.".to_string(),
+            updated_at: 9999,
+        }
+    }
+
+    #[test]
+    fn test_try_from_system_type() {
+        let prompt = AIPrompt::try_from(make_model("system")).unwrap();
+        assert_eq!(prompt.r#type, PromptType::System);
+    }
+
+    #[test]
+    fn test_try_from_user_type() {
+        let prompt = AIPrompt::try_from(make_model("user")).unwrap();
+        assert_eq!(prompt.r#type, PromptType::User);
+    }
+
+    #[test]
+    fn test_try_from_unknown_type_defaults_to_system() {
+        let prompt = AIPrompt::try_from(make_model("unknown")).unwrap();
+        assert_eq!(prompt.r#type, PromptType::System);
+    }
+
+    #[test]
+    fn test_try_from_copies_content_and_timestamp() {
+        let prompt = AIPrompt::try_from(make_model("user")).unwrap();
+        assert_eq!(prompt.content, "You are a helpful assistant.");
+        assert_eq!(prompt.updated_at, 9999);
+    }
+}

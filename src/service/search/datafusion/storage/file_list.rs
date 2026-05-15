@@ -97,3 +97,32 @@ pub fn get_segment_ids(file_key: &str) -> Option<Arc<BitVec>> {
     let data = r.get(trace_id)?;
     data.get(filename).cloned()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_nonexistent_trace_id_returns_error() {
+        let result = get("nonexistent_trace_xyz_file_list_12345");
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("trace_id not found")
+        );
+    }
+
+    #[test]
+    fn test_get_segment_ids_nonexistent_returns_none() {
+        let result = get_segment_ids("nonexistent_trace_file_list/$$/filename.parquet");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_segment_ids_no_separator_returns_none() {
+        let result = get_segment_ids("no-separator-here");
+        assert!(result.is_none());
+    }
+}

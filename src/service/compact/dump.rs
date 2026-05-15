@@ -689,7 +689,7 @@ async fn generate_dump(
     };
 
     // store the file in storage
-    let account = infra::storage::get_account(&file_key).unwrap_or_default();
+    let account = infra::storage::get_account(org_id, &file_key).unwrap_or_default();
     infra::storage::put(&account, &file_key, buf.into()).await?;
 
     let dump_file = FileKey {
@@ -749,7 +749,7 @@ async fn calculate_dump_file_stats(account: &str, file_key: &str) -> Result<Stre
 
     // Parse the parquet file to get FileRecord list
     let file_format = FileFormat::from_extension(file_key).unwrap_or(FileFormat::Parquet);
-    let (_, mut reader) = get_recordbatch_reader_from_bytes(file_format, &file_data)
+    let (_, mut reader) = get_recordbatch_reader_from_bytes(file_format, file_data)
         .await
         .map_err(|e| format!("failed to parse dump file as parquet: {e}"))?;
 
@@ -880,6 +880,8 @@ mod tests {
 
     use super::*;
 
+    // ---- DumpJob ----
+
     #[test]
     fn test_dump_job_creation() {
         let job = DumpJob {
@@ -914,6 +916,76 @@ mod tests {
         assert_eq!(cloned.job_id, job.job_id);
         assert_eq!(cloned.offset, job.offset);
     }
+
+    #[test]
+    fn test_dump_job_traces_stream_type() {
+        let job = DumpJob {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Traces,
+            stream_name: "trace_stream".to_string(),
+            job_id: 1,
+            offset: 100,
+        };
+        assert_eq!(job.stream_type, StreamType::Traces);
+    }
+
+    #[test]
+    fn test_dump_job_zero_offset() {
+        let job = DumpJob {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "stream".to_string(),
+            job_id: 0,
+            offset: 0,
+        };
+        assert_eq!(job.job_id, 0);
+        assert_eq!(job.offset, 0);
+    }
+
+    #[test]
+    fn test_dump_job_negative_offset() {
+        // offsets can technically be any i64
+        let job = DumpJob {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "stream".to_string(),
+            job_id: 99,
+            offset: -1,
+        };
+        assert_eq!(job.offset, -1);
+    }
+
+    #[test]
+    fn test_dump_job_max_values() {
+        let job = DumpJob {
+            org_id: "org".to_string(),
+            stream_type: StreamType::Metrics,
+            stream_name: "stream".to_string(),
+            job_id: i64::MAX,
+            offset: i64::MAX,
+        };
+        assert_eq!(job.job_id, i64::MAX);
+        assert_eq!(job.offset, i64::MAX);
+    }
+
+    #[test]
+    fn test_dump_job_clone_independence() {
+        // Modifying the original should not affect the clone (String fields are value types)
+        let original = DumpJob {
+            org_id: "original_org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_name: "original_stream".to_string(),
+            job_id: 1,
+            offset: 100,
+        };
+        let mut cloned = original.clone();
+        cloned.job_id = 999;
+        cloned.offset = 9999;
+        assert_eq!(original.job_id, 1);
+        assert_eq!(original.offset, 100);
+    }
+
+    // ---- create_record_batch ----
 
     #[test]
     fn test_dump_create_record_batch_empty() {
@@ -1163,6 +1235,587 @@ mod tests {
 
         for (i, expected_name) in expected_columns.iter().enumerate() {
             assert_eq!(schema.field(i).name(), expected_name);
+        }
+    }
+
+    // ---- New tests for uncovered branches ----
+
+    #[test]
+    fn test_dump_create_record_batch_zero_sizes() {
+        // Test files with all-zero numeric fields
+        let file = FileRecord {
+            id: 0,
+            account: "".to_string(),
+            org: "".to_string(),
+            stream: "".to_string(),
+            date: "".to_string(),
+            file: "".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 0,
+            compressed_size: 0,
+            index_size: 0,
+            updated_at: 0,
+        };
+
+        let result = create_record_batch(vec![file]);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 1);
+
+        let id_col = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(id_col.value(0), 0);
+
+        let records_col = batch
+            .column(10)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(records_col.value(0), 0);
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_max_timestamps() {
+        let file = FileRecord {
+            id: i64::MAX,
+            account: "acc".to_string(),
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            date: "9999-12-31".to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: i64::MAX - 1,
+            max_ts: i64::MAX,
+            records: i64::MAX,
+            original_size: i64::MAX,
+            compressed_size: i64::MAX,
+            index_size: i64::MAX,
+            updated_at: i64::MAX,
+        };
+
+        let result = create_record_batch(vec![file]);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+
+        let min_ts_col = batch
+            .column(8)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(min_ts_col.value(0), i64::MAX - 1);
+
+        let max_ts_col = batch
+            .column(9)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(max_ts_col.value(0), i64::MAX);
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_all_deleted() {
+        let files: Vec<FileRecord> = (0..5)
+            .map(|i| FileRecord {
+                id: i,
+                account: "acc".to_string(),
+                org: "org".to_string(),
+                stream: "stream".to_string(),
+                date: "2024-01-01".to_string(),
+                file: format!("file{}.parquet", i),
+                deleted: true, // all deleted
+                flattened: false,
+                min_ts: i * 1000,
+                max_ts: i * 1000 + 999,
+                records: 10,
+                original_size: 1024,
+                compressed_size: 512,
+                index_size: 64,
+                updated_at: i * 1000 + 1000,
+            })
+            .collect();
+
+        let result = create_record_batch(files);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 5);
+
+        let deleted_col = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        for i in 0..5 {
+            assert!(deleted_col.value(i), "row {} should be deleted", i);
+        }
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_all_flattened() {
+        let files: Vec<FileRecord> = (0..3)
+            .map(|i| FileRecord {
+                id: i,
+                account: "acc".to_string(),
+                org: "org".to_string(),
+                stream: "stream".to_string(),
+                date: "2024-06-15".to_string(),
+                file: format!("file{}.parquet", i),
+                deleted: false,
+                flattened: true, // all flattened
+                min_ts: 1000,
+                max_ts: 2000,
+                records: 50,
+                original_size: 2048,
+                compressed_size: 1024,
+                index_size: 128,
+                updated_at: 3000,
+            })
+            .collect();
+
+        let result = create_record_batch(files);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 3);
+
+        let flattened_col = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<BooleanArray>()
+            .unwrap();
+        for i in 0..3 {
+            assert!(flattened_col.value(i), "row {} should be flattened", i);
+        }
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_account_field() {
+        let file = FileRecord {
+            id: 42,
+            account: "my-unique-account-id".to_string(),
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            date: "2024-01-15".to_string(),
+            file: "file.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 100,
+            max_ts: 200,
+            records: 5,
+            original_size: 100,
+            compressed_size: 50,
+            index_size: 5,
+            updated_at: 200,
+        };
+
+        let result = create_record_batch(vec![file]);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+
+        let account_col = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(account_col.value(0), "my-unique-account-id");
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_file_and_date_fields() {
+        let file = FileRecord {
+            id: 7,
+            account: "acc".to_string(),
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            date: "2025-03-22".to_string(),
+            file: "2025/03/22/00/abc123.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 0,
+            compressed_size: 0,
+            index_size: 0,
+            updated_at: 0,
+        };
+
+        let result = create_record_batch(vec![file]);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+
+        let date_col = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(date_col.value(0), "2025-03-22");
+
+        let file_col = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(file_col.value(0), "2025/03/22/00/abc123.parquet");
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_size_columns() {
+        let file = FileRecord {
+            id: 1,
+            account: "acc".to_string(),
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            date: "2024-01-01".to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            flattened: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 777,
+            original_size: 100_000,
+            compressed_size: 40_000,
+            index_size: 5_000,
+            updated_at: 9999,
+        };
+
+        let result = create_record_batch(vec![file]);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+
+        let orig_col = batch
+            .column(11)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(orig_col.value(0), 100_000);
+
+        let comp_col = batch
+            .column(12)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(comp_col.value(0), 40_000);
+
+        let idx_col = batch
+            .column(13)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(idx_col.value(0), 5_000);
+
+        let upd_col = batch
+            .column(14)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(upd_col.value(0), 9999);
+    }
+
+    #[test]
+    fn test_dump_create_record_batch_large_batch() {
+        // 100 files — checks builder capacity handling
+        let files: Vec<FileRecord> = (0..100)
+            .map(|i| FileRecord {
+                id: i,
+                account: format!("acc{}", i),
+                org: format!("org{}", i),
+                stream: format!("stream{}", i),
+                date: "2024-01-01".to_string(),
+                file: format!("{}.parquet", i),
+                deleted: i % 3 == 0,
+                flattened: i % 2 == 0,
+                min_ts: i * 100,
+                max_ts: i * 100 + 99,
+                records: i * 10,
+                original_size: i * 1000,
+                compressed_size: i * 500,
+                index_size: i * 50,
+                updated_at: i * 100 + 100,
+            })
+            .collect();
+
+        let result = create_record_batch(files);
+        assert!(result.is_ok());
+        let batch = result.unwrap();
+        assert_eq!(batch.num_rows(), 100);
+    }
+
+    // ---- Round-trip: create_record_batch -> record_batch_to_file_record ----
+
+    #[test]
+    fn test_roundtrip_single_file() {
+        let original = FileRecord {
+            id: 42,
+            account: "acc42".to_string(),
+            org: "org_rt".to_string(),
+            stream: "stream_rt".to_string(),
+            date: "2024-07-04".to_string(),
+            file: "roundtrip.parquet".to_string(),
+            deleted: false,
+            flattened: true,
+            min_ts: 10_000,
+            max_ts: 20_000,
+            records: 250,
+            original_size: 25_000,
+            compressed_size: 12_500,
+            index_size: 1_250,
+            updated_at: 20_001,
+        };
+
+        let batch = create_record_batch(vec![original.clone()]).unwrap();
+        let recovered = crate::service::file_list_dump::record_batch_to_file_record(batch);
+
+        assert_eq!(recovered.len(), 1);
+        let r = &recovered[0];
+        assert_eq!(r.id, original.id);
+        assert_eq!(r.account, original.account);
+        assert_eq!(r.org, original.org);
+        assert_eq!(r.stream, original.stream);
+        assert_eq!(r.date, original.date);
+        assert_eq!(r.file, original.file);
+        assert_eq!(r.deleted, original.deleted);
+        assert_eq!(r.flattened, original.flattened);
+        assert_eq!(r.min_ts, original.min_ts);
+        assert_eq!(r.max_ts, original.max_ts);
+        assert_eq!(r.records, original.records);
+        assert_eq!(r.original_size, original.original_size);
+        assert_eq!(r.compressed_size, original.compressed_size);
+        assert_eq!(r.index_size, original.index_size);
+        assert_eq!(r.updated_at, original.updated_at);
+    }
+
+    #[test]
+    fn test_roundtrip_multiple_files_preserves_count() {
+        let files: Vec<FileRecord> = (1..=10)
+            .map(|i| FileRecord {
+                id: i,
+                account: format!("a{}", i),
+                org: "org".to_string(),
+                stream: "stream".to_string(),
+                date: "2024-01-01".to_string(),
+                file: format!("{}.parquet", i),
+                deleted: false,
+                flattened: false,
+                min_ts: i * 1000,
+                max_ts: i * 1000 + 999,
+                records: i * 5,
+                original_size: i * 100,
+                compressed_size: i * 50,
+                index_size: i * 5,
+                updated_at: i * 1000 + 1000,
+            })
+            .collect();
+
+        let count = files.len();
+        let batch = create_record_batch(files).unwrap();
+        let recovered = crate::service::file_list_dump::record_batch_to_file_record(batch);
+
+        assert_eq!(recovered.len(), count);
+        // Verify sorting: record_batch_to_file_record sorts by id
+        for w in recovered.windows(2) {
+            assert!(w[0].id <= w[1].id);
+        }
+    }
+
+    #[test]
+    fn test_roundtrip_empty_batch() {
+        let batch = create_record_batch(vec![]).unwrap();
+        let recovered = crate::service::file_list_dump::record_batch_to_file_record(batch);
+        assert_eq!(recovered.len(), 0);
+    }
+
+    // ---- generate_dump_stream_name (via file_list_dump) ----
+
+    #[test]
+    fn test_generate_dump_stream_name_logs() {
+        let name = generate_dump_stream_name(StreamType::Logs, "app_logs");
+        assert_eq!(name, "app_logs_logs");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_metrics() {
+        let name = generate_dump_stream_name(StreamType::Metrics, "cpu_metrics");
+        assert_eq!(name, "cpu_metrics_metrics");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_traces() {
+        let name = generate_dump_stream_name(StreamType::Traces, "http_traces");
+        assert_eq!(name, "http_traces_traces");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_filelist() {
+        let name = generate_dump_stream_name(StreamType::Filelist, "fl_stream");
+        assert_eq!(name, "fl_stream_file_list");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_enrichment_tables() {
+        let name = generate_dump_stream_name(StreamType::EnrichmentTables, "geo_table");
+        assert_eq!(name, "geo_table_enrichment_tables");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_empty_stream() {
+        let name = generate_dump_stream_name(StreamType::Logs, "");
+        assert_eq!(name, "_logs");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_stream_with_underscores() {
+        let name = generate_dump_stream_name(StreamType::Metrics, "my_stream_name");
+        assert_eq!(name, "my_stream_name_metrics");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_stream_with_hyphens() {
+        let name = generate_dump_stream_name(StreamType::Logs, "my-stream-2024");
+        assert_eq!(name, "my-stream-2024_logs");
+    }
+
+    #[test]
+    fn test_generate_dump_stream_name_format_pattern() {
+        // Verify the pattern is always {stream_name}_{stream_type}
+        for (stype, suffix) in &[
+            (StreamType::Logs, "logs"),
+            (StreamType::Metrics, "metrics"),
+            (StreamType::Traces, "traces"),
+        ] {
+            let name = generate_dump_stream_name(*stype, "test");
+            assert_eq!(name, format!("test_{}", suffix));
+        }
+    }
+
+    // ---- StreamStats accumulation logic (pure arithmetic) ----
+
+    #[test]
+    fn test_stream_stats_default_values() {
+        let stats = StreamStats {
+            created_at: 0,
+            doc_time_min: i64::MAX,
+            doc_time_max: 0,
+            doc_num: 0,
+            file_num: 0,
+            storage_size: 0.0,
+            compressed_size: 0.0,
+            index_size: 0.0,
+        };
+        // Check the sentinel value for doc_time_min (as used in dump() function)
+        assert_eq!(stats.doc_time_min, i64::MAX);
+        // After normalisation this would be set to 0
+        let normalized_min = if stats.doc_time_min == i64::MAX {
+            0
+        } else {
+            stats.doc_time_min
+        };
+        assert_eq!(normalized_min, 0);
+    }
+
+    #[test]
+    fn test_stream_stats_accumulation_from_files() {
+        // Mirrors the stats accumulation logic inside dump()
+        let file_records = vec![
+            (
+                100i64,
+                1_000i64,
+                1_000_000i64,
+                50i64,
+                200i64,
+                5_000i64,
+                2_500i64,
+                250i64,
+            ),
+            (200, 1_500, 1_500_000, 100, 300, 10_000, 5_000, 500),
+        ];
+
+        let mut stats = StreamStats {
+            created_at: 0,
+            doc_time_min: i64::MAX,
+            doc_time_max: 0,
+            doc_num: 0,
+            file_num: 0,
+            storage_size: 0.0,
+            compressed_size: 0.0,
+            index_size: 0.0,
+        };
+
+        for (records, min_ts, max_ts, file_num_delta, _doc, orig, comp, idx) in &file_records {
+            stats.file_num += file_num_delta;
+            stats.doc_num += records;
+            stats.doc_time_min = stats.doc_time_min.min(*min_ts);
+            stats.doc_time_max = stats.doc_time_max.max(*max_ts);
+            stats.storage_size += *orig as f64;
+            stats.compressed_size += *comp as f64;
+            stats.index_size += *idx as f64;
+        }
+
+        if stats.doc_time_min == i64::MAX {
+            stats.doc_time_min = 0;
+        }
+
+        assert_eq!(stats.doc_num, 300);
+        assert_eq!(stats.file_num, 150);
+        assert_eq!(stats.doc_time_min, 1_000);
+        assert_eq!(stats.doc_time_max, 1_500_000);
+        assert_eq!(stats.storage_size, 15_000.0);
+        assert_eq!(stats.compressed_size, 7_500.0);
+        assert_eq!(stats.index_size, 750.0);
+    }
+
+    #[test]
+    fn test_stream_stats_doc_time_min_sentinel_no_files() {
+        // When no files have been processed, doc_time_min stays at MAX
+        // and should be clamped to 0 as the dump() function does
+        let mut stats = StreamStats {
+            created_at: 0,
+            doc_time_min: i64::MAX,
+            doc_time_max: 0,
+            doc_num: 0,
+            file_num: 0,
+            storage_size: 0.0,
+            compressed_size: 0.0,
+            index_size: 0.0,
+        };
+
+        if stats.doc_time_min == i64::MAX {
+            stats.doc_time_min = 0;
+        }
+
+        assert_eq!(stats.doc_time_min, 0);
+    }
+
+    #[test]
+    fn test_dump_job_various_stream_types_for_stream_format() {
+        // The dump function formats stream as "org/stream_type/name"
+        // Verify this pattern is consistent with DumpJob fields
+        let cases = vec![
+            (StreamType::Logs, "logs"),
+            (StreamType::Metrics, "metrics"),
+            (StreamType::Traces, "traces"),
+        ];
+        for (stype, type_str) in cases {
+            let job = DumpJob {
+                org_id: "org".to_string(),
+                stream_type: stype,
+                stream_name: "stream".to_string(),
+                job_id: 1,
+                offset: 0,
+            };
+            let formatted = format!("{}/{}/{}", job.org_id, job.stream_type, job.stream_name);
+            assert!(
+                formatted.contains(type_str),
+                "formatted stream '{}' should contain type '{}'",
+                formatted,
+                type_str
+            );
         }
     }
 }

@@ -781,3 +781,81 @@ pub async fn get_file_id_lists(
     }
     Ok(file_lists)
 }
+
+#[cfg(test)]
+mod tests {
+    use infra::file_list::FileId;
+
+    use super::*;
+
+    fn make_file_id(id: i64, size: i64) -> FileId {
+        FileId {
+            id,
+            records: 10,
+            original_size: size,
+            deleted: false,
+        }
+    }
+
+    #[test]
+    fn test_distribute_even() {
+        let buckets = distribute(10, 5);
+        assert_eq!(buckets, vec![2, 2, 2, 2, 2]);
+    }
+
+    #[test]
+    fn test_distribute_with_remainder() {
+        let buckets = distribute(10, 3);
+        assert_eq!(buckets, vec![4, 3, 3]);
+    }
+
+    #[test]
+    fn test_distribute_fewer_than_nodes() {
+        let buckets = distribute(2, 5);
+        assert_eq!(buckets, vec![1, 1, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_distribute_single_node() {
+        let buckets = distribute(7, 1);
+        assert_eq!(buckets, vec![7]);
+    }
+
+    #[test]
+    fn test_partition_file_by_nums_even() {
+        let files: Vec<FileId> = (1..=6).map(|i| make_file_id(i, 100)).collect();
+        let parts = partition_file_by_nums(files, 3);
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0], vec![1, 2]);
+        assert_eq!(parts[1], vec![3, 4]);
+        assert_eq!(parts[2], vec![5, 6]);
+    }
+
+    #[test]
+    fn test_partition_file_by_nums_more_nodes_than_files() {
+        let files: Vec<FileId> = (1..=2).map(|i| make_file_id(i, 100)).collect();
+        let parts = partition_file_by_nums(files, 5);
+        assert_eq!(parts.len(), 5);
+        assert_eq!(parts[0], vec![1]);
+        assert_eq!(parts[1], vec![2]);
+        // remaining partitions empty
+        assert!(parts[2].is_empty());
+        assert!(parts[3].is_empty());
+        assert!(parts[4].is_empty());
+    }
+
+    #[test]
+    fn test_partition_file_by_bytes_basic() {
+        let files: Vec<FileId> = vec![
+            make_file_id(1, 100),
+            make_file_id(2, 100),
+            make_file_id(3, 100),
+            make_file_id(4, 100),
+        ];
+        let parts = partition_file_by_bytes(files, 2);
+        assert_eq!(parts.len(), 2);
+        // total = 400, avg = 200, so 2 files per partition
+        let total_ids: Vec<i64> = parts.iter().flatten().cloned().collect();
+        assert_eq!(total_ids.len(), 4);
+    }
+}

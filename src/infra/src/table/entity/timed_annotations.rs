@@ -44,3 +44,28 @@ impl Related<super::timed_annotation_panels::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "ann-1".to_string(),
+            dashboard_id: "dash-1".to_string(),
+            start_time: 1000,
+            end_time: Some(2000),
+            title: "Deploy v2.0".to_string(),
+            text: Some("Production deployment".to_string()),
+            tags: serde_json::json!(["deploy", "production"]),
+            created_at: 1000,
+        };
+        assert_eq!(m.id, "ann-1");
+        assert_eq!(m.dashboard_id, "dash-1");
+        assert_eq!(m.start_time, 1000);
+        assert_eq!(m.end_time, Some(2000));
+        assert_eq!(m.title, "Deploy v2.0");
+        assert!(m.text.is_some());
+    }
+}

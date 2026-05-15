@@ -146,3 +146,13 @@ mod organizations {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_org_constant_value() {
+        assert_eq!(DEFAULT_ORG, "default");
+    }
+}

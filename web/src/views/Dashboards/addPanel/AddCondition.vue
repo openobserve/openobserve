@@ -10,165 +10,163 @@
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
-      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}}`"
+      :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
-    <q-btn-group>
-      <q-btn
-        square
-        icon-right="arrow_drop_down"
-        no-caps
-        dense
-        :no-wrap="true"
-        color="primary"
-        size="sm"
-        :label="computedLabel(condition)"
-        class="q-pl-sm"
+    <OButtonGroup class="axis-field" radius="sm">
+      <OButton
+        variant="primary"
+        size="chip-12"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
       >
+        {{ computedLabel(condition) }}
+        <template #icon-right><q-icon name="arrow_drop_down" /></template>
         <q-menu
           class="q-pa-md"
           @show="(e: any) => loadFilterItem(condition.column)"
         >
-          <div style="display: flex">
+          <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
               :streams="getAllSelectedStreams()"
               v-model="condition.column"
-              :data-test="`dashboard-add-condition-column-${conditionIndex}}`"
+              :data-test="`dashboard-add-condition-column-${conditionIndex}`"
             />
-            <q-btn
-              size="xs"
-              dense
+            <OButton
+              variant="ghost"
+              size="icon"
               @click="removeColumnName"
-              icon="close"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
-            />
+            >
+              <template #icon-left
+                ><q-icon name="close" size="18px"
+              /></template>
+            </OButton>
           </div>
           <div style="height: 100%">
             <div class="q-pa-xs" style="height: 100%">
               <div class="q-gutter-xs" style="height: 100%">
-                <q-tabs v-model="condition.type" dense>
-                  <q-tab
-                    dense
+                <OTabs v-model="condition.type" dense>
+                  <OTab
                     name="list"
                     :label="t('common.list')"
-                    style="width: auto"
                     :data-test="`dashboard-add-condition-list-${conditionIndex}`"
-                  ></q-tab>
-                  <q-tab
-                    dense
+                  ></OTab>
+                  <OTab
                     name="condition"
                     :label="t('common.condition')"
-                    style="width: auto"
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
-                  ></q-tab>
-                </q-tabs>
+                  ></OTab>
+                </OTabs>
                 <q-separator></q-separator>
-                <q-tab-panels
-                  v-model="condition.type"
-                  dense
-                  animated
-                  style="height: 100%"
-                >
-                  <q-tab-panel dense name="condition" class="q-pa-none">
-                    <div class="flex column" style="height: 220px">
+                <div class="tw:h-full">
+                  <OTabPanels v-model="condition.type" animated>
+                    <OTabPanel name="condition">
+                      <div class="flex column" style="height: 220px">
+                        <q-select
+                          dense
+                          borderless
+                          hide-bottom-space
+                          v-model="condition.operator"
+                          :options="operators"
+                          :label="t('common.operator')"
+                          style="width: 100%"
+                          data-test="dashboard-add-condition-operator"
+                          class="o2-custom-select-dashboard"
+                        />
+                        <CommonAutoComplete
+                          v-if="
+                            !['Is Null', 'Is Not Null'].includes(
+                              condition.operator,
+                            )
+                          "
+                          :label="t('common.value')"
+                          v-model="condition.value"
+                          :items="dashboardVariablesFilterItems"
+                          searchRegex="(?:^|[^$])\$?(\w+)"
+                        ></CommonAutoComplete>
+                      </div>
+                    </OTabPanel>
+                    <OTabPanel name="list">
                       <q-select
                         dense
                         borderless
-                        hide-bottom-space
-                        v-model="condition.operator"
-                        :options="operators"
-                        :label="t('common.operator')"
-                        style="width: 100%"
-                        data-test="dashboard-add-condition-operator"
+                        v-model="condition.values"
+                        :options="sortedFilteredListOptions"
+                        :label="t('common.selectFilter')"
+                        multiple
+                        emit-value
+                        map-options
+                        :rules="[
+                          (val: any) =>
+                            val.length > 0 || 'At least 1 item required',
+                        ]"
+                        use-input
+                        @filter="filterListFn"
+                        data-test="dashboard-add-condition-list-tab"
                         class="o2-custom-select-dashboard"
-                      />
-                      <CommonAutoComplete
-                        v-if="
-                          !['Is Null', 'Is Not Null'].includes(
-                            condition.operator,
-                          )
-                        "
-                        :label="t('common.value')"
-                        v-model="condition.value"
-                        :items="dashboardVariablesFilterItems"
-                        searchRegex="(?:^|[^$])\$?(\w+)"
-                      ></CommonAutoComplete>
-                    </div>
-                  </q-tab-panel>
-                  <q-tab-panel dense name="list" class="q-pa-none">
-                    <q-select
-                      dense
-                      borderless
-                      v-model="condition.values"
-                      :options="sortedFilteredListOptions"
-                      :label="t('common.selectFilter')"
-                      multiple
-                      emit-value
-                      map-options
-                      :rules="[
-                        (val: any) =>
-                          val.length > 0 || 'At least 1 item required',
-                      ]"
-                      use-input
-                      @filter="filterListFn"
-                      data-test="dashboard-add-condition-list-tab"
-                      class="o2-custom-select-dashboard"
-                    >
-                      <template v-slot:selected>
-                        {{
-                          condition.values[0]?.length > 15
-                            ? condition.values[0]?.substring(0, 15) + "..."
-                            : condition.values[0]
-                        }}
-                        {{
-                          condition.values?.length > 1
-                            ? " +" + (condition.values?.length - 1)
-                            : ""
-                        }}
-                      </template>
-                      <template
-                        v-slot:option="{
-                          itemProps,
-                          opt,
-                          selected,
-                          toggleOption,
-                        }"
                       >
-                        <q-item v-bind="itemProps">
-                          <q-item-section side>
-                            <q-checkbox
-                              dense
-                              :model-value="selected"
-                              @update:model-value="toggleOption(opt)"
-                              data-test="dashboard-add-condition-list-item"
-                            ></q-checkbox>
-                          </q-item-section>
-                          <q-item-section>
-                            <SanitizedHtmlRenderer :html-content="opt" />
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
-                  </q-tab-panel>
-                </q-tab-panels>
+                        <template v-slot:selected>
+                          {{
+                            condition.values[0]?.length > 15
+                              ? condition.values[0]?.substring(0, 15) + "..."
+                              : condition.values[0]
+                          }}
+                          {{
+                            condition.values?.length > 1
+                              ? " +" + (condition.values?.length - 1)
+                              : ""
+                          }}
+                        </template>
+                        <template
+                          v-slot:option="{
+                            itemProps,
+                            opt,
+                            selected,
+                            toggleOption,
+                          }"
+                        >
+                          <q-item v-bind="itemProps">
+                            <q-item-section side>
+                              <q-checkbox
+                                dense
+                                :model-value="selected"
+                                @update:model-value="toggleOption(opt)"
+                                data-test="dashboard-add-condition-list-item"
+                              ></q-checkbox>
+                            </q-item-section>
+                            <q-item-section>
+                              <SanitizedHtmlRenderer :html-content="opt" />
+                            </q-item-section>
+                          </q-item>
+                        </template>
+                      </q-select>
+                    </OTabPanel>
+                  </OTabPanels>
+                </div>
               </div>
             </div>
           </div>
         </q-menu>
-      </q-btn>
-      <q-btn
-        size="xs"
-        dense
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-chip"
         @click="$emit('remove-condition')"
-        icon="close"
         data-test="dashboard-add-condition-remove"
-      />
-    </q-btn-group>
+      >
+        <template #icon-left><q-icon name="close" /></template>
+      </OButton>
+    </OButtonGroup>
   </div>
 </template>
 
 <script lang="ts">
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -182,6 +180,12 @@ import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 export default defineComponent({
   name: "AddCondition",
   components: {
+    OButtonGroup,
+    OButton,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     StreamFieldSelect,

@@ -50,6 +50,10 @@ export default class DashboardFolder {
   async deleteFolder(folderName) {
     const { page } = this;
 
+    // Re-search for the folder so the list is filtered to a deterministic
+    // single-row state before we try to open its action menu.
+    await this.searchFolder(folderName);
+
     // Locate the folder card
     const folderCard = page.locator('[data-test^="dashboard-folder-tab-"]', {
       hasText: folderName,
@@ -58,14 +62,12 @@ export default class DashboardFolder {
     // Ensure visible
     await folderCard.waitFor({ state: "visible", timeout: 10000 });
     await folderCard.scrollIntoViewIfNeeded();
-    await folderCard.click();
-    await page.waitForTimeout(200); // Slight pause to allow hover
-    await folderCard.click();
     await folderCard.hover();
 
-    // Click the more (3 dots) icon
+    // The more icon lives inside a hover-only container. force-click bypasses
+    // the CSS visibility gate while still resolving by data-test.
     const moreIcon = folderCard.locator('[data-test="dashboard-more-icon"]');
-    await moreIcon.click();
+    await moreIcon.click({ force: true });
 
     // Click delete icon
     const deleteIcon = page.locator(
@@ -82,6 +84,10 @@ export default class DashboardFolder {
   async editFolderName(oldName, newName) {
     const { page } = this;
 
+    // Re-search to filter the folder list down to this row before opening
+    // its action menu — keeps the more-icon visibility deterministic.
+    await this.searchFolder(oldName);
+
     // Locate the folder card using the current name
     const folderCard = page.locator('[data-test^="dashboard-folder-tab-"]', {
       hasText: oldName,
@@ -89,14 +95,12 @@ export default class DashboardFolder {
     // Make sure it's visible
     await folderCard.waitFor({ state: "visible", timeout: 10000 });
     await folderCard.scrollIntoViewIfNeeded();
-    await folderCard.click();
-    await folderCard.click();
     await folderCard.hover();
 
-    // Click the more (3-dots) icon
+    // The more icon lives inside a hover-only container. force-click bypasses
+    // the CSS visibility gate while still resolving by data-test.
     const moreIcon = folderCard.locator('[data-test="dashboard-more-icon"]');
-    await moreIcon.waitFor({ state: "visible", timeout: 3000 });
-    await moreIcon.click();
+    await moreIcon.click({ force: true });
 
     // Click edit folder
     await page.locator('[data-test="dashboard-edit-folder-icon"]').click();

@@ -51,29 +51,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <q-btn
-        class="text-bold no-border"
-        padding="sm 0"
-        color="secondary"
-        no-caps
-        :label="t(`user.sendInvite`)"
-        @click="inviteUser()"
-        :disable="userEmail == ''"
-        style="
-          padding: 7px 9px;
-          min-height: 0px;
-          width: 100px;
-          display: block;
-          float: right;
-          top: 1px;
-        "
-      />
+      <span style="width: 100px; display: block; float: right; position: relative; top: 1px;">
+        <OButton
+          variant="primary"
+          size="xs"
+          :disabled="userEmail == ''"
+          @click="inviteUser()"
+        >
+          {{ t('user.sendInvite') }}
+        </OButton>
+      </span>
     </div>
   </q-page>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -85,6 +79,7 @@ import usersService from "@/services/users";
 
 export default defineComponent({
   name: "MemberInvitationPage",
+  components: { OButton },
   props: {
     currentrole: {
       type: String,

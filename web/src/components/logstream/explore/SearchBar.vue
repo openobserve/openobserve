@@ -18,17 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div class="row flex justify-end align-center">
       <div class="col-auto q-my-xs">
-        <q-btn
-          class="q-mr-sm download-logs-btn q-px-sm"
+        <OButton
+          class="q-mr-sm"
+          variant="ghost"
           size="sm"
           :disabled="
             queryData.queryResults.hasOwnProperty('hits') &&
             !queryData.queryResults.hits.length
           "
-          icon="download"
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        ></q-btn>
+        >
+          <Download class="tw:size-4" />
+        </OButton>
         <div
           class="float-left"
           v-show="queryData.streamType !== 'enrichment_tables'"
@@ -46,15 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="search-time q-pl-sm float-left q-mr-sm">
-          <q-btn
+          <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
-            dense
-            flat
+            variant="primary"
+            size="sm-action"
             :title="t('search.runQuery')"
-            class="q-pa-none search-button"
             @click="searchData"
-            >{{ t("search.runQuery") }}</q-btn
+            >{{ t("search.runQuery") }}</OButton
           >
         </div>
       </div>
@@ -82,6 +83,8 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Download } from 'lucide-vue-next';
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
 
@@ -110,6 +113,8 @@ export default defineComponent({
   },
   components: {
     DateTime,
+    OButton,
+    Download,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -376,29 +381,6 @@ export default defineComponent({
 
   .fields_autocomplete {
     max-height: 250px;
-  }
-
-  .search-button {
-    width: 96px;
-    line-height: 29px;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 11px;
-    color: white;
-
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 3px 3px 3px 3px;
-
-      .q-icon {
-        font-size: 15px;
-        color: #ffffff;
-      }
-    }
-  }
-
-  .download-logs-btn {
-    height: 30px;
   }
 }
 

@@ -34,21 +34,25 @@ vi.mock("vue-router", () => ({
   })),
 }));
 
-vi.mock("vuex", () => ({
-  useStore: vi.fn(() => ({
-    state: {
-      selectedOrganization: { identifier: "test-org" },
-      zoConfig: { timestamp_column: "_timestamp" },
-      organizationData: {
-        organizationSettings: {
-          span_id_field_name: "span_id",
-          trace_id_field_name: "trace_id",
+vi.mock("vuex", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+    useStore: vi.fn(() => ({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        zoConfig: { timestamp_column: "_timestamp", sql_reserved_keywords: [] },
+        organizationData: {
+          organizationSettings: {
+            span_id_field_name: "span_id",
+            trace_id_field_name: "trace_id",
+          },
         },
       },
-    },
-    dispatch: vi.fn(),
-  })),
-}));
+      dispatch: vi.fn(),
+    })),
+  };
+});
 
 const { mockCopyToClipboard, mockNotify } = vi.hoisted(() => ({
   mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
@@ -77,16 +81,21 @@ const { localTraceFilterStore, mockUseLocalTraceFilterField } = vi.hoisted(
   },
 );
 
-vi.mock("@/utils/zincutils", () => ({
-  b64EncodeStandard: vi.fn((s: string) => `b64std:${s}`),
-  b64EncodeUnicode: vi.fn((s: string) => `b64uni:${s}`),
-  useLocalTraceFilterField: mockUseLocalTraceFilterField,
-}));
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    b64EncodeStandard: vi.fn((s: string) => `b64std:${s}`),
+    b64EncodeUnicode: vi.fn((s: string) => `b64uni:${s}`),
+    useLocalTraceFilterField: mockUseLocalTraceFilterField,
+  };
+});
 
 vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),
 }));
 
+import { getSpanColorHex } from "@/utils/traces/traceColors";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
 
 // ---------------------------------------------------------------------------
@@ -130,6 +139,7 @@ describe("useTraces", () => {
       expect(inst).toHaveProperty("tracesShareURL");
       expect(inst).toHaveProperty("formatTracesMetaData");
       expect(inst).toHaveProperty("setServiceColors"); // [auto-generated]
+      expect(inst).toHaveProperty("getOrSetServiceColor");
     });
   });
 
@@ -754,18 +764,18 @@ describe("useTraces", () => {
           service_name: [],
           spans: [1, 0],
           first_event: {},
-          llm_usage_tokens_input: 100,
-          llm_usage_tokens_output: 200,
-          llm_usage_tokens_total: 300,
-          llm_usage_cost_total: 0.05,
+          gen_ai_usage_input_tokens: 100,
+          gen_ai_usage_output_tokens: 200,
+          gen_ai_usage_total_tokens: 300,
+          gen_ai_usage_cost: 0.05,
         },
       ];
 
       const [item] = formatTracesMetaData(traces);
-      expect(item.llm_usage_details_input).toBe(100);
-      expect(item.llm_usage_details_output).toBe(200);
-      expect(item.llm_usage_details_total).toBe(300);
-      expect(item.llm_cost_details_total).toBe(0.05);
+      expect(item.gen_ai_usage_input_tokens).toBe(100);
+      expect(item.gen_ai_usage_output_tokens).toBe(200);
+      expect(item.gen_ai_usage_total_tokens).toBe(300);
+      expect(item.gen_ai_usage_cost).toBe(0.05);
     });
   });
 
@@ -1218,6 +1228,64 @@ describe("useTraces", () => {
       // getSpanColorHex is mocked as (index) => `#color-${index}`
       // colorIndex = Object.keys(serviceColors).length = 2 before insertion
       expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-2");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getOrSetServiceColor
+  // -------------------------------------------------------------------------
+  describe("getOrSetServiceColor", () => {
+    it("should return existing color when service already has one", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = { "my-service": "#ff0000" };
+
+      const color = getOrSetServiceColor("my-service");
+
+      expect(color).toBe("#ff0000");
+      // Verify the existing color was not overwritten
+      expect(searchObj.meta.serviceColors["my-service"]).toBe("#ff0000");
+      // Verify no new keys were added
+      expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(1);
+    });
+
+    it("should create and return a new color when service is unknown", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      // Override the mock to return a specific hex for this test
+      vi.mocked(getSpanColorHex).mockReturnValueOnce("#abcdef");
+
+      const color = getOrSetServiceColor("new-service");
+
+      expect(color).toBe("#abcdef");
+      expect(searchObj.meta.serviceColors["new-service"]).toBe("#abcdef");
+      // Should have been called with index 0 since serviceColors was empty
+      expect(getSpanColorHex).toHaveBeenCalledWith(0);
+    });
+
+    it("should return undefined for empty string input", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      const color = getOrSetServiceColor("");
+
+      expect(color).toBeUndefined();
+      // Should not have added any color for empty string
+      expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(0);
+    });
+
+    it("should initialize and assign a color when serviceColors starts empty", () => {
+      const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.meta.serviceColors = {};
+
+      const color = getOrSetServiceColor("valid-service");
+
+      expect(color).toBe("#color-0");
+      expect(searchObj.meta.serviceColors["valid-service"]).toBe("#color-0");
     });
   });
 

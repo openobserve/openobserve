@@ -723,3 +723,205 @@ fn set_dashboard_owner_if_empty(
         dashboard.set_owner(user_email.to_string());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use super::{get_folder, is_overwrite};
+    use crate::service::dashboards::DashboardError;
+
+    fn status(err: DashboardError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // get_folder
+    #[test]
+    fn test_get_folder_returns_param_when_present() {
+        assert_eq!(get_folder("folder=my-folder"), "my-folder");
+    }
+
+    #[test]
+    fn test_get_folder_returns_default_when_absent() {
+        assert_eq!(
+            get_folder(""),
+            config::meta::folder::DEFAULT_FOLDER.to_owned()
+        );
+    }
+
+    #[test]
+    fn test_get_folder_other_params_ignored() {
+        assert_eq!(
+            get_folder("overwrite=true"),
+            config::meta::folder::DEFAULT_FOLDER.to_owned()
+        );
+    }
+
+    // is_overwrite
+    #[test]
+    fn test_is_overwrite_true() {
+        assert!(is_overwrite("overwrite=true"));
+    }
+
+    #[test]
+    fn test_is_overwrite_false() {
+        assert!(!is_overwrite("overwrite=false"));
+    }
+
+    #[test]
+    fn test_is_overwrite_absent() {
+        assert!(!is_overwrite(""));
+    }
+
+    #[test]
+    fn test_is_overwrite_invalid_value_defaults_false() {
+        assert!(!is_overwrite("overwrite=maybe"));
+    }
+
+    // From<DashboardError> for Response — 404
+    #[test]
+    fn test_dashboard_not_found_is_not_found() {
+        assert_eq!(
+            status(DashboardError::DashboardNotFound),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_move_destination_folder_not_found_is_not_found() {
+        assert_eq!(
+            status(DashboardError::MoveDestinationFolderNotFound),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_create_folder_not_found_is_not_found() {
+        assert_eq!(
+            status(DashboardError::CreateFolderNotFound),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_tab_not_found_is_not_found() {
+        assert_eq!(
+            status(DashboardError::TabNotFound("t1".to_string())),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn test_panel_not_found_is_not_found() {
+        assert_eq!(
+            status(DashboardError::PanelNotFound("p1".to_string())),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_move_missing_folder_param_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::MoveMissingFolderParam),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_panel_unsupported_version_is_bad_request() {
+        assert_eq!(
+            status(DashboardError::PanelUnsupportedVersion),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 409 Conflict
+    #[test]
+    fn test_update_conflicting_hash_is_conflict() {
+        assert_eq!(
+            status(DashboardError::UpdateConflictingHash),
+            StatusCode::CONFLICT
+        );
+    }
+
+    #[test]
+    fn test_panel_already_exists_is_conflict() {
+        assert_eq!(
+            status(DashboardError::PanelAlreadyExists(
+                "p1".to_string(),
+                "t1".to_string()
+            )),
+            StatusCode::CONFLICT
+        );
+    }
+
+    // 403 Forbidden
+    #[test]
+    fn test_permission_denied_is_forbidden() {
+        assert_eq!(
+            status(DashboardError::PermissionDenied),
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[test]
+    fn test_user_not_found_is_forbidden() {
+        assert_eq!(status(DashboardError::UserNotFound), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_list_permitted_dashboards_error_is_forbidden() {
+        assert_eq!(
+            status(DashboardError::ListPermittedDashboardsError(
+                anyhow::anyhow!("err")
+            )),
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_update_missing_hash_is_internal_error() {
+        assert_eq!(
+            status(DashboardError::UpdateMissingHash),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_put_missing_title_is_internal_error() {
+        assert_eq!(
+            status(DashboardError::PutMissingTitle),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_create_default_folder_is_internal_error() {
+        assert_eq!(
+            status(DashboardError::CreateDefaultFolder),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_distinct_value_error_is_internal_error() {
+        assert_eq!(
+            status(DashboardError::DistinctValueError),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_move_dashboard_delete_old_is_internal_error() {
+        assert_eq!(
+            status(DashboardError::MoveDashboardDeleteOld(
+                "d1".to_string(),
+                "f1".to_string(),
+                "db error".to_string()
+            )),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+}

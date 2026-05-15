@@ -223,3 +223,82 @@ async fn list_models(
         .map(|(dest, temp)| (dest, temp.map(|t| t.name)))
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike as _;
+
+    use super::*;
+
+    fn make_model(id: &str, module: &str, type_json: serde_json::Value) -> Model {
+        Model {
+            id: id.to_string(),
+            org: "myorg".to_string(),
+            name: "my-dest".to_string(),
+            module: module.to_string(),
+            template_id: None,
+            r#type: type_json,
+        }
+    }
+
+    #[test]
+    fn test_try_into_alert_http_ok() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
+        let model = make_model(&id, "alert", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_ok());
+        let dest = result.unwrap();
+        assert_eq!(dest.org_id, "myorg");
+        assert_eq!(dest.name, "my-dest");
+        assert!(matches!(dest.module, destinations::Module::Alert { .. }));
+    }
+
+    #[test]
+    fn test_try_into_alert_with_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
+        let model = make_model(&id, "alert", type_json);
+        let dest = model.try_into(Some("tmpl".to_string())).unwrap();
+        match dest.module {
+            destinations::Module::Alert { template, .. } => {
+                assert_eq!(template, Some("tmpl".to_string()));
+            }
+            _ => panic!("expected alert module"),
+        }
+    }
+
+    #[test]
+    fn test_try_into_pipeline_ok() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"url": "https://pipeline.example.com"});
+        let model = make_model(&id, "pipeline", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_ok());
+        assert!(matches!(
+            result.unwrap().module,
+            destinations::Module::Pipeline { .. }
+        ));
+    }
+
+    #[test]
+    fn test_try_into_unknown_module_treated_as_pipeline() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"url": "https://example.com"});
+        let model = make_model(&id, "UNKNOWN_MODULE", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_ok());
+        assert!(matches!(
+            result.unwrap().module,
+            destinations::Module::Pipeline { .. }
+        ));
+    }
+
+    #[test]
+    fn test_try_into_invalid_ksuid_fails() {
+        let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
+        let model = make_model("not-a-ksuid", "alert", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_err());
+    }
+}

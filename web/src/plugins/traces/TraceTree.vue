@@ -98,8 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex span-row"
           :class="{
             'span-row-selected':
-              (spans as any[])[virtualRow.index].spanId === selectedSpanId,
+              (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
           }"
+          @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
         >
           <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
@@ -127,27 +128,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
+                @mouseenter="
+                  onHoverSpan((spans as any[])[virtualRow.index].spanId)
+                "
               >
                 <div
                   class="absolute view-logs-container"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
-                  <q-btn
-                    class="q-mx-xs view-span-logs"
-                    :class="
-                      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'
-                    "
-                    size="0.625rem"
-                    icon="search"
-                    dense
-                    no-caps
-                    :title="t('traces.viewLogs')"
-                    @click.stop="
-                      viewSpanLogs((spans as any[])[virtualRow.index])
-                    "
-                    :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
-                  >
-                  </q-btn>
+                  <div class="tw:mx-1 view-span-logs">
+                    <OButton
+                      variant="ghost"
+                      size="icon"
+                      :title="t('traces.viewLogs')"
+                      @click.stop="
+                        viewSpanLogs((spans as any[])[virtualRow.index])
+                      "
+                      :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
+                    >
+                      <q-icon name="search" size="12px" />
+                    </OButton>
+                  </div>
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
@@ -286,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span
                         v-if="
-                          (spans as any[])[virtualRow.index].llm_usage?.total >
+                          (spans as any[])[virtualRow.index].genAiUsage?.total >
                           0
                         "
                         class="q-mr-sm"
@@ -294,19 +295,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-icon name="functions" size="10px" />
                         {{
                           formatTokens(
-                            (spans as any[])[virtualRow.index].llm_usage.total,
+                            (spans as any[])[virtualRow.index].genAiUsage.total,
                           )
                         }}
                       </span>
                       <span
                         v-if="
-                          (spans as any[])[virtualRow.index].llm_cost?.total > 0
+                          (spans as any[])[virtualRow.index].genAiCost?.total > 0
                         "
                       >
                         <q-icon name="attach_money" size="10px" />
                         {{
                           formatCost(
-                            (spans as any[])[virtualRow.index].llm_cost.total,
+                            (spans as any[])[virtualRow.index].genAiCost.total,
                           )
                         }}
                       </span>
@@ -422,6 +423,8 @@ import {
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
+import OButton from "@/lib/core/Button/OButton.vue";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "TraceTree",
@@ -471,6 +474,10 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    hoveredSpanId: {
+      type: String,
+      default: "",
+    },
     isSidebarOpen: {
       type: Boolean,
       default: false,
@@ -483,8 +490,11 @@ export default defineComponent({
   emits: [
     "toggleCollapse",
     "selectSpan",
+    "hoverSpan",
+    "unhoverSpan",
     "update-current-index",
     "search-result",
+    "view-correlated-logs",
   ],
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs } = useTraces();
@@ -492,6 +502,9 @@ export default defineComponent({
 
     const { t } = useI18n();
     const router = useRouter();
+
+    // As there are some UX issues, disabling it for now
+    const enableHoverSelection = false;
 
     // ── Virtualizer ──────────────────────────────────────────────────────────
     const rowVirtualizer = useVirtualizer(
@@ -505,6 +518,10 @@ export default defineComponent({
 
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
     const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+    const highlightedSpanId = computed(
+      () => props.hoveredSpanId || props.selectedSpanId,
+    );
 
     onMounted(() => {
       if (props.selectedSpanId) {
@@ -572,8 +589,18 @@ export default defineComponent({
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
     };
+    const onHoverSpan = (spanId: string) => {
+      if(enableHoverSelection) emit("hoverSpan", spanId);
+    };
+    const onUnhoverSpan = () => {
+     if(enableHoverSelection) emit("unhoverSpan");
+    };
 
     const viewSpanLogs = (span: any) => {
+      if (config.isEnterprise === "true") {
+        emit("view-correlated-logs", span);
+        return;
+      }
       const queryDetails = buildQueryDetails(span);
       navigateToLogs(queryDetails);
     };
@@ -780,6 +807,9 @@ export default defineComponent({
     return {
       toggleSpanCollapse,
       selectSpan,
+      onHoverSpan,
+      onUnhoverSpan,
+      highlightedSpanId,
       store,
       viewSpanLogs,
       t,
@@ -811,7 +841,7 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge },
+  components: { SpanBlock, SpanKindBadge, OButton },
 });
 </script>
 

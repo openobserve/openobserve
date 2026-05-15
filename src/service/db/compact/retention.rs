@@ -183,3 +183,39 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    #[test]
+    fn test_mk_key_no_date_range() {
+        let key = mk_key("myorg", StreamType::Logs, "mystream", None);
+        assert_eq!(key, "myorg/logs/mystream/all");
+    }
+
+    #[test]
+    fn test_mk_key_with_date_range() {
+        let key = mk_key(
+            "org1",
+            StreamType::Metrics,
+            "cpu",
+            Some(("2023-01-01", "2023-01-02")),
+        );
+        assert_eq!(key, "org1/metrics/cpu/2023-01-01,2023-01-02");
+    }
+
+    #[test]
+    fn test_mk_key_traces_type() {
+        let key = mk_key("testorg", StreamType::Traces, "spans", None);
+        assert_eq!(key, "testorg/traces/spans/all");
+    }
+
+    #[test]
+    fn test_is_deleting_stream_false_when_not_in_cache() {
+        let result = is_deleting_stream("neworg_never_added", StreamType::Logs, "newstream", None);
+        assert!(!result);
+    }
+}

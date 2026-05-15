@@ -842,3 +842,20 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_postgres_scheduler_new() {
+        let s = PostgresScheduler::new();
+        drop(s);
+    }
+
+    #[test]
+    fn test_postgres_scheduler_default() {
+        let s = PostgresScheduler::default();
+        drop(s);
+    }
+}

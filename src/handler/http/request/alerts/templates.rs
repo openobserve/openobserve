@@ -373,3 +373,77 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
 
     MetaHttpResponse::json(templates)
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use crate::service::db::alerts::templates::TemplateError;
+
+    fn status(err: TemplateError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // 404 Not Found
+    #[test]
+    fn test_not_found_is_not_found() {
+        assert_eq!(status(TemplateError::NotFound), StatusCode::NOT_FOUND);
+    }
+
+    // 409 Conflict
+    #[test]
+    fn test_delete_with_destination_is_conflict() {
+        assert_eq!(
+            status(TemplateError::DeleteWithDestination("slack".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_empty_name_is_bad_request() {
+        assert_eq!(status(TemplateError::EmptyName), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_invalid_name_is_bad_request() {
+        assert_eq!(status(TemplateError::InvalidName), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_empty_title_is_bad_request() {
+        assert_eq!(status(TemplateError::EmptyTitle), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_empty_body_is_bad_request() {
+        assert_eq!(status(TemplateError::EmptyBody), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_already_exists_is_bad_request() {
+        assert_eq!(
+            status(TemplateError::AlreadyExists),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_delete_with_alert_is_bad_request() {
+        assert_eq!(
+            status(TemplateError::DeleteWithAlert("my-alert".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let infra_err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db unavailable".to_string(),
+        ));
+        assert_eq!(
+            status(TemplateError::InfraError(infra_err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+}

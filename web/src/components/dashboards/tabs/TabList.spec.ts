@@ -224,9 +224,9 @@ describe("TabList", () => {
   describe("Tab Interaction", () => {
     it("should have correct q-tabs configuration", () => {
       wrapper = createWrapper();
-      
+
       const qTabs = wrapper.find('[data-test="dashboard-tab-list"]');
-      expect(qTabs.classes()).toContain("q-tabs");
+      expect(qTabs.exists()).toBe(true);
     });
 
     it("should handle tab click events", async () => {

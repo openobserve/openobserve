@@ -116,3 +116,26 @@ enum RateLimitRules {
     ApiGroupOperation,
     StatIntervalMs,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_new_idx_contains_name() {
+        let sql = create_ratelimit_resource_key_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(RESOURCE_KEY_NEW));
+    }
+
+    #[test]
+    fn test_resource_key_old_constant() {
+        assert_eq!(RESOURCE_KEY_OLD, "rkey_idx");
+    }
+
+    #[test]
+    fn test_resource_key_new_constant() {
+        assert_eq!(RESOURCE_KEY_NEW, "rkey_idx_with_interval");
+    }
+}

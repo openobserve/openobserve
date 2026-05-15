@@ -132,3 +132,53 @@ impl From<AiMessage> for PromptResponse {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_image_attachment_filename_absent_when_none() {
+        let img = ImageAttachment {
+            data: "abc".to_string(),
+            mime_type: "image/png".to_string(),
+            filename: None,
+        };
+        let json = serde_json::to_value(&img).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("filename"));
+    }
+
+    #[test]
+    fn test_image_attachment_filename_present_when_some() {
+        let img = ImageAttachment {
+            data: "abc".to_string(),
+            mime_type: "image/jpeg".to_string(),
+            filename: Some("photo.jpg".to_string()),
+        };
+        let json = serde_json::to_value(&img).unwrap();
+        assert!(json.as_object().unwrap().contains_key("filename"));
+    }
+
+    #[test]
+    fn test_deserialize_image_attachment_valid() {
+        let json_str = r#"{"data":"aGVsbG8=","mime_type":"image/png"}"#;
+        let img: ImageAttachment = serde_json::from_str(json_str).unwrap();
+        assert_eq!(img.mime_type, "image/png");
+        assert!(img.filename.is_none());
+    }
+
+    #[test]
+    fn test_deserialize_image_attachment_invalid_mime_type() {
+        let json_str = r#"{"data":"abc","mime_type":"image/gif"}"#;
+        let result: Result<ImageAttachment, _> = serde_json::from_str(json_str);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deserialize_image_attachment_data_too_large() {
+        let big = "x".repeat(MAX_IMAGE_B64_LEN + 1);
+        let json_str = format!(r#"{{"data":"{}","mime_type":"image/png"}}"#, big);
+        let result: Result<ImageAttachment, _> = serde_json::from_str(&json_str);
+        assert!(result.is_err());
+    }
+}

@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="col-auto"
         :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
         :style="store.state.isAiChatExpanded
-          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: 44px;'
-          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: 44px; padding-right: 0.625rem;'"
+          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: calc(var(--navbar-height) + 8px);'
+          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: calc(var(--navbar-height) + 8px); padding-right: 0.625rem;'"
       >
         <O2AIChat
           :header-height="42.5"
@@ -380,7 +380,7 @@ export default defineComponent({
     let slackURL = "https://short.openobserve.ai/community";
     if (
       config.isEnterprise == "true" &&
-      store.state.zoConfig.custom_slack_url != ""
+      store.state.zoConfig.custom_slack_url
     ) {
       slackURL = store.state.zoConfig.custom_slack_url;
     }
@@ -922,6 +922,7 @@ export default defineComponent({
         light_mode_theme_color: undefined,
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
+        org_storage_enabled: false,
       };
 
       try {
@@ -964,6 +965,9 @@ export default defineComponent({
             orgSettings?.data?.data?.claim_parser_function ??
             defaultSettings.claim_parser_function,
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
+          org_storage_enabled:
+            orgSettings?.data?.data?.org_storage_enabled ??
+            defaultSettings.org_storage_enabled,
         });
 
         if (
@@ -1604,7 +1608,11 @@ export default defineComponent({
 }
 
 .header-menu {
-  .q-btn {
+  display: flex;
+  align-items: center;
+
+  .q-btn,
+  [data-o2-btn] {
     transition: transform 0.2s ease;
 
     &:hover {
@@ -1620,7 +1628,8 @@ export default defineComponent({
   }
 
   // Skip bounce for org selector (inside div)
-  [data-test="navbar-organizations-select"] .q-btn {
+  [data-test="navbar-organizations-select"] .q-btn,
+  [data-test="navbar-organizations-select"] [data-o2-btn] {
     &:hover {
       transform: none;
     }

@@ -43,6 +43,7 @@ vi.mock("vue-router", () => ({
     push: mockPush,
     currentRoute: mockCurrentRoute,
   }),
+  useRoute: () => mockCurrentRoute.value,
   RouterView: { template: "<div data-test='router-view'></div>" },
 }));
 
@@ -103,7 +104,7 @@ describe("IngestTraces (Index.vue)", () => {
     });
 
     it("should render the tabs for navigation", () => {
-      const tabs = wrapper.findComponent({ name: "QTabs" });
+      const tabs = wrapper.findComponent({ name: "OTabs" });
       expect(tabs.exists()).toBe(true);
     });
 

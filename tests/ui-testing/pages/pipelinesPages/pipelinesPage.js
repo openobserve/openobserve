@@ -88,7 +88,7 @@ export class PipelinesPage {
         this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
         this.enrichmentTableTab =
-          '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label';
+          '[data-test="function-enrichment-table-tab"] .o-tab__label';
         this.addEnrichmentTableButton = page.getByRole('button', { name: 'New enrichment table' });
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
@@ -2601,7 +2601,7 @@ export class PipelinesPage {
      * Navigate back from backfill page
      */
     async navigateBackFromBackfill() {
-        const backButton = this.page.locator('[data-test*="back"], button:has-text("Back"), .q-btn:has-text("Back")').first();
+        const backButton = this.page.locator('[data-test*="back"], button:has-text("Back")').first();
         if (await backButton.isVisible().catch(() => false)) {
             await backButton.click();
         } else {
@@ -2661,7 +2661,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if action buttons are visible
      */
     async areActionButtonsVisible() {
-        const actionLocator = this.page.locator('[data-test*="action"], button.action, .q-btn').first();
+        const actionLocator = this.page.locator('[data-test*="action"], button.action, button[data-o2-btn]').first();
         return await actionLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2744,7 +2744,7 @@ export class PipelinesPage {
      * Navigate back from history page
      */
     async navigateBackFromHistory() {
-        const backButton = this.page.locator('[data-test*="back"], button:has-text("Back"), .q-btn:has-text("Back")').first();
+        const backButton = this.page.locator('[data-test*="back"], button:has-text("Back")').first();
         if (await backButton.isVisible().catch(() => false)) {
             await backButton.click();
         } else {

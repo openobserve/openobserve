@@ -18,14 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div class="row items-center no-wrap q-mb-sm">
       <div v-if="backButton" class="col-auto">
-        <q-btn
-          class="q-mr-md el-border"
-          no-caps
+        <OButton
+          variant="outline"
+          size="icon-xs"
+          class="q-mr-sm"
           @click="onBackClicked"
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-        />
+        >
+          <template #icon-left><q-icon name="arrow_back_ios_new" /></template>
+        </OButton>
       </div>
       <div class="col">
         <div class="text-h6">
@@ -39,13 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="q-mb-sm" />
   </div>
 </template>
-  
+
 <script lang="ts">
 import { defineComponent } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "DashboardHeader",
-  components: {},
+  components: { OButton },
   props: {
     title: {
       type: String,
@@ -68,6 +69,5 @@ export default defineComponent({
   },
 });
 </script>
-  
+
 <style scoped lang="scss"></style>
-  

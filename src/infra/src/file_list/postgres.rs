@@ -493,16 +493,19 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .with_label_values(&["query_for_merge", "file_list"])
             .inc();
 
+        let cfg = get_config();
+        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = $1 AND date >= $2 AND date <= $3;
+    WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
 
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
+            .bind(max_size)
             .fetch_all(&pool)
             .await;
         let time = start.elapsed().as_secs_f64();
@@ -745,7 +748,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let sql = r#"
 SELECT date
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5 AND date >= $7 AND date < $8
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND original_size <= $5 AND date >= $7 AND date < $8
     GROUP BY date HAVING count(*) >= $6;
             "#;
 
@@ -754,7 +757,7 @@ SELECT date
             .bind(time_start)
             .bind(max_ts_upper_bound)
             .bind(time_end)
-            .bind(cfg.compact.old_data_min_records)
+            .bind(cfg.compact.max_file_size as i64 / 2)
             .bind(cfg.compact.old_data_min_files)
             .bind(date_from)
             .bind(date_to)
@@ -1034,23 +1037,27 @@ GROUP BY stream;
         stream_type: Option<StreamType>,
         stream_name: Option<&str>,
     ) -> Result<Vec<(String, StreamStats)>> {
-        let sql = if let Some(stream_type) = stream_type
-            && let Some(stream_name) = stream_name
-        {
-            format!(
-                "SELECT * FROM stream_stats WHERE stream = '{org_id}/{stream_type}/{stream_name}';",
-            )
-        } else {
-            format!("SELECT * FROM stream_stats WHERE org = '{org_id}';")
-        };
+        // SECURITY: bind parameters via sqlx to prevent SQL injection when
+        // org_id / stream_type / stream_name contain quotes or SQL metacharacters.
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
             .with_label_values(&["get_stream_stats", "stream_stats"])
             .inc();
         let start = std::time::Instant::now();
-        let ret = sqlx::query_as::<_, super::StatsRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let ret = if let Some(stream_type) = stream_type
+            && let Some(stream_name) = stream_name
+        {
+            let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE stream = $1;")
+                .bind(&stream_key)
+                .fetch_all(&pool)
+                .await?
+        } else {
+            sqlx::query_as::<_, super::StatsRecord>("SELECT * FROM stream_stats WHERE org = $1;")
+                .bind(org_id)
+                .fetch_all(&pool)
+                .await?
+        };
         let mut stats: HashMap<String, StreamStats> = HashMap::with_capacity(ret.len() / 2);
         for r in ret {
             match stats.get_mut(&r.stream) {
@@ -1391,17 +1398,35 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         Ok(ret)
     }
 
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64> {
+    async fn set_job_pending(
+        &self,
+        ids: &[i64],
+        offsets: i64,
+        stream: Option<&str>,
+    ) -> Result<u64> {
         let pool = CLIENT.clone();
-        let sql = if ids.is_empty() {
-            "UPDATE file_list_jobs SET status = $1;".to_string()
-        } else {
-            format!(
-                "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+        let mut conditions: Vec<String> = Vec::new();
+        if !ids.is_empty() {
+            conditions.push(format!(
+                "id IN ({})",
                 ids.iter()
                     .map(|id| id.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ));
+        }
+        if offsets > 0 {
+            conditions.push(format!("offsets >= {offsets}"));
+        }
+        if let Some(stream) = stream {
+            conditions.push(format!("stream = '{stream}'"));
+        }
+        let sql = if conditions.is_empty() {
+            "UPDATE file_list_jobs SET status = $1;".to_string()
+        } else {
+            format!(
+                "UPDATE file_list_jobs SET status = $1 WHERE {};",
+                conditions.join(" AND ")
             )
         };
         DB_QUERY_NUMS
@@ -1767,6 +1792,30 @@ GROUP BY stream;
             .with_label_values(&["stats_by_date_range", "file_list_dump_stats"])
             .observe(time);
         Ok(ret.map(|r| r.into()).unwrap_or_default())
+    }
+
+    // TODO: optimize with date from org_storage_settings
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = r#"SELECT 
+SUM(original_size)::BIGINT AS storage_size,
+SUM(index_size)::BIGINT AS index_size
+FROM file_list
+WHERE org = $1 AND account = $2;"#;
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .observe(time);
+        Ok(ret.unwrap_or_default())
     }
 }
 
@@ -2234,7 +2283,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(32) DEFAULT '' NOT NULL"
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(128) DEFAULT '' NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2639,7 +2688,7 @@ fn file_list_partition_ddl(table: &str) -> String {
         r#"
 CREATE TABLE {table} (
     id              BIGINT GENERATED ALWAYS AS IDENTITY,
-    account         VARCHAR(32) NOT NULL,
+    account         VARCHAR(128) NOT NULL,
     org             VARCHAR(100) NOT NULL,
     stream          VARCHAR(256) NOT NULL,
     date            VARCHAR(16) NOT NULL,
@@ -2729,7 +2778,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account    VARCHAR(32)  not null,
+    account    VARCHAR(128)  not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -2799,7 +2848,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
@@ -2816,6 +2865,18 @@ CREATE TABLE IF NOT EXISTS stream_stats
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
+    }
+
+    // after introducing org_storage, the account can have value of org_id:default,
+    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    for table in &["file_list", "file_list_history", "file_list_deleted"] {
+        log::info!("[POSTGRES] updating account col to 128 for table {table}");
+        sqlx::query(&format!(
+            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
+        ))
+        .execute(&pool)
+        .await?;
+        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
     }
 
     Ok(())
@@ -3200,7 +3261,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3224,7 +3285,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_history (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3248,7 +3309,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_deleted (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,

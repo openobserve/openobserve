@@ -148,3 +148,27 @@ enum AnomalyDetectionModels {
     TrainingDataPoints,
     CreatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_models_table_contains_table_name() {
+        let sql = create_anomaly_detection_models_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("anomaly_detection_models"));
+    }
+
+    #[test]
+    fn test_latest_idx_name() {
+        let sql = create_anomaly_models_latest_idx_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(ANOMALY_MODELS_LATEST_IDX));
+    }
+
+    #[test]
+    fn test_config_fk_constant() {
+        assert_eq!(ANOMALY_MODELS_CONFIG_FK, "fk_anomaly_models_config");
+    }
+}

@@ -1163,6 +1163,54 @@ describe("TenstackTable", () => {
       const [, rowIndex] = wrapper.emitted("click:dataRow")![0] as any[];
       expect(rowIndex).toBe(1);
     });
+
+    it("should emit click:dataRow with the correct sorted row data in virtual scroll mode with server-side sorting", async () => {
+      // This tests the bug where virtual scroll emits original unsorted data instead of sorted data
+      const sortableCols = [
+        { id: "name", accessorKey: "name", header: "NAME", size: 200, meta: { sortable: true } },
+        { id: "spans", accessorKey: "spans", header: "SPANS", size: 100, meta: { sortable: true } },
+      ];
+
+      // Original rows in default order
+      const originalRows = [
+        { _timestamp: 1000, name: "alpha", spans: 10 },
+        { _timestamp: 2000, name: "beta", spans: 5 },
+        { _timestamp: 3000, name: "gamma", spans: 20 },
+      ];
+
+      // When sorted by spans desc, the order should be: gamma(20), alpha(10), beta(5)
+      const sortedRows = [
+        { _timestamp: 3000, name: "gamma", spans: 20 },  // First after sorting
+        { _timestamp: 1000, name: "alpha", spans: 10 },
+        { _timestamp: 2000, name: "beta", spans: 5 },
+      ];
+
+      wrapper = mountTable({
+        columns: sortableCols,
+        rows: sortedRows,  // Pass the server-sorted rows
+        sortBy: "spans",   // Indicate we're sorted by spans
+        sortOrder: "desc", // Descending order
+        sortFieldMap: {},  // No field mapping needed
+        useVirtualScroll: true, // Use virtual scroll (default but explicit)
+      });
+
+      // Click on the first virtual row (should be gamma with 20 spans)
+      const firstVirtualRow = wrapper.find('[data-test="o2-table-detail-3000"]');
+      expect(firstVirtualRow.exists()).toBe(true);
+      await firstVirtualRow.trigger("click");
+
+      // Should emit the correct sorted row data, not the original row at index 0
+      expect(wrapper.emitted("click:dataRow")).toBeTruthy();
+      const [emittedRow] = wrapper.emitted("click:dataRow")![0] as any[];
+
+      // Should emit gamma (first in sorted order), not alpha (first in original order)
+      expect(emittedRow).toMatchObject({
+        _timestamp: 3000,
+        name: "gamma",
+        spans: 20
+      });
+      expect(emittedRow.name).not.toBe("alpha"); // Should NOT be the original first row
+    });
   });
 
   // ── rowClass prop ─────────────────────────────────────────────────────────
@@ -1352,7 +1400,7 @@ describe("TenstackTable", () => {
 
       const copyBtn = wrapper.find(".copy-btn");
       expect(copyBtn.exists()).toBe(true);
-      await copyBtn.trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1376,7 +1424,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn").trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledOnce();
@@ -1405,7 +1453,7 @@ describe("TenstackTable", () => {
 
       const copyBtn = wrapper.find(".copy-btn");
       expect(copyBtn.exists()).toBe(true);
-      await copyBtn.trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1423,7 +1471,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn").trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text");
@@ -1447,7 +1495,7 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      await wrapper.find(".copy-btn").trigger("click");
+      await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1503,7 +1551,7 @@ describe("TenstackTable", () => {
       // Two copy buttons: index 0 = "region" cell, index 1 = "ts" cell.
       const copyBtns = wrapper.findAll(".copy-btn");
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await copyBtns[1].trigger("click");
+      await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
@@ -1536,7 +1584,7 @@ describe("TenstackTable", () => {
       await flushPromises();
 
       const copyBtns = wrapper.findAll(".copy-btn");
-      await copyBtns[1].trigger("click");
+      await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
       const copiedValue = mockCopyToClipboard.mock.calls[0][0] as string;
@@ -1580,7 +1628,7 @@ describe("TenstackTable", () => {
       // (region is index 0, ts right-aligned is index 1).
       const copyBtns = wrapper.findAll(".copy-btn");
       expect(copyBtns.length).toBeGreaterThanOrEqual(2);
-      await copyBtns[1].trigger("click");
+      await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);

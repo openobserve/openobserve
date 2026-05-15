@@ -245,7 +245,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div
-          v-show="isConfigOptionVisible('promqlTable', 'visible-columns') || isConfigOptionVisible('promqlTable', 'hidden-columns')"
+          v-show="
+            isConfigOptionVisible('promqlTable', 'visible-columns') ||
+            isConfigOptionVisible('promqlTable', 'hidden-columns')
+          "
           class="q-mb-sm text-subtitle2 q-mt-md"
         >
           Column Filters
@@ -373,7 +376,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div
-          v-show="isConfigOptionVisible('promqlTable', 'sticky-first-column') || isConfigOptionVisible('promqlTable', 'sticky-columns')"
+          v-show="
+            isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
+            isConfigOptionVisible('promqlTable', 'sticky-columns')
+          "
           class="q-mb-sm text-subtitle2 q-mt-md"
         >
           Sticky Columns
@@ -468,17 +474,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
         "
       >
-        <div v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')" class="q-mb-sm q-mt-md" style="font-weight: 600"></div>
-        <q-btn
-          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
+        <div
+          v-show="
+            isConfigOptionVisible('promqlTable', 'configure-column-order')
+          "
+          class="q-mb-sm q-mt-md"
+          style="font-weight: 600"
+        ></div>
+        <OButton
+          v-show="
+            isConfigOptionVisible('promqlTable', 'configure-column-order')
+          "
+          variant="outline"
+          size="sm"
           @click="openColumnOrderPopup"
-          style="cursor: pointer; padding: 0px 5px"
-          :label="t(`dashboard.configureColumnOrder`)"
-          no-caps
-          icon="reorder"
           data-test="dashboard-config-column-order-button"
-          class="el-border"
-        />
+        >
+          <template #icon-left><q-icon name="reorder" /></template>
+          {{ t(`dashboard.configureColumnOrder`) }}
+        </OButton>
 
         <!-- Column Order Popup Dialog -->
         <q-dialog
@@ -502,11 +516,13 @@ import { defineComponent, computed, ref, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "PromQLChartConfig",
   components: {
     ColumnOrderPopUp,
+    OButton,
   },
   props: {
     chartType: {

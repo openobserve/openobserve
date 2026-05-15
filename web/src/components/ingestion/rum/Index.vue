@@ -22,13 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
-      <q-tabs
+      <OTabs
         v-model="rumtabs"
-        indicator-color="transparent"
-        inline-label
-        vertical
+        orientation="vertical"
       >
-        <q-route-tab
+        <ORouteTab
           name="rumWebTab"
           :to="{
             name: 'frontendMonitoring',
@@ -38,9 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           icon="web"
           :label="t('common.browser')"
-          content-class="tab_content"
         />
-      </q-tabs>
+      </OTabs>
     </template>
 
     <template v-slot:after>
@@ -56,6 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
@@ -69,11 +69,10 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "IngestRum",
-  components: {},
+  components: {
+    OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      rumtabs: "rumWebTab",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -88,6 +87,10 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const routeToRumTab: Record<string, string> = {
+      frontendMonitoring: "rumWebTab",
+    };
+    const rumtabs = ref(routeToRumTab[router.currentRoute.value.name as string] ?? "rumWebTab");
 
     onMounted(() => {
       const ingestRoutes = ["frontendMonitoring"];
@@ -153,6 +156,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      rumtabs,
       getImageURL,
       verifyOrganizationStatus,
     };
@@ -166,18 +170,16 @@ export default defineComponent({
   .head {
     padding-bottom: 1rem;
   }
-  .q-tabs {
+  .o-tabs {
     &--vertical {
       margin: 1.5rem 1rem 0 1rem;
-      .q-tab {
+      .o-tab {
         justify-content: flex-start;
         padding: 0 0.6rem 0 0.6rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
         text-transform: capitalize;
 
         &__content.tab_content {
-          .q-tab {
+          .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;

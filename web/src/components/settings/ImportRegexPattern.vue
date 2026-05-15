@@ -172,49 +172,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="card-container tw:mb-[0.625rem]">
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
         <div class="col">
-          <div class="flex">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              @click="arrowBackFn"
-              icon="arrow_back_ios_new"
-              data-test="regex-pattern-import-back-btn"
-            />
-            <div class="text-h6 q-ml-md">
-              {{ t("regex_patterns.import_title") }}
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+                @click="arrowBackFn"
+                data-test="regex-pattern-import-back-btn"
+              >
+                <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
+              </OButton>
+              <div class="text-h6">
+                {{ t("regex_patterns.import_title") }}
+              </div>
             </div>
-          </div>
         </div>
-        <div class="flex justify-center">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
+        <div class="tw:flex tw:gap-2 tw:justify-center">
+          <OButton
+            variant="outline"
+            size="sm-action"
             @click="arrowBackFn"
             data-test="regex-pattern-import-cancel-btn"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('dashboard.import')"
+          >{{ t('function.cancel') }}</OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-primary-button-dark'
-                : 'o2-primary-button-light'
-            "
             @click="handleImportClick"
             data-test="regex-pattern-import-json-btn"
-          />
+          >{{ t('dashboard.import') }}</OButton>
         </div>
       </div>
     </div>
@@ -257,6 +242,8 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import AppTabs from "../common/AppTabs.vue";
+import { BookOpen, Upload, Link, ChevronLeft } from "lucide-vue-next";
+import OButton from "@/lib/core/Button/OButton.vue";
 import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
@@ -318,14 +305,17 @@ export default defineComponent({
       {
         label: "Built-in Patterns",
         value: "import_built_in_patterns",
+        icon: BookOpen,
       },
       {
         label: "File Upload / JSON",
         value: "import_json_file",
+        icon: Upload,
       },
       {
         label: "URL Import",
         value: "import_json_url",
+        icon: Link,
       },
     ]);
 
@@ -600,6 +590,7 @@ export default defineComponent({
   components: {
     BaseImport,
     AppTabs,
+    OButton,
     BuiltInPatternsTab: defineAsyncComponent(
       () => import("@/components/settings/BuiltInPatternsTab.vue"),
     ),

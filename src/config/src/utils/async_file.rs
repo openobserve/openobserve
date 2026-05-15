@@ -508,4 +508,141 @@ mod tests {
         // Cleanup
         std::fs::remove_dir_all(test_dir).unwrap();
     }
+
+    // ── create_wal_dir_datetime_filter unit tests ─────────────────────────────
+    // Non-existent paths have is_file()=false, so the extension check passes
+    // and the result is purely determined by the date-range logic.
+
+    fn make_filter(
+        start: (i32, u32, u32, u32),
+        end: (i32, u32, u32, u32),
+    ) -> impl Fn(PathBuf) -> bool {
+        let s = Utc
+            .with_ymd_and_hms(start.0, start.1, start.2, start.3, 0, 0)
+            .single()
+            .unwrap();
+        let e = Utc
+            .with_ymd_and_hms(end.0, end.1, end.2, end.3, 0, 0)
+            .single()
+            .unwrap();
+        create_wal_dir_datetime_filter(s, e, 0)
+    }
+
+    #[test]
+    fn test_filter_in_range_returns_true() {
+        let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
+        assert!(f(PathBuf::from("2025/9/10/3")));
+    }
+
+    #[test]
+    fn test_filter_before_range_returns_false() {
+        let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
+        assert!(!f(PathBuf::from("2025/9/10/1")));
+    }
+
+    #[test]
+    fn test_filter_after_range_returns_false() {
+        let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
+        assert!(!f(PathBuf::from("2025/9/10/5")));
+    }
+
+    #[test]
+    fn test_filter_invalid_year_returns_false() {
+        let f = make_filter((2025, 9, 10, 0), (2025, 9, 10, 23));
+        // Year 1000 < 1901 — implausible
+        assert!(!f(PathBuf::from("1000/9/10/5")));
+        // Year 10000 > 9999 — implausible
+        assert!(!f(PathBuf::from("10000/9/10/5")));
+    }
+
+    #[test]
+    fn test_filter_non_numeric_year_returns_false() {
+        let f = make_filter((2025, 9, 10, 0), (2025, 9, 10, 23));
+        assert!(!f(PathBuf::from("YYYY/9/10/5")));
+    }
+
+    #[test]
+    fn test_filter_missing_year_returns_true() {
+        let f = make_filter((2025, 9, 10, 0), (2025, 9, 10, 23));
+        // Empty path → year component absent → return true (skippable)
+        assert!(f(PathBuf::from("")));
+    }
+
+    #[test]
+    fn test_filter_invalid_month_returns_false() {
+        let f = make_filter((2025, 9, 10, 0), (2025, 9, 10, 23));
+        assert!(!f(PathBuf::from("2025/13/10/5"))); // month 13 invalid
+        assert!(!f(PathBuf::from("2025/0/10/5"))); // month 0 invalid
+    }
+
+    #[test]
+    fn test_filter_missing_month_returns_true() {
+        let f = make_filter((2025, 9, 10, 0), (2025, 9, 10, 23));
+        assert!(f(PathBuf::from("2025")));
+    }
+
+    #[test]
+    fn test_filter_invalid_day_returns_false() {
+        let f = make_filter((2025, 9, 1, 0), (2025, 9, 30, 23));
+        // September has 30 days — day 31 is invalid
+        assert!(!f(PathBuf::from("2025/9/31/5")));
+        assert!(!f(PathBuf::from("2025/9/0/5"))); // day 0 invalid
+    }
+
+    #[test]
+    fn test_filter_missing_day_uses_start_or_end_day() {
+        // start_time = 2025-09-10T02, end_time = 2025-09-10T04
+        // Missing day: if month == start_time.month → use start day (10), else end day (10)
+        let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
+        // path has year+month only; day falls back to start.day=10
+        // then hour is also missing → uses start.hour=2, which is in range
+        assert!(f(PathBuf::from("2025/9")));
+    }
+
+    #[test]
+    fn test_filter_invalid_hour_returns_false() {
+        let f = make_filter((2025, 9, 10, 0), (2025, 9, 10, 23));
+        assert!(!f(PathBuf::from("2025/9/10/24"))); // hour 24 invalid
+        assert!(!f(PathBuf::from("2025/9/10/bad"))); // non-numeric
+    }
+
+    #[test]
+    fn test_filter_missing_hour_uses_fallback() {
+        // start=2025-09-10T02, end=2025-09-10T04
+        let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
+        // Path has year/month/day only; hour absent → fallback
+        // month==start.month && day==start.day → use start.hour=2 (in range)
+        assert!(f(PathBuf::from("2025/9/10")));
+    }
+
+    #[test]
+    fn test_filter_leap_year_feb_29_valid() {
+        // 2024 is a leap year → Feb has 29 days
+        let f = make_filter((2024, 2, 29, 0), (2024, 2, 29, 23));
+        assert!(f(PathBuf::from("2024/2/29/12")));
+    }
+
+    #[test]
+    fn test_filter_non_leap_year_feb_29_invalid() {
+        // 2025 is not a leap year → Feb has 28 days; day 29 is invalid
+        let f = make_filter((2025, 2, 1, 0), (2025, 2, 28, 23));
+        assert!(!f(PathBuf::from("2025/2/29/12")));
+    }
+
+    #[test]
+    fn test_filter_skip_count_skips_prefix_components() {
+        let start = Utc.with_ymd_and_hms(2025, 9, 10, 2, 0, 0).single().unwrap();
+        let end = Utc.with_ymd_and_hms(2025, 9, 10, 4, 0, 0).single().unwrap();
+        let f = create_wal_dir_datetime_filter(start, end, 2);
+        // skip_count=2 → skip first 2 components ("files" and "org")
+        assert!(f(PathBuf::from("files/org/2025/9/10/3")));
+        assert!(!f(PathBuf::from("files/org/2025/9/10/5")));
+    }
+
+    #[test]
+    fn test_filter_at_exact_boundary_inclusive() {
+        let f = make_filter((2025, 9, 10, 2), (2025, 9, 10, 4));
+        assert!(f(PathBuf::from("2025/9/10/2"))); // start boundary
+        assert!(f(PathBuf::from("2025/9/10/4"))); // end boundary
+    }
 }

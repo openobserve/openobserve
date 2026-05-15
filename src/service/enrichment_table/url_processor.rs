@@ -760,10 +760,9 @@ pub async fn check_range_support_for_url(
     let cfg = get_config();
     let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
-    let client = Client::builder()
-        .timeout(timeout)
-        .build()
-        .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
+    let client =
+        crate::common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
+            .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
     check_range_support(&client, url, org_id, table_name).await
 }
@@ -952,10 +951,9 @@ impl UrlCsvProcessor {
         let chunk_size = cfg.enrichment_table.url_fetch_max_size_mb * 1024 * 1024;
         let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
-        let client = Client::builder()
-            .timeout(timeout)
-            .build()
-            .expect("Failed to create HTTP client");
+        let client =
+            crate::common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
+                .expect("Failed to create HTTP client");
 
         Self {
             client,
@@ -984,6 +982,15 @@ impl UrlCsvProcessor {
     /// `None` if the header is missing (common with dynamic/chunked responses).
     /// The size can be logged for monitoring but isn't required for processing.
     pub async fn validate_url(&self) -> Result<Option<u64>> {
+        // SSRF protection: resolve and validate the URL (literal-IP, hostname,
+        // and every resolved A/AAAA record) before issuing any request.
+        if let Err(e) =
+            crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&self.url)
+                .await
+        {
+            return Err(anyhow!("URL blocked by SSRF guard: {}", e));
+        }
+
         let response = self.client.head(&self.url).send().await?;
 
         // Check HTTP status. Anything outside 2xx range is a failure.
@@ -1921,6 +1928,93 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[tokio::test]
+    async fn test_mpsc_trigger_multiple_times() {
+        // Multiple triggers for the same org/table should all succeed
+        for i in 0..5 {
+            let result = trigger_url_job_processing(format!("org_{}", i), format!("table_{}", i));
+            assert!(result.is_ok(), "trigger {} should succeed", i);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_mpsc_trigger_empty_strings() {
+        // Empty strings are valid identifiers for the channel
+        let result = trigger_url_job_processing("".to_string(), "".to_string());
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_mpsc_trigger_unicode_org_id() {
+        let result = trigger_url_job_processing("org_测试".to_string(), "table_データ".to_string());
+        assert!(result.is_ok());
+    }
+
+    // ---- EnrichmentUrlJobEvent ----
+
+    #[test]
+    fn test_enrichment_url_job_event_fields() {
+        let event = EnrichmentUrlJobEvent {
+            org_id: "my_org".to_string(),
+            table_name: "my_table".to_string(),
+        };
+        assert_eq!(event.org_id, "my_org");
+        assert_eq!(event.table_name, "my_table");
+    }
+
+    #[test]
+    fn test_enrichment_url_job_event_clone() {
+        let event = EnrichmentUrlJobEvent {
+            org_id: "org1".to_string(),
+            table_name: "table1".to_string(),
+        };
+        let cloned = event.clone();
+        assert_eq!(cloned.org_id, event.org_id);
+        assert_eq!(cloned.table_name, event.table_name);
+    }
+
+    #[test]
+    fn test_enrichment_url_job_event_debug() {
+        let event = EnrichmentUrlJobEvent {
+            org_id: "org_debug".to_string(),
+            table_name: "tbl_debug".to_string(),
+        };
+        let debug_str = format!("{:?}", event);
+        assert!(debug_str.contains("org_debug"));
+        assert!(debug_str.contains("tbl_debug"));
+    }
+
+    // ---- UrlCsvProcessor ----
+
+    #[test]
+    fn test_url_csv_processor_new_stores_url() {
+        let url = "https://example.com/data.csv".to_string();
+        let processor = UrlCsvProcessor::new(url.clone());
+        assert_eq!(processor.url(), url);
+    }
+
+    #[test]
+    fn test_url_csv_processor_url_accessor() {
+        let url = "https://cdn.example.com/large-file.csv.gz".to_string();
+        let processor = UrlCsvProcessor::new(url.clone());
+        assert_eq!(processor.url(), &url);
+    }
+
+    #[test]
+    fn test_url_csv_processor_empty_url() {
+        let processor = UrlCsvProcessor::new("".to_string());
+        assert_eq!(processor.url(), "");
+    }
+
+    #[test]
+    fn test_url_csv_processor_url_with_query_params() {
+        let url = "https://example.com/data.csv?token=abc123&format=csv".to_string();
+        let processor = UrlCsvProcessor::new(url.clone());
+        assert_eq!(processor.url(), url.as_str());
+    }
+
+    // ---- parse_csv_chunk (existing cases) ----
+
     #[test]
     fn test_parse_csv_chunk_complete_lines() {
         let csv_data = b"name,age,city\nAlice,30,NYC\nBob,25,LA\n";
@@ -1977,5 +2071,299 @@ mod tests {
         assert!(headers.is_none());
         assert_eq!(records.len(), 0);
         assert_eq!(leftover.len(), 0);
+    }
+
+    // ---- parse_csv_chunk (new edge cases) ----
+
+    #[test]
+    fn test_parse_csv_chunk_header_only_line() {
+        // A CSV with just a header row and a newline — no data rows
+        let csv_data = b"col_a,col_b,col_c\n";
+        let (records, headers, leftover) = parse_csv_chunk(csv_data, None).unwrap();
+
+        assert!(headers.is_some());
+        let h = headers.unwrap();
+        assert_eq!(h, vec!["col_a", "col_b", "col_c"]);
+        assert_eq!(records.len(), 0);
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_single_column() {
+        let csv_data = b"value\n10\n20\n30\n";
+        let (records, headers, leftover) = parse_csv_chunk(csv_data, None).unwrap();
+
+        assert_eq!(headers.as_ref().unwrap(), &vec!["value".to_string()]);
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].get("value").unwrap().as_str().unwrap(), "10");
+        assert_eq!(records[2].get("value").unwrap().as_str().unwrap(), "30");
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_with_existing_headers_incomplete_line() {
+        let headers = vec!["x".to_string(), "y".to_string()];
+        // Last line is incomplete (no trailing newline)
+        let csv_data = b"1,2\n3,4\n5";
+        let (records, parsed_headers, leftover) =
+            parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        assert!(parsed_headers.is_none());
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].get("x").unwrap().as_str().unwrap(), "1");
+        assert_eq!(records[1].get("x").unwrap().as_str().unwrap(), "3");
+        assert_eq!(leftover, b"5");
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_empty_fields() {
+        let csv_data = b"a,b,c\n,,\n1,,3\n";
+        let (records, headers, leftover) = parse_csv_chunk(csv_data, None).unwrap();
+
+        assert!(headers.is_some());
+        assert_eq!(records.len(), 2);
+        // First data row: all empty
+        assert_eq!(records[0].get("a").unwrap().as_str().unwrap(), "");
+        assert_eq!(records[0].get("b").unwrap().as_str().unwrap(), "");
+        assert_eq!(records[0].get("c").unwrap().as_str().unwrap(), "");
+        // Second row: b is empty
+        assert_eq!(records[1].get("a").unwrap().as_str().unwrap(), "1");
+        assert_eq!(records[1].get("b").unwrap().as_str().unwrap(), "");
+        assert_eq!(records[1].get("c").unwrap().as_str().unwrap(), "3");
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_row_fewer_fields_than_headers() {
+        // Row has fewer columns than headers — extra headers are simply omitted
+        let headers = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let csv_data = b"1,2\n";
+        let (records, parsed_headers, leftover) =
+            parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        assert!(parsed_headers.is_none());
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].get("a").unwrap().as_str().unwrap(), "1");
+        assert_eq!(records[0].get("b").unwrap().as_str().unwrap(), "2");
+        // "c" should not be present (no value)
+        assert!(records[0].get("c").is_none());
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_headers_preserved_across_calls() {
+        // Simulate the multi-chunk streaming scenario:
+        //   chunk 1: header + partial data
+        //   chunk 2: continuation of data
+        let chunk1 = b"id,name\n1,Alice\n2,Bo";
+        let (records1, headers1, leftover1) = parse_csv_chunk(chunk1, None).unwrap();
+
+        assert!(headers1.is_some());
+        let h = headers1.as_ref().unwrap();
+        assert_eq!(h, &vec!["id".to_string(), "name".to_string()]);
+        assert_eq!(records1.len(), 1);
+        assert_eq!(leftover1, b"2,Bo");
+
+        // Prepend leftover to chunk 2
+        let mut chunk2 = leftover1.clone();
+        chunk2.extend_from_slice(b"b\n3,Carol\n");
+        let (records2, headers2, leftover2) = parse_csv_chunk(&chunk2, Some(h)).unwrap();
+
+        assert!(headers2.is_none()); // headers already known
+        assert_eq!(records2.len(), 2);
+        assert_eq!(records2[0].get("name").unwrap().as_str().unwrap(), "Bob");
+        assert_eq!(records2[1].get("name").unwrap().as_str().unwrap(), "Carol");
+        assert_eq!(leftover2.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_many_columns() {
+        // Build a CSV with 20 columns
+        let header_names: Vec<String> = (0..20).map(|i| format!("col{}", i)).collect();
+        let header_line = header_names.join(",") + "\n";
+        let values: Vec<String> = (0..20).map(|i| format!("val{}", i)).collect();
+        let data_line = values.join(",") + "\n";
+        let csv = format!("{}{}", header_line, data_line);
+
+        let (records, headers, leftover) = parse_csv_chunk(csv.as_bytes(), None).unwrap();
+
+        assert!(headers.is_some());
+        assert_eq!(headers.as_ref().unwrap().len(), 20);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].len(), 20);
+        for i in 0..20 {
+            let key = format!("col{}", i);
+            let expected_val = format!("val{}", i);
+            assert_eq!(
+                records[0].get(&key).unwrap().as_str().unwrap(),
+                expected_val
+            );
+        }
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_only_newline() {
+        // Buffer contains only a newline — results in a header parse of an empty row
+        // csv reader with has_headers=true will see an empty header; the result
+        // may be an empty or single-empty-string header vec and 0 records.
+        let csv_data = b"\n";
+        let result = parse_csv_chunk(csv_data, None);
+        // The important thing: it doesn't panic and returns Ok
+        assert!(result.is_ok());
+        let (records, _headers, leftover) = result.unwrap();
+        assert_eq!(records.len(), 0);
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_numeric_values_stored_as_strings() {
+        // All CSV values should be stored as JSON strings regardless of whether
+        // they look numeric
+        let headers = vec!["id".to_string(), "score".to_string(), "ratio".to_string()];
+        let csv_data = b"42,99,3.14\n";
+        let (records, ..) = parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        assert_eq!(records.len(), 1);
+        // Values must be JSON strings, not numbers
+        assert!(records[0].get("id").unwrap().is_string());
+        assert_eq!(records[0].get("id").unwrap().as_str().unwrap(), "42");
+        assert_eq!(records[0].get("score").unwrap().as_str().unwrap(), "99");
+        assert_eq!(records[0].get("ratio").unwrap().as_str().unwrap(), "3.14");
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_single_data_row_no_trailing_newline() {
+        // When the last newline IS the only newline (end of header), the single
+        // data row that follows without a newline becomes leftover
+        let csv_data = b"name,age\nAlice,30";
+        let (records, headers, leftover) = parse_csv_chunk(csv_data, None).unwrap();
+
+        assert!(headers.is_some());
+        assert_eq!(records.len(), 0); // Alice has no trailing newline → leftover
+        assert_eq!(leftover, b"Alice,30");
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_multiple_newlines_at_end() {
+        // Extra blank lines at the end produce empty records that are included
+        let headers = vec!["a".to_string(), "b".to_string()];
+        let csv_data = b"1,2\n3,4\n\n";
+        let (records, _, leftover) = parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        // The trailing empty line may be parsed as an empty record by csv crate
+        // The key invariant is: no panic, leftover is empty (last char is \n)
+        assert_eq!(leftover.len(), 0);
+        // records will have at least the 2 non-empty rows
+        assert!(records.len() >= 2);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_leftover_is_not_empty_when_no_trailing_newline() {
+        let headers = vec!["k".to_string(), "v".to_string()];
+        let csv_data = b"alpha,beta\ngamma,delta\nepsilon";
+        let (records, _, leftover) = parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        assert_eq!(records.len(), 2);
+        assert_eq!(leftover, b"epsilon");
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_returns_all_values_as_json_string_type() {
+        let headers = vec![
+            "bool_like".to_string(),
+            "null_like".to_string(),
+            "float".to_string(),
+        ];
+        let csv_data = b"true,null,1.23e10\n";
+        let (records, ..) = parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        assert_eq!(records.len(), 1);
+        for key in &["bool_like", "null_like", "float"] {
+            assert!(
+                records[0].get(*key).unwrap().is_string(),
+                "field {} should be a JSON string",
+                key
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_header_names_preserved() {
+        // Header names with spaces, underscores, and hyphens
+        let csv_data = b"first name,last_name,middle-name\nJohn,Doe,Q\n";
+        let (records, headers, _) = parse_csv_chunk(csv_data, None).unwrap();
+
+        let h = headers.unwrap();
+        assert_eq!(h[0], "first name");
+        assert_eq!(h[1], "last_name");
+        assert_eq!(h[2], "middle-name");
+
+        assert_eq!(
+            records[0].get("first name").unwrap().as_str().unwrap(),
+            "John"
+        );
+        assert_eq!(
+            records[0].get("last_name").unwrap().as_str().unwrap(),
+            "Doe"
+        );
+        assert_eq!(
+            records[0].get("middle-name").unwrap().as_str().unwrap(),
+            "Q"
+        );
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_many_rows() {
+        // 1000 complete data rows
+        let mut csv = String::from("id,value\n");
+        for i in 0..1000 {
+            csv.push_str(&format!("{},{}\n", i, i * 2));
+        }
+        let (records, headers, leftover) = parse_csv_chunk(csv.as_bytes(), None).unwrap();
+
+        assert!(headers.is_some());
+        assert_eq!(records.len(), 1000);
+        assert_eq!(leftover.len(), 0);
+        assert_eq!(records[0].get("id").unwrap().as_str().unwrap(), "0");
+        assert_eq!(records[999].get("id").unwrap().as_str().unwrap(), "999");
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_with_existing_headers_single_row() {
+        let headers = vec!["ts".to_string(), "msg".to_string()];
+        let csv_data = b"1234567890,hello world\n";
+        let (records, parsed_headers, leftover) =
+            parse_csv_chunk(csv_data, Some(&headers)).unwrap();
+
+        assert!(parsed_headers.is_none());
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            records[0].get("ts").unwrap().as_str().unwrap(),
+            "1234567890"
+        );
+        assert_eq!(
+            records[0].get("msg").unwrap().as_str().unwrap(),
+            "hello world"
+        );
+        assert_eq!(leftover.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_csv_chunk_leftover_accumulation_pattern() {
+        // Verify the leftover from one call can be prepended to the next correctly
+        let first = b"a,b,c\n1,2,3\n4,5";
+        let (r1, h1, lo1) = parse_csv_chunk(first, None).unwrap();
+        assert_eq!(r1.len(), 1);
+        assert_eq!(lo1, b"4,5");
+
+        let mut second_buf = lo1.clone();
+        second_buf.extend_from_slice(b",6\n7,8,9\n");
+        let (r2, h2, lo2) = parse_csv_chunk(&second_buf, h1.as_ref()).unwrap();
+        assert!(h2.is_none()); // already have headers
+        assert_eq!(r2.len(), 2);
+        assert_eq!(r2[0].get("a").unwrap().as_str().unwrap(), "4");
+        assert_eq!(r2[1].get("b").unwrap().as_str().unwrap(), "8");
+        assert_eq!(lo2.len(), 0);
     }
 }

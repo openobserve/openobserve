@@ -274,11 +274,8 @@ describe("IncidentServiceGraph.vue", () => {
         },
       };
 
-        data: emptyGraphData,
-
       wrapper = mountComponent();
       await flushPromises();
-
 
       // Find refresh button in empty state
       const buttons = wrapper.findAll("button");
@@ -410,8 +407,6 @@ describe("IncidentServiceGraph.vue", () => {
           services_with_alerts: 1,
         },
       };
-
-        data: mixedData,
 
       wrapper = mountComponent();
       await flushPromises();

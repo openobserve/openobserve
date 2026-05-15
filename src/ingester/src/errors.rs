@@ -120,3 +120,95 @@ pub enum Error {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_table_overflow_error_display() {
+        let e = Error::MemoryTableOverflowError {};
+        assert_eq!(e.to_string(), "MemoryTableOverflowError");
+    }
+
+    #[test]
+    fn test_memory_circuit_breaker_error_display() {
+        let e = Error::MemoryCircuitBreakerError {};
+        assert_eq!(e.to_string(), "MemoryCircuitBreakerError");
+    }
+
+    #[test]
+    fn test_disk_circuit_breaker_error_display() {
+        let e = Error::DiskCircuitBreakerError {};
+        assert_eq!(e.to_string(), "DiskCircuitBreakerError");
+    }
+
+    #[test]
+    fn test_open_file_error_display() {
+        let e = Error::OpenFileError {
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "no such file"),
+            path: "/tmp/test.wal".into(),
+        };
+        assert!(e.to_string().contains("/tmp/test.wal"));
+    }
+
+    #[test]
+    fn test_open_dir_error_display() {
+        let e = Error::OpenDirError {
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
+            path: "/tmp/test_dir".into(),
+        };
+        assert!(e.to_string().contains("/tmp/test_dir"));
+        assert!(e.to_string().contains("Failed to open directory"));
+    }
+
+    #[test]
+    fn test_create_file_error_display() {
+        let e = Error::CreateFileError {
+            source: std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"),
+            path: "/tmp/new.wal".into(),
+        };
+        assert!(e.to_string().contains("/tmp/new.wal"));
+        assert!(e.to_string().contains("Failed to create file"));
+    }
+
+    #[test]
+    fn test_delete_file_error_display() {
+        let e = Error::DeleteFileError {
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),
+            path: "/tmp/old.wal".into(),
+        };
+        assert!(e.to_string().contains("/tmp/old.wal"));
+        assert!(e.to_string().contains("Failed to delete file"));
+    }
+
+    #[test]
+    fn test_rename_file_error_display() {
+        let e = Error::RenameFileError {
+            source: std::io::Error::new(std::io::ErrorKind::PermissionDenied, "no perms"),
+            path: "/tmp/rename.wal".into(),
+        };
+        assert!(e.to_string().contains("/tmp/rename.wal"));
+        assert!(e.to_string().contains("Failed to rename file"));
+    }
+
+    #[test]
+    fn test_read_file_error_display() {
+        let e = Error::ReadFileError {
+            source: std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "eof"),
+            path: "/tmp/read.wal".into(),
+        };
+        assert!(e.to_string().contains("/tmp/read.wal"));
+        assert!(e.to_string().contains("Failed to read file"));
+    }
+
+    #[test]
+    fn test_write_file_error_display() {
+        let e = Error::WriteFileError {
+            source: std::io::Error::new(std::io::ErrorKind::WriteZero, "no space"),
+            path: "/tmp/write.wal".into(),
+        };
+        assert!(e.to_string().contains("/tmp/write.wal"));
+        assert!(e.to_string().contains("Failed to write file"));
+    }
+}

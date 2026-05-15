@@ -27,13 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn
+          <OButton
             v-close-popup="true"
-            round
-            flat
-            icon="cancel"
+            variant="ghost"
+            size="icon-circle"
             data-test="dashboard-folder-move-cancel"
-          />
+          >
+            <template #icon-left><q-icon name="cancel" /></template>
+          </OButton>
         </div>
       </div>
     </q-card-section>
@@ -48,7 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-folder-move-form"
       >
         <q-input
-          v-model="store.state.organizationData.folders.find((item: any) => item.folderId === activeFolderId).name"
+          v-model="
+            store.state.organizationData.folders.find(
+              (item: any) => item.folderId === activeFolderId,
+            ).name
+          "
           :label="t('dashboard.currentFolderLabel')"
           class="q-py-none showLabelOnTop"
           stack-label
@@ -61,29 +66,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>&nbsp;</span>
 
         <!-- select folder or create new folder and select -->
-        <SelectFolderDropdown @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
+        <SelectFolderDropdown
+          @folder-selected="selectedFolder = $event"
+          :activeFolderId="activeFolderId"
+        />
 
-        <div class="flex justify-start q-mt-sm">
-          <q-btn
+        <div class="flex justify-start q-mt-sm tw:gap-2">
+          <OButton
             v-close-popup="true"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            :label="t('dashboard.cancel')"
-            no-caps
+            variant="outline"
+            size="sm-action"
             data-test="dashboard-folder-move-cancel"
-          />
-          <q-btn
+            >{{ t("dashboard.cancel") }}</OButton
+          >
+          <OButton
             data-test="dashboard-folder-move"
-            :disable="activeFolderId === selectedFolder.value"
+            :disabled="activeFolderId === selectedFolder.value"
             :loading="onSubmit.isLoading.value"
-            :label="t('common.move')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-          />
+            >{{ t("common.move") }}</OButton
+          >
         </div>
       </q-form>
     </q-card-section>
@@ -99,10 +103,11 @@ import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown },
+  components: { SelectFolderDropdown, OButton },
   props: {
     activeFolderId: {
       type: String,
@@ -120,7 +125,7 @@ export default defineComponent({
     //dropdown selected folder
     const selectedFolder = ref({
       label: store.state.organizationData.folders.find(
-        (item: any) => item.folderId === props.activeFolderId
+        (item: any) => item.folderId === props.activeFolderId,
       ).name,
       value: props.activeFolderId,
     });
@@ -140,7 +145,7 @@ export default defineComponent({
             store,
             props.dashboardIds,
             props.activeFolderId,
-            selectedFolder.value.value
+            selectedFolder.value.value,
           );
 
           showPositiveNotification("Dashboard Moved successfully", {
@@ -151,12 +156,11 @@ export default defineComponent({
           moveFolderForm.value?.resetValidation();
         } catch (err: any) {
           //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
-          if(err.status !== 403){
+          if (err.status !== 403) {
             showErrorNotification(err?.message ?? "Dashboard move failed.", {
-            timeout: 2000,
+              timeout: 2000,
             });
           }
-
         }
       });
     });

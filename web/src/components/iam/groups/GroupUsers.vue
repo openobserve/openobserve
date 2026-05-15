@@ -29,31 +29,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             Show
           </span>
-          <div
+          <OToggleGroup
             class="q-ml-xs"
-            style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+            :model-value="usersDisplay"
+            @update:model-value="(v) => updateUserTable(v as string)"
           >
-            <template v-for="visual in usersDisplayOptions" :key="visual.value">
-              <q-btn
-                :data-test="`iam-users-selection-show-${visual.value}-btn`"
-                :color="visual.value === usersDisplay ? 'primary' : ''"
-                :flat="visual.value === usersDisplay ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-md visual-selection-btn"
-                @click="updateUserTable(visual.value)"
-                style="height: 30px;"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
-          </div>
+            <OToggleGroupItem
+              v-for="visual in usersDisplayOptions"
+              :key="visual.value"
+              :value="visual.value"
+              size="sm"
+              :data-test="`iam-users-selection-show-${visual.value}-btn`"
+            >
+              {{ visual.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
         </div>
       </div>
       <div
@@ -167,6 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import AppTable from "@/components/AppTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import { watch, computed } from "vue";

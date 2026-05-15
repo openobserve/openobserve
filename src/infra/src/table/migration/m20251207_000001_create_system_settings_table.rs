@@ -257,3 +257,68 @@ enum SystemSettings {
     CreatedBy,
     UpdatedBy,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::DbBackend;
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_scope_index_contains_name() {
+        let stmt = create_scope_index();
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("idx_system_settings_scope"));
+    }
+
+    #[test]
+    fn test_create_org_index_contains_name() {
+        let stmt = create_org_index();
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("idx_system_settings_org"));
+    }
+
+    #[test]
+    fn test_create_user_index_contains_name() {
+        let stmt = create_user_index();
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("idx_system_settings_user"));
+    }
+
+    #[test]
+    fn test_create_key_index_contains_name() {
+        let stmt = create_key_index();
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("idx_system_settings_key"));
+    }
+
+    #[test]
+    fn test_create_category_index_contains_name() {
+        let stmt = create_category_index();
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("idx_system_settings_category"));
+    }
+
+    #[test]
+    fn test_create_unique_setting_index_is_unique() {
+        let stmt = create_unique_setting_index();
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("idx_system_settings_unique"));
+        assert!(sql.to_uppercase().contains("UNIQUE"));
+    }
+
+    #[test]
+    fn test_create_system_settings_table_sqlite() {
+        let stmt = create_system_settings_table(DbBackend::Sqlite);
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("system_settings"));
+    }
+
+    #[test]
+    fn test_create_system_settings_table_postgres() {
+        let stmt = create_system_settings_table(DbBackend::Postgres);
+        let sql = stmt.build(SqliteQueryBuilder);
+        assert!(sql.contains("system_settings"));
+    }
+}

@@ -888,4 +888,482 @@ mod tests {
             _ => panic!("Expected V1 variant"),
         }
     }
+
+    #[test]
+    fn test_agg_function_from_meta_all_variants() {
+        use meta_alerts::AggFunction as M;
+        assert!(matches!(AggFunction::from(M::Avg), AggFunction::Avg));
+        assert!(matches!(AggFunction::from(M::Min), AggFunction::Min));
+        assert!(matches!(AggFunction::from(M::Max), AggFunction::Max));
+        assert!(matches!(AggFunction::from(M::Sum), AggFunction::Sum));
+        assert!(matches!(AggFunction::from(M::Count), AggFunction::Count));
+        assert!(matches!(AggFunction::from(M::Median), AggFunction::Median));
+        assert!(matches!(AggFunction::from(M::P50), AggFunction::P50));
+        assert!(matches!(AggFunction::from(M::P75), AggFunction::P75));
+        assert!(matches!(AggFunction::from(M::P90), AggFunction::P90));
+        assert!(matches!(AggFunction::from(M::P95), AggFunction::P95));
+        assert!(matches!(AggFunction::from(M::P99), AggFunction::P99));
+    }
+
+    #[test]
+    fn test_agg_function_to_meta_all_variants() {
+        use meta_alerts::AggFunction as M;
+        assert!(matches!(M::from(AggFunction::Avg), M::Avg));
+        assert!(matches!(M::from(AggFunction::Min), M::Min));
+        assert!(matches!(M::from(AggFunction::Max), M::Max));
+        assert!(matches!(M::from(AggFunction::Sum), M::Sum));
+        assert!(matches!(M::from(AggFunction::Count), M::Count));
+        assert!(matches!(M::from(AggFunction::Median), M::Median));
+        assert!(matches!(M::from(AggFunction::P50), M::P50));
+        assert!(matches!(M::from(AggFunction::P75), M::P75));
+        assert!(matches!(M::from(AggFunction::P90), M::P90));
+        assert!(matches!(M::from(AggFunction::P95), M::P95));
+        assert!(matches!(M::from(AggFunction::P99), M::P99));
+    }
+
+    #[test]
+    fn test_query_type_from_meta_all_variants() {
+        use meta_alerts::QueryType as M;
+        assert!(matches!(QueryType::from(M::Custom), QueryType::Custom));
+        assert!(matches!(QueryType::from(M::SQL), QueryType::SQL));
+        assert!(matches!(QueryType::from(M::PromQL), QueryType::PromQL));
+    }
+
+    #[test]
+    fn test_query_type_to_meta_all_variants() {
+        use meta_alerts::QueryType as M;
+        assert!(matches!(M::from(QueryType::Custom), M::Custom));
+        assert!(matches!(M::from(QueryType::SQL), M::SQL));
+        assert!(matches!(M::from(QueryType::PromQL), M::PromQL));
+    }
+
+    #[test]
+    fn test_operator_from_meta_all_variants() {
+        use meta_alerts::Operator as M;
+        assert!(matches!(Operator::from(M::EqualTo), Operator::EqualTo));
+        assert!(matches!(
+            Operator::from(M::NotEqualTo),
+            Operator::NotEqualTo
+        ));
+        assert!(matches!(
+            Operator::from(M::GreaterThan),
+            Operator::GreaterThan
+        ));
+        assert!(matches!(
+            Operator::from(M::GreaterThanEquals),
+            Operator::GreaterThanEquals
+        ));
+        assert!(matches!(Operator::from(M::LessThan), Operator::LessThan));
+        assert!(matches!(
+            Operator::from(M::LessThanEquals),
+            Operator::LessThanEquals
+        ));
+        assert!(matches!(Operator::from(M::Contains), Operator::Contains));
+        assert!(matches!(
+            Operator::from(M::NotContains),
+            Operator::NotContains
+        ));
+    }
+
+    #[test]
+    fn test_operator_to_meta_all_variants() {
+        use meta_alerts::Operator as M;
+        assert!(matches!(M::from(Operator::EqualTo), M::EqualTo));
+        assert!(matches!(M::from(Operator::NotEqualTo), M::NotEqualTo));
+        assert!(matches!(M::from(Operator::GreaterThan), M::GreaterThan));
+        assert!(matches!(
+            M::from(Operator::GreaterThanEquals),
+            M::GreaterThanEquals
+        ));
+        assert!(matches!(M::from(Operator::LessThan), M::LessThan));
+        assert!(matches!(
+            M::from(Operator::LessThanEquals),
+            M::LessThanEquals
+        ));
+        assert!(matches!(M::from(Operator::Contains), M::Contains));
+        assert!(matches!(M::from(Operator::NotContains), M::NotContains));
+    }
+
+    #[test]
+    fn test_search_event_type_from_meta_all_variants() {
+        use meta_search::SearchEventType as M;
+        assert!(matches!(SearchEventType::from(M::UI), SearchEventType::UI));
+        assert!(matches!(
+            SearchEventType::from(M::Dashboards),
+            SearchEventType::Dashboards
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Reports),
+            SearchEventType::Reports
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Alerts),
+            SearchEventType::Alerts
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Values),
+            SearchEventType::Values
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Other),
+            SearchEventType::Other
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::RUM),
+            SearchEventType::RUM
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::DerivedStream),
+            SearchEventType::DerivedStream
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::SearchJob),
+            SearchEventType::SearchJob
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Download),
+            SearchEventType::Download
+        ));
+        assert!(matches!(
+            SearchEventType::from(M::Insights),
+            SearchEventType::Insights
+        ));
+    }
+
+    #[test]
+    fn test_search_event_type_to_meta_all_variants() {
+        use meta_search::SearchEventType as M;
+        assert!(matches!(M::from(SearchEventType::UI), M::UI));
+        assert!(matches!(
+            M::from(SearchEventType::Dashboards),
+            M::Dashboards
+        ));
+        assert!(matches!(M::from(SearchEventType::Reports), M::Reports));
+        assert!(matches!(M::from(SearchEventType::Alerts), M::Alerts));
+        assert!(matches!(M::from(SearchEventType::Values), M::Values));
+        assert!(matches!(M::from(SearchEventType::Other), M::Other));
+        assert!(matches!(M::from(SearchEventType::RUM), M::RUM));
+        assert!(matches!(
+            M::from(SearchEventType::DerivedStream),
+            M::DerivedStream
+        ));
+        assert!(matches!(M::from(SearchEventType::SearchJob), M::SearchJob));
+        assert!(matches!(M::from(SearchEventType::Download), M::Download));
+        assert!(matches!(M::from(SearchEventType::Insights), M::Insights));
+    }
+
+    #[test]
+    fn test_stream_type_from_meta_all_variants() {
+        use meta_stream::StreamType as M;
+        assert!(matches!(StreamType::from(M::Logs), StreamType::Logs));
+        assert!(matches!(StreamType::from(M::Metrics), StreamType::Metrics));
+        assert!(matches!(StreamType::from(M::Traces), StreamType::Traces));
+        assert!(matches!(
+            StreamType::from(M::EnrichmentTables),
+            StreamType::EnrichmentTables
+        ));
+        assert!(matches!(
+            StreamType::from(M::Filelist),
+            StreamType::Filelist
+        ));
+        assert!(matches!(
+            StreamType::from(M::Metadata),
+            StreamType::Metadata
+        ));
+        assert!(matches!(StreamType::from(M::Index), StreamType::Index));
+        // ServiceGraph maps to Metadata
+        assert!(matches!(
+            StreamType::from(M::ServiceGraph),
+            StreamType::Metadata
+        ));
+    }
+
+    #[test]
+    fn test_stream_type_to_meta_all_variants() {
+        use meta_stream::StreamType as M;
+        assert!(matches!(M::from(StreamType::Logs), M::Logs));
+        assert!(matches!(M::from(StreamType::Metrics), M::Metrics));
+        assert!(matches!(M::from(StreamType::Traces), M::Traces));
+        assert!(matches!(
+            M::from(StreamType::EnrichmentTables),
+            M::EnrichmentTables
+        ));
+        assert!(matches!(M::from(StreamType::Filelist), M::Filelist));
+        assert!(matches!(M::from(StreamType::Metadata), M::Metadata));
+        assert!(matches!(M::from(StreamType::Index), M::Index));
+    }
+
+    #[test]
+    fn test_frequency_type_roundtrip() {
+        use meta_alerts::FrequencyType as M;
+        assert!(matches!(FrequencyType::from(M::Cron), FrequencyType::Cron));
+        assert!(matches!(
+            FrequencyType::from(M::Minutes),
+            FrequencyType::Minutes
+        ));
+        assert!(matches!(M::from(FrequencyType::Cron), M::Cron));
+        assert!(matches!(M::from(FrequencyType::Minutes), M::Minutes));
+    }
+
+    #[test]
+    fn test_alert_skip_fields_absent_when_default() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("template"));
+        assert!(!obj.contains_key("context_attributes"));
+        assert!(!obj.contains_key("updated_at"));
+        assert!(!obj.contains_key("deduplication"));
+    }
+
+    #[test]
+    fn test_alert_skip_fields_present_when_some() {
+        let mut alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
+        alert.template = Some("my-template".to_string());
+        alert.context_attributes = Some(HashMap::from([("env".to_string(), "prod".to_string())]));
+        alert.updated_at = Some(1_700_000_000);
+        let json = serde_json::to_value(&alert).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("template"));
+        assert!(obj.contains_key("context_attributes"));
+        assert!(obj.contains_key("updated_at"));
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_none_absent() {
+        let tc = TriggerCondition {
+            timezone: None,
+            ..TriggerCondition::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_some_present() {
+        let tc = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..TriggerCondition::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
+    fn test_compare_historic_data_from_meta() {
+        let meta = meta_alerts::CompareHistoricData {
+            offset: "1h".to_string(),
+        };
+        let converted = CompareHistoricData::from(meta);
+        assert_eq!(converted.offset, "1h");
+    }
+
+    #[test]
+    fn test_condition_roundtrip() {
+        use meta_alerts::Condition as MetaCondition;
+        let meta = MetaCondition {
+            column: "level".to_string(),
+            operator: meta_alerts::Operator::EqualTo,
+            value: serde_json::Value::String("error".to_string()),
+            ignore_case: false,
+        };
+        let local = Condition::from(meta);
+        assert_eq!(local.column, "level");
+        assert!(matches!(local.operator, Operator::EqualTo));
+
+        let back = meta_alerts::Condition::from(local);
+        assert_eq!(back.column, "level");
+        assert!(matches!(back.operator, meta_alerts::Operator::EqualTo));
+    }
+
+    #[test]
+    fn test_trigger_condition_from_meta_converts_frequency_to_minutes() {
+        let meta = meta_alerts::TriggerCondition {
+            period: 15,
+            operator: meta_alerts::Operator::GreaterThan,
+            threshold: 5,
+            frequency: 300, // 300 seconds → 5 minutes
+            cron: "".to_string(),
+            frequency_type: meta_alerts::FrequencyType::Minutes,
+            silence: 60,
+            timezone: Some("UTC".to_string()),
+            tolerance_in_secs: Some(10),
+            align_time: false,
+        };
+        let tc = TriggerCondition::from(meta);
+        assert_eq!(tc.period_minutes, 15);
+        assert!(matches!(tc.operator, Operator::GreaterThan));
+        assert_eq!(tc.threshold_count, 5);
+        assert_eq!(tc.frequency_minutes, 5); // 300 / 60 = 5
+        assert_eq!(tc.silence_minutes, 60);
+        assert_eq!(tc.timezone, Some("UTC".to_string()));
+        assert_eq!(tc.tolerance_seconds, Some(10));
+        assert!(!tc.align_time);
+    }
+
+    #[test]
+    fn test_trigger_condition_to_meta_converts_frequency_to_seconds() {
+        let tc = TriggerCondition {
+            period_minutes: 10,
+            operator: Operator::LessThan,
+            threshold_count: 3,
+            frequency_minutes: 5,
+            cron: "".to_string(),
+            frequency_type: FrequencyType::Minutes,
+            silence_minutes: 30,
+            timezone: None,
+            tolerance_seconds: None,
+            align_time: true,
+        };
+        let meta = meta_alerts::TriggerCondition::from(tc);
+        assert_eq!(meta.period, 10);
+        assert!(matches!(meta.operator, meta_alerts::Operator::LessThan));
+        assert_eq!(meta.threshold, 3);
+        assert_eq!(meta.frequency, 300); // 5 * 60 = 300
+        assert_eq!(meta.silence, 30);
+        assert!(meta.timezone.is_none());
+        assert!(meta.tolerance_in_secs.is_none());
+        assert!(meta.align_time);
+    }
+
+    #[test]
+    fn test_aggregation_from_meta() {
+        let meta = meta_alerts::Aggregation {
+            group_by: Some(vec!["service".to_string(), "region".to_string()]),
+            function: meta_alerts::AggFunction::Count,
+            having: meta_alerts::Condition {
+                column: "count".to_string(),
+                operator: meta_alerts::Operator::GreaterThanEquals,
+                value: serde_json::json!(100),
+                ignore_case: false,
+            },
+        };
+        let agg = Aggregation::from(meta);
+        assert_eq!(
+            agg.group_by,
+            Some(vec!["service".to_string(), "region".to_string()])
+        );
+        assert!(matches!(agg.function, AggFunction::Count));
+        assert_eq!(agg.having.column, "count");
+    }
+
+    #[test]
+    fn test_aggregation_to_meta() {
+        let agg = Aggregation {
+            group_by: None,
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "value".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::json!(42),
+                ignore_case: false,
+            },
+        };
+        let meta = meta_alerts::Aggregation::from(agg);
+        assert!(meta.group_by.is_none());
+        assert!(matches!(meta.function, meta_alerts::AggFunction::Avg));
+        assert_eq!(meta.having.column, "value");
+    }
+
+    #[test]
+    fn test_query_condition_from_meta_sql() {
+        let meta = meta_alerts::QueryCondition {
+            query_type: meta_alerts::QueryType::SQL,
+            conditions: None,
+            sql: Some("SELECT count(*) FROM logs".to_string()),
+            promql: None,
+            promql_condition: None,
+            aggregation: None,
+            vrl_function: None,
+            search_event_type: None,
+            multi_time_range: None,
+        };
+        let qc = QueryCondition::from(meta);
+        assert!(matches!(qc.query_type, QueryType::SQL));
+        assert_eq!(qc.sql, Some("SELECT count(*) FROM logs".to_string()));
+        assert!(qc.conditions.is_none());
+        assert!(qc.aggregation.is_none());
+    }
+
+    #[test]
+    fn test_query_condition_to_meta_sql() {
+        let qc = QueryCondition {
+            query_type: QueryType::SQL,
+            conditions: None,
+            sql: Some("SELECT count(*) FROM logs".to_string()),
+            promql: None,
+            promql_condition: None,
+            aggregation: None,
+            vrl_function: Some("fn".to_string()),
+            search_event_type: None,
+            multi_time_range: None,
+        };
+        let meta = meta_alerts::QueryCondition::from(qc);
+        assert!(matches!(meta.query_type, meta_alerts::QueryType::SQL));
+        assert_eq!(meta.sql, Some("SELECT count(*) FROM logs".to_string()));
+        assert_eq!(meta.vrl_function, Some("fn".to_string()));
+        assert!(meta.conditions.is_none());
+    }
+
+    #[test]
+    fn test_alert_from_meta_without_trigger_maps_fields() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.name = "test-alert".to_string();
+        meta_alert.org_id = "org1".to_string();
+        meta_alert.stream_name = "default".to_string();
+        meta_alert.enabled = true;
+        meta_alert.creates_incident = true;
+
+        let alert = Alert::from((meta_alert, None));
+        assert_eq!(alert.name, "test-alert");
+        assert_eq!(alert.org_id, "org1");
+        assert_eq!(alert.stream_name, "default");
+        assert!(alert.enabled);
+        assert!(alert.creates_incident);
+        assert!(alert.last_triggered_at.is_none());
+        assert!(alert.last_satisfied_at.is_none());
+    }
+
+    #[test]
+    fn test_alert_from_meta_with_trigger_no_timestamps() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.name = "triggered-alert".to_string();
+        let trigger = config::meta::triggers::Trigger::default();
+
+        let alert = Alert::from((meta_alert, Some(trigger)));
+        assert_eq!(alert.name, "triggered-alert");
+        // default trigger has no start/end time — timestamps remain None
+        assert!(alert.last_triggered_at.is_none());
+        assert!(alert.last_satisfied_at.is_none());
+    }
+
+    #[test]
+    fn test_alert_to_meta_maps_basic_fields() {
+        let json = serde_json::json!({
+            "name": "my-alert",
+            "org_id": "myorg",
+            "stream_name": "stream1",
+            "enabled": true,
+            "creates_incident": true
+        });
+        let alert: Alert = serde_json::from_value(json).unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(meta.name, "my-alert");
+        assert_eq!(meta.org_id, "myorg");
+        assert_eq!(meta.stream_name, "stream1");
+        assert!(meta.enabled);
+        assert!(meta.creates_incident);
+    }
+
+    #[test]
+    fn test_alert_to_meta_default_fields() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({})).unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(meta.name, "");
+        assert_eq!(meta.org_id, "");
+        assert!(!meta.enabled);
+        assert!(!meta.creates_incident);
+        assert!(meta.id.is_none());
+        assert!(meta.owner.is_none());
+    }
 }

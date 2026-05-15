@@ -256,6 +256,11 @@ pub struct FoundGroup {
     pub unique_values: Option<usize>,
     /// Cardinality class derived from unique_values (None if no data yet)
     pub cardinality_class: Option<CardinalityClass>,
+    /// Category this group belongs to (e.g., "AWS", "Kubernetes", "Azure", "GCP", "Common").
+    /// Sourced from the underlying `FieldAlias.group`. When `None`, the frontend falls
+    /// back to inferring the category from `group_id` prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 /// Dimension analytics tracking
@@ -558,5 +563,241 @@ mod tests {
             CardinalityClass::from_cardinality(50000),
             CardinalityClass::VeryHigh
         );
+    }
+
+    #[test]
+    fn test_stream_info_new() {
+        let s = StreamInfo::new("my_stream".to_string());
+        assert_eq!(s.stream_name, "my_stream");
+        assert_eq!(s.stream_type, StreamType::default());
+        assert!(s.filters.is_empty());
+    }
+
+    #[test]
+    fn test_stream_info_with_filters() {
+        let mut filters = HashMap::new();
+        filters.insert("env".to_string(), "prod".to_string());
+        let s = StreamInfo::with_filters("s".to_string(), filters.clone());
+        assert_eq!(s.filters, filters);
+        assert_eq!(s.stream_type, StreamType::default());
+    }
+
+    #[test]
+    fn test_stream_info_set_stream_type() {
+        let s = StreamInfo::new("s".to_string()).set_stream_type(StreamType::Metrics);
+        assert_eq!(s.stream_type, StreamType::Metrics);
+    }
+
+    #[test]
+    fn test_cardinality_class_is_suitable_for_correlation() {
+        assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
+        assert!(CardinalityClass::Low.is_suitable_for_correlation());
+        assert!(CardinalityClass::Medium.is_suitable_for_correlation());
+        assert!(!CardinalityClass::High.is_suitable_for_correlation());
+        assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
+    }
+
+    #[test]
+    fn test_cardinality_class_priority_score() {
+        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
+        assert_eq!(CardinalityClass::Low.priority_score(), 2);
+        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
+        assert_eq!(CardinalityClass::High.priority_score(), 4);
+        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
+    }
+
+    #[test]
+    fn test_dimension_analytics_new() {
+        let d = DimensionAnalytics::new("namespace".to_string());
+        assert_eq!(d.dimension_name, "namespace");
+        assert_eq!(d.cardinality, 0);
+        assert_eq!(d.service_count, 0);
+        assert_eq!(d.cardinality_class, CardinalityClass::VeryLow);
+        assert!(d.sample_values.is_empty());
+    }
+
+    #[test]
+    fn test_dimension_analytics_update() {
+        let mut d = DimensionAnalytics::new("env".to_string());
+        let mut sample = HashMap::new();
+        sample.insert("logs".to_string(), HashMap::new());
+        d.update(5, 2, sample, HashMap::new(), HashMap::new());
+        assert_eq!(d.cardinality, 5);
+        assert_eq!(d.service_count, 2);
+        assert_eq!(d.cardinality_class, CardinalityClass::VeryLow);
+    }
+
+    #[test]
+    fn test_dimension_analytics_is_suitable_for_correlation() {
+        let mut d = DimensionAnalytics::new("region".to_string());
+        d.update(3, 1, HashMap::new(), HashMap::new(), HashMap::new());
+        assert!(d.is_suitable_for_correlation());
+
+        // high cardinality — not suitable
+        d.update(5000, 1, HashMap::new(), HashMap::new(), HashMap::new());
+        assert!(!d.is_suitable_for_correlation());
+    }
+
+    #[test]
+    fn test_cardinality_class_boundary_values() {
+        // Exact boundary cases for from_cardinality
+        assert_eq!(
+            CardinalityClass::from_cardinality(0),
+            CardinalityClass::VeryLow
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10),
+            CardinalityClass::VeryLow
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(11),
+            CardinalityClass::Low
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(100),
+            CardinalityClass::Low
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(101),
+            CardinalityClass::Medium
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(1000),
+            CardinalityClass::Medium
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(1001),
+            CardinalityClass::High
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10000),
+            CardinalityClass::High
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10001),
+            CardinalityClass::VeryHigh
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(usize::MAX),
+            CardinalityClass::VeryHigh
+        );
+    }
+
+    #[test]
+    fn test_cardinality_class_ordering() {
+        // Derived PartialOrd should respect declaration order
+        assert!(CardinalityClass::VeryLow < CardinalityClass::Low);
+        assert!(CardinalityClass::Low < CardinalityClass::Medium);
+        assert!(CardinalityClass::Medium < CardinalityClass::High);
+        assert!(CardinalityClass::High < CardinalityClass::VeryHigh);
+    }
+
+    #[test]
+    fn test_dimension_analytics_update_truncates_sample_values() {
+        let mut d = DimensionAnalytics::new("pod".to_string());
+        // 15 sample values in one stream → should be truncated to 10
+        let many_values: Vec<String> = (0..15).map(|i| format!("v{i}")).collect();
+        let mut inner = HashMap::new();
+        inner.insert("stream1".to_string(), many_values);
+        let mut sample = HashMap::new();
+        sample.insert("logs".to_string(), inner);
+
+        d.update(15, 1, sample, HashMap::new(), HashMap::new());
+
+        // After update, samples should be truncated to first 10
+        let stream_samples = &d.sample_values["logs"]["stream1"];
+        assert_eq!(stream_samples.len(), 10);
+        assert_eq!(stream_samples[0], "v0");
+        assert_eq!(stream_samples[9], "v9");
+    }
+
+    #[test]
+    fn test_stream_info_filters_empty_absent() {
+        let s = StreamInfo::with_type("s".to_string(), StreamType::Logs);
+        let json = serde_json::to_value(&s).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("filters"));
+    }
+
+    #[test]
+    fn test_stream_info_filters_present_when_nonempty() {
+        let mut filters = HashMap::new();
+        filters.insert("env".to_string(), "prod".to_string());
+        let s = StreamInfo::with_type_and_filters("s".to_string(), StreamType::Logs, filters);
+        let json = serde_json::to_value(&s).unwrap();
+        assert!(json.as_object().unwrap().contains_key("filters"));
+    }
+
+    #[test]
+    fn test_correlation_response_all_streams_absent_when_empty() {
+        let r = CorrelationResponse {
+            service_name: "svc".to_string(),
+            matched_dimensions: HashMap::new(),
+            additional_dimensions: HashMap::new(),
+            related_streams: RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+            },
+            all_streams: vec![],
+            matched_set_id: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("all_streams"));
+        assert!(!obj.contains_key("matched_set_id"));
+    }
+
+    #[test]
+    fn test_correlation_response_all_streams_present_when_nonempty() {
+        let r = CorrelationResponse {
+            service_name: "svc".to_string(),
+            matched_dimensions: HashMap::new(),
+            additional_dimensions: HashMap::new(),
+            related_streams: RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+            },
+            all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
+            matched_set_id: Some("set1".to_string()),
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("all_streams"));
+        assert!(obj.contains_key("matched_set_id"));
+    }
+
+    #[test]
+    fn test_dimension_analytics_empty_maps_absent() {
+        let d = DimensionAnalytics::new("env".to_string());
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("sample_values"));
+        assert!(!obj.contains_key("value_children"));
+        assert!(!obj.contains_key("value_counts"));
+    }
+
+    #[test]
+    fn test_service_streams_empty_vecs_absent() {
+        let s = ServiceStreams::default();
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("logs"));
+        assert!(!obj.contains_key("traces"));
+        assert!(!obj.contains_key("metrics"));
+    }
+
+    #[test]
+    fn test_service_streams_vecs_present_when_nonempty() {
+        let s = ServiceStreams {
+            logs: vec!["l".to_string()],
+            traces: vec!["t".to_string()],
+            metrics: vec!["m".to_string()],
+        };
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("logs"));
+        assert!(obj.contains_key("traces"));
+        assert!(obj.contains_key("metrics"));
     }
 }

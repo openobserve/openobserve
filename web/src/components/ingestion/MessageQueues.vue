@@ -36,25 +36,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="search" class="cursor-pointer" />
               </template>
             </q-input>
-            <q-tabs
+            <OTabs
               v-model="ingestTabType"
-              indicator-color="transparent"
-              inline-label
-              vertical
+              orientation="vertical"
               class="data-sources-database-tabs item-left"
             >
               <template v-for="(tab, index) in filteredList" :key="tab.name">
-                <q-route-tab
+                <ORouteTab
                   :title="tab.name"
                   :default="index === 0"
                   :name="tab.name"
                   :to="tab.to"
                   :icon="tab.icon"
                   :label="tab.label"
-                  content-class="tab_content"
                 />
               </template>
-            </q-tabs>
+            </OTabs>
           </div>
         </div>
       </div>
@@ -78,6 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -86,9 +85,11 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "DevOpsPage",
+  components: { OTabs, ORouteTab },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -107,7 +108,7 @@ export default defineComponent({
 
     const tabsFilter = ref("");
 
-    const ingestTabType = ref("rabbitmq");
+    const ingestTabType = ref(resolveTab("message-queues", router.currentRoute.value.name as string, "rabbitmq"));
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "message-queues") {
@@ -207,7 +208,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .data-sources-database-tabs {
-  :deep(.q-tab) {
+  :deep(.o-tab) {
     min-height: 36px;
   }
 }

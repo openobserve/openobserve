@@ -153,3 +153,33 @@ fn parse_key(key: &str) -> Result<(String, StreamType, String)> {
     let stream_name = key_columns[4].into();
     Ok((org_id, stream_type, stream_name))
 }
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_key_valid() {
+        let (org, stream_type, stream_name) =
+            parse_key("/schemas/logs/myorg/logs/mystream").unwrap();
+        assert_eq!(org, "myorg");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(stream_name, "mystream");
+    }
+
+    #[test]
+    fn test_parse_key_too_short_returns_err() {
+        assert!(parse_key("/schemas/logs/myorg").is_err());
+    }
+
+    #[test]
+    fn test_parse_key_metrics() {
+        let (org, stream_type, stream_name) =
+            parse_key("/schemas/metrics/testorg/metrics/cpu_usage").unwrap();
+        assert_eq!(org, "testorg");
+        assert_eq!(stream_type, StreamType::Metrics);
+        assert_eq!(stream_name, "cpu_usage");
+    }
+}

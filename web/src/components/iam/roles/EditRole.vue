@@ -91,36 +91,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   Show
                 </span>
-                <div
+                <OToggleGroup
                   class="q-ml-xs"
-                   style="
-                  border: 1px solid var(--o2-border-color);
-                  width: fit-content;
-                  border-radius: 0.3rem;
-                  padding: 2px;
-                "
+                  :model-value="filter.permissions"
+                  @update:model-value="(v) => updateTableData(v as string)"
                 >
-                  <template
+                  <OToggleGroupItem
                     v-for="visual in permissionDisplayOptions"
                     :key="visual.value"
+                    :value="visual.value"
+                    size="sm"
+                    :data-test="`edit-role-permissions-show-${visual.value}-btn`"
                   >
-                    <q-btn
-                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                      :color="
-                        visual.value === filter.permissions ? 'primary' : ''
-                      "
-                      :flat="visual.value === filter.permissions ? false : true"
-                      dense
-                      no-caps
-                      size="11px"
-                      class="q-px-md visual-selection-btn"
-                      @click="updateTableData(visual.value)"
-                      style="height: 30px;"
-                    >
-                      {{ visual.label }}</q-btn
-                    >
-                  </template>
-                </div>
+                    {{ visual.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
               </div>
               <div data-test="edit-role-permissions-search-input">
                 <q-input
@@ -161,34 +146,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div></div>
-            <div
+            <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
               class="q-mr-md q-my-xs"
-              style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+              :model-value="permissionsUiType"
+              @update:model-value="(v) => updatePermissionsUi(v as string)"
             >
-              <template
+              <OToggleGroupItem
                 v-for="visual in permissionUiOptions"
                 :key="visual.value"
+                :value="visual.value"
+                size="sm"
+                :data-test="`edit-role-permissions-show-${visual.value}-btn`"
               >
-                <q-btn
-                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                  :color="visual.value === permissionsUiType ? 'primary' : ''"
-                  :flat="visual.value === permissionsUiType ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-md visual-selection-btn"
-                  @click="updatePermissionsUi(visual.value)"
-                >
-                  {{ visual.label }}</q-btn
-                >
-              </template>
-            </div>
+                {{ visual.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
           </div>
 
           <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
@@ -277,21 +250,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end tw:w-full"
         style="position: sticky; bottom: 0.45rem; z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-        <q-btn
+      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
+        <OButton
           data-test="edit-role-cancel-btn"
-          class="o2-secondary-button"
-          :label="t('alerts.cancel')"
-          no-caps
+          variant="outline"
+          size="sm-action"
           @click="cancelPermissionsUpdate"
-        />
-        <q-btn
+        >
+          {{ t('alerts.cancel') }}
+        </OButton>
+        <OButton
           data-test="edit-role-save-btn"
-          :label="t('alerts.save')"
-          class="o2-primary-button q-ml-md"
-          no-caps
+          variant="primary"
+          size="sm-action"
           @click="saveRole"
-        />
+        >
+          {{ t('alerts.save') }}
+        </OButton>
       </div>
         
       </div>
@@ -302,6 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
 import { defineAsyncComponent, ref, type Ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18n } from "vue-i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
@@ -332,6 +310,7 @@ import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
+import { Shield, Users, Bot, LayoutList, CheckSquare, Table2, Braces } from "lucide-vue-next";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
@@ -404,10 +383,12 @@ const tabs = [
   {
     value: "permissions",
     label: "Permissions",
+    icon: Shield,
   },
   {
     value: "users",
     label: "Users",
+    icon: Users,
   },
 ];
 
@@ -415,6 +396,7 @@ if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
+    icon: Bot,
   });
 }
 
@@ -422,10 +404,12 @@ const permissionDisplayOptions = [
   {
     label: "All",
     value: "all",
+    icon: LayoutList,
   },
   {
     label: "Selected",
     value: "selected",
+    icon: CheckSquare,
   },
 ];
 
@@ -433,10 +417,12 @@ const permissionUiOptions = [
   {
     label: "Table",
     value: "table",
+    icon: Table2,
   },
   {
     label: "JSON",
     value: "json",
+    icon: Braces,
   },
 ];
 

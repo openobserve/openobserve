@@ -67,16 +67,16 @@ describe("isLLMTrace", () => {
     expect(isLLMTrace({ gen_ai_request_model: "gpt-3.5-turbo" })).toBe(true);
   });
 
-  it("returns true for llm_input", () => {
-    expect(isLLMTrace({ llm_input: "hello" })).toBe(true);
+  it("returns true for gen_ai_operation_name", () => {
+    expect(isLLMTrace({ gen_ai_operation_name: "chat" })).toBe(true);
   });
 
-  it("returns true for llm_output", () => {
-    expect(isLLMTrace({ llm_output: "world" })).toBe(true);
+  it("returns true for gen_ai_input_messages", () => {
+    expect(isLLMTrace({ gen_ai_input_messages: "hello" })).toBe(true);
   });
 
-  it("returns true for llm_observation_type", () => {
-    expect(isLLMTrace({ llm_observation_type: "GENERATION" })).toBe(true);
+  it("returns true for gen_ai_output_messages", () => {
+    expect(isLLMTrace({ gen_ai_output_messages: "world" })).toBe(true);
   });
 
   it("returns true for gen_ai_usage_input_tokens", () => {
@@ -87,16 +87,8 @@ describe("isLLMTrace", () => {
     expect(isLLMTrace({ gen_ai_usage_output_tokens: 50 })).toBe(true);
   });
 
-  it("returns true for llm_usage_tokens", () => {
-    expect(isLLMTrace({ llm_usage_tokens: 150 })).toBe(true);
-  });
-
-  it("returns true for legacy llm_provider_name", () => {
-    expect(isLLMTrace({ llm_provider_name: "anthropic" })).toBe(true);
-  });
-
-  it("returns true for legacy llm_usage_details_input", () => {
-    expect(isLLMTrace({ llm_usage_details_input: 200 })).toBe(true);
+  it("returns true for gen_ai_usage_cost", () => {
+    expect(isLLMTrace({ gen_ai_usage_cost: 0.05 })).toBe(true);
   });
 });
 
@@ -116,8 +108,8 @@ describe("parseUsageDetails", () => {
     });
   });
 
-  it("parses plain input/output/total keys", () => {
-    expect(parseUsageDetails({ input: 10, output: 20, total: 30 })).toEqual({
+  it("parses gen_ai usage fields from object", () => {
+    expect(parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20, gen_ai_usage_total_tokens: 30 })).toEqual({
       input: 10,
       output: 20,
       total: 30,
@@ -125,7 +117,7 @@ describe("parseUsageDetails", () => {
   });
 
   it("computes total from input + output when total is absent", () => {
-    expect(parseUsageDetails({ input: 10, output: 20 })).toEqual({
+    expect(parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20 })).toEqual({
       input: 10,
       output: 20,
       total: 30,
@@ -141,18 +133,17 @@ describe("parseUsageDetails", () => {
     expect(result).toEqual({ input: 100, output: 50, total: 150 });
   });
 
-  it("parses legacy llm_usage_details_* keys", () => {
+  it("computes total from input+output when total is absent", () => {
     const result = parseUsageDetails({
-      llm_usage_details_input: 5,
-      llm_usage_details_output: 10,
-      llm_usage_details_total: 15,
+      gen_ai_usage_input_tokens: 100,
+      gen_ai_usage_output_tokens: 50,
     });
-    expect(result).toEqual({ input: 5, output: 10, total: 15 });
+    expect(result).toEqual({ input: 100, output: 50, total: 150 });
   });
 
   it("parses a JSON string", () => {
     const result = parseUsageDetails(
-      JSON.stringify({ input: 7, output: 3, total: 10 }),
+      JSON.stringify({ gen_ai_usage_input_tokens: 7, gen_ai_usage_output_tokens: 3, gen_ai_usage_total_tokens: 10 }),
     );
     expect(result).toEqual({ input: 7, output: 3, total: 10 });
   });
@@ -174,9 +165,9 @@ describe("parseCostDetails", () => {
     expect(parseCostDetails(null)).toEqual({ input: 0, output: 0, total: 0 });
   });
 
-  it("parses plain input/output/total keys", () => {
+  it("parses gen_ai cost fields from object", () => {
     expect(
-      parseCostDetails({ input: 0.001, output: 0.002, total: 0.003 }),
+      parseCostDetails({ gen_ai_usage_cost_input: 0.001, gen_ai_usage_cost_output: 0.002, gen_ai_usage_cost: 0.003 }),
     ).toEqual({
       input: 0.001,
       output: 0.002,
@@ -185,22 +176,13 @@ describe("parseCostDetails", () => {
   });
 
   it("computes total from input + output when total is absent", () => {
-    const result = parseCostDetails({ input: 0.001, output: 0.002 });
+    const result = parseCostDetails({ gen_ai_usage_cost_input: 0.001, gen_ai_usage_cost_output: 0.002 });
     expect(result.total).toBeCloseTo(0.003);
-  });
-
-  it("parses legacy llm_cost_details_* keys", () => {
-    const result = parseCostDetails({
-      llm_cost_details_input: 0.0005,
-      llm_cost_details_output: 0.001,
-      llm_cost_details_total: 0.0015,
-    });
-    expect(result).toEqual({ input: 0.0005, output: 0.001, total: 0.0015 });
   });
 
   it("parses a JSON string", () => {
     const result = parseCostDetails(
-      JSON.stringify({ input: 0.01, output: 0.02, total: 0.03 }),
+      JSON.stringify({ gen_ai_usage_cost_input: 0.01, gen_ai_usage_cost_output: 0.02, gen_ai_usage_cost: 0.03 }),
     );
     expect(result).toEqual({ input: 0.01, output: 0.02, total: 0.03 });
   });
@@ -518,24 +500,24 @@ describe("getQualityScoreColor", () => {
 // getObservationTypeColor
 // ---------------------------------------------------------------------------
 describe("getObservationTypeColor", () => {
-  it("returns 'green' for GENERATION", () => {
-    expect(getObservationTypeColor("GENERATION")).toBe("green");
+  it("returns 'green' for chat", () => {
+    expect(getObservationTypeColor("chat")).toBe("green");
   });
 
-  it("returns 'blue' for EMBEDDING", () => {
-    expect(getObservationTypeColor("EMBEDDING")).toBe("blue");
+  it("returns 'blue' for embeddings", () => {
+    expect(getObservationTypeColor("embeddings")).toBe("blue");
   });
 
-  it("returns 'purple' for AGENT", () => {
-    expect(getObservationTypeColor("AGENT")).toBe("purple");
+  it("returns 'purple' for invoke_agent", () => {
+    expect(getObservationTypeColor("invoke_agent")).toBe("purple");
   });
 
-  it("returns 'orange' for TOOL", () => {
-    expect(getObservationTypeColor("TOOL")).toBe("orange");
+  it("returns 'orange' for execute_tool", () => {
+    expect(getObservationTypeColor("execute_tool")).toBe("orange");
   });
 
-  it("returns 'red' for GUARDRAIL", () => {
-    expect(getObservationTypeColor("GUARDRAIL")).toBe("red");
+  it("returns 'red' for guardrail", () => {
+    expect(getObservationTypeColor("guardrail")).toBe("red");
   });
 
   it("returns 'grey' for unknown types", () => {
@@ -579,21 +561,21 @@ describe("extractLLMData", () => {
   });
 
   it("falls back to 'unknown' for missing provider", () => {
-    const span = { llm_input: "hello" };
+    const span = { gen_ai_input_messages: "hello" };
     const result = extractLLMData(span)!;
     expect(result.provider).toBe("unknown");
   });
 
   it("falls back to 'unknown' for missing model name", () => {
-    const span = { llm_input: "hello" };
+    const span = { gen_ai_input_messages: "hello" };
     const result = extractLLMData(span)!;
     expect(result.modelName).toBe("unknown");
   });
 
-  it("defaults observationType to 'SPAN'", () => {
-    const span = { llm_input: "hello" };
+  it("defaults observationType to 'span'", () => {
+    const span = { gen_ai_input_messages: "hello" };
     const result = extractLLMData(span)!;
-    expect(result.observationType).toBe("SPAN");
+    expect(result.observationType).toBe("span");
   });
 
   it("captures userId and sessionId", () => {

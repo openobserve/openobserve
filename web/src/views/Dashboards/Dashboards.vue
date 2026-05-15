@@ -22,571 +22,575 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
   >
     <!-- searchBar at top -->
-     <div class="tw:w-full tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
+    <div class="tw:w-full tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
       <div class="card-container">
-        <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center">
-            <div class="q-table__title">{{ t("dashboard.header") }}</div>
+        <div
+          class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
+        >
+          <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
-              <div class="flex q-ml-auto tw:ps-2">
-                <q-input
-                  v-model="dynamicQueryModel"
-                  dense
-                  borderless
-                  :placeholder="
-                    searchAcrossFolders
-                      ? t('dashboard.searchAcross')
-                      : t('dashboard.search')
-                  "
-                  data-test="dashboard-search"
-                  :clearable="searchAcrossFolders"
-                  @clear="clearSearchHistory"
-                  class="o2-search-input"
+          <div class="flex q-ml-auto tw:ps-2">
+            <q-input
+              v-model="dynamicQueryModel"
+              dense
+              borderless
+              :placeholder="
+                searchAcrossFolders
+                  ? t('dashboard.searchAcross')
+                  : t('dashboard.search')
+              "
+              data-test="dashboard-search"
+              :clearable="searchAcrossFolders"
+              @clear="clearSearchHistory"
+              class="o2-search-input"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-search-input-dark'
+                  : 'o2-search-input-light'
+              "
+              hide-bottom-space
+            >
+              <template #prepend>
+                <q-icon
+                  class="o2-search-input-icon"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'o2-search-input-dark'
-                      : 'o2-search-input-light'
+                      ? 'o2-search-input-icon-dark'
+                      : 'o2-search-input-icon-light'
                   "
-                hide-bottom-space>
-                  <template #prepend>
-                    <q-icon
-                      class="o2-search-input-icon"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-search-input-icon-dark'
-                          : 'o2-search-input-icon-light'
-                      "
-                      name="search"
-                    />
-                  </template>
-                </q-input>
-              </div>
-              <div class="tw:mb-2">
-                <q-toggle
-                  data-test="dashboard-search-across-folders-toggle"
-                  v-model="searchAcrossFolders"
-                  label="All Folders"
-                  size="lg"
-                  class="q-ml-sm tw:h-[36px] o2-toggle-button-lg"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-toggle-button-lg-dark'
-                      : 'o2-toggle-button-lg-light'
-                  "
+                  name="search"
+                />
+              </template>
+            </q-input>
+          </div>
+          <div class="tw:mb-2">
+            <q-toggle
+              data-test="dashboard-search-across-folders-toggle"
+              v-model="searchAcrossFolders"
+              label="All Folders"
+              size="lg"
+              class="q-ml-sm tw:h-[36px] o2-toggle-button-lg"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'o2-toggle-button-lg-dark'
+                  : 'o2-toggle-button-lg-light'
+              "
+            >
+            </q-toggle>
+            <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
+              {{
+                searchAcrossFolders
+                  ? t("dashboard.searchSelf")
+                  : t("dashboard.searchAll")
+              }}
+            </q-tooltip>
+          </div>
+          <!-- import dashboard button with dropdown -->
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import">
+                {{ t(`dashboard.import`) }}
+                <template #icon-right>
+                  <q-icon name="expand_more" size="xs" />
+                </template>
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="importDashboard"
+              data-test="dashboard-import-custom"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>Custom</span>
+                <span
+                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                  >Import from JSON file or URL</span
                 >
-                </q-toggle>
-                <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-                  {{
-                    searchAcrossFolders
-                      ? t("dashboard.searchSelf")
-                      : t("dashboard.searchAll")
-                  }}
-                </q-tooltip>
               </div>
-              <!-- import dashboard button with dropdown -->
-              <q-btn-dropdown
-                class="q-ml-sm o2-secondary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
-                flat
-                :label="t(`dashboard.import`)"
-                data-test="dashboard-import"
-              >
-                <q-list>
-                  <q-item clickable v-close-popup @click="importDashboard" data-test="dashboard-import-custom">
-                    <q-item-section>
-                      <q-item-label>Custom</q-item-label>
-                      <q-item-label caption>Import from JSON file or URL</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                  <q-item clickable v-close-popup @click="showAddDashboardFromGitHub = true" data-test="dashboard-import-templates">
-                    <q-item-section>
-                      <q-item-label>Templates</q-item-label>
-                      <q-item-label caption>Browse and import from gallery</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-btn-dropdown>
-              <!-- new dashboard button -->
-              <q-btn
-                class="q-ml-sm o2-primary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                no-caps
-                flat
-                data-test="dashboard-new"
-                :label="t(`dashboard.add`)"
-                @click="addDashboard"
-              />
+            </ODropdownItem>
+            <ODropdownItem
+              @select="showAddDashboardFromGitHub = true"
+              data-test="dashboard-import-templates"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>Templates</span>
+                <span
+                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                  >Browse and import from gallery</span
+                >
+              </div>
+            </ODropdownItem>
+          </ODropdown>
+          <!-- new dashboard button -->
+          <OButton
+            class="q-ml-sm tw:h-9"
+            variant="primary"
+            size="sm"
+            data-test="dashboard-new"
+            @click="addDashboard"
+          >
+            {{ t(`dashboard.add`) }}
+          </OButton>
         </div>
       </div>
-     </div>
-     <div 
+    </div>
+    <div
       class="full-width alert-list-table"
       style="height: calc(100vh - 116px)"
-     >
-       <q-splitter
-            v-model="splitterModel"
-            unit="px"
-            :limits="[200, 500]"
-            style="height: calc(100vh - 116px)"
-            data-test="dashboard-splitter"
     >
-      <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="tw:h-full">
-          <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
-          <!-- folder list starts here -->
-          <div
-            class="dashboard-folder-header dashboard-sticky-top "
-            :class="
-              store.state.theme === 'dark'
-                ? 'dashboard-folder-header-dark'
-                : 'dashboard-folder-header-light'
-            "
-          >
-            <div
-              class="text-bold q-px-sm q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2"
-            >
-              {{ t("dashboard.folderLabel") }}
-              <div>
-                <q-btn
-                  class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
+      <q-splitter
+        v-model="splitterModel"
+        unit="px"
+        :limits="[200, 500]"
+        style="height: calc(100vh - 116px)"
+        data-test="dashboard-splitter"
+      >
+        <template v-slot:before>
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full">
+              <div
+                class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
+              >
+                <!-- folder list starts here -->
+                <div
+                  class="dashboard-folder-header dashboard-sticky-top"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'o2-secondary-button-dark'
-                      : 'o2-secondary-button-light'
+                      ? 'dashboard-folder-header-dark'
+                      : 'dashboard-folder-header-light'
                   "
-                  no-caps
-                  flat
-                  @click.stop="addFolder"
-                  data-test="dashboard-new-folder-btn"
-                  title="Add Folder"
                 >
-                  <q-icon name="add" size="xs" />
-                </q-btn>
-              </div>
-            </div>
-            <q-separator class="tw:mb-1 tw:mt-[3px]" size="2px"></q-separator>
-            <!-- Search Input -->
-            <div style="width: 100%" class="flex folder-item q-py-xs">
-              <q-input
-                v-model="folderSearchQuery"
-                dense
-                borderless
-                data-test="folder-search"
-                placeholder="Search Folder"
-                style="width: 100%"
-                clearable
-                class="tw:mx-2 q-px-xs"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-search-input-dark'
-                    : 'o2-search-input-light'
-                "
-               hide-bottom-space>
-                <template #prepend>
-                  <q-icon
-                    class="o2-search-input-icon"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-search-input-icon-dark'
-                        : 'o2-search-input-icon-light'
-                    "
-                    name="search"
-                  />
-                </template>
-              </q-input>
-              <div></div>
-            </div>
-          </div>
-          <div class="dashboards-tabs tw:flex-1 tw:overflow-y-auto">
-            <q-tabs
-              indicator-color="transparent"
-              inline-label
-              vertical
-              v-model="activeFolderId"
-              data-test="dashboards-folder-tabs"
-            >
-              <q-tab
-                v-for="(tab, index) in filteredFolders"
-                :key="tab.folderId"
-                :name="tab.folderId"
-                content-class="tab_content full-width"
-                class="individual-tab"
-                :data-test="`dashboard-folder-tab-${tab.folderId}`"
-              >
-                <div class="folder-item full-width row justify-between no-wrap">
-                  <span class="folder-name text-truncate" :title="tab.name">{{
-                    tab.name
-                  }}</span>
-                  <div class="hover-actions">
-                    <q-btn
-                      v-if="
-                        index ||
-                        (folderSearchQuery?.length > 0 &&
-                          index == 0 &&
-                          tab.folderId.toLowerCase() != 'default')
-                      "
+                  <div
+                    class="text-bold q-px-sm q-py-sm tw:flex tw:items-center tw:justify-between tw:gap-2"
+                  >
+                    {{ t("dashboard.folderLabel") }}
+                    <div>
+                      <OButton
+                        variant="outline"
+                        size="icon"
+                        class="tw:h-7 tw:w-8"
+                        @click.stop="addFolder"
+                        data-test="dashboard-new-folder-btn"
+                        title="Add Folder"
+                      >
+                        <q-icon name="add" size="xs" />
+                      </OButton>
+                    </div>
+                  </div>
+                  <q-separator
+                    class="tw:mb-1 tw:mt-[3px]"
+                    size="2px"
+                  ></q-separator>
+                  <!-- Search Input -->
+                  <div style="width: 100%" class="flex folder-item q-py-xs">
+                    <q-input
+                      v-model="folderSearchQuery"
                       dense
-                      flat
-                      no-caps
-                      icon="more_vert"
-                      style="cursor: pointer; justify-self: end; height: 0.5rem"
-                      size="sm"
-                      data-test="dashboard-more-icon"
+                      borderless
+                      data-test="folder-search"
+                      placeholder="Search Folder"
+                      style="width: 100%"
+                      clearable
+                      class="tw:mx-2 q-px-xs"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-search-input-dark'
+                          : 'o2-search-input-light'
+                      "
+                      hide-bottom-space
                     >
-                      <q-menu>
-                        <q-list dense>
-                          <q-item
-                            v-close-popup
-                            clickable
-                            @click.stop="editFolder(tab.folderId)"
-                            data-test="dashboard-edit-folder-icon"
-                          >
-                            <q-item-section avatar>
-                              <q-icon :name="outlinedEdit" size="xs" />
-                            </q-item-section>
-                            <q-item-section>
-                              <q-item-label>Edit</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                          <q-item
-                            v-close-popup
-                            clickable
-                            @click.stop="showDeleteFolderDialogFn(tab.folderId)"
-                            data-test="dashboard-delete-folder-icon"
-                          >
-                            <q-item-section avatar>
-                              <q-icon :name="outlinedDelete" size="xs" />
-                            </q-item-section>
-                            <q-item-section>
-                              <q-item-label>Delete</q-item-label>
-                            </q-item-section>
-                          </q-item>
-                        </q-list>
-                      </q-menu>
-                    </q-btn>
+                      <template #prepend>
+                        <q-icon
+                          class="o2-search-input-icon"
+                          :class="
+                            store.state.theme === 'dark'
+                              ? 'o2-search-input-icon-dark'
+                              : 'o2-search-input-icon-light'
+                          "
+                          name="search"
+                        />
+                      </template>
+                    </q-input>
+                    <div></div>
                   </div>
                 </div>
-                <q-separator />
-              </q-tab>
-            </q-tabs>
+                <div class="dashboards-tabs tw:flex-1 tw:overflow-y-auto">
+                  <OTabs
+                    orientation="vertical"
+                    v-model="activeFolderId"
+                    data-test="dashboards-folder-tabs"
+                  >
+                    <OTab
+                      v-for="(tab, index) in filteredFolders"
+                      :key="tab.folderId"
+                      :name="tab.folderId"
+                      class="individual-tab"
+                      :data-test="`dashboard-folder-tab-${tab.folderId}`"
+                    >
+                      <div
+                        class="folder-item full-width row justify-between no-wrap tw:group/row"
+                      >
+                        <span
+                          class="folder-name text-truncate"
+                          :title="tab.name"
+                          >{{ tab.name }}</span
+                        >
+                        <div
+                          class="tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible tw:flex tw:items-center tw:absolute tw:right-0 tw:top-1/2 tw:-translate-y-1/2"
+                        >
+                          <ODropdown
+                            v-if="
+                              index ||
+                              (folderSearchQuery?.length > 0 &&
+                                index == 0 &&
+                                tab.folderId.toLowerCase() != 'default')
+                            "
+                            side="bottom"
+                            align="start"
+                          >
+                            <template #trigger>
+                              <OButton
+                                size="icon"
+                                variant="ghost"
+                                class="tw:h-6 tw:w-6"
+                                data-test="dashboard-more-icon"
+                              >
+                                <q-icon name="more_vert" size="xs" />
+                              </OButton>
+                            </template>
+                            <ODropdownItem
+                              @select="editFolder(tab.folderId)"
+                              data-test="dashboard-edit-folder-icon"
+                            >
+                              <template #icon-left>
+                                <q-icon :name="outlinedEdit" size="xs" />
+                              </template>
+                              Edit
+                            </ODropdownItem>
+                            <ODropdownItem
+                              @select="showDeleteFolderDialogFn(tab.folderId)"
+                              data-test="dashboard-delete-folder-icon"
+                            >
+                              <template #icon-left>
+                                <q-icon :name="outlinedDelete" size="xs" />
+                              </template>
+                              Delete
+                            </ODropdownItem>
+                          </ODropdown>
+                        </div>
+                      </div>
+                    </OTab>
+                  </OTabs>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        </div>
-        </div>
-      </template>
-      <template v-slot:after>
+        </template>
+        <template v-slot:after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-          <!-- add dashboard table -->
-          <q-table
-            ref="qTable"
-            :rows="dashboards"
-            :columns="columns"
-            row-key="id"
-            :pagination="pagination"
-            :filter="filterQuery"
-            :filter-method="filterData"
-            v-model:selected="selected"
-            selection="multiple"
-            :loading="loading"
-            @row-click="onRowClick"
-            data-test="dashboard-table"
-            :style="
-              !filterQuery.length && dashboards.length > 0
-                ? 'height: calc(100vh  - var(--navbar-height) - 80px)'
-                : ''
-            "
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          >
-            <!-- if data not available show nodata component -->
-            <template #no-data>
-              <NoData />
-            </template>
-            <!-- we need to handle custom header for the table -->
-            <!-- so we manually added check box and all the columns -->
-            <template v-slot:header="props">
-              <q-tr :props="props">
-                <!-- Adding this block to render the select-all checkbox -->
-                <q-th auto-width>
-                  <q-checkbox
-                    v-model="props.selected"
-                    size="sm"
-                    class="o2-table-checkbox"
-                    @update:model-value="props.select"
-                  />
-                </q-th>
-
-                <!-- Rendering the rest of the columns -->
-                <!-- here passing the classes and style to the columns -->
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                  :class="col.classes"
-                  :style="col.style"
-                >
-                  {{ col.label }}
-                </q-th>
-              </q-tr>
-            </template>
-            <!-- body selection which on click selects the dashboard -->
-            <template #body-selection="scope">
-              <q-checkbox
-                v-model="scope.selected"
-                size="sm"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-table-checkbox-dark'
-                    : 'o2-table-checkbox-light'
+              <!-- add dashboard table -->
+              <q-table
+                ref="qTable"
+                :rows="dashboards"
+                :columns="columns"
+                row-key="id"
+                :pagination="pagination"
+                :filter="filterQuery"
+                :filter-method="filterData"
+                v-model:selected="selected"
+                selection="multiple"
+                :loading="loading"
+                @row-click="onRowClick"
+                data-test="dashboard-table"
+                :style="
+                  !filterQuery.length && dashboards.length > 0
+                    ? 'height: calc(100vh  - var(--navbar-height) - 80px)'
+                    : ''
                 "
-                class="o2-table-checkbox"
-              />
-            </template>
-            <template #body-cell-name="props">
-              <q-td :props="props">
-                <div :title="props.value" class="text-truncate">
-                  {{
-                    props.value && props.value.length > 30
-                      ? props.value.slice(0, 30) + "..."
-                      : props.value
-                  }}
-                  <q-tooltip
-                    v-if="props.value && props.value.length > 30"
-                    class="q-mt-lg tw:w-[300px]"
-                    anchor="top middle"
-                    self="bottom middle"
-                  >
-                    {{ props.value }}
-                  </q-tooltip>
-                </div>
-              </q-td>
-            </template>
-            <template #body-cell-description="props">
-              <q-td :props="props">
-                <div :title="props.value">
-                  {{
-                    props.value && props.value.length > 30
-                      ? props.value.slice(0, 30) + "..."
-                      : props.value
-                  }}
-                </div>
-              </q-td>
-            </template>
-            <template #body-cell-folder="props">
-              <q-td :props="props">
-                <div @click.stop="updateActiveFolderId(props.row.folder_id)">
-                  {{ props.row.folder }}
-                </div>
-              </q-td>
-            </template>
-            <!-- add delete icon in actions column -->
-            <template #body-cell-actions="props">
-              <q-td :props="props">
-                <q-btn
-                  v-if="props.row.actions == 'true'"
-                  :title="t('dashboard.move_to_another_folder')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :icon="outlinedDriveFileMove"
-                  @click.stop="showMoveDashboardPanel(props.row)"
-                  data-test="dashboard-move-to-another-folder"
-                >
-              </q-btn>
-                <q-btn
-                  v-if="props.row.actions == 'true'"
-                  :title="t('dashboard.duplicate')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="content_copy"
-                  @click.stop="
-                    duplicateDashboard(props.row.id, props.row.folder_id)
-                  "
-                  data-test="dashboard-duplicate"
-                >
-              </q-btn>
-                <q-btn
-                  v-if="props.row.actions == 'true'"
-                  :title="t('dashboard.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  :icon="outlinedDelete"
-                  data-test="dashboard-delete"
-                  flat
-                  @click.stop="showDeleteDialogFn(props)"
-                >
-              </q-btn>
-              </q-td>
-            </template>
-            <template #bottom="scope">
-              <div class="bottom-btn tw:h-[48px]">
-                <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md"
-                >
-                  {{ resultTotal }} {{ t("dashboard.header") }}
-                </div>
-                <div class="bottom-btn-dashboard-list">
-                  <q-btn
-                    v-if="selected.length > 0"
-                    data-test="dashboard-list-move-across-folders-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+              >
+                <!-- if data not available show nodata component -->
+                <template #no-data>
+                  <NoData />
+                </template>
+                <!-- we need to handle custom header for the table -->
+                <!-- so we manually added check box and all the columns -->
+                <template v-slot:header="props">
+                  <q-tr :props="props">
+                    <!-- Adding this block to render the select-all checkbox -->
+                    <q-th auto-width>
+                      <q-checkbox
+                        v-model="props.selected"
+                        size="sm"
+                        class="o2-table-checkbox"
+                        @update:model-value="props.select"
+                      />
+                    </q-th>
+
+                    <!-- Rendering the rest of the columns -->
+                    <!-- here passing the classes and style to the columns -->
+                    <q-th
+                      v-for="col in props.cols"
+                      :key="col.name"
+                      :props="props"
+                      :class="col.classes"
+                      :style="col.style"
+                    >
+                      {{ col.label }}
+                    </q-th>
+                  </q-tr>
+                </template>
+                <!-- body selection which on click selects the dashboard -->
+                <template #body-selection="scope">
+                  <q-checkbox
+                    v-model="scope.selected"
+                    size="sm"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
+                        ? 'o2-table-checkbox-dark'
+                        : 'o2-table-checkbox-light'
                     "
-                    @click="moveMultipleDashboards"
+                    class="o2-table-checkbox"
+                  />
+                </template>
+                <template #body-cell-name="props">
+                  <q-td :props="props">
+                    <div :title="props.value" class="text-truncate">
+                      {{
+                        props.value && props.value.length > 30
+                          ? props.value.slice(0, 30) + "..."
+                          : props.value
+                      }}
+                      <q-tooltip
+                        v-if="props.value && props.value.length > 30"
+                        class="q-mt-lg tw:w-[300px]"
+                        anchor="top middle"
+                        self="bottom middle"
+                      >
+                        {{ props.value }}
+                      </q-tooltip>
+                    </div>
+                  </q-td>
+                </template>
+                <template #body-cell-description="props">
+                  <q-td :props="props">
+                    <div :title="props.value">
+                      {{
+                        props.value && props.value.length > 30
+                          ? props.value.slice(0, 30) + "..."
+                          : props.value
+                      }}
+                    </div>
+                  </q-td>
+                </template>
+                <template #body-cell-folder="props">
+                  <q-td :props="props">
+                    <div
+                      @click.stop="updateActiveFolderId(props.row.folder_id)"
+                    >
+                      {{ props.row.folder }}
+                    </div>
+                  </q-td>
+                </template>
+                <!-- add delete icon in actions column -->
+                <template #body-cell-actions="props">
+                  <q-td
+                    :props="props"
+                    class="tw:overflow-visible tw:text-center"
                   >
-                    <q-icon :name="outlinedDriveFileMove" size="16px" />
-                    <span class="tw:ml-2">Move</span>
-                  </q-btn>
-                  <q-btn
-                    v-if="selected.length > 0"
-                    data-test="dashboard-list-export-dashboards-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    @click="multipleExportDashboard"
-                  >
-                    <q-icon name="download" size="16px" />
-                    <span class="tw:ml-2">Export</span>
-                  </q-btn>
-                  <q-btn
-                    v-if="selected.length > 0"
-                    data-test="dashboard-list-delete-dashboards-btn"
-                    class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-secondary-button-dark'
-                        : 'o2-secondary-button-light'
-                    "
-                    @click="openBulkDeleteDialog"
-                  >
-                    <q-icon name="delete" size="16px" />
-                    <span class="tw:ml-2">Delete</span>
-                  </q-btn>
-                </div>
-                <QTablePagination
-                  :scope="scope"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  position="bottom"
-                  @update:changeRecordPerPage="changePagination"
-                  @update:maxRecordToReturn="changeMaxRecordToReturn"
+                    <div
+                      class="tw:flex tw:items-center tw:justify-center tw:gap-1"
+                    >
+                      <OButton
+                        v-if="props.row.actions == 'true'"
+                        :title="t('dashboard.move_to_another_folder')"
+                        size="icon"
+                        variant="ghost"
+                        @click.stop="showMoveDashboardPanel(props.row)"
+                        data-test="dashboard-move-to-another-folder"
+                      >
+                        <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      </OButton>
+                      <OButton
+                        v-if="props.row.actions == 'true'"
+                        :title="t('dashboard.duplicate')"
+                        size="icon"
+                        variant="ghost"
+                        @click.stop="
+                          duplicateDashboard(props.row.id, props.row.folder_id)
+                        "
+                        data-test="dashboard-duplicate"
+                      >
+                        <q-icon name="content_copy" size="16px" />
+                      </OButton>
+                      <OButton
+                        v-if="props.row.actions == 'true'"
+                        :title="t('dashboard.delete')"
+                        size="icon"
+                        variant="ghost"
+                        @click.stop="showDeleteDialogFn(props)"
+                        data-test="dashboard-delete"
+                      >
+                        <q-icon :name="outlinedDelete" size="16px" />
+                      </OButton>
+                    </div>
+                  </q-td>
+                </template>
+                <template #bottom="scope">
+                  <div class="bottom-btn tw:py-2">
+                    <div
+                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md"
+                    >
+                      {{ resultTotal }} {{ t("dashboard.header") }}
+                    </div>
+                    <div class="bottom-btn-dashboard-list">
+                      <OButton
+                        v-if="selected.length > 0"
+                        variant="outline"
+                        size="sm"
+                        class="q-mr-sm tw:h-9"
+                        data-test="dashboard-list-move-across-folders-btn"
+                        @click="moveMultipleDashboards"
+                      >
+                        <template #icon-left>
+                          <q-icon :name="outlinedDriveFileMove" size="16px" />
+                        </template>
+                        Move
+                      </OButton>
+                      <OButton
+                        v-if="selected.length > 0"
+                        variant="outline"
+                        size="sm"
+                        class="q-mr-sm tw:h-9"
+                        data-test="dashboard-list-export-dashboards-btn"
+                        @click="multipleExportDashboard"
+                      >
+                        <template #icon-left>
+                          <q-icon name="download" size="16px" />
+                        </template>
+                        Export
+                      </OButton>
+                      <OButton
+                        v-if="selected.length > 0"
+                        variant="outline"
+                        size="sm"
+                        class="q-mr-sm tw:h-9"
+                        data-test="dashboard-list-delete-dashboards-btn"
+                        @click="openBulkDeleteDialog"
+                      >
+                        <template #icon-left>
+                          <q-icon name="delete" size="16px" />
+                        </template>
+                        Delete
+                      </OButton>
+                    </div>
+                    <QTablePagination
+                      :scope="scope"
+                      :resultTotal="resultTotal"
+                      :perPageOptions="perPageOptions"
+                      position="bottom"
+                      @update:changeRecordPerPage="changePagination"
+                      @update:maxRecordToReturn="changeMaxRecordToReturn"
+                    />
+                  </div>
+                </template>
+              </q-table>
+
+              <!-- add dashboard -->
+              <q-dialog
+                v-model="showAddDashboardDialog"
+                position="right"
+                full-height
+                maximized
+                data-test="dashboard-add-dialog"
+              >
+                <AddDashboard
+                  style="width: 30vw"
+                  @updated="updateDashboardList"
+                  :activeFolderId="activeFolderId"
                 />
-              </div>
-            </template>
-          </q-table>
+              </q-dialog>
 
-          <!-- add dashboard -->
-          <q-dialog
-            v-model="showAddDashboardDialog"
-            position="right"
-            full-height
-            maximized
-            data-test="dashboard-add-dialog"
-          >
-            <AddDashboard
-              style="width: 30vw"
-              @updated="updateDashboardList"
-              :activeFolderId="activeFolderId"
-            />
-          </q-dialog>
+              <!-- add dashboard from GitHub gallery -->
+              <AddDashboardFromGitHub
+                v-model="showAddDashboardFromGitHub"
+                @added="getDashboards"
+              />
 
-          <!-- add dashboard from GitHub gallery -->
-          <AddDashboardFromGitHub
-            v-model="showAddDashboardFromGitHub"
-            @added="getDashboards"
-          />
+              <!-- add/edit folder -->
+              <q-dialog
+                v-model="showAddFolderDialog"
+                position="right"
+                full-height
+                maximized
+                data-test="dashboard-folder-dialog"
+              >
+                <AddFolder
+                  style="width: 30vw"
+                  @update:modelValue="updateFolderList"
+                  :edit-mode="isFolderEditMode"
+                  :folder-id="selectedFolderToEdit ?? 'default'"
+                />
+              </q-dialog>
 
-          <!-- add/edit folder -->
-          <q-dialog
-            v-model="showAddFolderDialog"
-            position="right"
-            full-height
-            maximized
-            data-test="dashboard-folder-dialog"
-          >
-            <AddFolder
-              style="width: 30vw"
-              @update:modelValue="updateFolderList"
-              :edit-mode="isFolderEditMode"
-              :folder-id="selectedFolderToEdit ?? 'default'"
-            />
-          </q-dialog>
+              <!-- move dashboard to another folder -->
+              <q-dialog
+                v-model="showMoveDashboardDialog"
+                position="right"
+                full-height
+                maximized
+                data-test="dashboard-move-to-another-folder-dialog"
+              >
+                <MoveDashboardToAnotherFolder
+                  @updated="handleDashboardMoved"
+                  :dashboard-ids="selectedDashboardIdToMove"
+                  :activeFolderId="activeFolderToMove"
+                />
+              </q-dialog>
 
-          <!-- move dashboard to another folder -->
-          <q-dialog
-            v-model="showMoveDashboardDialog"
-            position="right"
-            full-height
-            maximized
-            data-test="dashboard-move-to-another-folder-dialog"
-          >
-            <MoveDashboardToAnotherFolder
-              @updated="handleDashboardMoved"
-              :dashboard-ids="selectedDashboardIdToMove"
-              :activeFolderId="activeFolderToMove"
-            />
-          </q-dialog>
+              <!-- delete dashboard dialog -->
+              <ConfirmDialog
+                title="Delete dashboard"
+                data-test="dashboard-confirm-dialog"
+                message="Are you sure you want to delete the dashboard?"
+                @update:ok="deleteDashboard"
+                @update:cancel="confirmDeleteDialog = false"
+                v-model="confirmDeleteDialog"
+              />
 
-          <!-- delete dashboard dialog -->
-          <ConfirmDialog
-            title="Delete dashboard"
-            data-test="dashboard-confirm-dialog"
-            message="Are you sure you want to delete the dashboard?"
-            @update:ok="deleteDashboard"
-            @update:cancel="confirmDeleteDialog = false"
-            v-model="confirmDeleteDialog"
-          />
+              <!-- delete folder dialog -->
+              <ConfirmDialog
+                title="Delete Folder"
+                data-test="dashboard-confirm-delete-folder-dialog"
+                message="Are you sure you want to delete this Folder?"
+                @update:ok="deleteFolder"
+                @update:cancel="confirmDeleteFolderDialog = false"
+                v-model="confirmDeleteFolderDialog"
+              />
 
-          <!-- delete folder dialog -->
-          <ConfirmDialog
-            title="Delete Folder"
-            data-test="dashboard-confirm-delete-folder-dialog"
-            message="Are you sure you want to delete this Folder?"
-            @update:ok="deleteFolder"
-            @update:cancel="confirmDeleteFolderDialog = false"
-            v-model="confirmDeleteFolderDialog"
-          />
-
-          <!-- bulk delete dashboards dialog -->
-          <ConfirmDialog
-            title="Delete Dashboards"
-            data-test="dashboard-confirm-bulk-delete-dialog"
-            :message="`Are you sure you want to delete ${selected.length} dashboard(s)?`"
-            @update:ok="bulkDeleteDashboards"
-            @update:cancel="confirmBulkDelete = false"
-            v-model="confirmBulkDelete"
-          />
-        </div>
-        </div>
-      </template>
-    </q-splitter>
-     </div>
+              <!-- bulk delete dashboards dialog -->
+              <ConfirmDialog
+                title="Delete Dashboards"
+                data-test="dashboard-confirm-bulk-delete-dialog"
+                :message="`Are you sure you want to delete ${selected.length} dashboard(s)?`"
+                @update:ok="bulkDeleteDashboards"
+                @update:cancel="confirmBulkDelete = false"
+                v-model="confirmBulkDelete"
+              />
+            </div>
+          </div>
+        </template>
+      </q-splitter>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 // @ts-nocheck
 import {
   computed,
@@ -647,6 +651,11 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 export default defineComponent({
   name: "Dashboards",
   components: {
+    OTabs,
+    OTab,
+    OButton,
+    ODropdown,
+    ODropdownItem,
     AddDashboard,
     AddDashboardFromGitHub,
     QTablePagination,
@@ -690,7 +699,8 @@ export default defineComponent({
       useNotifications();
 
     // Listen for AI assistant dashboard mutations to auto-refresh the list
-    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
+    const { on: onDashboardEvent, off: offDashboardEvent } =
+      useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
@@ -1347,7 +1357,7 @@ export default defineComponent({
         const response = await dashboardService.bulkDelete(
           store.state.selectedOrganization.identifier,
           payload,
-          activeFolderId.value
+          activeFolderId.value,
         );
 
         dismiss();
@@ -1397,7 +1407,10 @@ export default defineComponent({
         console.error("Error deleting dashboards:", error);
 
         // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting dashboards. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting dashboards. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           $q.notify({
             type: "negative",
@@ -1514,15 +1527,13 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .dashboards-tabs {
-  .q-tabs {
+  .o-tabs {
     height: auto !important;
     max-height: none !important;
   }
 
   .individual-tab {
     min-height: 1.5rem;
-    margin-bottom: 6px;
-    border-bottom: 1px lightgray dotted;
   }
   .folder-item {
     display: flex;
@@ -1532,40 +1543,25 @@ export default defineComponent({
     border-radius: 0.25rem;
     transition: background-color 0.3s;
 
-    &:hover {
-      .hover-actions {
-        display: flex;
-      }
-    }
-
     // .folder-name {
     //   white-space: nowrap;
     //   overflow: hidden;
     //   text-overflow: ellipsis;
     // }
-
-    .hover-actions {
-      display: none;
-      align-items: center;
-
-      .q-btn {
-        margin-left: 0.5rem;
-      }
-    }
   }
 
-  .q-tabs {
+  .o-tabs {
     &--vertical {
       margin: 5px;
 
-      .q-tab {
+      .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
         border-radius: 0.5rem;
         text-transform: capitalize;
 
         &__content.tab_content {
-          .q-tab {
+          .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
               font-weight: 600;

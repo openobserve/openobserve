@@ -46,15 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="badge-value">{{ props.error.version }}</span>
         </span>
       </div>
-      <q-btn
-        unelevated
-        no-caps
-        label="Upload Source Maps"
-        icon="cloud_upload"
-        class="o2-primary-button tw:my-2"
-        size="sm"
+      <OButton
+        variant="primary"
+        size="sm-action"
+        class="tw:my-2"
         @click="navigateToUpload"
-      />
+      >
+        <Upload class="tw:size-4 tw:mr-1" />
+        Upload Source Maps
+      </OButton>
     </div>
 
     <!-- Pretty formatted view -->
@@ -242,6 +242,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { Upload } from 'lucide-vue-next';
 import {
   generateCacheKey,
   getCachedTranslation,

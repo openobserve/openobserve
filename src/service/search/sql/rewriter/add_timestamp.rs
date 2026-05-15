@@ -95,4 +95,65 @@ mod tests {
         let expected = "SELECT _timestamp, name, age FROM users";
         assert_eq!(statement.to_string(), expected);
     }
+
+    #[test]
+    fn test_add_timestamp_already_present_unnamed_expr() {
+        let sql = "SELECT _timestamp, name FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddTimestampVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        // Already present → no duplicate
+        assert_eq!(statement.to_string(), "SELECT _timestamp, name FROM users");
+    }
+
+    #[test]
+    fn test_add_timestamp_wildcard_skips_insertion() {
+        let sql = "SELECT * FROM events";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddTimestampVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        // Wildcard → no insertion
+        assert_eq!(statement.to_string(), "SELECT * FROM events");
+    }
+
+    #[test]
+    fn test_add_timestamp_alias_expr_already_present() {
+        // _timestamp as aliased expression — should not insert a second copy
+        let sql = "SELECT _timestamp AS ts, name FROM users";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddTimestampVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        let out = statement.to_string();
+        // _timestamp already present in ExprWithAlias branch → at most one occurrence
+        assert_eq!(out.matches("_timestamp").count(), 1);
+    }
+
+    #[test]
+    fn test_add_timestamp_single_column_gets_timestamp() {
+        let sql = "SELECT level FROM logs";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let mut visitor = AddTimestampVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(statement.to_string(), "SELECT _timestamp, level FROM logs");
+    }
 }

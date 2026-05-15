@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -31,23 +31,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container tw:mb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 15px)">
             <div class="flex tw:h-[calc(100vh-50px)]">
               <div class="full-width" v-if="showManagementTabs">
-                <q-tabs
+                <OTabs
                   class="management-tabs"
                   v-model="settingsTab"
-                  indicator-color="transparent"
-                  inline-label
-                  vertical
+                  orientation="vertical"
                 >
-                <q-route-tab
-                  default
+                <ORouteTab
                   name="queryManagement"
                   :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
                   icon="query_stats"
                   :label="t('settings.queryManagement')"
-                  content-class="tab_content"
                   v-if="config.isEnterprise == 'true' && isMetaOrg"
                 />
-                <q-route-tab
+                <ORouteTab
                   v-if="config.isEnterprise == 'true' && isMetaOrg"
                   data-test="nodes-tab"
                   name="nodes"
@@ -59,25 +55,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   icon="hub"
                   :label="t('settings.nodes')"
-                  content-class="tab_content"
                 />
-                <q-route-tab
+                <ORouteTab
                   name="general"
                   :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  content-class="tab_content"
-                  :icon="outlinedSettings"
+                  icon="settings"
                   :label="t('settings.generalLabel')"
                 >
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   name="organization"
                   :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  content-class="tab_content"
                   icon="business"
                   :label="t('settings.orgLabel')"
                 >
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   v-if="config.isEnterprise == 'true' && isMetaOrg"
                   data-test="domain-management-tab"
                   name="domain_management"
@@ -89,9 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   icon="domain"
                   :label="t('settings.ssoDomainRestrictions')"
-                  content-class="tab_content"
                 />
-                <q-route-tab
+                <ORouteTab
                   data-test="alert-destinations-tab"
                   name="alert_destinations"
                   :to="{
@@ -100,12 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  content-class="tab_content"
                   icon="location_on"
                   :label="t('alert_destinations.header')"
                 >
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   v-if="config.isEnterprise == 'true'"
                   data-test="pipeline-destinations-tab"
                   name="pipeline_destinations"
@@ -115,12 +106,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  content-class="tab_content"
                    icon="person_pin_circle"
                    :label="t('pipeline_destinations.header')"
                 >
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
+                  v-if="config.isEnterprise == 'true' && (config.isCloud != 'true' || store.state.organizationData.organizationSettings.org_storage_enabled === true)"
+                  data-test="storage-settings-tab"
+                  name="storageSettings"
+                  :to="{
+                    name: 'storageSettings',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  content-class="tab_content"
+                  icon="cloud"
+                  :label="t('storage_settings.tabLabel')"
+                >
+                </ORouteTab>
+                <ORouteTab
                   data-test="alert-templates-tab"
                   name="templates"
                   :to="{
@@ -129,12 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  content-class="tab_content"
                   icon="description"
                   :label="t('alert_templates.header')"
                 >
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   v-if="store.state.zoConfig.model_pricing_enabled"
                   data-test="model-pricing-tab"
                   name="model_pricing"
@@ -148,8 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="paid"
                   :label="t('settings.llmModelPricing')"
                 >
-                </q-route-tab>
-                <q-route-tab
+                </ORouteTab>
+                <ORouteTab
                   v-if="config.isEnterprise == 'true'"
                   data-test="management-cipher-key-tab"
                   name="cipher-keys"
@@ -159,12 +163,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  content-class="tab_content"
                   icon="key"
                   :label="t('settings.cipherKeys')"
                 >
-                </q-route-tab>
-                <!-- <q-route-tab
+                </ORouteTab>
+                <!-- <ORouteTab
                   v-if="config.isEnterprise == 'true'"
                   data-test="ai-toolsets-tab"
                   name="ai_toolsets"
@@ -174,12 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  content-class="tab_content"
                   icon="smart_toy"
                   :label="t('settings.aiToolsets')"
                 >
-                </q-route-tab> -->
-                <q-route-tab
+                </ORouteTab> -->
+                <ORouteTab
                     v-if="config.isEnterprise == 'true' && isMetaOrg"
                     data-test="license-tab"
                     name="license"
@@ -191,9 +193,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }"
                     icon="card_membership"
                     :label="t('settings.license')"
-                    content-class="tab_content"
                   />
-                <q-route-tab
+                <ORouteTab
                   v-if="config.isCloud == 'true' && isMetaOrg"
                   data-test="organization-management-tab"
                   name="organization_management"
@@ -205,9 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   icon="lan"
                   :label="t('settings.organizationManagement')"
-                  content-class="tab_content"
                 />
-                <q-route-tab
+                <ORouteTab
                   v-if="config.isEnterprise == 'true'"
                   data-test="regex-patterns-tab"
                   name="regex_patterns"
@@ -217,7 +217,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  content-class="tab_content"
                 >
                 <div class="tw:flex tw:items-center tw:w-full">
                   <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
@@ -225,8 +224,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw:text-white' : 'tw:text-black'"
                   >{{ t('regex_patterns.title') }}</span>
                 </div>
-              </q-route-tab>
-                <q-route-tab
+              </ORouteTab>
+                <ORouteTab
                   v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
                   data-test="correlation-settings-tab"
                   name="correlation_settings"
@@ -238,26 +237,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                   icon="group_work"
                   :label="t('settings.correlationSettings')"
-                  content-class="tab_content"
                 />
-                </q-tabs>
+                </OTabs>
               </div>
             </div>
           </div>
         </div>
       </template>
       <template #separator>
-          <q-btn
+          <OButton
             data-test="logs-search-field-list-collapse-btn-management"
-            :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
+            variant="sidebar-button"
+            size="sidebar-button"
             :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
             :class="showManagementTabs ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
             @click="controlManagementTabs"
-          />
+          >
+            <template #icon-left>
+              <q-icon :name="showManagementTabs ? 'chevron_left' : 'chevron_right'" />
+            </template>
+          </OButton>
       </template>
 
       <template v-slot:after>
@@ -275,6 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 // @ts-ignore
 import {
   defineComponent,
@@ -296,13 +298,34 @@ import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 export default defineComponent({
   name: "AppSettings",
   components: {
+    OTabs,
+    ORouteTab,
+    OButton,
   },
   setup() {
     const { t } = useI18n();
     const store = useStore();
     const q = useQuasar();
     const router: any = useRouter();
-    const settingsTab = ref("general");
+    const routeToSettingsTab: Record<string, string> = {
+      general:               "general",
+      organization:          "organization",
+      nodes:                 "nodes",
+      queryManagement:       "queryManagement",
+      domainManagement:      "domain_management",
+      alertDestinations:     "alert_destinations",
+      pipelineDestinations:  "pipeline_destinations",
+      alertTemplates:        "templates",
+      modelPricing:          "model_pricing",
+      cipherKeys:            "cipher-keys",
+      license:               "license",
+      orgnizationManagement: "organization_management",
+      regexPatterns:         "regex_patterns",
+      correlationSettings:   "correlation_settings",
+    };
+    const settingsTab = ref(
+      routeToSettingsTab[router.currentRoute.value.name as string] ?? "general"
+    );
     const { isMetaOrg } = useIsMetaOrg();
     const splitterModel = ref(250);
     const storePreviousStoreModel  = ref(250);

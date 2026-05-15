@@ -340,11 +340,11 @@ pub async fn get_latest_traces(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as llm_usage_details_input, \
-            sum(llm_usage_tokens_output) as llm_usage_details_output, \
-            sum(llm_usage_tokens_total) as llm_usage_details_total, \
-            sum(llm_usage_cost_total) as llm_cost_details_total, \
-            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
@@ -476,19 +476,19 @@ pub async fn get_latest_traces(
                 spans: [0, 0],
                 service_name: Vec::new(),
                 first_event: serde_json::Value::Null,
-                llm_usage_tokens_input: json::get_int_value(
-                    item.get("llm_usage_details_input").unwrap_or_default(),
+                gen_ai_usage_input_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_input").unwrap_or_default(),
                 ),
-                llm_usage_tokens_output: json::get_int_value(
-                    item.get("llm_usage_details_output").unwrap_or_default(),
+                gen_ai_usage_output_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_output").unwrap_or_default(),
                 ),
-                llm_usage_tokens_total: json::get_int_value(
-                    item.get("llm_usage_details_total").unwrap_or_default(),
+                gen_ai_usage_total_tokens: json::get_int_value(
+                    item.get("gen_ai_usage_details_total").unwrap_or_default(),
                 ),
-                llm_usage_cost_total: json::get_float_value(
-                    item.get("llm_cost_details_total").unwrap_or_default(),
+                gen_ai_usage_cost: json::get_float_value(
+                    item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
-                llm_input: item.get("llm_input").cloned(),
+                gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
             },
         );
     }
@@ -1096,11 +1096,11 @@ async fn process_latest_traces_stream(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            sum(llm_usage_tokens_input) as llm_usage_details_input, \
-            sum(llm_usage_tokens_output) as llm_usage_details_output, \
-            sum(llm_usage_tokens_total) as llm_usage_details_total, \
-            sum(llm_usage_cost_total) as llm_cost_details_total, \
-            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as llm_input \
+            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
@@ -1193,11 +1193,25 @@ async fn process_latest_traces_stream(
     // Partitions from search_partition are already in DESC order (newest-first) by default,
     // since the partition SQL has no ORDER BY and the default is OrderBy::Desc.
     let partitions_desc = if sql_order_expr == "zo_sql_timestamp DESC" {
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=DESC",
+            partitions.len()
+        );
         partitions
     } else if sql_order_expr == "zo_sql_timestamp ASC" {
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] using {} time partitions, order=ASC",
+            partitions.len()
+        );
         partitions.into_iter().rev().collect::<Vec<_>>()
     } else {
         // order by other fields can't be multiple partitions
+        log::info!(
+            "[TRACES_STREAM trace_id {trace_id}] sort_by non-timestamp ({sql_order_expr}), \
+            forcing single partition [{}, {}]",
+            partition_req.start_time,
+            partition_req.end_time,
+        );
         vec![[partition_req.start_time, partition_req.end_time]]
     };
 
@@ -1374,19 +1388,19 @@ async fn process_latest_traces_stream(
                     spans: [0, 0],
                     service_name: Vec::new(),
                     first_event: serde_json::Value::Null,
-                    llm_usage_tokens_input: json::get_int_value(
-                        item.get("llm_usage_details_input").unwrap_or_default(),
+                    gen_ai_usage_input_tokens: json::get_int_value(
+                        item.get("gen_ai_usage_details_input").unwrap_or_default(),
                     ),
-                    llm_usage_tokens_output: json::get_int_value(
-                        item.get("llm_usage_details_output").unwrap_or_default(),
+                    gen_ai_usage_output_tokens: json::get_int_value(
+                        item.get("gen_ai_usage_details_output").unwrap_or_default(),
                     ),
-                    llm_usage_tokens_total: json::get_int_value(
-                        item.get("llm_usage_details_total").unwrap_or_default(),
+                    gen_ai_usage_total_tokens: json::get_int_value(
+                        item.get("gen_ai_usage_details_total").unwrap_or_default(),
                     ),
-                    llm_usage_cost_total: json::get_float_value(
-                        item.get("llm_cost_details_total").unwrap_or_default(),
+                    gen_ai_usage_cost: json::get_float_value(
+                        item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                     ),
-                    llm_input: item.get("llm_input").cloned(),
+                    gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
                 },
             );
         }
@@ -1702,11 +1716,11 @@ struct TraceResponseItem {
     spans: [u16; 2],
     service_name: Vec<TraceServiceNameItem>,
     first_event: serde_json::Value,
-    llm_usage_tokens_input: i64,
-    llm_usage_tokens_output: i64,
-    llm_usage_tokens_total: i64,
-    llm_usage_cost_total: f64,
-    llm_input: Option<serde_json::Value>,
+    gen_ai_usage_input_tokens: i64,
+    gen_ai_usage_output_tokens: i64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
+    gen_ai_input_messages: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -1714,4 +1728,29 @@ struct TraceServiceNameItem {
     service_name: String,
     count: u16,
     duration: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trace_service_name_item_default() {
+        let item = TraceServiceNameItem::default();
+        assert_eq!(item.service_name, "");
+        assert_eq!(item.count, 0);
+        assert_eq!(item.duration, 0);
+    }
+
+    #[test]
+    fn test_trace_service_name_item_fields() {
+        let item = TraceServiceNameItem {
+            service_name: "my-service".to_string(),
+            count: 42,
+            duration: 1000,
+        };
+        assert_eq!(item.service_name, "my-service");
+        assert_eq!(item.count, 42);
+        assert_eq!(item.duration, 1000);
+    }
 }

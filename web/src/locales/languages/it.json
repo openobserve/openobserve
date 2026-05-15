@@ -123,7 +123,11 @@
     "create": "Crea",
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
-    "updated_at": "Aggiornato a"
+    "updated_at": "Aggiornato a",
+    "error": "Errore",
+    "db": "Banca dati",
+    "discardChanges": "Ignora le modifiche",
+    "unsavedChanges": "Modifiche non salvate"
   },
   "search": {
     "selectIndex": "Seleziona Stream First",
@@ -390,7 +394,9 @@
     "autoRunEnabled": "Esecuzione automatica abilitata",
     "selectStreamFirst": "Seleziona prima uno stream",
     "traces": "Tracce",
-    "switchToLogs": "clicca per tornare a Logs"
+    "switchToLogs": "clicca per tornare a Logs",
+    "patternNoValuesAvailable": "Nessun valore disponibile",
+    "selectLogStream": "Seleziona lo stream dei log"
   },
   "menu": {
     "home": "Home",
@@ -1125,7 +1131,8 @@
     "nginx": "Nginx",
     "apache": "Apache",
     "iis": "IIS",
-    "pubsub": "Registri Pub/Sub"
+    "pubsub": "Registri Pub/Sub",
+    "aiLabel": "Integrazioni AI"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2234,6 +2241,8 @@
     "importedFromAnomalyPattern": "Avviso precompilato da un modello di registro anomalo: rivedi le impostazioni di urgenza",
     "additional_settings": "Impostazioni aggiuntive",
     "alertNamePlaceholder": "Nome dell'avviso",
+    "nameRequired": "Il nome dell'avviso è obbligatorio.",
+    "nameNoSpecialChars": "Il nome dell'avviso non può contenere ':', '#', '?', '&', '%', virgolette o spazi. Usare invece i trattini bassi (_).",
     "anomalyNamePlaceholder": "Nome dell'anomalia",
     "folder": "Cartella",
     "selectStreamTypeFirst": "Seleziona prima un tipo di stream",
@@ -2280,7 +2289,8 @@
       "addNewDestination": "Aggiungi nuova destinazione",
       "destinationRequired": "È richiesta almeno una destinazione!",
       "disabledNotificationsInfo": "Il rilevamento delle anomalie verrà comunque eseguito e scriverà i risultati nel flusso _anomalies. Abilita le notifiche per ricevere avvisi quando vengono rilevate anomalie."
-    }
+    },
+    "anomalyName": "Nome dell'anomalia"
   },
   "alert_templates": {
     "header": "Modelli",
@@ -2889,7 +2899,52 @@
       "multiStepAgent": "Agente in più fasi"
     },
     "noLogsAvailableForService": "Nessun registro disponibile per questo servizio",
-    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo."
+    "spansTruncatedWarning": "Mostra {count} di {total} intervalli: la traccia potrebbe essere incompleta. Restringi l'intervallo di tempo o contatta l'amministratore per aumentare il limite di intervallo.",
+    "servicesCatalog": {
+      "tabLabel": "Catalogo dei servizi",
+      "title": "Catalogo dei servizi",
+      "filterPlaceholder": "Filtra per nome del servizio...",
+      "noServicesFound": "Nessun servizio trovato nell'intervallo di tempo selezionato.",
+      "loading": "Caricamento dei servizi...",
+      "columns": {
+        "serviceName": "Servizio",
+        "status": "Status",
+        "requests": "Richieste",
+        "errorRate": "Tasso di errore",
+        "errors": "Errori",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Latenza media",
+        "lastSeen": "Visto l'ultima volta",
+        "operations": "Operazioni"
+      },
+      "status": {
+        "healthy": "Salutare",
+        "warning": "Avvertenza",
+        "degraded": "Degradato"
+      },
+      "viewTraces": "Visualizza tracce",
+      "exportCsv": "Esporta CSV",
+      "justNow": "Proprio ora",
+      "minutesAgo": "{n} m fa",
+      "hoursAgo": "{n} h fa",
+      "daysAgo": "{n} d fa"
+    },
+    "noErrorPresent": "Nessun errore presente per questo intervallo",
+    "httpStatusCode": "Codice di stato HTTP",
+    "grpcStatusCode": "Codice di stato gRPC",
+    "dbResponseStatusCode": "Codice di stato della risposta DB",
+    "processExitCode": "Codice di uscita del processo",
+    "exceptionsWithCount": "Eccezioni ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Messaggio:",
+    "escapedLabel": "Fuggito:",
+    "stacktraceLabel": "Trace dello stack:",
+    "copyStacktrace": "Copia stacktrace",
+    "noStacktraceAvailable": "Nessuno stacktrace disponibile",
+    "stacktraceCopied": "Stacktrace copiato negli appunti",
+    "stacktraceCopyFailed": "Copia dello stacktrace non riuscita"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3291,7 +3346,9 @@
     "noMetricsDescription": "Nessuna metrica trovata per questa correlazione nell'intervallo di tempo selezionato.",
     "errorRetrievingTraces": "Si è verificato un errore durante il recupero delle tracce.",
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
-    "noDataFound": "Nessun dato trovato"
+    "noDataFound": "Nessun dato trovato",
+    "isWorkloadType": "Identificatore del servizio",
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -3654,5 +3711,52 @@
     "clearAll": "Cancella tutto",
     "clearAllTitle": "Cancella tutte le chat",
     "clearAllMessage": "Ciò eliminerà definitivamente tutta la cronologia chat. Questa azione non può essere annullata."
+  },
+  "storage_settings": {
+    "tabLabel": "Storage dell'organizzazione",
+    "title": "Storage dell'organizzazione",
+    "notEnabled": "l'archiviazione dell'organizzazione non è abilitata per questa organizzazione",
+    "notConfigured": "configurare un provider di archiviazione personalizzato per i dati di questa organizzazione",
+    "configured": "disposto",
+    "heroHeadline": "Porta il tuo spazio di archiviazione a",
+    "heroSub": "Connetti il tuo bucket cloud e i dati rimangono nella tua infrastruttura: pieno controllo, zero vincoli.",
+    "configureStorage": "Configurazione dello storage",
+    "supportedProviders": "Provider supportati",
+    "noStorageConfigured": "Nessuno spazio di archiviazione configurato",
+    "routeDataDesc": "Indirizza i dati di questa organizzazione a un bucket dedicato, indipendentemente dalle altre organizzazioni e dalle impostazioni predefinite globali.",
+    "perOrgIsolation": "Isolamento per organizzazione",
+    "appliesImmediately": "Si applica immediatamente ai nuovi dati",
+    "usesOrgCredentials": "Utilizza credenziali con ambito di organizzazione",
+    "updateStorage": "Aggiorna spazio di archiviazione",
+    "active": "attivo",
+    "bucketName": "nome del secchio",
+    "region": "regione",
+    "serverUrl": "url del server",
+    "accessKey": "chiave di accesso",
+    "secretKey": "chiave segreta",
+    "roleArn": "filato di ruolo",
+    "createdAt": "creato in",
+    "updatedAt": "aggiornato su",
+    "featureOwnDataTitle": "Gestisci i tuoi dati dall'inizio alla fine",
+    "featureOwnDataDesc": "Archivia i dati acquisiti direttamente nel tuo bucket e mantieni il controllo completo di chi può accedervi.",
+    "featureSecureTitle": "Sicuro e conforme",
+    "featureSecureDesc": "Chiavi di accesso granulari, i tuoi dati sensibili rimangono nella tua infrastruttura.",
+    "goBack": "Torna indietro",
+    "newStorageConfiguration": "Nuova configurazione di storage",
+    "selectProviderDesc": "seleziona un provider di cloud storage per archiviare i dati di questa organizzazione.",
+    "bucketNameRequired": "Il nome del bucket è obbligatorio",
+    "accessKeyRequired": "La chiave di accesso è obbligatoria",
+    "secretKeyRequired": "È richiesta la chiave segreta",
+    "serverURLRequired": "L'URL del server è obbligatorio",
+    "regionRequired": "La regione è obbligatoria",
+    "roleARNRequired": "Il ruolo ARN è obbligatorio",
+    "back": "Indietro",
+    "continue": "Continua",
+    "save": "Salva",
+    "update": "Aggiornamento",
+    "awsStsCloudInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. È necessario aggiungere l'account Openobserve AWS come tipo di entità attendibile per questo ruolo nella console AWS. Contatta il team di Openobserve per ottenere le informazioni sull'account o per ulteriore assistenza nella configurazione.",
+    "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo.",
+    "externalIdRequired": "È richiesto un ID esterno",
+    "storageAccountRequired": "Il nome dell'account di archiviazione è obbligatorio"
   }
 }

@@ -204,3 +204,67 @@ pub async fn exists(id: &str) -> Result<bool, errors::Error> {
 
     Ok(record.is_some())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_model() -> Model {
+        Model {
+            id: "tmpl-1".to_string(),
+            org_id: "myorg".to_string(),
+            response_type: "json".to_string(),
+            name: "test_template".to_string(),
+            description: Some("A test template".to_string()),
+            content: "Hello {{name}}".to_string(),
+            dimensions: serde_json::json!(["accuracy", "relevance"]),
+            version: 2,
+            is_active: true,
+            created_by: Some("admin".to_string()),
+            created_at: 1000,
+            updated_by: None,
+            updated_at: 2000,
+        }
+    }
+
+    #[test]
+    fn test_eval_template_from_model_fields() {
+        let model = make_model();
+        let et = EvalTemplate::from(model);
+        assert_eq!(et.id, "tmpl-1");
+        assert_eq!(et.org_id, "myorg");
+        assert_eq!(et.response_type, "json");
+        assert_eq!(et.name, "test_template");
+        assert_eq!(et.version, 2);
+        assert!(et.is_active);
+        assert_eq!(et.created_at, 1000);
+        assert_eq!(et.updated_at, 2000);
+    }
+
+    #[test]
+    fn test_eval_template_dimensions_deserialized() {
+        let model = make_model();
+        let et = EvalTemplate::from(model);
+        assert_eq!(et.dimensions, vec!["accuracy", "relevance"]);
+    }
+
+    #[test]
+    fn test_eval_template_invalid_dimensions_defaults_to_empty() {
+        let mut model = make_model();
+        model.dimensions = serde_json::json!(42);
+        let et = EvalTemplate::from(model);
+        assert!(et.dimensions.is_empty());
+    }
+
+    #[test]
+    fn test_eval_template_optional_fields() {
+        let mut model = make_model();
+        model.description = None;
+        model.created_by = None;
+        model.updated_by = Some("editor".to_string());
+        let et = EvalTemplate::from(model);
+        assert!(et.description.is_none());
+        assert!(et.created_by.is_none());
+        assert_eq!(et.updated_by.as_deref(), Some("editor"));
+    }
+}

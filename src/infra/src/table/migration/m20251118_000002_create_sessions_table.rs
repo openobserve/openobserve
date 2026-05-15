@@ -69,3 +69,22 @@ pub(super) enum Sessions {
     CreatedAt,
     UpdatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_sessions() {
+        let sql = create_sessions_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("sessions"));
+    }
+
+    #[test]
+    fn test_create_table_if_not_exists() {
+        let sql = create_sessions_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("IF NOT EXISTS"));
+    }
+}

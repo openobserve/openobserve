@@ -135,26 +135,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item>
               </template>
             </q-select>
-            <q-btn
-              icon="refresh"
-              class="iconHoverBtn q-ml-xs"
-              :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-              padding="xs"
-              unelevated
-              size="sm"
-              round
-              flat
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              class="q-ml-xs"
               :title="t('alerts.alertSettings.refreshDestinations')"
-              style="min-width: auto"
               @click="$emit('refresh:destinations')"
-            />
-            <q-btn
-              :label="t('alerts.anomaly.addNewDestination')"
-              class="o2-secondary-button q-ml-sm"
-              no-caps
-              size="sm"
+            >
+              <RefreshCw class="tw:size-4" />
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              class="q-ml-sm"
               @click="openAddDestination"
-            />
+            >
+              {{ t('alerts.anomaly.addNewDestination') }}
+            </OButton>
           </div>
           <div
             v-if="
@@ -188,9 +185,12 @@ import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import OButton from '@/lib/core/Button/OButton.vue';
+import { RefreshCw } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyAlerting",
+  components: { OButton, RefreshCw },
 
   props: {
     config: {

@@ -95,7 +95,7 @@ describe("Recommended", () => {
       },
     });
 
-    const tabs = wrapper.findComponent({ name: "QTabs" });
+    const tabs = wrapper.findComponent({ name: "OTabs" });
     expect(tabs.exists()).toBe(true);
   });
 
@@ -109,8 +109,8 @@ describe("Recommended", () => {
       },
     });
 
-    const tabs = wrapper.findComponent({ name: "QTabs" });
-    expect(tabs.props("vertical")).toBe(true);
+    const tabs = wrapper.findComponent({ name: "OTabs" });
+    expect(tabs.props("orientation")).toBe("vertical");
   });
 
   it("should render router-view for content", () => {

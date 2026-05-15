@@ -14,3 +14,19 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            org_id: "default".to_string(),
+            incident_id: "inc-1".to_string(),
+            events: serde_json::json!([{"type": "alert"}]),
+        };
+        assert_eq!(m.org_id, "default");
+        assert_eq!(m.incident_id, "inc-1");
+    }
+}

@@ -44,24 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <div class="error-404-actions">
-        <q-btn
+        <OButton
           data-test="error-404-go-home-btn"
-          unelevated
-          no-caps
-          color="primary"
-          :label="t('common.goHome')"
+          variant="primary"
+          size="sm-action"
           to="/"
-          class="error-404-home-btn"
-        />
-        <q-btn
+        >{{ t('common.goHome') }}</OButton>
+        <OButton
           data-test="error-404-go-back-btn"
-          flat
-          no-caps
-          color="primary"
-          :label="t('common.goBack')"
-          class="error-404-back-btn"
+          variant="outline"
+          size="sm-action"
           @click="goBack"
-        />
+        >{{ t('common.goBack') }}</OButton>
       </div>
 
       <p class="error-404-redirect">
@@ -75,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const { t } = useI18n();
 const router = useRouter();

@@ -123,7 +123,11 @@
     "version": "Versión",
     "create": "Crear",
     "resources": "Recursos",
-    "updated_at": "Actualizado en"
+    "updated_at": "Actualizado en",
+    "error": "Error",
+    "db": "Base de datos",
+    "discardChanges": "Descartar cambios",
+    "unsavedChanges": "Cambios no guardados"
   },
   "search": {
     "selectIndex": "Selecciona el índice primero",
@@ -390,7 +394,9 @@
     "autoRunEnabled": "Ejecución automática habilitada",
     "selectStreamFirst": "Selecciona primero una transmisión",
     "traces": "Huellas",
-    "switchToLogs": "haga clic para volver a Registros"
+    "switchToLogs": "haga clic para volver a Registros",
+    "patternNoValuesAvailable": "No hay valores disponibles",
+    "selectLogStream": "Seleccione la secuencia de registros"
   },
   "menu": {
     "home": "Inicio",
@@ -1125,7 +1131,8 @@
     "nginx": "Nginx",
     "apache": "apache",
     "iis": "IIS",
-    "pubsub": "Registros de Pub/Sub"
+    "pubsub": "Registros de Pub/Sub",
+    "aiLabel": "Integraciones de IA"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -2236,6 +2243,8 @@
     "editJson": "Editar alerta JSON",
     "additional_settings": "Ajustes adicionales",
     "alertNamePlaceholder": "Nombre de alerta",
+    "nameRequired": "El nombre de la alerta es obligatorio.",
+    "nameNoSpecialChars": "El nombre de la alerta no puede contener ':', '#', '?', '&', '%', comillas ni espacios. Use guiones bajos (_) en su lugar.",
     "anomalyNamePlaceholder": "Nombre de la anomalía",
     "folder": "Carpeta",
     "selectStreamTypeFirst": "Selecciona primero un tipo de transmisión",
@@ -2282,7 +2291,8 @@
       "addNewDestination": "Agregar nuevo destino",
       "destinationRequired": "¡Se requiere al menos un destino!",
       "disabledNotificationsInfo": "La detección de anomalías seguirá ejecutándose y escribirá los resultados en la secuencia _anomalies. Habilite las notificaciones para recibir alertas cuando se detecten anomalías."
-    }
+    },
+    "anomalyName": "Nombre de la anomalía"
   },
   "alert_templates": {
     "header": "Plantillas",
@@ -2878,7 +2888,52 @@
       "multiStepAgent": "Agente de varios pasos"
     },
     "noLogsAvailableForService": "No hay registros disponibles para este servicio",
-    "spansTruncatedWarning": "Se muestran {count} de intervalos de {total}; es posible que el rastreo esté incompleto. Reduzca el intervalo de tiempo o póngase en contacto con su administrador para aumentar el límite de intervalo."
+    "spansTruncatedWarning": "Se muestran {count} de intervalos de {total}; es posible que el rastreo esté incompleto. Reduzca el intervalo de tiempo o póngase en contacto con su administrador para aumentar el límite de intervalo.",
+    "servicesCatalog": {
+      "tabLabel": "Catálogo de servicios",
+      "title": "Catálogo de servicios",
+      "filterPlaceholder": "Filtrar por nombre de servicio...",
+      "noServicesFound": "No se ha encontrado ningún servicio en el intervalo de tiempo seleccionado.",
+      "loading": "Cargando servicios...",
+      "columns": {
+        "serviceName": "Servicio",
+        "status": "Estado",
+        "requests": "Solicitudes",
+        "errorRate": "Tasa de error",
+        "errors": "Errores",
+        "p50Latency": "P50",
+        "p95Latency": "P95",
+        "p99Latency": "P99",
+        "avgLatency": "Latencia promedio",
+        "lastSeen": "Visto por última vez",
+        "operations": "Operaciones"
+      },
+      "status": {
+        "healthy": "Saludable",
+        "warning": "Advertencia",
+        "degraded": "Degradado"
+      },
+      "viewTraces": "Ver trazas",
+      "exportCsv": "Exportar CSV",
+      "justNow": "Justo ahora",
+      "minutesAgo": "Hace {n} m",
+      "hoursAgo": "Hace {n} h",
+      "daysAgo": "Hace {n} d"
+    },
+    "noErrorPresent": "No hay ningún error en este intervalo",
+    "httpStatusCode": "Código de estado HTTP",
+    "grpcStatusCode": "Código de estado de gRPC",
+    "dbResponseStatusCode": "Código de estado de respuesta de base de datos",
+    "processExitCode": "Código de salida del proceso",
+    "exceptionsWithCount": "Excepciones ({count})",
+    "typeLabel": "Tipo:",
+    "messageLabel": "Mensaje:",
+    "escapedLabel": "Se escapó:",
+    "stacktraceLabel": "Stacktrace:",
+    "copyStacktrace": "Copiar stacktrace",
+    "noStacktraceAvailable": "No hay stacktrace disponible",
+    "stacktraceCopied": "Stacktrace copiado al portapapeles",
+    "stacktraceCopyFailed": "No se pudo copiar stacktrace"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3280,7 +3335,9 @@
     "noMetricsDescription": "No se han encontrado métricas para esta correlación en el intervalo de tiempo seleccionado.",
     "errorRetrievingTraces": "Se ha producido un error al recuperar los rastros.",
     "serviceGroupProtected": "No se puede eliminar el grupo de servicios. Solo puede modificar los campos mapeados.",
-    "noDataFound": "No se han encontrado datos"
+    "noDataFound": "No se han encontrado datos",
+    "isWorkloadType": "Identificador de servicio",
+    "isWorkloadTypeTooltip": "Cuando está habilitado, este grupo se usa para identificar de forma exclusiva un servicio (por ejemplo, un clúster, un espacio de nombres o una implementación). Deshabilite para los grupos que describen las operaciones a través de un servicio, como el método HTTP o el nombre de la base de datos."
   },
   "sreChat": {
     "emptyMessage": "Pregúntame cualquier cosa sobre tus alertas e incidencias",
@@ -3643,5 +3700,52 @@
     "clearAll": "Borrar todo",
     "clearAllTitle": "Borrar todos los chats",
     "clearAllMessage": "Esto borrará permanentemente todo el historial de chat. Esta acción no se puede deshacer."
+  },
+  "storage_settings": {
+    "tabLabel": "Almacenamiento organizacional",
+    "title": "Almacenamiento organizacional",
+    "notEnabled": "el almacenamiento de la organización no está habilitado para esta organización",
+    "notConfigured": "configurar un proveedor de almacenamiento personalizado para los datos de esta organización",
+    "configured": "configurado",
+    "heroHeadline": "Traiga su propio almacenamiento a",
+    "heroSub": "Conecta tu propio depósito en la nube y los datos permanecen en tu infraestructura: control total, sin bloqueos.",
+    "configureStorage": "Configurar el almacenamiento",
+    "supportedProviders": "Proveedores compatibles",
+    "noStorageConfigured": "No hay almacenamiento configurado",
+    "routeDataDesc": "Dirija los datos de esta organización a un depósito dedicado, independientemente de los valores predeterminados globales y de otras organizaciones.",
+    "perOrgIsolation": "Aislamiento por organización",
+    "appliesImmediately": "Se aplica inmediatamente a los datos nuevos",
+    "usesOrgCredentials": "Utiliza credenciales de ámbito orgánico",
+    "updateStorage": "Actualizar almacenamiento",
+    "active": "activo",
+    "bucketName": "nombre del depósito",
+    "region": "región",
+    "serverUrl": "URL del servidor",
+    "accessKey": "clave de acceso",
+    "secretKey": "clave secreta",
+    "roleArn": "hilo de rol",
+    "createdAt": "creado en",
+    "updatedAt": "actualizado en",
+    "featureOwnDataTitle": "Sea dueño de sus datos de principio a fin",
+    "featureOwnDataDesc": "Almacena los datos ingeridos directamente en tu propio depósito y mantén el control total de quién puede acceder a ellos.",
+    "featureSecureTitle": "Seguro y compatible",
+    "featureSecureDesc": "Con claves de acceso detalladas, sus datos confidenciales permanecen en su infraestructura.",
+    "goBack": "Regresar",
+    "newStorageConfiguration": "Nueva configuración de almacenamiento",
+    "selectProviderDesc": "seleccione un proveedor de almacenamiento en la nube para almacenar los datos de esta organización.",
+    "bucketNameRequired": "El nombre del bucket es obligatorio",
+    "accessKeyRequired": "Se requiere una clave de acceso",
+    "secretKeyRequired": "Se requiere una clave secreta",
+    "serverURLRequired": "La URL del servidor es obligatoria",
+    "regionRequired": "La región es obligatoria",
+    "roleARNRequired": "El ARN del rol es obligatorio",
+    "back": "Atrás",
+    "continue": "Continuar",
+    "save": "Guardar",
+    "update": "Actualización",
+    "awsStsCloudInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Debe añadir la cuenta AWS de Openobserve como tipo de entidad de confianza para este rol en la consola de AWS. Póngase en contacto con el equipo de Openobserve para obtener la información de la cuenta o para obtener más ayuda para configurarla.",
+    "awsStsSelfHostedInfo": "Esto utiliza AWS sts para asumir funciones y realizar operaciones. Asegúrese de haber configurado las credenciales de AWS en el entorno de instalación que tienen acceso a esta función.",
+    "externalIdRequired": "Se requiere un identificador externo",
+    "storageAccountRequired": "El nombre de la cuenta de almacenamiento es obligatorio"
   }
 }

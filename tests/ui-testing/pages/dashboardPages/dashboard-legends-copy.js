@@ -105,7 +105,7 @@ export default class DashboardLegendsCopy {
   async copyLegend(index) {
     const item = this.getLegendItem(index);
     await item.hover(); // Hover to reveal copy button
-    const copyBtn = item.locator('.copy-btn');
+    const copyBtn = item.locator('[data-test="dashboard-legend-copy-btn"]');
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click();
     testLogger.info(`Copied legend at index ${index}`);
@@ -188,10 +188,10 @@ export default class DashboardLegendsCopy {
    * @returns {import('@playwright/test').Locator}
    */
   getTableCell(rowIndex, colIndex) {
-    // TanStack table (dashboard mode) renders rows directly in tbody with class dashboard-data-row.
+    // TanStack table (dashboard mode) renders rows with data-test="dashboard-data-row".
     // All data cells use class copy-cell-td.
     const dataRows = this.dashboardTable
-      .locator('tbody tr.dashboard-data-row')
+      .locator('[data-test="dashboard-data-row"]')
       .filter({ has: this.page.locator('td.copy-cell-td') });
     return dataRows.nth(rowIndex).locator('td.copy-cell-td').nth(colIndex);
   }

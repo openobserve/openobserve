@@ -92,4 +92,21 @@ mod tests {
         assert_eq!(h.sum64("test2"), 2079727570557907492);
         assert_eq!(h.sum64("test3"), 3631677894875752354);
     }
+
+    #[test]
+    fn test_gxhash_new_hasher_produces_nonzero_hash() {
+        use std::hash::Hasher;
+        let mut hasher = new_hasher();
+        hasher.write(b"hello");
+        let hash = hasher.finish();
+        assert_ne!(hash, 0);
+    }
+
+    #[test]
+    fn test_gxhash_empty_string_deterministic() {
+        let mut h = new();
+        let hash1 = h.sum64("");
+        let hash2 = h.sum64("");
+        assert_eq!(hash1, hash2);
+    }
 }

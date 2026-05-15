@@ -270,7 +270,15 @@ pub async fn list_pipelines(
         ("x-o2-mcp" = json!({"description": "Get pipeline details by ID", "category": "pipelines"}))
     )
 )]
-pub async fn get_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
+pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    }
+
     let meta_pipeline = match crate::service::db::pipeline::get_by_id(&pipeline_id).await {
         Ok(pipeline) => pipeline,
         Err(e) => return e.into(),
@@ -369,7 +377,15 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
         ("x-o2-mcp" = json!({"description": "Delete a pipeline", "category": "pipelines", "requires_confirmation": true}))
     )
 )]
-pub async fn delete_pipeline(Path((_org_id, pipeline_id)): Path<(String, String)>) -> Response {
+pub async fn delete_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -> Response {
+    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
+        .await
+        .as_deref()
+        != Some(org_id.as_str())
+    {
+        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    }
+
     match pipeline::delete_pipeline(&pipeline_id).await {
         Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
@@ -613,4 +629,85 @@ pub async fn enable_pipeline_bulk(
         unsuccessful,
         err,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{http::StatusCode, response::Response};
+
+    use crate::service::db::pipeline::PipelineError;
+
+    fn status(err: PipelineError) -> StatusCode {
+        Response::from(err).status()
+    }
+
+    // 404 Not Found
+    #[test]
+    fn test_not_found_is_not_found() {
+        assert_eq!(
+            status(PipelineError::NotFound("abc".to_string())),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    // 409 Conflict
+    #[test]
+    fn test_modified_is_conflict() {
+        assert_eq!(
+            status(PipelineError::Modified("abc".to_string())),
+            StatusCode::CONFLICT
+        );
+    }
+
+    // 400 Bad Request
+    #[test]
+    fn test_stream_in_use_is_bad_request() {
+        assert_eq!(status(PipelineError::StreamInUse), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_pipeline_does_not_apply_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::PipelineDoesNotApply),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_pipeline_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::InvalidPipeline("bad config".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_invalid_derived_stream_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::InvalidDerivedStream(
+                "missing field".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
+    fn test_delete_derived_stream_is_bad_request() {
+        assert_eq!(
+            status(PipelineError::DeleteDerivedStream("failed".to_string())),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // 500 Internal Server Error
+    #[test]
+    fn test_infra_error_is_internal_server_error() {
+        let err = infra::errors::Error::DbError(infra::errors::DbError::SeaORMError(
+            "db down".to_string(),
+        ));
+        assert_eq!(
+            status(PipelineError::InfraError(err)),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 }

@@ -108,3 +108,44 @@ pub async fn extract_real_ip(
     }
     next.run(req).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_empty_string_returns_no_sources() {
+        let sources = resolve_client_ip_sources("");
+        assert!(sources.0.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_whitespace_only_returns_no_sources() {
+        let sources = resolve_client_ip_sources("  ,  ");
+        assert!(sources.0.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_single_valid_source() {
+        let sources = resolve_client_ip_sources("XRealIp");
+        assert_eq!(sources.0.len(), 1);
+    }
+
+    #[test]
+    fn test_resolve_multiple_valid_sources() {
+        let sources = resolve_client_ip_sources("XRealIp,CfConnectingIp");
+        assert_eq!(sources.0.len(), 2);
+    }
+
+    #[test]
+    fn test_resolve_invalid_source_filtered_out() {
+        let sources = resolve_client_ip_sources("NotARealSource");
+        assert!(sources.0.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_mix_valid_and_invalid() {
+        let sources = resolve_client_ip_sources("XRealIp,BadSource,CfConnectingIp");
+        assert_eq!(sources.0.len(), 2);
+    }
+}

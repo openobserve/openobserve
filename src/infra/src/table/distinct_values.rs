@@ -223,3 +223,47 @@ pub async fn len() -> Result<u64, errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_distinct_field_record_new_stream() {
+        let rec = DistinctFieldRecord::new(
+            OriginType::Stream,
+            "origin-id-1",
+            "myorg",
+            "mystream",
+            "logs".to_string(),
+            "fieldname",
+        );
+        assert_eq!(rec.origin, OriginType::Stream);
+        assert_eq!(rec.origin_id, "origin-id-1");
+        assert_eq!(rec.org_name, "myorg");
+        assert_eq!(rec.stream_name, "mystream");
+        assert_eq!(rec.stream_type, "logs");
+        assert_eq!(rec.field_name, "fieldname");
+    }
+
+    #[test]
+    fn test_distinct_field_record_new_dashboard() {
+        let rec = DistinctFieldRecord::new(
+            OriginType::Dashboard,
+            "dash-id",
+            "org2",
+            "stream2",
+            "metrics".to_string(),
+            "field2",
+        );
+        assert_eq!(rec.origin, OriginType::Dashboard);
+        assert_eq!(rec.origin_id, "dash-id");
+    }
+
+    #[test]
+    fn test_origin_type_equality() {
+        assert_eq!(OriginType::Stream, OriginType::Stream);
+        assert_ne!(OriginType::Stream, OriginType::Report);
+        assert_ne!(OriginType::Dashboard, OriginType::Report);
+    }
+}

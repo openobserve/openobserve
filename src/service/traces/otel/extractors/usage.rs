@@ -167,3 +167,219 @@ impl UsageExtractor {
         cost
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn test_extract_usage_gen_ai_input_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(100i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("input"), Some(&100i64));
+    }
+
+    #[test]
+    fn test_extract_usage_gen_ai_output_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(50i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("output"), Some(&50i64));
+    }
+
+    #[test]
+    fn test_extract_usage_gen_ai_total_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.total_tokens".to_string(), json::json!(150i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("total"), Some(&150i64));
+    }
+
+    #[test]
+    fn test_extract_usage_llm_usage_total_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("llm.usage.total_tokens".to_string(), json::json!(200i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("total"), Some(&200i64));
+    }
+
+    #[test]
+    fn test_extract_usage_open_inference_prompt_and_completion() {
+        let mut attrs = HashMap::new();
+        attrs.insert("llm.token_count.prompt".to_string(), json::json!(30i64));
+        attrs.insert("llm.token_count.completion".to_string(), json::json!(20i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("input"), Some(&30i64));
+        assert_eq!(usage.get("output"), Some(&20i64));
+    }
+
+    #[test]
+    fn test_extract_usage_zero_value_not_inserted() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(0i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert!(usage.get("input").is_none());
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_ai_scope_total_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert("ai.usage.tokens".to_string(), json::json!(300i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("total"), Some(&300i64));
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_ai_scope_input_output() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.input_tokens".to_string(), json::json!(40i64));
+        attrs.insert("gen_ai.usage.output_tokens".to_string(), json::json!(60i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("input"), Some(&40i64));
+        assert_eq!(usage.get("output"), Some(&60i64));
+    }
+
+    #[test]
+    fn test_extract_usage_langfuse_usage_details_renames_keys() {
+        let mut attrs = HashMap::new();
+        let details = json::json!({
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30
+        });
+        attrs.insert(
+            "langfuse.observation.usage_details".to_string(),
+            json::Value::String(details.to_string()),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("input"), Some(&10i64));
+        assert_eq!(usage.get("output"), Some(&20i64));
+        assert_eq!(usage.get("total"), Some(&30i64));
+    }
+
+    #[test]
+    fn test_extract_cost_gen_ai_usage_cost() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.cost".to_string(), json::json!(0.05f64));
+        let cost = UsageExtractor.extract_cost(&attrs);
+        assert_eq!(cost.get("total"), Some(&0.05f64));
+    }
+
+    #[test]
+    fn test_extract_cost_zero_not_inserted() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.cost".to_string(), json::json!(0.0f64));
+        let cost = UsageExtractor.extract_cost(&attrs);
+        assert!(cost.get("total").is_none());
+    }
+
+    #[test]
+    fn test_extract_cost_langfuse_cost_details() {
+        let mut attrs = HashMap::new();
+        let details = json::json!({ "input": 0.01, "output": 0.02 });
+        attrs.insert(
+            "langfuse.observation.cost_details".to_string(),
+            json::Value::String(details.to_string()),
+        );
+        let cost = UsageExtractor.extract_cost(&attrs);
+        assert_eq!(cost.get("input"), Some(&0.01f64));
+        assert_eq!(cost.get("output"), Some(&0.02f64));
+    }
+
+    #[test]
+    fn test_extract_usage_empty_attributes_returns_empty_map() {
+        let usage = UsageExtractor.extract_usage(&HashMap::new(), "");
+        assert!(usage.is_empty());
+    }
+
+    #[test]
+    fn test_extract_cost_empty_attributes_returns_empty_map() {
+        let cost = UsageExtractor.extract_cost(&HashMap::new());
+        assert!(cost.is_empty());
+    }
+
+    #[test]
+    fn test_extract_usage_cache_read_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.usage.cache_read_tokens".to_string(),
+            json::json!(25i64),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("cache_read_input_tokens"), Some(&25i64));
+    }
+
+    #[test]
+    fn test_extract_usage_cache_write_tokens() {
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "gen_ai.usage.cache_write_tokens".to_string(),
+            json::json!(10i64),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("cache_creation_input_tokens"), Some(&10i64));
+    }
+
+    #[test]
+    fn test_extract_usage_prompt_completion_tokens_alias() {
+        let mut attrs = HashMap::new();
+        attrs.insert("gen_ai.usage.prompt_tokens".to_string(), json::json!(80i64));
+        attrs.insert(
+            "gen_ai.usage.completion_tokens".to_string(),
+            json::json!(120i64),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("input"), Some(&80i64));
+        assert_eq!(usage.get("output"), Some(&120i64));
+    }
+
+    #[test]
+    fn test_extract_usage_vercel_prompt_tokens_fallback() {
+        let mut attrs = HashMap::new();
+        // No input_tokens present; prompt_tokens is the or_else fallback
+        attrs.insert("gen_ai.usage.prompt_tokens".to_string(), json::json!(60i64));
+        let usage = UsageExtractor.extract_usage(&attrs, "ai");
+        assert_eq!(usage.get("input"), Some(&60i64));
+    }
+
+    #[test]
+    fn test_extract_usage_langfuse_nested_object() {
+        // Tests the `else if let Some(s) = v.as_object()` branch in usage_details
+        let mut attrs = HashMap::new();
+        let details = json::json!({
+            "tokens": {
+                "input": 100,
+                "output": 50
+            }
+        });
+        attrs.insert(
+            "langfuse.observation.usage_details".to_string(),
+            json::Value::String(details.to_string()),
+        );
+        let usage = UsageExtractor.extract_usage(&attrs, "");
+        assert_eq!(usage.get("tokens_input"), Some(&100i64));
+        assert_eq!(usage.get("tokens_output"), Some(&50i64));
+    }
+
+    #[test]
+    fn test_extract_cost_langfuse_nested_object() {
+        // Tests the `else if let Some(s) = v.as_object()` branch in cost_details
+        let mut attrs = HashMap::new();
+        let details = json::json!({
+            "tokens": {
+                "input": 0.01,
+                "output": 0.005
+            }
+        });
+        attrs.insert(
+            "langfuse.observation.cost_details".to_string(),
+            json::Value::String(details.to_string()),
+        );
+        let cost = UsageExtractor.extract_cost(&attrs);
+        assert_eq!(cost.get("tokens_input"), Some(&0.01f64));
+        assert_eq!(cost.get("tokens_output"), Some(&0.005f64));
+    }
+}

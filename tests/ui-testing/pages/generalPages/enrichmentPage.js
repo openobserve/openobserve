@@ -343,18 +343,19 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async applyQuery() {
-        // Wait for refresh button to be ready
-        await this.page.waitForSelector(this.refreshButton, { state: 'visible' });
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        
+        // OButton returns early in handleClick when loading=true, so wait for enabled first.
+        const refreshBtn = this.page.locator(this.refreshButton);
+        await refreshBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await expect(refreshBtn).toBeEnabled({ timeout: 15000 });
+
         // Click on the run query button and wait for response
         const search = this.page.waitForResponse("**/api/**/_search**");
-        await this.page.locator(this.refreshButton).click({ force: true });
-        
+        await refreshBtn.click();
+
         // Wait for the search response
         const response = await search;
-        await expect.poll(async () => response.status()).toBe(200);
-        
+        await expect.poll(async () => response.status(), { timeout: 30000 }).toBe(200);
+
         // Wait for results to render and process
         await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
@@ -1969,7 +1970,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
         testLogger.debug('Closing URL Jobs dialog');
 
         // Try clicking X button, fallback to pressing Escape
-        const closeBtn = this.page.locator('.q-dialog [aria-label="Close"], .q-dialog .q-btn--flat').first();
+        const closeBtn = this.page.locator('.q-dialog [aria-label="Close"], .q-dialog button[data-o2-btn]').first();
         if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await closeBtn.click();
         } else {

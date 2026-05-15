@@ -24,13 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:before>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
+          <OTabs
             v-model="ingestiontabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
+            orientation="vertical"
           >
-            <q-route-tab
+            <ORouteTab
               name="prometheus"
               :to="{
                 name: 'prometheus',
@@ -40,9 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
               label="Prometheus"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="otelCollector"
               :to="{
                 name: 'otelCollector',
@@ -52,9 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
               label="OTEL Collector"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="telegraf"
               :to="{
                 name: 'telegraf',
@@ -64,9 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
               label="Telegraf"
-              content-class="tab_content"
             />
-            <q-route-tab
+            <ORouteTab
               name="cloudwatchMetrics"
               :to="{
                 name: 'cloudwatchMetrics',
@@ -76,9 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
               label="AWS CloudWatch Metrics"
-              content-class="tab_content"
             />
-          </q-tabs>
+          </OTabs>
         </div>
       </div>
     </template>
@@ -100,6 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
+import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -110,14 +107,14 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestMetrics",
-  components: {},
+  components: {
+    OTabs, OTab, ORouteTab,},
   data() {
-    return {
-      ingestiontabs: "",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -132,6 +129,9 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const ingestiontabs = ref(
+      resolveTab("ingestMetrics", router.currentRoute.value.name as string, "prometheus")
+    );
 
     onBeforeMount(() => {
       const ingestRoutes = [
@@ -213,6 +213,7 @@ export default defineComponent({
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
     };

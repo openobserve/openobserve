@@ -198,4 +198,36 @@ mod tests {
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
     }
+
+    #[test]
+    fn test_is_querier_route_ingester_exclusion() {
+        // streams/_json is a querier-prefix route but ends with an ingester suffix
+        assert!(!is_querier_route("/api/org1/streams/_json"));
+        assert!(!is_querier_route("/api/org1/streams/_bulk"));
+        assert!(!is_querier_route("/api/org1/streams/v1/logs"));
+        // regular streams route should pass
+        assert!(is_querier_route("/api/org1/streams"));
+    }
+
+    #[test]
+    fn test_is_querier_route_not_enough_segments() {
+        // "traces/latest" needs skip_segments=3, but "/traces/latest" only has 2 segments
+        assert!(!is_querier_route("/traces/latest"));
+        // "summary" needs skip_segments=2, "/summary" only has 1 segment
+        assert!(!is_querier_route("/summary"));
+    }
+
+    #[test]
+    fn test_extract_path_without_query_edge_cases() {
+        assert_eq!(extract_path_without_query(""), "");
+        assert_eq!(extract_path_without_query("?only_query"), "");
+        assert_eq!(extract_path_without_query("/path"), "/path");
+    }
+
+    #[test]
+    fn test_is_querier_route_by_body_false_cases() {
+        assert!(!is_querier_route_by_body("/"));
+        assert!(!is_querier_route_by_body(""));
+        assert!(!is_querier_route_by_body("/api/org1/something"));
+    }
 }

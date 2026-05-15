@@ -534,3 +534,31 @@ fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
     let now = now_micros();
     ts > now - window_micros
 }
+
+#[cfg(test)]
+mod tests {
+    use super::processing_files;
+
+    #[test]
+    fn test_is_processing_false_initially() {
+        assert!(!processing_files::is_processing(
+            "unique_not_added_file_abc123.parquet"
+        ));
+    }
+
+    #[test]
+    fn test_add_and_is_processing() {
+        let name = "test_add_file_xyz999.parquet";
+        processing_files::add(name);
+        assert!(processing_files::is_processing(name));
+        processing_files::remove(name);
+    }
+
+    #[test]
+    fn test_remove_clears_processing() {
+        let name = "test_remove_file_qqq888.parquet";
+        processing_files::add(name);
+        processing_files::remove(name);
+        assert!(!processing_files::is_processing(name));
+    }
+}

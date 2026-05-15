@@ -178,7 +178,8 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<i64>;
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64>;
+    async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
+    -> Result<u64>;
     async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
@@ -200,6 +201,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: (String, String),
     ) -> Result<StreamStats>;
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
 }
 
 pub async fn health_check() -> Result<()> {
@@ -523,8 +525,8 @@ pub async fn get_pending_jobs_count() -> Result<stdHashMap<String, stdHashMap<St
 }
 
 #[inline]
-pub async fn set_job_pending(ids: &[i64]) -> Result<u64> {
-    CLIENT.set_job_pending(ids).await
+pub async fn set_job_pending(ids: &[i64], offsets: i64, stream: Option<&str>) -> Result<u64> {
+    CLIENT.set_job_pending(ids, offsets, stream).await
 }
 
 #[inline]
@@ -577,6 +579,11 @@ pub async fn query_dump_stats_by_date_range(
     CLIENT
         .query_dump_stats_by_date_range(org_id, stream_type, stream_name, date_range)
         .await
+}
+
+#[inline]
+pub async fn org_stats_by_account(org_id: &str, account: &str) -> Result<(i64, i64)> {
+    CLIENT.org_stats_by_account(org_id, account).await
 }
 
 pub async fn local_cache_gc() -> Result<()> {
@@ -787,4 +794,205 @@ pub struct FileId {
 pub struct FileIdWithFile {
     pub id: i64,
     pub file: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::{StreamStats, StreamType};
+
+    use super::*;
+
+    // ── parse_stream_key ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_parse_stream_key_valid_logs() {
+        let result = parse_stream_key("myorg/logs/mystream");
+        assert!(result.is_some());
+        let (org, stype, stream) = result.unwrap();
+        assert_eq!(org, "myorg");
+        assert_eq!(stype, StreamType::Logs);
+        assert_eq!(stream, "mystream");
+    }
+
+    #[test]
+    fn test_parse_stream_key_valid_metrics() {
+        let result = parse_stream_key("default/metrics/cpu_usage");
+        assert!(result.is_some());
+        let (org, stype, stream) = result.unwrap();
+        assert_eq!(org, "default");
+        assert_eq!(stype, StreamType::Metrics);
+        assert_eq!(stream, "cpu_usage");
+    }
+
+    #[test]
+    fn test_parse_stream_key_valid_traces() {
+        let result = parse_stream_key("acme/traces/http_spans");
+        assert!(result.is_some());
+        let (org, stype, stream) = result.unwrap();
+        assert_eq!(org, "acme");
+        assert_eq!(stype, StreamType::Traces);
+        assert_eq!(stream, "http_spans");
+    }
+
+    #[test]
+    fn test_parse_stream_key_too_few_parts() {
+        assert!(parse_stream_key("myorg/logs").is_none());
+        assert!(parse_stream_key("myorg").is_none());
+        assert!(parse_stream_key("").is_none());
+    }
+
+    #[test]
+    fn test_parse_stream_key_too_many_parts() {
+        // More than 3 segments → None
+        assert!(parse_stream_key("org/logs/stream/extra").is_none());
+    }
+
+    // ── FileListJobStatus::from(i64) ──────────────────────────────────────────
+
+    #[test]
+    fn test_file_list_job_status_from_i64() {
+        assert_eq!(FileListJobStatus::from(0), FileListJobStatus::Pending);
+        assert_eq!(FileListJobStatus::from(1), FileListJobStatus::Running);
+        assert_eq!(FileListJobStatus::from(2), FileListJobStatus::Done);
+        // Unknown values fall back to Pending
+        assert_eq!(FileListJobStatus::from(99), FileListJobStatus::Pending);
+        assert_eq!(FileListJobStatus::from(-1), FileListJobStatus::Pending);
+    }
+
+    #[test]
+    fn test_file_list_job_status_default() {
+        assert_eq!(FileListJobStatus::default(), FileListJobStatus::Pending);
+    }
+
+    // ── From<&FileRecord> for FileMeta ────────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_from_file_record() {
+        let record = FileRecord {
+            id: 1,
+            account: "acc".to_string(),
+            org: "org1".to_string(),
+            stream: "default/logs/test".to_string(),
+            date: "2024-01-01".to_string(),
+            file: "file1.parquet".to_string(),
+            deleted: false,
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 500,
+            original_size: 102400,
+            compressed_size: 51200,
+            index_size: 1024,
+            flattened: true,
+            updated_at: 9999,
+        };
+
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.min_ts, 1000);
+        assert_eq!(meta.max_ts, 2000);
+        assert_eq!(meta.records, 500);
+        assert_eq!(meta.original_size, 102400);
+        assert_eq!(meta.compressed_size, 51200);
+        assert_eq!(meta.index_size, 1024);
+        assert!(meta.flattened);
+    }
+
+    // ── From<&FileRecord> for FileKey ────────────────────────────────────────
+
+    #[test]
+    fn test_file_key_from_file_record() {
+        let record = FileRecord {
+            id: 42,
+            account: "myaccount".to_string(),
+            org: "org1".to_string(),
+            stream: "default/logs/nginx".to_string(),
+            date: "2024-01-15".to_string(),
+            file: "chunk001.parquet".to_string(),
+            deleted: false,
+            min_ts: 100,
+            max_ts: 200,
+            records: 10,
+            original_size: 4096,
+            compressed_size: 2048,
+            index_size: 0,
+            flattened: false,
+            updated_at: 0,
+        };
+
+        let key = FileKey::from(&record);
+        assert_eq!(key.id, 42);
+        assert_eq!(key.account, "myaccount");
+        assert_eq!(
+            key.key,
+            "files/default/logs/nginx/2024-01-15/chunk001.parquet"
+        );
+        assert!(!key.deleted);
+        assert!(key.segment_ids.is_none());
+        assert_eq!(key.meta.min_ts, 100);
+        assert_eq!(key.meta.max_ts, 200);
+    }
+
+    // ── From<&StatsRecord> for StreamStats ───────────────────────────────────
+
+    #[test]
+    fn test_stream_stats_from_stats_record() {
+        let record = StatsRecord {
+            stream: "default/logs/test".to_string(),
+            file_num: 10,
+            min_ts: Some(1000),
+            max_ts: 9000,
+            records: 5000,
+            original_size: 1_048_576,
+            compressed_size: 524_288,
+            index_size: 8192,
+        };
+
+        let stats = StreamStats::from(&record);
+        assert_eq!(stats.doc_time_min, 1000);
+        assert_eq!(stats.doc_time_max, 9000);
+        assert_eq!(stats.doc_num, 5000);
+        assert_eq!(stats.file_num, 10);
+        assert_eq!(stats.storage_size, 1_048_576.0);
+        assert_eq!(stats.compressed_size, 524_288.0);
+        assert_eq!(stats.index_size, 8192.0);
+        assert_eq!(stats.created_at, 0); // always zero from record conversion
+    }
+
+    #[test]
+    fn test_stream_stats_from_stats_record_min_ts_none() {
+        let record = StatsRecord {
+            stream: "org/metrics/cpu".to_string(),
+            file_num: 1,
+            min_ts: None,
+            max_ts: 5000,
+            records: 100,
+            original_size: 256,
+            compressed_size: 128,
+            index_size: 0,
+        };
+
+        let stats = StreamStats::from(&record);
+        assert_eq!(stats.doc_time_min, 0); // None → default (0)
+        assert_eq!(stats.doc_time_max, 5000);
+    }
+
+    #[test]
+    fn test_stream_stats_from_stats_record_owned() {
+        let record = StatsRecord {
+            stream: "org/logs/app".to_string(),
+            file_num: 3,
+            min_ts: Some(111),
+            max_ts: 999,
+            records: 300,
+            original_size: 512,
+            compressed_size: 256,
+            index_size: 64,
+        };
+
+        // owned conversion should produce the same result as ref conversion
+        let stats_owned = StreamStats::from(record.clone());
+        let stats_ref = StreamStats::from(&record);
+        assert_eq!(stats_owned.doc_time_min, stats_ref.doc_time_min);
+        assert_eq!(stats_owned.doc_num, stats_ref.doc_num);
+        assert_eq!(stats_owned.file_num, stats_ref.file_num);
+    }
 }

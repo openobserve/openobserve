@@ -47,3 +47,35 @@ impl Related<super::alert_incident_alerts::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "inc-1".to_string(),
+            org_id: "myorg".to_string(),
+            status: "open".to_string(),
+            severity: "P2".to_string(),
+            group_values: serde_json::json!({"service": "api"}),
+            key_type: "service".to_string(),
+            topology_context: None,
+            first_alert_at: 1000,
+            last_alert_at: 2000,
+            resolved_at: None,
+            alert_count: 3,
+            title: Some("High Error Rate".to_string()),
+            assigned_to: None,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        assert_eq!(m.id, "inc-1");
+        assert_eq!(m.status, "open");
+        assert_eq!(m.severity, "P2");
+        assert_eq!(m.alert_count, 3);
+        assert!(m.topology_context.is_none());
+        assert!(m.resolved_at.is_none());
+    }
+}

@@ -258,11 +258,6 @@ describe('DetailTable.vue', () => {
         stubs: {
           QCard: false,
           QCardSection: false,
-          QBtn: {
-            name: 'QBtn',
-            template: '<button class="q-btn"><slot /></button>',
-            props: ['round', 'flat', 'icon'],
-          },
           QSeparator: true,
           QTabs: true,
           QTab: true,
@@ -272,7 +267,7 @@ describe('DetailTable.vue', () => {
       },
     });
 
-    const closeButton = wrapper.findAll('.q-btn');
+    const closeButton = wrapper.findAll('button');
     expect(closeButton.length).toBeGreaterThan(0);
   });
 });

@@ -105,9 +105,12 @@ pub async fn del_offset(
         .map_err(Into::into)
 }
 
-pub async fn reset_offset(time: i64) -> Result<u64, anyhow::Error> {
-    let prefix = "/compact/files/";
-    let ret = db::list(prefix).await?;
+pub async fn reset_offset(time: i64, stream: Option<&str>) -> Result<u64, anyhow::Error> {
+    let prefix = match stream {
+        Some(s) => format!("/compact/files/{s}"),
+        None => "/compact/files/".to_string(),
+    };
+    let ret = db::list(&prefix).await?;
     let count = ret.len() as u64;
     for key in ret.keys() {
         db::put(key, time.to_string().into(), db::NO_NEED_WATCH, None).await?;
@@ -154,6 +157,18 @@ pub async fn sync_cache_to_db() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mk_key_format() {
+        let key = mk_key("myorg", StreamType::Logs, "app_logs");
+        assert_eq!(key, "/compact/files/myorg/logs/app_logs");
+    }
+
+    #[test]
+    fn test_mk_key_metrics_stream() {
+        let key = mk_key("org1", StreamType::Metrics, "cpu_usage");
+        assert_eq!(key, "/compact/files/org1/metrics/cpu_usage");
+    }
 
     #[tokio::test]
     async fn test_compact_files() {
