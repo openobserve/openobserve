@@ -8,10 +8,9 @@ import {
   useVueTable,
   type ColumnDef,
   type Table,
-  type RowModel,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
-import type { OTableColumnDef, OTableProps } from "../OTable.types";
+import type { OTableColumnDef } from "../OTable.types";
 
 /**
  * Creates and manages the TanStack Table instance.
@@ -36,14 +35,20 @@ export function useTableCore<TData>(
     getSubRows?: (row: TData) => TData[];
     pagination: string;
     sorting: string;
+    rowHeight?: number;
+    filterMode?: string;
   },
   emit: any,
 ) {
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
 
-  // Track column sizes
+  // Track column sizing
   const columnSizing = ref<Record<string, number>>({});
+  const columnResizeMode = "onChange";
+
+  // Track sorting state for client-side
+  const sortingState = ref<any[]>([]);
 
   // Build TanStack ColumnDef array from our OTableColumnDef
   const tanstackColumns = computed<ColumnDef<TData>[]>(() => {
@@ -54,17 +59,15 @@ export function useTableCore<TData>(
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
-          ? ({ row, column, getValue }: any) => {
-              // When a string is provided, treat it as a component name for FlexRender
-              return typeof col.cell === "string"
-                ? col.cell
-                : (col.cell as any);
-            }
+          ? ((info: any) => {
+              if (typeof col.cell === "string") return col.cell;
+              return col.cell;
+            })
           : undefined,
-        size: col.size,
-        minSize: col.minSize,
-        maxSize: col.maxSize,
-        enableSorting: col.sortable ?? false,
+        size: col.size ?? 150,
+        minSize: col.minSize ?? 40,
+        maxSize: col.maxSize ?? 800,
+        enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
         enableResizing: col.resizable ?? props.enableColumnResize ?? false,
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
@@ -72,11 +75,12 @@ export function useTableCore<TData>(
           align: col.meta?.align ?? "left",
           headerClass: col.meta?.headerClass ?? "",
           cellClass: col.meta?.cellClass ?? "",
-          ...col.meta,
           isAction: col.isAction,
           sortable: col.sortable,
           hideable: col.hideable,
           closable: col.hideable,
+          showWrap: false,
+          ...col.meta,
         },
         footer: col.footer as any,
         aggregationFn: col.aggregate,
@@ -85,13 +89,13 @@ export function useTableCore<TData>(
     });
   });
 
-  // Determine if client-side sorting is active
   const isClientSort = computed(() => props.sorting === "client");
-  // For server-side sort, pass the active sort state to TanStack
-  // but we handle sorting externally
   const isClientPagination = computed(() => props.pagination === "client");
+  const isClientFilter = computed(
+    () => (props.filterMode ?? "client") === "client",
+  );
 
-  // Initial sorting state
+  // Initial sorting state (client-side)
   const initialSorting = computed(() => {
     if (props.sorting === "client" && props.sortBy) {
       const field = props.sortFieldMap?.[props.sortBy] ?? props.sortBy;
@@ -100,7 +104,7 @@ export function useTableCore<TData>(
     return [];
   });
 
-  // Build the TanStack table
+  // Build the TanStack table instance
   const table = useVueTable({
     get data() {
       return props.data;
@@ -110,29 +114,37 @@ export function useTableCore<TData>(
     },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: isClientSort.value ? getSortedRowModel() : undefined,
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: isClientFilter.value
+      ? getFilteredRowModel()
+      : undefined,
     getPaginationRowModel: isClientPagination.value
       ? getPaginationRowModel()
       : undefined,
     getSubRows: props.getSubRows as any,
+    enableSorting: props.sorting !== "none",
+    enableColumnResizing: props.enableColumnResize ?? false,
+    columnResizeMode,
     onSortingChange: (updater) => {
       if (props.sorting === "server") return;
-      // Let TanStack handle client-side sorting
-      const oldSorting = table.getState()?.sorting ?? [];
-      const newSorting =
-        typeof updater === "function" ? updater(oldSorting) : updater;
-      if (props.sorting === "client") {
-        // Update the table sorting state
-        (table as any).setSorting(newSorting);
-      }
+      const old = sortingState.value;
+      const next =
+        typeof updater === "function" ? updater(old) : updater;
+      sortingState.value = next;
+    },
+    defaultColumn: {
+      minSize: 40,
+      maxSize: 800,
     },
     state: {
-      sorting: initialSorting.value,
+      get sorting() {
+        if (isClientSort.value) return sortingState.value;
+        return [];
+      },
       get columnOrder() {
         return columnOrder.value.length ? columnOrder.value : undefined;
       },
       get columnSizing() {
-        return columnSizing.value;
+        return props.enableColumnResize ? undefined : undefined;
       },
       get columnVisibility() {
         return props.columnVisibility ?? {};
@@ -156,18 +168,34 @@ export function useTableCore<TData>(
     () => props.pageSize,
     (size) => {
       if (isClientPagination.value && size) {
-        (table as any).setPageSize?.(size);
+        table.setPageSize?.(size);
       }
     },
     { immediate: true },
   );
 
+  // Compute column size CSS variables
+  const columnSizeVars = computed(() => {
+    const headers = table?.getFlatHeaders?.() ?? [];
+    const colSizes: Record<string, string> = {};
+    for (const header of headers) {
+      const safeId = header.id.replace(/[^a-zA-Z0-9]/g, "-");
+      colSizes[`--header-${safeId}-size`] = `${header.getSize()}px`;
+      colSizes[`--col-${header.column.id}-size`] = `${header.column.getSize()}px`;
+    }
+    return colSizes;
+  });
+
   return {
     table,
     columnOrder,
     columnSizing,
+    sortingState,
     isClientSort,
     isClientPagination,
+    isClientFilter,
     tanstackColumns,
+    columnResizeMode,
+    columnSizeVars,
   };
 }

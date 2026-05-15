@@ -10,6 +10,7 @@ const props = defineProps<{
   row: Row<any>;
   highlightText?: string;
   shouldHighlight?: boolean;
+  getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
   bordered?: boolean;
@@ -32,20 +33,19 @@ const alignClass = computed(() => {
 
 const isAction = computed(() => meta.value?.isAction ?? false);
 
+const highlightedHtml = computed(() => {
+  if (!props.highlightText || !props.shouldHighlight || !props.getHighlightedHtml) {
+    return null;
+  }
+  return props.getHighlightedHtml(props.cell.column.id, props.cell.getValue());
+});
+
 function handleClick() {
   emit("cell-click", {
     columnId: props.cell.column.id,
     row: props.row.original,
     value: props.cell.getValue(),
   });
-}
-
-/**
- * Renders highlighted text by splitting on highlight keywords.
- * Simple client-side highlighting for non-virtual-scroll tables.
- */
-function renderHighlightedText(value: unknown): string {
-  return String(value ?? "");
 }
 </script>
 
@@ -58,7 +58,7 @@ function renderHighlightedText(value: unknown): string {
       alignClass,
       bordered ? 'tw:border-r tw:border-border-default' : '',
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
-      wrap ? '' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
+      wrap ? 'tw:break-words tw:whitespace-normal' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
     ]"
     :style="{
@@ -66,16 +66,22 @@ function renderHighlightedText(value: unknown): string {
     }"
     @click="handleClick"
   >
-    <slot v-if="isAction" />
+    <slot v-if="$slots.default" />
     <!-- Custom cell render via TanStack FlexRender -->
     <FlexRender
       v-else-if="cell.column.columnDef.cell"
       :render="cell.column.columnDef.cell"
       :props="cell.getContext()"
     />
+    <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
+    <span
+      v-else-if="highlightedHtml"
+      class="tw:text-text-primary tw:text-sm"
+      v-html="highlightedHtml"
+    />
     <!-- Default: plain text -->
     <span v-else class="tw:text-text-primary tw:text-sm">
-      {{ renderHighlightedText(cell.getValue()) }}
+      {{ cell.renderValue() }}
     </span>
   </td>
 </template>

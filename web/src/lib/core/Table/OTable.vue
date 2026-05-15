@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, toRef, useSlots } from "vue";
+import { computed, ref, toRef, useSlots } from "vue";
 import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
@@ -12,6 +12,8 @@ import { useTableExpansion } from "./composables/useTableExpansion";
 import { useTableFiltering } from "./composables/useTableFiltering";
 import { useTableHighlight } from "./composables/useTableHighlight";
 import { useTableColumnManagement } from "./composables/useTableColumnManagement";
+import { useTableVirtualization } from "./composables/useTableVirtualization";
+import { useTableKeyboard } from "./composables/useTableKeyboard";
 
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
@@ -38,13 +40,19 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   bordered: true,
   striped: false,
   stickyHeader: true,
+  wrap: false,
   rowKey: "id",
+  rowHeight: 24,
   filterMode: "client",
   defaultColumns: true,
 });
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+// ── Refs for virtual scroll & keyboard ──────────────────────────
+const scrollContainerRef = ref<HTMLElement | null>(null);
+const columnIds = computed(() => props.columns.map((c) => c.id));
 
 // ── Core table instance ─────────────────────────────────────────
 const {
@@ -53,6 +61,7 @@ const {
   columnSizing,
   isClientSort,
   isClientPagination,
+  columnSizeVars,
 } = useTableCore<TData>(
   {
     data: props.data,
@@ -71,6 +80,8 @@ const {
     getSubRows: props.getSubRows,
     pagination: props.pagination,
     sorting: props.sorting,
+    rowHeight: props.rowHeight,
+    filterMode: props.filterMode,
   },
   emit,
 );
@@ -125,26 +136,62 @@ const filtering = useTableFiltering<TData>(
 const highlighting = useTableHighlight({
   highlightText: props.highlightText,
   highlightFields: props.highlightFields,
+  enableSemanticHighlight: props.highlightFields?.length ? false : true,
+  ftsKeys: (props.columns as any).ftsKeys,
 });
 
 // ── Column Management ───────────────────────────────────────────
-const columnMgmt = useTableColumnManagement({
-  enableColumnResize: props.enableColumnResize,
-  enableColumnReorder: props.enableColumnReorder,
-  columnVisibility: props.columnVisibility,
-  columnOrder: columnOrder.value,
-});
+const columnMgmt = useTableColumnManagement(
+  {
+    enableColumnResize: props.enableColumnResize,
+    enableColumnReorder: props.enableColumnReorder,
+    columnVisibility: props.columnVisibility,
+    columnOrder,
+    columnIds,
+    pinnedFirstColumn: undefined,
+  },
+  emit,
+);
 
 // ── Rows to display ─────────────────────────────────────────────
 const displayRows = computed(() => {
-  if (isClientPagination.value) {
-    return table.getRowModel().rows;
-  }
   return table.getRowModel().rows;
 });
 
-// ── Expansion slot lookup ───────────────────────────────────────
-const hasExpansionSlot = computed(() => !!slots.expansion);
+// ── Virtual scroll ──────────────────────────────────────────────
+const {
+  virtualRows,
+  totalSize,
+  baseOffset,
+  measure: virtualMeasure,
+} = useTableVirtualization({
+  rows: displayRows,
+  parentRef: scrollContainerRef,
+  scrollEl: scrollContainerRef.value ?? undefined,
+  scrollMargin: 0,
+  rowHeight: props.rowHeight ?? 24,
+  overscan: 100,
+});
+
+const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
+
+// Virtual measureElement callback — wraps the virtualizer's measure
+function measureElement(el: any) {
+  if (el && props.virtualScroll) {
+    virtualMeasure();
+  }
+}
+
+// ── Keyboard navigation ─────────────────────────────────────────
+useTableKeyboard(table, scrollContainerRef, {
+  enabled: computed(() => !props.loading),
+  onRowSelect: (row: TData) => {
+    selection.toggleRow(row);
+  },
+  onRowExpand: (row: TData) => {
+    expansion.toggleRow(row);
+  },
+});
 
 // ── Table-level empty/loading/error state ──────────────────────
 const showEmpty = computed(
@@ -155,17 +202,18 @@ const showLoadingOverlay = computed(
   () => props.loading && displayRows.value.length === 0,
 );
 
-// ── CSS variable computation for column sizes ──────────────────
-const columnSizeVars = computed(() => {
-  const sizes: Record<string, string> = {};
-  // Build CSS custom properties for each column's computed size
-  const headers = table.getFlatHeaders?.() ?? [];
-  for (const header of headers) {
-    const safeId = header.id.replace(/[^a-zA-Z0-9]/g, "-");
-    sizes[`--header-${safeId}-size`] = `${header.getSize()}px`;
+// ── Scroll event handler ────────────────────────────────────────
+function handleScroll(event: Event) {
+  const el = event.target as HTMLElement;
+  if (!el) return;
+  emit("scroll", { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
+
+  // Detect scroll end for lazy loading
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+  if (atBottom) {
+    emit("scroll-end", { scrollTop: el.scrollTop });
   }
-  return sizes;
-});
+}
 
 /**
  * Exposed API: parent can access the TanStack table instance
@@ -180,7 +228,9 @@ defineExpose({
     columnOrder.value = props.columns.map((c) => c.id);
   },
   scrollToTop: () => {
-    // Implemented when virtual scroll is integrated
+    if (scrollContainerRef.value) {
+      scrollContainerRef.value.scrollTop = 0;
+    }
   },
 });
 </script>
@@ -206,7 +256,6 @@ defineExpose({
       :showing-to="pagination.showingTo.value"
       :is-first-page="pagination.isFirstPage.value"
       :is-last-page="pagination.isLastPage.value"
-      :title="(slots as any)?.['top']?.() ? '' : ''"
       @update:page-size="pagination.setPageSize"
       @first-page="pagination.firstPage"
       @prev-page="pagination.prevPage"
@@ -216,6 +265,7 @@ defineExpose({
 
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
+      ref="scrollContainerRef"
       class="tw:flex-1 tw:overflow-auto tw:min-h-0 tw:relative"
       :style="{
         maxHeight: props.maxHeight
@@ -225,6 +275,7 @@ defineExpose({
           : undefined,
       }"
       data-test="o2-table-scroll-container"
+      @scroll="handleScroll"
     >
       <table
         :class="[
@@ -233,7 +284,7 @@ defineExpose({
           props.bordered ? '' : 'tw:border-separate tw:border-spacing-0',
         ]"
         :style="{
-          ...columnSizeVars.value,
+          ...columnSizeVars,
         }"
         data-test="o2-table"
       >
@@ -241,28 +292,33 @@ defineExpose({
         <OTableHeader
           :header-groups="table.getHeaderGroups()"
           :table="table"
+          :column-order="columnOrder"
           :selection-multiple="selection.isMultiple.value"
           :is-all-selected="selection.isAllSelected()"
           :is-indeterminate="selection.isIndeterminate()"
           :expansion-enabled="expansion.isEnabled.value"
           :enable-column-reorder="props.enableColumnReorder"
           :enable-column-resize="props.enableColumnResize"
+          :is-resizing="columnMgmt.isResizing.value"
           :sorting-enabled="sorting.isEnabled.value"
           :sort-by="sorting.activeSortBy.value ?? undefined"
           :sort-order="sorting.activeSortOrder.value ?? undefined"
-          :sort-field-map="props.sortFieldMap ?? {}"
+          :sort-field-map="props.sortFieldMap"
           :get-sort-icon="sorting.getSortIcon"
           :sticky-header="props.stickyHeader"
           :bordered="props.bordered"
           @toggle-all-rows="selection.toggleAllRows"
           @sort="sorting.handleSort"
-          @column-close="emit('column-close', $event)"
+          @column-close="columnMgmt.closeColumn"
+          @update:column-order="(order: string[]) => { columnOrder = order; }"
+          @drag-start="columnMgmt.onDragStart"
+          @drag-end="columnMgmt.onDragEnd"
         />
 
         <!-- ── Body ─────────────────────────────────────────── -->
         <OTableBody
           v-if="!showEmpty && !showError"
-          :rows="displayRows.value"
+          :rows="displayRows"
           :table="table"
           :selection-enabled="selection.isEnabled.value"
           :selection-multiple="selection.isMultiple.value"
@@ -271,6 +327,7 @@ defineExpose({
           :is-expanded-fn="(row: TData) => expansion.isExpanded(row)"
           :highlight-text="props.highlightText"
           :should-highlight-column="highlighting.shouldHighlightColumn"
+          :get-highlighted-html="highlighting.getHighlightedHtml"
           :wrap="props.wrap"
           :dense="props.dense"
           :bordered="props.bordered"
@@ -278,11 +335,15 @@ defineExpose({
           :row-class="(props.rowClass as any)"
           :row-style-fn="props.getRowStyle"
           :loading="props.loading"
+          :virtual-rows="isVirtual ? virtualRows : undefined"
+          :total-size="isVirtual ? totalSize : undefined"
+          :base-offset="isVirtual ? baseOffset : undefined"
+          :measure-element="isVirtual ? measureElement : undefined"
           @toggle-selection="selection.toggleRow"
           @toggle-expansion="expansion.toggleRow"
           @row-click="(row: TData, evt: MouseEvent) => emit('row-click', row, evt)"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
-          @cell-click="(params) => emit('cell-click', params)"
+          @cell-click="(params: any) => emit('cell-click', params)"
         >
           <!-- Pass through named cell slots from parent -->
           <template
@@ -297,6 +358,11 @@ defineExpose({
               :column="slotProps.column"
             />
           </template>
+
+          <!-- Expansion slot -->
+          <template v-if="slots.expansion" #expansion="expSlotProps">
+            <slot name="expansion" :row="expSlotProps.row" />
+          </template>
         </OTableBody>
       </table>
 
@@ -305,21 +371,25 @@ defineExpose({
         v-if="showEmpty"
         :message="props.emptyMessage"
       >
-        <slot name="empty" />
+        <template v-if="slots.empty" #default>
+          <slot name="empty" />
+        </template>
       </OTableEmpty>
 
       <!-- ── Loading State ──────────────────────────────────── -->
       <OTableLoading
         v-if="showLoadingOverlay"
-        :overlay="displayRows.value.length > 0"
+        :overlay="displayRows.length > 0"
       >
-        <slot name="loading" />
+        <template v-if="slots.loading" #default>
+          <slot name="loading" />
+        </template>
       </OTableLoading>
 
       <!-- ── Error State ────────────────────────────────────── -->
       <OTableError
         v-if="showError"
-        :message="props.error"
+        :message="props.error ?? ''"
         @retry="
           emit(
             'pagination-change',
