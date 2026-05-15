@@ -481,43 +481,49 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
   /**
    * Build alias list for a given query index (used to filter out non-VRL fields)
    */
+  // Helper to get/init per-query field cache in meta
+  const getQueryFields = (queryIndex: number) => {
+    if (!dashboardPanelData.meta.queryFields[queryIndex]) {
+      dashboardPanelData.meta.queryFields[queryIndex] = {
+        customQueryFields: [],
+        vrlFunctionFieldList: [],
+      };
+    }
+    return dashboardPanelData.meta.queryFields[queryIndex];
+  };
+
   const buildAliasListForQuery = (queryIndex: number): string[] => {
-    const aliasList: any[] = [];
+    const aliasList: string[] = [];
     const query = dashboardPanelData.data.queries[queryIndex];
     if (!query) return aliasList;
 
-    if (query.customQuery === false) {
-      query?.fields?.x?.forEach((it: any) => {
-        if (!it.isDerived) aliasList.push(it.alias);
+    // Always include axis field aliases (works for both builder and custom mode)
+    ["x", "y", "z", "breakdown"].forEach((axis) => {
+      query?.fields?.[axis]?.forEach((it: any) => {
+        if (!it.isDerived && it.alias) aliasList.push(it.alias);
       });
-      query?.fields?.breakdown?.forEach((it: any) => {
-        if (!it.isDerived) aliasList.push(it.alias);
-      });
-      query?.fields?.y?.forEach((it: any) => {
-        if (!it.isDerived) aliasList.push(it.alias);
-      });
-      query?.fields?.z?.forEach((it: any) => {
-        if (!it.isDerived) aliasList.push(it.alias);
-      });
-      const specialFields = [
-        "latitude",
-        "longitude",
-        "weight",
-        "source",
-        "target",
-        "value",
-        "name",
-        "value_for_maps",
-      ];
-      specialFields.forEach((fieldName) => {
-        const field = query?.fields?.[fieldName];
-        if (field?.alias && !field?.isDerived) aliasList.push(field.alias);
-      });
-    }
-
-    dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
-      aliasList.push(it.name);
     });
+
+    const specialFields = [
+      "latitude",
+      "longitude",
+      "weight",
+      "source",
+      "target",
+      "value",
+      "name",
+      "value_for_maps",
+    ];
+    specialFields.forEach((fieldName) => {
+      const field = query?.fields?.[fieldName];
+      if (field?.alias && !field?.isDerived) aliasList.push(field.alias);
+    });
+
+    // Include customQueryFields from per-query cache
+    const qf = dashboardPanelData.meta.queryFields[queryIndex];
+    if (qf) {
+      qf.customQueryFields.forEach((it: any) => aliasList.push(it.name));
+    }
 
     return aliasList;
   };
@@ -529,7 +535,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     if (Array.isArray(fieldList) && Array.isArray(fieldList[0])) {
       const perQueryFields: string[][] = fieldList;
 
-      // Store each query's VRL field list separately
+      // Store each query's VRL field list in meta.queryFields
       perQueryFields.forEach((fields: string[], queryIndex: number) => {
         const query = dashboardPanelData.data.queries[queryIndex];
         if (!query) return;
@@ -542,13 +548,13 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
               ),
           )
           .map((field: string) => ({ name: field, type: "Utf8" }));
-        query.vrlFunctionFieldList = filteredFieldList;
+        getQueryFields(queryIndex).vrlFunctionFieldList = filteredFieldList;
       });
 
-      // Sync active query's VRL fields to meta for the field selector UI
-      const activeQuery = dashboardPanelData.data.queries[currentQueryIndex];
+      // Sync active query's VRL fields to shared meta for the field selector UI
+      const activeQf = dashboardPanelData.meta.queryFields[currentQueryIndex];
       dashboardPanelData.meta.stream.vrlFunctionFieldList =
-        activeQuery?.vrlFunctionFieldList ?? [];
+        activeQf?.vrlFunctionFieldList ?? [];
       return;
     }
 
@@ -563,11 +569,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       )
       .map((field: any) => ({ name: field, type: "Utf8" }));
 
-    if (dashboardPanelData.data.queries[currentQueryIndex]) {
-      dashboardPanelData.data.queries[currentQueryIndex].vrlFunctionFieldList =
-        filteredFieldList;
-    }
-
+    getQueryFields(currentQueryIndex).vrlFunctionFieldList = filteredFieldList;
     dashboardPanelData.meta.stream.vrlFunctionFieldList = filteredFieldList;
   };
 

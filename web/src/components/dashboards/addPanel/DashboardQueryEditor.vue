@@ -710,9 +710,12 @@ export default defineComponent({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].vrlFunctionQuery = "";
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].vrlFunctionFieldList = [];
+        // Clear per-query VRL field cache in meta
+        const currentIdx = dashboardPanelData.layout.currentQueryIndex;
+        if (dashboardPanelData.meta.queryFields[currentIdx]) {
+          dashboardPanelData.meta.queryFields[currentIdx].vrlFunctionFieldList =
+            [];
+        }
         dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
 

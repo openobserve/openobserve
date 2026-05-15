@@ -190,6 +190,14 @@ export default defineComponent({
       },
     );
 
+    // re-sync the toggle when switching between query tabs
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      () => {
+        initializeSelectedButtonType();
+      },
+    );
+
     const isSQLMode = computed(() => selectedButtonQueryType.value === "sql");
 
     const isPromQLMode = computed(

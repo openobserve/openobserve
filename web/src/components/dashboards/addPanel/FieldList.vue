@@ -932,6 +932,7 @@ export default defineComponent({
 
     const flattenGroupedFields = computed(() => {
       const flattenedFields: any[] = [];
+      const addedFieldNames = new Set<string>();
 
       dashboardPanelData.meta.stream.customQueryFields.forEach((field: any) => {
         flattenedFields.push({
@@ -939,15 +940,20 @@ export default defineComponent({
           type: field.type,
           isGroup: false,
         });
+        addedFieldNames.add(field.name?.toLowerCase());
       });
 
+      // Deduplicate VRL fields against custom query fields to prevent duplicates
       dashboardPanelData.meta.stream.vrlFunctionFieldList.forEach(
         (field: any) => {
-          flattenedFields.push({
-            name: field.name,
-            type: field.type,
-            isGroup: false,
-          });
+          if (!addedFieldNames.has(field.name?.toLowerCase())) {
+            flattenedFields.push({
+              name: field.name,
+              type: field.type,
+              isGroup: false,
+            });
+            addedFieldNames.add(field.name?.toLowerCase());
+          }
         },
       );
 

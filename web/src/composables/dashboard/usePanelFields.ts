@@ -852,13 +852,12 @@ export const usePanelFields = ({
     ) {
       dashboardPanelData.meta.stream.customQueryFields = [];
       dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
-      // Also clear the per-query stored VRL field list for the current query
-      const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
-      if (currentQuery) {
-        currentQuery.vrlFunctionFieldList = [];
+      // Also clear per-query field cache in meta
+      const currentIdx = dashboardPanelData.layout.currentQueryIndex;
+      if (dashboardPanelData.meta.queryFields[currentIdx]) {
+        dashboardPanelData.meta.queryFields[currentIdx].customQueryFields = [];
+        dashboardPanelData.meta.queryFields[currentIdx].vrlFunctionFieldList =
+          [];
       }
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex

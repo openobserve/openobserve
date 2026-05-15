@@ -181,6 +181,10 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
     hiddenQueries: [],
   },
   meta: {
+    queryFields: {} as Record<
+      number,
+      { customQueryFields: any[]; vrlFunctionFieldList: any[] }
+    >,
     parsedQuery: "",
     dragAndDrop: {
       dragging: false,
