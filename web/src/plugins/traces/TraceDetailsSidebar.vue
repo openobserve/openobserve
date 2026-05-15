@@ -929,6 +929,8 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1984,7 +1986,9 @@ export default defineComponent({
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
         store.state.theme === "dark",
-        searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+        props.span
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
+          : "#9e9e9e",
       ),
     );
 
