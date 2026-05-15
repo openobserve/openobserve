@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="scheduledFilterQuery"
           :placeholder="t('reports.search')"
         >
-          <template #prepend>
+          <template #icon-left>
             <q-icon name="search" class="cursor-pointer" />
           </template>
         </OInput>

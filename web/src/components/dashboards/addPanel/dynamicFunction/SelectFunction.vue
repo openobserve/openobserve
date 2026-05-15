@@ -62,7 +62,7 @@
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
-                  <template #prepend>
+                  <template #icon-left>
                     <q-icon
                       :name="getIconBasedOnArgType(fields.args[argIndex].type)"
                     />

@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mb-4"
             data-test="add-dashboard-github-search"
           >
-            <template #prepend>
+            <template #icon-left>
               <q-icon name="search" />
             </template>
           </OInput>

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clearable
           @clear="searchQuery = ''"
         >
-          <template #prepend>
+          <template #icon-left>
             <q-icon name="search" />
           </template>
         </OInput>

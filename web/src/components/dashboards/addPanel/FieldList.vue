@@ -464,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('search.searchField')"
             class="tw:mx-[0.625rem]"
           >
-            <template #prepend>
+            <template #icon-left>
               <q-icon name="search" />
             </template>
           </OInput>

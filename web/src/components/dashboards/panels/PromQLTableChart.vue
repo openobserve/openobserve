@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="min-width: 200px; max-width: 400px"
                 placeholder="Select series to filter"
               >
-                <template #prepend>
+                <template #icon-left>
                   <q-icon name="filter_list" size="xs" />
                 </template>
               </OSelect>
