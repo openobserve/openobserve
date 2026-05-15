@@ -15,7 +15,7 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow_schema::SchemaRef;
+use arrow_schema::{SchemaRef, SortOptions};
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::{Session, TableProvider, memory::DataSourceExec},
@@ -27,7 +27,8 @@ use datafusion::{
     },
     execution::cache::cache_manager::FileStatisticsCache,
     logical_expr::TableProviderFilterPushDown,
-    physical_plan::ExecutionPlan,
+    physical_expr::{LexOrdering, PhysicalSortExpr},
+    physical_plan::{ExecutionPlan, expressions::Column},
     prelude::Expr,
 };
 use rayon::prelude::*;
@@ -168,14 +169,6 @@ impl TableProvider for ListingTableAdapter {
             filter_projection,
         )?;
 
-        if reverse {
-            log::info!(
-                "[trace_id {}] attempted to split file groups by statistics, but there were more file groups than target_partitions: {}; falling back to unordered",
-                self.trace_id,
-                state.config().target_partitions(),
-            );
-        }
-
         Ok(plan)
     }
 
@@ -204,15 +197,48 @@ fn handler_tantivy_index(
         let mut file_groups = config.file_groups.clone();
 
         if reverse {
-            let new_file_groups = file_groups
-                .into_iter()
-                .map(|file_group| {
-                    let mut files = file_group.into_inner();
-                    files.reverse();
-                    FileGroup::new(files)
-                })
-                .collect();
-            file_groups = new_file_groups;
+            let schema = config.file_source().table_schema().table_schema();
+            match schema.index_of(TIMESTAMP_COL_NAME) {
+                Ok(index) => {
+                    let sort_order = LexOrdering::new(vec![PhysicalSortExpr {
+                        expr: Arc::new(Column::new(TIMESTAMP_COL_NAME, index)),
+                        options: SortOptions {
+                            descending: true,
+                            nulls_first: false,
+                        },
+                    }]);
+                    if let Some(sort_order) = sort_order {
+                        match FileScanConfig::split_groups_by_statistics_with_target_partitions(
+                            schema,
+                            &file_groups,
+                            &sort_order,
+                            target_partitions,
+                        ) {
+                            Ok(new_file_groups) => {
+                                file_groups = new_file_groups;
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "[trace_id {trace_id}] failed to split file groups by statistics: {e}, falling back to reversing file groups"
+                                );
+                                file_groups = file_groups
+                                    .into_iter()
+                                    .map(|file_group| {
+                                        let mut files = file_group.into_inner();
+                                        files.reverse();
+                                        FileGroup::new(files)
+                                    })
+                                    .collect();
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    log::warn!(
+                        "[trace_id {trace_id}] _timestamp column not found in schema, skipping split_groups_by_statistics"
+                    );
+                }
+            }
         }
 
         let start = std::time::Instant::now();
@@ -240,7 +266,7 @@ fn handler_tantivy_index(
         let files_nums = new_file_groups.iter().map(|g| g.len()).sum::<usize>();
 
         log::info!(
-            "[trace_id {trace_id}] listing table adapter, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
+            "[trace_id {trace_id}] listing table adapter, target_partitions: {target_partitions}, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
             start.elapsed().as_millis() as usize,
         );
 
