@@ -181,10 +181,15 @@
           @update:cancel="confirmBulkDelete = false"
           v-model="confirmBulkDelete"
         />
-        <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
-          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
-        </q-dialog>
-      </OPage>
+        <AddRegexPattern
+          data-test="regex-pattern-list-add-regex-pattern-drawer"
+          v-model:open="showAddRegexPatternDialog.show"
+          :data="showAddRegexPatternDialog.data"
+          :is-edit="showAddRegexPatternDialog.isEdit"
+          @update:list="getRegexPatterns"
+          @close="closeAddRegexPatternDialog"
+        />
+      </q-page>
   </template>
 
 <script lang="ts">

@@ -60,8 +60,12 @@ test.describe("dashboard folder testcases", () => {
     await page.waitForTimeout(1000);
     await pm.dashboardPage.verifyShareDashboardLink(randomDashboardName);
     await page.waitForTimeout(1000);
-    // Click on folder name in breadcrumbs to go back to folder view
-    await page.getByText(folderName).click();
+    // Click on folder name in breadcrumbs to go back to folder view.
+    // Use the explicit data-test on the breadcrumb span (ViewDashboard.vue) —
+    // a bare getByText(folderName) is ambiguous in CI when the folder name
+    // also appears in toast notifications, history, or auto-completion popups,
+    // and Playwright's strict mode throws when multiple elements match.
+    await page.locator('[data-test="dashboard-view-folder-breadcrumb"]').click();
     await page.waitForTimeout(1000);
     await pm.dashboardPage.deleteSearchedDashboard(randomDashboardName);
 

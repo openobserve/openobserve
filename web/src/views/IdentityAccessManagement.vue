@@ -5,6 +5,7 @@
       unit="px"
       :limits="[0, 300]"
       class="tw:overflow-hidden logs-splitter-smooth"
+      style="height: 100%;"
     >
       <template v-slot:before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
@@ -33,7 +34,7 @@
       </template>
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-          <div class="tw:overflow-hidden">
+          <div class="tw:overflow-hidden tw:h-full">
             <RouterView />
           </div>
         </div>

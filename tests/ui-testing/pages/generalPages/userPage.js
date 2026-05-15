@@ -73,20 +73,27 @@ export class UserPage {
 
     async deleteUser(email) {
         await this.page.locator(`[data-test="delete-basic-user-${email.replace('@', '\\@')}"]`).click();
-        await this.page.getByRole('button', { name: 'OK' }).click();
+        // User delete confirmation is rendered by ODialog — use its built-in
+        // primary button rather than matching by visible text, which is
+        // ambiguous when other "OK" buttons exist on the page.
+        await this.page.locator('[data-test="user-delete-dialog"] [data-test="o-dialog-primary-btn"]').click();
     }
 
     async deleteUserCancel(email) {
         // Logic to simulate unauthorized deletion
         await this.page.locator(`[data-test="delete-basic-user-${email.replace('@', '\\@')}"]`).click();
-        await this.page.getByRole('button', { name: 'Cancel' }).click();
+        await this.page.locator('[data-test="user-delete-dialog"] [data-test="o-dialog-secondary-btn"]').click();
     }
 
     async verifySuccessMessage(expectedMessage) {
-        // Wait directly for the specific alert — avoids being confused by earlier
-        // "Please wait..." spinner notifications that briefly appear as role=alert.
-        const specificAlert = this.page.getByRole('alert').filter({ hasText: expectedMessage });
-        await expect(specificAlert).toBeVisible({ timeout: 15000 });
+        // Match both Quasar notification toasts (.q-notification__message) and
+        // q-input form validation messages ([role="alert"] inside q-field__bottom).
+        // getByRole('alert') alone can miss the notification when accessibility
+        // tree resolution races against Quasar's notify queue + dialog portals.
+        const specificAlert = this.page
+            .locator('.q-notification__message, [role="alert"]')
+            .filter({ hasText: expectedMessage });
+        await expect(specificAlert.first()).toBeVisible({ timeout: 15000 });
     }
 
     async addUserFirstLast(firstName, lastName) {

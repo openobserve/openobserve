@@ -326,51 +326,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialogVisible" @hide="closeErrorDialog">
-      <q-card class="backfill-error-dialog" style="min-width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">
-            <q-icon name="error" color="negative" size="24px" class="q-mr-sm" />
-            Backfill Job Error
+    <ODialog data-test="backfill-jobs-list-error-dialog"
+      v-model:open="errorDialogVisible"
+      size="md"
+      title="Backfill Job Error"
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="errorDialogVisible = false; closeErrorDialog()"
+    >
+      <template #header-left>
+        <q-icon name="error" color="negative" size="18px" />
+      </template>
+
+      <div v-if="errorDialogData">
+        <div class="q-mb-md">
+          <div class="text-caption text-grey-6">Job ID</div>
+          <div class="text-body2 text-weight-medium">
+            {{ errorDialogData.job_id }}
           </div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
+        </div>
 
-        <q-separator />
-
-        <q-card-section v-if="errorDialogData">
-          <div class="q-mb-md">
-            <div class="text-caption text-grey-6">Job ID</div>
-            <div class="text-body2 text-weight-medium">
-              {{ errorDialogData.job_id }}
-            </div>
+        <div class="q-mb-md">
+          <div class="text-caption text-grey-6">Pipeline</div>
+          <div class="text-body2">
+            {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-caption text-grey-6">Pipeline</div>
-            <div class="text-body2">
-              {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
-            </div>
+        <div>
+          <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
+          <div class="error-message-box">
+            {{ errorDialogData.error }}
           </div>
+        </div>
+      </div>
 
-          <div>
-            <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
-            <div class="error-message-box">
-              {{ errorDialogData.error }}
-            </div>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    </ODialog>
 
     <!-- Confirm Dialog -->
     <ConfirmDialog
@@ -390,7 +381,17 @@ import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronLeft, RefreshCw, Pause, Play, Pencil, Eye, Trash2, AlertCircle } from "lucide-vue-next";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import {
+  ChevronLeft,
+  RefreshCw,
+  Pause,
+  Play,
+  Pencil,
+  Eye,
+  Trash2,
+  AlertCircle,
+} from "lucide-vue-next";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";

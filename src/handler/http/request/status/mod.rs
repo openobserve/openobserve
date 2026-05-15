@@ -211,6 +211,10 @@ struct ConfigResponse<'a> {
     auto_query_enabled: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
+    #[cfg(feature = "enterprise")]
+    org_storage_providers: String,
+    #[cfg(feature = "enterprise")]
+    org_storage_region: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -331,6 +335,11 @@ pub async fn zo_config() -> impl IntoResponse {
     let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
     let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
+
+    #[cfg(feature = "enterprise")]
+    let org_storage_providers = o2cfg.org_storage.allowed_providers.clone();
+    #[cfg(feature = "enterprise")]
+    let org_storage_region = o2cfg.org_storage.region.clone();
 
     let custom_logo_text = enterprise_value!(
         "".to_string(),
@@ -459,6 +468,10 @@ pub async fn zo_config() -> impl IntoResponse {
         auto_query_enabled: cfg.common.auto_query_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
+        #[cfg(feature = "enterprise")]
+        org_storage_providers,
+        #[cfg(feature = "enterprise")]
+        org_storage_region,
     })
 }
 

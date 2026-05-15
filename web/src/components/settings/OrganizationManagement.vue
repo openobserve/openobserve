@@ -39,45 +39,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <OButton
-              variant="ghost"
-              size="sm"
-              class="q-ml-xs"
-              data-test="otg-management-extend-trial-btn"
-              @click.stop="toggleExtendTrialDialog(props.row)"
-            >
-              {{ t("settings.extendTrial") }}
-            </OButton>
-            <OButton
-              v-if="props.row.billing_provider === '-'"
-              variant="ghost"
-              size="sm"
-              class="q-ml-xs tw:text-emerald-600"
-              data-test="org-management-add-contract-btn"
-              @click.stop="toggleContractDialog(props.row, 'create')"
-            >
-              Add Contract
-            </OButton>
-            <OButton
-              v-if="props.row.billing_provider === 'no_op'"
-              variant="ghost"
-              size="sm"
-              class="q-ml-xs tw:text-emerald-600"
-              data-test="org-management-extend-contract-btn"
-              @click.stop="toggleContractDialog(props.row, 'extend')"
-            >
-              Extend Contract
-            </OButton>
-            <OButton
-              v-if="props.row.billing_provider === 'no_op'"
-              variant="ghost-destructive"
-              size="sm"
-              class="q-ml-xs"
-              data-test="org-management-revoke-contract-btn"
-              @click.stop="confirmRevokeContract(props.row)"
-            >
-              Revoke
-            </OButton>
+            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+              <OButton
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="otg-management-extend-trial-btn"
+                @click.stop="toggleExtendTrialDialog(props.row)"
+              >
+                <q-icon name="event" size="14px" />
+                <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="props.row.billing_provider === '-'"
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="org-management-add-contract-btn"
+                @click.stop="toggleContractDialog(props.row, 'create')"
+              >
+                <q-icon name="note_add" size="14px" />
+                <q-tooltip>Add Contract</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="props.row.billing_provider === 'no_op'"
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="org-management-extend-contract-btn"
+                @click.stop="toggleContractDialog(props.row, 'extend')"
+              >
+                <q-icon name="event" size="14px" />
+                <q-tooltip>Extend Contract</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="props.row.billing_provider === 'no_op'"
+                variant="ghost-destructive"
+                size="icon-xs-circle"
+                data-test="org-management-revoke-contract-btn"
+                @click.stop="confirmRevokeContract(props.row)"
+              >
+                <q-icon name="block" size="14px" />
+                <q-tooltip>Revoke</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="!props.row.org_storage_enabled"
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="org-management-storage-enable-btn"
+                @click.stop="toggleOrgStorage(props.row)"
+              >
+                <q-icon name="cloud_upload" size="14px" />
+                <q-tooltip>Enable Storage</q-tooltip>
+              </OButton>
+              <OButton
+                v-else
+                variant="ghost"
+                size="icon-xs-circle"
+                disabled
+                class="text-positive"
+                data-test="org-management-storage-enabled-btn"
+              >
+                <q-icon name="cloud_done" size="14px" />
+                <q-tooltip>Storage Enabled</q-tooltip>
+              </OButton>
+            </div>
           </q-td>
         </template>
         <template #top="scope">
@@ -121,120 +144,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Extend Trial Dialog -->
-    <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name"
-              >Extend Trial for {{ extendTrialDataRow.name }}</span
-            >
-            <span class="text-subtitle2 flex"
-              >Set the new trial extension period.</span
-            >
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div>
-            <div class="float-left text-bold">Week(s)</div>
-            <div class="float-right q-gutter-xs">
-              <span
-                v-for="page in 4"
-                :key="page"
-                @click="extendedTrial = page"
-                :class="[
-                  'cursor-pointer q-px-sm q-py-xs page-border',
-                  extendedTrial === page
-                    ? 'bg-primary text-white'
-                    : 'bg-white text-gray-700 border-gray-3',
-                ]"
-              >
-                {{ page }}
-              </span>
-            </div>
-          </div>
-        </q-card-section>
-        <q-card-actions align="right" class="text-primary q-mt-md">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
+    <ODialog data-test="organization-management-extend-trial-dialog"
+      v-model:open="extendTrialPrompt"
+      size="sm"
+      :title="`Extend Trial for ${extendTrialDataRow?.name}`"
+      sub-title="Set the new trial extension period."
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      @click:secondary="extendTrialPrompt = false"
+      @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+    >
+      <div>
+        <div class="float-left text-bold">Week(s)</div>
+        <div class="float-right q-gutter-xs">
+          <span
+            v-for="page in 4"
+            :key="page"
+            @click="extendedTrial = page"
+            :class="[
+              'cursor-pointer q-px-sm q-py-xs page-border',
+              extendedTrial === page
+                ? 'bg-primary text-white'
+                : 'bg-white text-gray-700 border-gray-3',
+            ]"
           >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
-          >
-            Extend trial by {{ extendedTrial }} week(s)
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+            {{ page }}
+          </span>
+        </div>
+      </div>
+    </ODialog>
 
     <!-- External Contract Dialog -->
-    <q-dialog v-model="contractPrompt">
-      <q-card class="q-pa-sm" style="min-width: 500px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="contractDataRow.name">
-              {{ contractMode === "create" ? "Create" : "Extend" }} External
-              Contract for {{ contractDataRow.name }}
-            </span>
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div class="q-mb-md">
-            <div class="text-bold q-mb-xs">
-              {{ contractMode === "create" ? "End Date" : "New End Date" }}
-            </div>
-            <q-input
-              v-model="contractEndDate"
-              dense
-              outlined
-              type="date"
-              data-test="contract-end-date-input"
-            />
-          </div>
-          <div
-            v-if="
-              contractMode === 'extend' && contractDataRow.contract_end_date
-            "
-            class="text-caption text-grey"
-          >
-            Current end date:
-            {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="text-primary">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="submitContract"
-          >
-            {{ contractMode === 'create' ? 'Create Contract' : 'Extend Contract' }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="organization-management-contract-dialog"
+      v-model:open="contractPrompt"
+      size="sm"
+      :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      @click:secondary="contractPrompt = false"
+      @click:primary="submitContract"
+    >
+      <div class="q-mb-md">
+        <div class="text-bold q-mb-xs">
+          {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
+        </div>
+        <q-input
+          v-model="contractEndDate"
+          dense
+          outlined
+          type="date"
+          data-test="contract-end-date-input"
+        />
+      </div>
+      <div
+        v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
+        class="text-caption text-grey"
+      >
+        Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+      </div>
+    </ODialog>
   </OPage>
 </template>
 <script lang="ts">
@@ -256,12 +224,15 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import orgStorageService from "@/services/org_storage";
 export default defineComponent({
   name: "PageAlerts",
   components: {
     NoData,
     QTablePagination,
     OButton,
+    ODialog,
   },
   setup() {
     const qTable = ref();
@@ -370,7 +341,8 @@ export default defineComponent({
         label: t("settings.actions"),
         align: "center",
         sortable: false,
-        style: "width: 280px",
+        classes: "actions-column",
+        style: "width: 220px",
       },
     ]);
     const perPageOptions: any = [
@@ -441,6 +413,7 @@ export default defineComponent({
               contract_end_date_display: formatMicrosToDate(
                 responseData[i].contract_end_date,
               ),
+              org_storage_enabled: responseData[i].org_storage_enabled || false,
             });
           }
 
@@ -596,6 +569,43 @@ export default defineComponent({
       });
     };
 
+    const toggleOrgStorage = (row: any) => {
+      $q.dialog({
+        title: "Enable Storage Settings",
+        message: `Are you sure you want to enable storage settings for "${row.name}"?`,
+        cancel: true,
+        persistent: true,
+      }).onOk(() => {
+        loading.value = true;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "enabling storage settings...",
+        });
+        orgStorageService
+          .enable(row.identifier)
+          .then(() => {
+            $q.notify({
+              type: "positive",
+              message: "Storage settings enabled successfully.",
+            });
+            getData();
+            loading.value = false;
+            dismiss();
+          })
+          .catch((error) => {
+            loading.value = false;
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message:
+                error.response?.data?.message ||
+                "Failed to enable storage settings.",
+              timeout: 5000,
+            });
+          });
+      });
+    };
+
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
       const payload = {
         new_end_date: getTimestampInMicroseconds(extended_week),
@@ -667,6 +677,7 @@ export default defineComponent({
       toggleContractDialog,
       submitContract,
       confirmRevokeContract,
+      toggleOrgStorage,
       formatMicrosToDate,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {

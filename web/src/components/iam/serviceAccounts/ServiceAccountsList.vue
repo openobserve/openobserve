@@ -192,155 +192,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
   </div>
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
+    <add-service-account
+      v-model:open="showAddUserDialog"
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      @updated="addMember"
+    />
+
+    <ODialog data-test="service-accounts-list-refresh-dialog"
+      v-model:open="confirmRefresh"
+      :title="t('serviceAccounts.confirmRefreshHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRefresh = false"
+      @click:primary="refreshServiceToken(toBeRefreshed)"
     >
-      <add-service-account
-        style="width: 30vw"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </q-dialog>
+      <p>{{ t('serviceAccounts.confirmRefreshMsg') }}</p>
+    </ODialog>
 
-    <q-dialog v-model="confirmRefresh">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("serviceAccounts.confirmRefreshHead") }}</div>
-          <div class="para">{{ t("serviceAccounts.confirmRefreshMsg") }}</div>
-        </q-card-section>
+    <ODialog data-test="service-accounts-list-delete-dialog"
+      v-model:open="confirmDelete"
+      :title="t('serviceAccounts.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
+    >
+      <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
+    </ODialog>
 
-        <q-card-actions class="confirmActions">
+    <ODialog data-test="service-accounts-list-bulk-delete-dialog"
+      v-model:open="confirmBulkDelete"
+      size="xs"
+      title="Delete Service Accounts"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteServiceAccounts"
+    >
+      <p>Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</p>
+    </ODialog>
+
+    <ODialog data-test="service-accounts-list-token-dialog"
+      v-model:open="isShowToken"
+      persistent
+      size="md"
+      title="Service Account Token"
+    >
+
+      <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
+        <!-- Token section taking 75% of the width -->
+        <div
+          class="text-h6 text-center tw:truncate el-border"
+          style="flex: 3; padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
+        >
+          {{ serviceToken }}
+        </div>
+        <!-- Buttons section taking 25% of the width -->
+        <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
           <OButton
-            v-close-popup="true"
             variant="outline"
-            size="sm-action"
-            data-test="cancel-button"
+            size="icon-md"
+            :title="t('serviceAccounts.copyToken')"
+            class="tw:mr-1"
+            @click.stop="copyToClipboard(serviceToken)"
           >
-            {{ t("user.cancel") }}
+            <q-icon name="content_copy" />
           </OButton>
           <OButton
-            data-test="confirm-button"
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="refreshServiceToken(toBeRefreshed)"
+            variant="outline"
+            size="icon-md"
+            :title="t('serviceAccounts.downloadToken')"
+            @click.stop="downloadTokenAsFile(serviceToken)"
           >
-            {{ t("user.ok") }}
+            <q-icon name="file_download" />
           </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("serviceAccounts.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("serviceAccounts.confirmDeleteMsg") }}</div>
-        </q-card-section>
+        </div>
+      </div>
 
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action" data-test="cancel-button">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            data-test="confirm-button"
-            @click="deleteUser"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Service Accounts</div>
-          <div class="para">Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="bulkDeleteServiceAccounts"
-          >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="isShowToken"  persistent>
-  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
-      <div>Service Account Token </div>
-          <OButton data-test="sa-cancel-button" variant="ghost" size="icon-circle-sm" @click="isShowToken = false">
-            <q-icon name="cancel" />
-          </OButton>
-    </q-card-section>
-
-    <q-card-section>
-
-      <div class="tw:flex tw:items-center tw:gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
-  <!-- Token section taking 75% of the width -->
-  <div
-    class="text-h6 text-center tw:truncate el-border"
-    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-  >
-    {{  serviceToken }}
-  </div>
-  <!-- Buttons section taking 25% of the width -->
-  <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
-    <OButton
-      variant="outline"
-      size="icon-md"
-      :title="t('serviceAccounts.copyToken')"
-      class="tw:mr-1"
-      @click.stop="copyToClipboard(serviceToken)"
-    >
-      <q-icon name="content_copy" />
-    </OButton>
-    <OButton
-      variant="outline"
-      size="icon-md"
-      :title="t('serviceAccounts.downloadToken')"
-      @click.stop="downloadTokenAsFile(serviceToken)"
-    >
-      <q-icon name="file_download" />
-    </OButton>
-  </div>
-  
-</div>
-
-    <div class="q-pt-md flex items-center warning-text">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
-      <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.
-      </span>
-    </div>
-   
-    </q-card-section>
-
-  </q-card>
-</q-dialog>
+      <div class="q-pt-md flex items-center warning-text">
+        <q-icon name="info" class="q-mr-xs" size="16px" />
+        <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
+      </div>
+    </ODialog>
   </OPage>
 </template>
 
 <script lang="ts">
 
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -367,7 +309,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton },
+  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -398,9 +340,19 @@ export default defineComponent({
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
 
-    onBeforeMount(()=>{
-      getServiceAccountsUsers();
-    })
+    onBeforeMount(async () => {
+      await getServiceAccountsUsers();
+
+      const query = router.currentRoute.value.query;
+      if (query.action === "add") {
+        addUser({}, false);
+      } else if (query.action === "update" && query.email) {
+        const match = serviceAccountsState.service_accounts_users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
+    });
 
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -641,6 +593,7 @@ export default defineComponent({
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       service_accounts
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
@@ -714,6 +667,7 @@ export default defineComponent({
     };
 
     const refreshServiceToken = async (row:any) =>{
+      confirmRefresh.value = false;
       row.isLoading = true;
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
           serviceToken.value = res.data.token;

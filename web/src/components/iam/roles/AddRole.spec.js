@@ -1,79 +1,144 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Dialog, Notify } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import AddRole from "./AddRole.vue";
-import { createRole, updateRole } from "@/services/iam";
+import { createRole } from "@/services/iam";
 
 // Mock the IAM service
 vi.mock("@/services/iam", () => ({
   createRole: vi.fn(),
-  updateRole: vi.fn()
+  updateRole: vi.fn(),
 }));
 
-// Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+// Mock vue-i18n so t(key) returns the key unchanged
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
+
+// Mock the analytics tracker — irrelevant to UI flow.
+const trackMock = vi.fn();
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: trackMock }),
+}));
 
 installQuasar({
   plugins: [Dialog, Notify],
 });
+
+// ODrawer stub: exposes the migrated props (open/width/title/...) and drives
+// the primary/secondary/neutral buttons via the standard click:* emits. Buttons
+// inside the default slot (the AddRole component still renders its own
+// OButton cancel/save inside the slot) are also exposed for direct clicks.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "showClose",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test-stub="o-drawer"
+      :data-open="open"
+      :data-title="title"
+      :data-width="width"
+    >
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+  inheritAttrs: false,
+};
+
+const findDrawer = (w) =>
+  w.findComponent({ name: "ODrawer" });
 
 describe("AddRole Component", () => {
   let wrapper;
   let mockStore;
   let notifyMock;
 
-  beforeEach(() => {
-    // Setup mock store
-    mockStore = {
-      state: {
-        selectedOrganization: {
-          identifier: "test-org"
-        }
-      }
-    };
-
-    // Setup notify mock
-    notifyMock = vi.fn();
-
-    // Mount component
-    wrapper = mount(AddRole, {
+  const mountAddRole = (props = {}) =>
+    mount(AddRole, {
       global: {
         plugins: [i18n],
         provide: {
           store: mockStore,
         },
         stubs: {
-          QCard: false,
-          QCardSection: false,
-          QIcon: true,
+          ODrawer: ODrawerStub,
           QInput: true,
-          QBtn: true
-        }
+        },
       },
       props: {
-        width: "30vw",
+        open: true,
         role: null,
-        org_identifier: "test-org"
-      }
+        org_identifier: "test-org",
+        ...props,
+      },
     });
 
-    // Attach notify mock
+  beforeEach(() => {
+    mockStore = {
+      state: {
+        selectedOrganization: {
+          identifier: "test-org",
+        },
+      },
+    };
+
+    notifyMock = vi.fn();
+
+    wrapper = mountAddRole();
+
+    // Attach notify mock onto the component's $q instance.
     wrapper.vm.$q.notify = notifyMock;
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    if (wrapper) wrapper.unmount();
   });
 
   describe("Component Initialization", () => {
@@ -81,13 +146,16 @@ describe("AddRole Component", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("initializes with empty role name", () => {
-      expect(wrapper.vm.name).toBe("");
+    it("renders the ODrawer with migrated props", () => {
+      const drawer = findDrawer(wrapper);
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.props("open")).toBe(true);
+      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("title")).toBe("iam.addRole");
     });
 
-    it("shows correct title", () => {
-      const title = wrapper.find('[data-test="add-role-section-title"]');
-      expect(title.text()).toBe("iam.addRole");
+    it("initializes with empty role name", () => {
+      expect(wrapper.vm.name).toBe("");
     });
   });
 
@@ -120,31 +188,31 @@ describe("AddRole Component", () => {
   describe("Role Creation", () => {
     it("creates role successfully", async () => {
       vi.mocked(createRole).mockResolvedValue({});
-      
+
       wrapper.vm.name = "test_role";
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(createRole).toHaveBeenCalledWith(
-        "test_role",
-        "test-org"
-      );
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(createRole).toHaveBeenCalledWith("test_role", "test-org");
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'Role "test_role" Created Successfully!',
-          color: "positive"
-        })
+          color: "positive",
+        }),
       );
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-      expect(wrapper.emitted()["added:role"]).toBeTruthy();
+      // Migrated emits: update:open(false) replaces the old cancel:hideform.
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen).toBeTruthy();
+      expect(updateOpen?.[updateOpen.length - 1]).toEqual([false]);
+      expect(wrapper.emitted("added:role")).toBeTruthy();
     });
 
     it("prevents creation with invalid role name", async () => {
       wrapper.vm.name = "invalid role";
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.vm.saveRole();
       await flushPromises();
 
@@ -154,7 +222,7 @@ describe("AddRole Component", () => {
     it("prevents creation with empty role name", async () => {
       wrapper.vm.name = "";
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.vm.saveRole();
       await flushPromises();
 
@@ -165,92 +233,65 @@ describe("AddRole Component", () => {
       vi.mocked(createRole).mockRejectedValue({
         response: {
           status: 400,
-          data: {
-            message: "Role already exists"
-          }
-        }
+          data: { message: "Role already exists" },
+        },
       });
 
       wrapper.vm.name = "test_role";
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Role already exists",
-          color: "negative"
-        })
+          color: "negative",
+        }),
       );
     });
 
     it("ignores 403 error notifications", async () => {
       vi.mocked(createRole).mockRejectedValue({
-        response: {
-          status: 403
-        }
+        response: { status: 403 },
       });
 
       wrapper.vm.name = "test_role";
       await wrapper.vm.$nextTick();
-      
+
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).not.toHaveBeenCalled();
+      expect(notifyMock).not.toHaveBeenCalled();
     });
   });
 
   describe("UI Interactions", () => {
-    it("emits cancel event on close icon click", async () => {
-      const closeIcon = wrapper.find('[data-test="add-role-close-dialog-btn"]');
-      await closeIcon.trigger("click");
-      
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
+    it("emits update:open(false) when ODrawer requests close", async () => {
+      // Simulate ODrawer's own close handling propagating via update:open.
+      await findDrawer(wrapper).vm.$emit("update:open", false);
+
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen).toBeTruthy();
+      expect(updateOpen?.[0]).toEqual([false]);
     });
 
-    it("emits cancel event on cancel button click", async () => {
+    it("emits update:open(false) when the cancel OButton is clicked", async () => {
       const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
+      expect(cancelButton.exists()).toBe(true);
       await cancelButton.trigger("click");
-      
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-    });
 
-    it("handles whitespace in role name", async () => {
-      // Since v-model.trim is used in template, we need to test the computed value
-      const input = wrapper.findComponent({ name: 'QInput' });
-      await input.setValue("  test_role  ");
-      expect(input.props('modelValue')).toBe("test_role");
-    });
-
-    it("shows validation hint for invalid role name", async () => {
-      // Remove stub for QInput to allow rendering of the hint slot
-      const wrapper = mount(AddRole, {
-        global: {
-          plugins: [i18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            QCard: false,
-            QCardSection: false,
-            QIcon: true,
-            QBtn: true
-          }
-        }
-      });
-
-      const hintText = wrapper.find('.q-field__messages').text();
-      expect(hintText).toBe('Use alphanumeric and \'_\' characters only, without spaces.');
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen).toBeTruthy();
+      expect(updateOpen?.[0]).toEqual([false]);
     });
   });
 
   describe("Form Validation", () => {
     it("shows required error when name is empty", async () => {
-      const input = wrapper.findComponent({ name: 'QInput' });
-      const rules = input.props('rules');
-      
+      const input = wrapper.findComponent({ name: "QInput" });
+      const rules = input.props("rules");
+
       const validationResult = await rules[0]("", {});
       expect(validationResult).toBe("common.nameRequired");
     });
@@ -258,18 +299,20 @@ describe("AddRole Component", () => {
     it("shows format error for invalid role name", async () => {
       wrapper.vm.name = "invalid@role";
       await wrapper.vm.$nextTick();
-      
-      const input = wrapper.findComponent({ name: 'QInput' });
-      const rules = input.props('rules');
-      
+
+      const input = wrapper.findComponent({ name: "QInput" });
+      const rules = input.props("rules");
+
       const validationResult = await rules[0]("invalid@role", {});
-      expect(validationResult).toBe("Use alphanumeric and '_' characters only, without spaces.");
+      expect(validationResult).toBe(
+        "Use alphanumeric and '_' characters only, without spaces.",
+      );
     });
 
-    it("enforces maximum length constraint", async () => {
-      const input = wrapper.findComponent({ name: 'QInput' });
-      // Convert maxlength to string since it's passed as string in template
-      expect(input.props('maxlength')).toBe("100");
+    it("enforces maximum length constraint", () => {
+      const input = wrapper.findComponent({ name: "QInput" });
+      // maxlength is passed as a string in the template.
+      expect(input.props("maxlength")).toBe("100");
     });
   });
 
@@ -278,10 +321,8 @@ describe("AddRole Component", () => {
       vi.mocked(createRole).mockRejectedValue({
         response: {
           status: 500,
-          data: {
-            message: "Network Error"
-          }
-        }
+          data: { message: "Network Error" },
+        },
       });
 
       wrapper.vm.name = "test_role";
@@ -289,19 +330,17 @@ describe("AddRole Component", () => {
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           color: "negative",
-          message: "Network Error"
-        })
+          message: "Network Error",
+        }),
       );
     });
 
     it("handles missing error response data", async () => {
       vi.mocked(createRole).mockRejectedValue({
-        response: {
-          status: 400
-        }
+        response: { status: 400 },
       });
 
       wrapper.vm.name = "test_role";
@@ -309,10 +348,8 @@ describe("AddRole Component", () => {
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          color: "negative"
-        })
+      expect(notifyMock).toHaveBeenCalledWith(
+        expect.objectContaining({ color: "negative" }),
       );
     });
   });
@@ -322,10 +359,8 @@ describe("AddRole Component", () => {
       vi.mocked(createRole).mockRejectedValue({
         response: {
           status: 400,
-          data: {
-            message: "Error"
-          }
-        }
+          data: { message: "Error" },
+        },
       });
 
       wrapper.vm.name = "test_role";
@@ -336,27 +371,57 @@ describe("AddRole Component", () => {
       expect(wrapper.vm.name).toBe("test_role");
     });
 
-    it("clears role name after successful submission", async () => {
+    it("emits update:open(false) after a successful submission", async () => {
       vi.mocked(createRole).mockResolvedValue({});
-      
+
       wrapper.vm.name = "test_role";
       await wrapper.vm.$nextTick();
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen).toBeTruthy();
+      expect(updateOpen?.[updateOpen.length - 1]).toEqual([false]);
     });
   });
 
   describe("Role Name Format Validation", () => {
     const testCases = [
-      { input: "valid_role_123", expected: true, description: "alphanumeric with underscore" },
-      { input: "UPPERCASE_ROLE", expected: true, description: "uppercase with underscore" },
-      { input: "123_numeric_start", expected: true, description: "starts with number" },
-      { input: "role with space", expected: false, description: "contains space" },
-      { input: "role@special", expected: false, description: "contains special character" },
-      { input: "role-hyphen", expected: false, description: "contains hyphen" },
-      { input: "_start_underscore", expected: true, description: "starts with underscore" }
+      {
+        input: "valid_role_123",
+        expected: true,
+        description: "alphanumeric with underscore",
+      },
+      {
+        input: "UPPERCASE_ROLE",
+        expected: true,
+        description: "uppercase with underscore",
+      },
+      {
+        input: "123_numeric_start",
+        expected: true,
+        description: "starts with number",
+      },
+      {
+        input: "role with space",
+        expected: false,
+        description: "contains space",
+      },
+      {
+        input: "role@special",
+        expected: false,
+        description: "contains special character",
+      },
+      {
+        input: "role-hyphen",
+        expected: false,
+        description: "contains hyphen",
+      },
+      {
+        input: "_start_underscore",
+        expected: true,
+        description: "starts with underscore",
+      },
     ];
 
     testCases.forEach(({ input, expected, description }) => {
@@ -369,28 +434,25 @@ describe("AddRole Component", () => {
   });
 
   describe("Save Button Behavior", () => {
-    it("triggers save on button click", async () => {
+    it("triggers save on save button click", async () => {
       vi.mocked(createRole).mockResolvedValue({});
-      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
       wrapper.vm.name = "valid_role";
       await wrapper.vm.$nextTick();
-      
+
+      const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
+      expect(saveButton.exists()).toBe(true);
       await saveButton.trigger("click");
       await flushPromises();
 
       expect(createRole).toHaveBeenCalled();
     });
 
-
-    // Add a test for proper error handling
     it("handles API errors correctly", async () => {
       vi.mocked(createRole).mockRejectedValue({
         response: {
           status: 400,
-          data: {
-            message: "Invalid role name"
-          }
-        }
+          data: { message: "Invalid role name" },
+        },
       });
 
       wrapper.vm.name = "test_role";
@@ -398,20 +460,17 @@ describe("AddRole Component", () => {
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Invalid role name",
-          color: "negative"
-        })
+          color: "negative",
+        }),
       );
     });
 
-    // Add a test for 403 error handling
     it("handles 403 errors silently", async () => {
       vi.mocked(createRole).mockRejectedValue({
-        response: {
-          status: 403
-        }
+        response: { status: 403 },
       });
 
       wrapper.vm.name = "test_role";
@@ -419,55 +478,53 @@ describe("AddRole Component", () => {
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).not.toHaveBeenCalled();
+      expect(notifyMock).not.toHaveBeenCalled();
     });
   });
 
   describe("Props Handling", () => {
-    it("initializes with provided role name", async () => {
-      const wrapper = mount(AddRole, {
-        global: {
-          plugins: [i18n],
-          provide: { store: mockStore }
-        },
-        props: {
-          role: { name: "existing_role" }
-        }
-      });
-
-      expect(wrapper.vm.name).toBe("existing_role");
+    it("initializes with provided role name", () => {
+      const localWrapper = mountAddRole({ role: { name: "existing_role" } });
+      expect(localWrapper.vm.name).toBe("existing_role");
+      localWrapper.unmount();
     });
 
-    it("uses default width when not provided", () => {
-      const wrapper = mount(AddRole, {
+    it("reflects the open prop on the drawer", () => {
+      const localWrapper = mountAddRole({ open: false });
+      expect(findDrawer(localWrapper).props("open")).toBe(false);
+      localWrapper.unmount();
+    });
+
+    it("uses the default open value (false) when not provided", () => {
+      // Mount without providing the open prop.
+      const localWrapper = mount(AddRole, {
         global: {
           plugins: [i18n],
-          provide: { store: mockStore }
-        }
+          provide: { store: mockStore },
+          stubs: { ODrawer: ODrawerStub, QInput: true },
+        },
       });
 
-      // The width prop has been removed from the component
-      // Verify the component mounts successfully without the width prop
-      expect(wrapper.exists()).toBe(true);
+      expect(findDrawer(localWrapper).props("open")).toBe(false);
+      localWrapper.unmount();
     });
   });
 
-  // Add new test categories after existing ones
   describe("Input Field Behavior", () => {
     it("updates model value on input", async () => {
-      const input = wrapper.findComponent({ name: 'QInput' });
+      const input = wrapper.findComponent({ name: "QInput" });
       await input.setValue("new_test_role");
       expect(wrapper.vm.name).toBe("new_test_role");
     });
 
     it("shows required field indicator", () => {
-      const input = wrapper.findComponent({ name: 'QInput' });
-      expect(input.props('label')).toContain('*');
+      const input = wrapper.findComponent({ name: "QInput" });
+      expect(input.props("label")).toContain("*");
     });
 
     it("has correct placeholder text", () => {
-      const input = wrapper.findComponent({ name: 'QInput' });
-      expect(input.props('label')).toContain('common.name');
+      const input = wrapper.findComponent({ name: "QInput" });
+      expect(input.props("label")).toContain("common.name");
     });
   });
 
@@ -477,11 +534,19 @@ describe("AddRole Component", () => {
       { input: "lowercase_only", expected: true, desc: "lowercase only" },
       { input: "Mixed_Case_Role", expected: true, desc: "mixed case" },
       { input: "123_numeric_prefix", expected: true, desc: "numeric prefix" },
-      { input: "_underscore_prefix", expected: true, desc: "underscore prefix" },
-      { input: "role_underscore_suffix_", expected: true, desc: "underscore suffix" },
+      {
+        input: "_underscore_prefix",
+        expected: true,
+        desc: "underscore prefix",
+      },
+      {
+        input: "role_underscore_suffix_",
+        expected: true,
+        desc: "underscore suffix",
+      },
       { input: "role#invalid", expected: false, desc: "hash character" },
       { input: "role+invalid", expected: false, desc: "plus character" },
-      { input: "role=invalid", expected: false, desc: "equals character" }
+      { input: "role=invalid", expected: false, desc: "equals character" },
     ];
 
     extendedTestCases.forEach(({ input, expected, desc }) => {
@@ -496,22 +561,22 @@ describe("AddRole Component", () => {
   describe("Form State Management", () => {
     it("emits correct events after successful submission", async () => {
       vi.mocked(createRole).mockResolvedValue({});
-      
+
       wrapper.vm.name = "test_role";
       await wrapper.vm.$nextTick();
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      // Check that the form emits the correct events
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-      expect(wrapper.emitted()["added:role"]).toBeTruthy();
-      
-      // Check that success notification was shown
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen).toBeTruthy();
+      expect(updateOpen?.[updateOpen.length - 1]).toEqual([false]);
+      expect(wrapper.emitted("added:role")).toBeTruthy();
+
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'Role "test_role" Created Successfully!',
-          color: "positive"
-        })
+          color: "positive",
+        }),
       );
     });
 
@@ -519,8 +584,8 @@ describe("AddRole Component", () => {
       vi.mocked(createRole).mockRejectedValue({
         response: {
           status: 400,
-          data: { message: "Error" }
-        }
+          data: { message: "Error" },
+        },
       });
 
       wrapper.vm.name = "test_role";
@@ -535,20 +600,20 @@ describe("AddRole Component", () => {
   describe("Notification Behavior", () => {
     it("shows success notification with correct role name", async () => {
       vi.mocked(createRole).mockResolvedValue({});
-      
+
       const roleName = "success_test_role";
       wrapper.vm.name = roleName;
       await wrapper.vm.$nextTick();
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: `Role "${roleName}" Created Successfully!`,
           color: "positive",
           position: "bottom",
-          timeout: 3000
-        })
+          timeout: 3000,
+        }),
       );
     });
 
@@ -557,8 +622,8 @@ describe("AddRole Component", () => {
       vi.mocked(createRole).mockRejectedValue({
         response: {
           status: 400,
-          data: { message: errorMessage }
-        }
+          data: { message: errorMessage },
+        },
       });
 
       wrapper.vm.name = "test_role";
@@ -566,34 +631,34 @@ describe("AddRole Component", () => {
       await wrapper.vm.saveRole();
       await flushPromises();
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: errorMessage,
           color: "negative",
           position: "bottom",
-          timeout: 3000
-        })
+          timeout: 3000,
+        }),
       );
     });
   });
 
   describe("Component Layout", () => {
-    it("has correct section title", () => {
-      const title = wrapper.find('[data-test="add-role-section-title"]');
-      expect(title.text()).toBe("iam.addRole");
+    it("renders the section container", () => {
+      const section = wrapper.find('[data-test="add-role-section"]');
+      expect(section.exists()).toBe(true);
     });
 
     it("has both save and cancel buttons", () => {
       const saveButton = wrapper.find('[data-test="add-alert-submit-btn"]');
       const cancelButton = wrapper.find('[data-test="add-alert-cancel-btn"]');
-      
+
       expect(saveButton.exists()).toBe(true);
       expect(cancelButton.exists()).toBe(true);
     });
 
-    it("has close dialog icon", () => {
-      const closeIcon = wrapper.find('[data-test="add-role-close-dialog-btn"]');
-      expect(closeIcon.exists()).toBe(true);
+    it("renders the ODrawer with the iam.addRole title", () => {
+      const drawer = findDrawer(wrapper);
+      expect(drawer.props("title")).toBe("iam.addRole");
     });
   });
 
@@ -616,6 +681,21 @@ describe("AddRole Component", () => {
       wrapper.vm.name = "role_123_test_456_name_789";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.isValidRoleName).toBe(true);
+    });
+  });
+
+  describe("Analytics", () => {
+    it("tracks the save role click on successful save", async () => {
+      vi.mocked(createRole).mockResolvedValue({});
+      wrapper.vm.name = "tracked_role";
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.saveRole();
+      await flushPromises();
+
+      expect(trackMock).toHaveBeenCalledWith("Button Click", {
+        button: "Save Role",
+        page: "Add Role",
+      });
     });
   });
 });

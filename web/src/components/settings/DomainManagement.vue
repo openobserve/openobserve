@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Action Buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-2 q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
+    <div class="tw:flex tw:justify-end tw:gap-2 q-pl-lg q-pr-xl q-py-lg full-width tw:absolute tw:bottom-0">
       <OButton
         variant="outline"
         size="sm-action"

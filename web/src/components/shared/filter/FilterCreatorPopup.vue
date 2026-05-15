@@ -1,9 +1,11 @@
 <template>
-  <q-dialog class="filter-container">
-    <q-card class="q-pa-md">
-      <q-card-section class="q-pa-none">
-        <div class="text-h6">{{ fieldName }}</div>
-      </q-card-section>
+  <ODialog data-test="filter-creator-popup-dialog" v-model:open="show" size="sm" :title="fieldName"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.apply')"
+    @click:secondary="show = false"
+    @click:primary="applyFilter"
+  >
+    <div class="q-pa-md filter-container">
       <q-card-section class="q-pa-none">
         <q-select
           v-model="selectedOperator"
@@ -43,20 +45,8 @@
           </div>
         </div>
       </q-card-section>
-      <q-card-actions align="right">
-        <OButton
-          v-close-popup
-          variant="outline"
-          size="sm-action"
-        >{{ t('common.cancel') }}</OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="applyFilter"
-        >{{ t('common.apply') }}</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -64,10 +54,10 @@
 import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 export default defineComponent({
   name: "FilterCreatorPopup",
-  components: { OButton },
+  components: { ODialog },
   props: [
     "fieldName",
     "fieldValues",
@@ -76,6 +66,7 @@ export default defineComponent({
     "defaultValues",
   ],
   setup(props, { emit }) {
+    const show = ref(true);
     const selectedValues = ref(props.defaultValues);
     const selectedOperator = ref(props.defaultOperator);
     const { t } = useI18n();
@@ -96,6 +87,7 @@ export default defineComponent({
     };
     return {
       t,
+      show,
       selectedValues,
       selectedOperator,
       applyFilter,

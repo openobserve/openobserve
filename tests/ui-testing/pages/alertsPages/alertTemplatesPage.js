@@ -25,7 +25,8 @@ export class AlertTemplatesPage {
         this.templateDeleteButton = '[data-test="alert-template-list-{templateName}-delete-template"]';
         this.templateUpdateButton = '[data-test="alert-template-list-{templateName}-update-template"]';
         this.deleteConfirmText = 'Delete Template';
-        this.confirmButton = '[data-test="confirm-button"]';
+        this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
+        this.confirmDialog = '[data-test="confirm-dialog"]';
         this.templateDeletedMessage = 'Template %s deleted successfully';
         this.templateInUseMessage = 'Template is in use for destination';
         this.templateCountText = 'Templates';
@@ -319,7 +320,7 @@ export class AlertTemplatesPage {
 
         // Click delete button using the correct locator
         await this.page.locator(this.templateDeleteButton.replace('{templateName}', templateName)).click();
-        await expect(this.page.getByText(this.deleteConfirmText, { exact: true })).toBeVisible();
+        await expect(this.page.locator(this.confirmDialog)).toBeVisible();
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(4000);
 
@@ -793,11 +794,13 @@ export class AlertTemplatesPage {
         await this.page.locator(this.importUrlInput).fill(url);
         await this.page.waitForTimeout(1000); // Small delay after filling URL
         await this.page.locator(this.importJsonButton).click();
-        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        // Wait for validation/preview to render — text contains Template index and field validation
+        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).click();
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
-        
+
         if (importType === 'invalid') {
             await expect(this.page.locator(this.preLocator)).toContainText(this.templateImportErrorText);
         } else {
@@ -826,7 +829,9 @@ export class AlertTemplatesPage {
         await this.page.locator(this.templateImportButton).click();
         await this.page.locator(this.importFileInput).setInputFiles(filePath);
         await this.page.locator(this.importJsonButton).click();
-        await expect(this.page.getByText('Template - 1: The "name"')).toBeVisible();
+        // Wait for validation/preview to render — text contains Template index and field validation
+        await expect(this.page.getByText('Template - 1:')).toBeVisible({ timeout: 15000 });
+        await expect(this.page.getByText(/The.*name.*field.*required/)).toBeVisible({ timeout: 5000 });
         await this.page.locator(this.importNameInput).fill(templateName);
         await this.page.locator(this.importJsonButton).click();
 

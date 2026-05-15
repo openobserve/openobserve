@@ -444,15 +444,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
       </div>
-
   </div>
 
-  <q-dialog
-    v-model="showJsonEditorDialog"
-    position="right"
-    full-height
-    maximized
-    :persistent="true"
+  <ODrawer data-test="add-alert-json-editor-drawer"
+    v-model:open="showJsonEditorDialog"
+    size="lg"
+    :title="t('alerts.editJson')"
+    persistent
   >
     <JsonEditor
       :data="formData"
@@ -463,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @saveJson="saveAlertJson"
       :isEditing="beingUpdated"
     />
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -487,6 +485,7 @@ import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlertin
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -531,6 +530,7 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
+    ODrawer,
     Shield,
     SlidersHorizontal,
     TrendingUp,

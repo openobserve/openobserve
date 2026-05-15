@@ -115,15 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
       </div>
-    <q-dialog
-      v-model="showAddOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideAddOrgDialog"
-    >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
-    </q-dialog>
+    <add-update-organization
+      :open="showAddOrganizationDialog"
+      @update:open="onDrawerOpenChange"
+      @updated="updateOrganizationList"
+      :model-value="toBeUpdatedOrganization"
+    />
   </OPage>
 </template>
 
@@ -393,6 +390,7 @@ export default defineComponent({
         name: "",
         identifier: "",
       };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "add",
@@ -417,6 +415,11 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
+
+    const onDrawerOpenChange = (val: boolean) => {
+      showAddOrganizationDialog.value = val;
+      if (!val) hideAddOrgDialog();
     };
 
     const inviteTeam = (props: any) => {
@@ -460,6 +463,12 @@ export default defineComponent({
     }, { immediate: true });
 
     const renameOrganization = (props: any) => {
+      toBeUpdatedOrganization.value = {
+        id: props.row.identifier,
+        name: props.row.name,
+        identifier: props.row.identifier,
+      };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "update",
@@ -467,13 +476,7 @@ export default defineComponent({
           to_be_updated_org_id: props.row.identifier,
           to_be_updated_org_name: props.row.name,
         },
-      })
-      toBeUpdatedOrganization.value = {
-        id: props.row.identifier,
-        name: props.row.name,
-        identifier: props.row.identifier,
-      };
-
+      });
     };
 
     return {
@@ -501,6 +504,7 @@ export default defineComponent({
       filterQuery,
       filterData,
       hideAddOrgDialog,
+      onDrawerOpenChange,
       visibleRows,
       hasVisibleRows,
 

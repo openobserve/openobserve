@@ -10,8 +10,12 @@ export default class DashboardLegendsCopy {
 
     // ShowLegendsPopup selectors (VERIFIED from ShowLegendsPopup.vue)
     this.legendsPopup = page.locator('[data-test="dashboard-show-legends-popup"]');
+    this.legendsCount = page.locator('[data-test="dashboard-show-legends-count"]');
     this.copyAllBtn = page.locator('[data-test="dashboard-show-legends-copy-all"]');
-    this.closeBtn = page.locator('[data-test="dashboard-show-legends-close"]');
+    // getByRole scope used because ShowLegendsPopup.vue doesn't yet carry
+    // data-test="dashboard-show-legends-dialog" in the currently deployed build;
+    // tighten to a scoped selector once the frontend PR ships.
+    this.closeBtn = page.getByRole('dialog').locator('[data-test="o-dialog-close-btn"]');
 
     // Chart renderer selector (VERIFIED from ChartRenderer.vue - data-test="chart-renderer")
     this.chartRenderer = page.locator('[data-test="chart-renderer"]');
@@ -151,8 +155,7 @@ export default class DashboardLegendsCopy {
    * @returns {Promise<string>}
    */
   async getTotalLegendsText() {
-    const countEl = this.legendsPopup.locator('.legend-count');
-    return await countEl.textContent();
+    return await this.legendsCount.textContent();
   }
 
   // ===== TABLE CELL COPY METHODS =====

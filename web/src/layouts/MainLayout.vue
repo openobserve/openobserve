@@ -134,10 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OPageContainer>
     </div>
 
-    <q-dialog v-model="showGetStarted"
-maximized full-height>
+    <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-    </q-dialog>
+    </ODialog>
     <PredefinedThemes />
   </OLayout>
 </template>
@@ -197,6 +196,7 @@ import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import {
   outlinedHome,
   outlinedSearch,
@@ -258,6 +258,7 @@ export default defineComponent({
     PredefinedThemes,
     O2AIChat,
     GetStarted,
+    ODialog,
   },
   methods: {
     navigateToDocs() {
@@ -899,6 +900,7 @@ export default defineComponent({
         light_mode_theme_color: undefined,
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
+        org_storage_enabled: false,
       };
 
       try {
@@ -941,6 +943,9 @@ export default defineComponent({
             orgSettings?.data?.data?.claim_parser_function ??
             defaultSettings.claim_parser_function,
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
+          org_storage_enabled:
+            orgSettings?.data?.data?.org_storage_enabled ??
+            defaultSettings.org_storage_enabled,
         });
 
         if (
