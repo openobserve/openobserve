@@ -850,7 +850,7 @@ export default defineComponent({
 
     // Apply multiple filter terms independently (replace-or-append per field).
     // Used by parent (Index.vue) for metrics brush selections and error toggle.
-    const applyFilters = (terms: string[]) => {
+    const applyFilters = (terms: string[], skipSearch = false) => {
       let current = searchObj.data.editorValue;
       for (const term of terms) {
         current = applyFilterTerm(term, current);
@@ -858,7 +858,8 @@ export default defineComponent({
       searchObj.data.editorValue = current;
       if (queryEditorRef.value?.setValue)
         queryEditorRef.value.setValue(current);
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+      // Only trigger search if not explicitly skipped
+      if (!skipSearch && store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
       }
     };

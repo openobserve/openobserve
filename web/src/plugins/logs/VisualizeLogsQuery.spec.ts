@@ -1864,8 +1864,7 @@ describe("VisualizeLogsQuery Component", () => {
         "bar",
         "area",
         "scatter",
-        "h-bar",
-        "stacked",
+        "h-bar"
       ];
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {

@@ -1759,7 +1759,15 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
     allFilters.push("span_status = 'ERROR'");
   }
   // Apply each filter term independently so replace-or-append works per field
-  searchBarRef.value?.applyFilters(allFilters);
+  // Skip search only when live mode is ON (datetime trigger will handle it)
+  // Don't skip when live mode is OFF (datetime trigger won't fire)
+  const skipSearch = Boolean(searchObj.meta.liveMode);
+
+  if (searchBarRef.value?.applyFilters) {
+    searchBarRef.value.applyFilters(allFilters, skipSearch);
+  } else {
+    console.warn("SearchBar not ready for filter application");
+  }
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,

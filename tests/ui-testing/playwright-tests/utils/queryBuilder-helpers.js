@@ -1,7 +1,28 @@
 const testLogger = require('./test-logger.js');
 const logData = require('../../fixtures/log.json');
-const { ingestTestData } = require('./data-ingestion.js');
-const { getOrgIdentifier } = require('./cloud-auth.js');
+const logsdata = require('../../../test-data/logs_data.json');
+const { getOrgIdentifier, getAuthHeaders } = require('./cloud-auth.js');
+
+/**
+ * Ingest test data via Playwright request fixture (for beforeAll).
+ * Uses the request APIRequestContext — no browser page needed.
+ */
+async function ingestForQueryBuilderTest(request, streamName = "e2e_automate") {
+    const orgId = getOrgIdentifier();
+    const headers = getAuthHeaders();
+    const baseUrl = process.env.INGESTION_URL.endsWith('/')
+        ? process.env.INGESTION_URL.slice(0, -1)
+        : process.env.INGESTION_URL;
+
+    const response = await request.post(`${baseUrl}/api/${orgId}/${streamName}/_json`, {
+        headers: headers,
+        data: logsdata
+    });
+    if (!response.ok()) throw new Error(`Ingestion failed: ${response.status()} ${await response.text()}`);
+    const responseData = await response.json();
+    testLogger.debug('Test data ingestion response', { response: responseData, streamName });
+    return responseData;
+}
 
 async function applyQueryButton(pm) {
     const searchPromise = pm.page.waitForResponse(
@@ -29,13 +50,31 @@ async function setupQueryAndSwitchToBuild(pm, page, query) {
     await pm.logsPage.waitForBuildTabLoaded();
 }
 
+/**
+ * Full init: navigate, select stream, run initial match_all query.
+ * Ingestion is handled by ingestForQueryBuilderTest in beforeAll.
+ */
 async function initQueryBuilderTest(page, pm) {
-    await page.waitForLoadState('domcontentloaded');
-    await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
     await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
     await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(pm);
 }
 
-module.exports = { applyQueryButton, setupQueryAndSwitchToBuild, initQueryBuilderTest };
+/**
+ * Lite init: navigate and select stream only. No initial query.
+ * For tests that call setupQueryAndSwitchToBuild (which runs their own query).
+ */
+async function initQueryBuilderTestLite(page, pm) {
+    await page.waitForLoadState('domcontentloaded');
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
+    await pm.logsPage.selectStream("e2e_automate");
+}
+
+module.exports = {
+    ingestForQueryBuilderTest,
+    applyQueryButton,
+    setupQueryAndSwitchToBuild,
+    initQueryBuilderTest,
+    initQueryBuilderTestLite,
+};
