@@ -2544,6 +2544,10 @@ export default defineComponent({
       if (customFrom) queryParams.from = customFrom;
       if (customTo) queryParams.to = customTo;
 
+      if(effectiveStreamName.value){
+        queryParams.stream = effectiveStreamName.value as string;
+      }
+
       const searchParams = new URLSearchParams();
       for (const [key, value] of Object.entries(queryParams)) {
         searchParams.append(key, String(value));
