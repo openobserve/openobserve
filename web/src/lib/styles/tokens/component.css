@@ -209,15 +209,15 @@
   --color-select-item-disabled: var(--color-text-disabled);
 
   /* Switch (OSwitch) */
-  --color-switch-track-off: var(--color-grey-300);
-  --color-switch-track-on: var(--color-primary-600);
-  --color-switch-thumb: var(--color-white);
-  --color-switch-disabled-track-off: var(--color-grey-200);
-  --color-switch-disabled-track-on: var(--color-primary-300);
-  --color-switch-disabled-thumb: var(--color-grey-400);
   --color-switch-focus-ring: var(--color-primary-400);
   --color-switch-label: var(--color-text-primary);
   --color-switch-label-disabled: var(--color-text-disabled);
+  --color-switch-border: var(--color-primary-600);
+  --color-switch-border-off: var(--color-grey-400);
+  --color-switch-thumb-off: var(--color-grey-400);
+  --color-switch-thumb-on: var(--color-primary-600);
+  --color-switch-disabled-border: var(--color-grey-300);
+  --color-switch-disabled-thumb: var(--color-grey-300);
 
   /* Checkbox (OCheckbox) */
   --color-checkbox-bg: var(--color-surface-base);
@@ -570,15 +570,15 @@
   --color-select-item-disabled: var(--color-select-item-disabled);
 
   /* Switch (OSwitch) */
-  --color-switch-track-off: var(--color-switch-track-off);
-  --color-switch-track-on: var(--color-switch-track-on);
-  --color-switch-thumb: var(--color-switch-thumb);
-  --color-switch-disabled-track-off: var(--color-switch-disabled-track-off);
-  --color-switch-disabled-track-on: var(--color-switch-disabled-track-on);
-  --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
   --color-switch-focus-ring: var(--color-switch-focus-ring);
   --color-switch-label: var(--color-switch-label);
   --color-switch-label-disabled: var(--color-switch-label-disabled);
+  --color-switch-border: var(--color-switch-border);
+  --color-switch-border-off: var(--color-switch-border-off);
+  --color-switch-thumb-off: var(--color-switch-thumb-off);
+  --color-switch-thumb-on: var(--color-switch-thumb-on);
+  --color-switch-disabled-border: var(--color-switch-disabled-border);
+  --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
 
   /* Checkbox (OCheckbox) */
   --color-checkbox-bg: var(--color-checkbox-bg);

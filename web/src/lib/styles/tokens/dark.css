@@ -127,11 +127,12 @@
     --color-select-item-disabled: var(--color-text-disabled);
 
     /* Switch (OSwitch) */
-    --color-switch-track-off: var(--color-grey-600);
-    --color-switch-track-on: var(--color-primary-500);
-    --color-switch-disabled-track-off: var(--color-grey-700);
-    --color-switch-disabled-track-on: var(--color-primary-800);
-    --color-switch-disabled-thumb: var(--color-grey-600);
+    --color-switch-border: var(--color-primary-500);
+    --color-switch-border-off: var(--color-grey-600);
+    --color-switch-thumb-off: var(--color-grey-500);
+    --color-switch-thumb-on: var(--color-primary-500);
+    --color-switch-disabled-border: var(--color-grey-700);
+    --color-switch-disabled-thumb: var(--color-grey-700);
 
     /* Checkbox (OCheckbox) */
     --color-checkbox-bg: var(--color-surface-panel);

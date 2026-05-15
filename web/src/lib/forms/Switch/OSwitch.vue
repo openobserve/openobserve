@@ -52,23 +52,25 @@ function toggle() {
 }
 
 // ── Track sizes ────────────────────────────────────────────────────────────
+// border-2 (2px each side) + p-0.5 (2px each side) = 4px eaten from each dimension
+// thumb = track_height - 4(border) - 4(padding), translate = track_width - 4 - 4 - thumb
 type TrackSize = { track: string; thumb: string; thumbTranslate: string };
 
 const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
-    track: "tw:w-7 tw:h-4",
-    thumb: "tw:size-3",
-    thumbTranslate: "tw:translate-x-3",
+    track: "tw:w-6 tw:h-3.5",
+    thumb: "tw:size-1.5",
+    thumbTranslate: "tw:translate-x-2",
   },
   md: {
-    track: "tw:w-9 tw:h-5",
-    thumb: "tw:size-4",
-    thumbTranslate: "tw:translate-x-4",
+    track: "tw:w-7 tw:h-4.5",
+    thumb: "tw:size-2.5",
+    thumbTranslate: "tw:translate-x-2.5",
   },
   lg: {
-    track: "tw:w-11 tw:h-6",
-    thumb: "tw:size-5",
-    thumbTranslate: "tw:translate-x-5",
+    track: "tw:w-8 tw:h-5",
+    thumb: "tw:size-3",
+    thumbTranslate: "tw:translate-x-3",
   },
 };
 
@@ -111,15 +113,14 @@ const hasLabel = computed(
       :disabled="disabled"
       :class="[
         'tw:relative tw:inline-flex tw:shrink-0 tw:rounded-full',
-        'tw:p-0.5 tw:items-center',
+        'tw:p-0.5 tw:items-center tw:bg-transparent tw:border-2',
         currentSizes.track,
-        isChecked ? 'tw:bg-switch-track-on' : 'tw:bg-switch-track-off',
-        disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
-        disabled && isChecked
-          ? 'tw:opacity-60 tw:bg-switch-disabled-track-on'
-          : disabled
-            ? 'tw:opacity-60 tw:bg-switch-disabled-track-off'
-            : '',
+        props.disabled
+          ? 'tw:border-switch-disabled-border tw:opacity-60'
+          : isChecked
+            ? 'tw:border-switch-border'
+            : 'tw:border-switch-border-off',
+        props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
         'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
         'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-200',
@@ -127,10 +128,14 @@ const hasLabel = computed(
     >
       <span
         :class="[
-          'tw:block tw:rounded-full tw:shadow-sm',
+          'tw:block tw:rounded-full',
           'tw:transition-transform tw:duration-200',
           currentSizes.thumb,
-          disabled ? 'tw:bg-switch-disabled-thumb' : 'tw:bg-switch-thumb',
+          props.disabled
+            ? 'tw:bg-switch-disabled-thumb'
+            : isChecked
+              ? 'tw:bg-switch-thumb-on'
+              : 'tw:bg-switch-thumb-off',
           isChecked ? currentSizes.thumbTranslate : 'tw:translate-x-0',
         ]"
       />
