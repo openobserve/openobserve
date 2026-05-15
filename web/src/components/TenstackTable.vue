@@ -596,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <tr
               :data-test="`o2-table-detail-${
-                (tableRows[virtualRow.index] as any)[
+                (formattedRows[virtualRow.index]?.original as any)?.[
                   store.state.zoConfig.timestamp_column || '_timestamp'
                 ]
               }`"
@@ -617,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ?.isExpandedRow
                   ? 'tw:table-row'
                   : 'tw:flex',
-                (tableRows[virtualRow.index] as any)[
+                (formattedRows[virtualRow.index]?.original as any)?.[
                   store.state.zoConfig.timestamp_column
                 ] === highlightTimestamp &&
                 !(formattedRows[virtualRow.index]?.original as any)
@@ -629,14 +629,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'table-row-hover',
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
-                  ? rowClass?.(tableRows[virtualRow.index] as any)
+                  ? rowClass?.(formattedRows[virtualRow.index]?.original as any)
                   : undefined,
               ]"
               @click="
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow &&
                 handleDataRowClick(
-                  tableRows[virtualRow.index],
+                  formattedRows[virtualRow.index]?.original,
                   virtualRow.index,
                   $event,
                 )
@@ -652,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:z-10"
                 :style="{
                   backgroundColor: getRowStatusColor(
-                    tableRows[virtualRow.index],
+                    formattedRows[virtualRow.index]?.original,
                   ),
                 }"
               />
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <slot
                   name="expanded-row"
-                  :row="tableRows[virtualRow.index - 1]"
+                  :row="formattedRows[virtualRow.index - 1]?.original"
                   :index="calculateActualIndex(virtualRow.index - 1)"
                   :hide-field-options="hideExpandFieldOptions"
                 />
