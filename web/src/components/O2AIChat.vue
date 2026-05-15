@@ -1379,7 +1379,7 @@ import {
   MAX_IMAGE_SIZE_BYTES,
   ALLOWED_IMAGE_TYPES,
 } from "@/ts/interfaces/chat";
-import OButton from "@/lib/core/Button/OButton.vue";
+
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
