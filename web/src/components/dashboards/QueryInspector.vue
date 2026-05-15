@@ -14,7 +14,7 @@
           placeholder="Search keywords..."
           data-test="query-inspector-search"
         >
-          <template #prepend>
+          <template #icon-left>
             <q-icon name="search" size="xs" />
           </template>
         </OInput>

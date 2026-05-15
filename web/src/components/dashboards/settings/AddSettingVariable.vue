@@ -40,58 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="q-mt-md q-mb-md"
             >
-              <q-select
-                hint="Variables will be available only in the selected tabs."
+              <OSelect
+                help-text="Variables will be available only in the selected tabs."
                 v-model="selectedTabs"
                 :options="tabsOptions"
                 label="Select tabs"
                 multiple
-                stack-label
-                outlined
-                dense
-                emit-value
-                map-options
+                searchable
                 @update:model-value="updatePanels"
-                filled
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
                 data-test="dashboard-variable-tabs-select"
-                :rules="[
-                  (val: any) =>
-                    (variableData.scope !== 'tabs' &&
-                      variableData.scope !== 'panels') ||
-                    (val && val.length > 0) ||
-                    'At least one tab is required',
-                ]"
-              >
-                <template v-slot:option="{ opt, selected, toggleOption }">
-                  <q-item
-                    v-if="opt.isTab"
-                    class="bg-grey-3 text-bold text-dark"
-                    style="pointer-events: none"
-                  >
-                    <q-item-section>{{ opt.label }}</q-item-section>
-                  </q-item>
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                    <q-item-section side>
-                      <q-checkbox
-                        :model-value="selected"
-                        @update:model-value="() => toggleOption(opt)"
-                        dense
-                        class="q-ma-none"
-                        :data-test="`dashboard-variable-assign-tabs-${opt.value}`"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label>{{ opt.label }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              />
             </div>
 
             <!-- Panel selection section - shown only when scope is panels -->
@@ -102,66 +60,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               class="q-mt-md"
             >
-              <q-select
-                hint="Variables will be available only in the selected panels."
+              <OSelect
+                help-text="Variables will be available only in the selected panels."
                 v-model="selectedPanels"
                 :options="groupedPanelsOptions"
                 label="Select panels"
-                stack-label
                 multiple
-                filled
-                outlined
-                dense
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop q-mb-md"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
-                emit-value
-                map-options
+                searchable
+                class="tw:mb-3"
                 data-test="dashboard-variable-panels-select"
-                :rules="[
-                  (val: any) =>
-                    variableData.scope !== 'panels' ||
-                    (val && val.length > 0) ||
-                    'At least one panel is required',
-                ]"
-              >
-                <template v-slot:option="{ opt, selected, toggleOption }">
-                  <!-- Tab separator -->
-                  <q-item
-                    v-if="opt.isTab"
-                    class="bg-grey-3 text-bold text-dark"
-                    style="pointer-events: none"
-                  >
-                    <q-item-section>{{ opt.label }}</q-item-section>
-                  </q-item>
-                  <!-- Panel options (including Current Panel) -->
-                  <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                    <q-item-section side>
-                      <q-checkbox
-                        :model-value="selected"
-                        @update:model-value="() => toggleOption(opt)"
-                        dense
-                        class="q-ma-none"
-                        :data-test="`dashboard-variable-assign-panels-${opt.value}`"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label
-                        :class="
-                          opt.isCurrentPanel
-                            ? 'text-primary text-weight-bold'
-                            : ''
-                        "
-                      >
-                        {{ opt.label }}
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              />
             </div>
           </div>
           <div class="col">

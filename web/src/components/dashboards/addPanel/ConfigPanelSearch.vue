@@ -24,7 +24,7 @@ const emit = defineEmits<{
     clearable
     autofocus
   >
-    <template #prefix>
+    <template #icon-left>
       <q-icon name="search" size="xs" class="tw:text-[var(--o2-text-muted)]" />
     </template>
   </OInput>
