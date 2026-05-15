@@ -186,8 +186,9 @@ jobs:
           EXISTING_COMMENT_ID="${{ steps.find_comment.outputs.comment_id }}"
 
           if [ -n "$EXISTING_COMMENT_ID" ]; then
+            jq -Rs '{body: .}' /tmp/review_body.txt > /tmp/review_payload.json
             gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
-              -X PATCH --input /tmp/review_body.txt
+              -X PATCH --input /tmp/review_payload.json
             echo "Updated existing review comment: $EXISTING_COMMENT_ID"
           else
             gh pr comment "${{ steps.pr.outputs.pr_number }}" --body-file /tmp/review_body.txt
