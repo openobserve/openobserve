@@ -1041,11 +1041,13 @@ pub async fn search_partition(
         is_histogram,
     );
 
-    resp.non_ts_order_by_cols = sql
-        .order_by
-        .iter()
-        .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
-        .collect();
+    if is_non_ts_order_by {
+        resp.non_ts_order_by_cols = sql
+            .order_by
+            .iter()
+            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
+            .collect();
+    }
 
     if cfg.limit.disable_partitions_for_non_ts_order_by && is_non_ts_order_by {
         log::info!(
