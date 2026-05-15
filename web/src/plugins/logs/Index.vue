@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
+  <OPage class="logPage" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -417,7 +417,7 @@ size="20px" />
         :isClicked="showSearchScheduler"
       />
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

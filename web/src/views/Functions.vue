@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page>
+  <OPage>
     <div class=" tw:pb-[0.625rem]">
       <q-splitter
         v-model="splitterModel"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

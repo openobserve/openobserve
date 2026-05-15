@@ -79,102 +79,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right Drawer for VRL Information -->
-      <q-drawer
-        v-model="showVrlInfo"
-        side="right"
-        bordered
-        :width="450"
-        overlay
-        elevated
-      >
-        <div class="q-pa-md">
-          <div class="row items-center q-mb-md">
-            <div class="col text-h6 text-bold">
-              {{ t("settings.claimParserFunctionInfoTitle") }}
-            </div>
-            <div class="col-auto">
-              <OButton
-                variant="ghost"
-                size="icon"
-                @click="showVrlInfo = false"
-              >
-                <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-              </OButton>
-            </div>
-          </div>
-
-          <div class="text-body2">
-            <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionInputTitle") }}</div>
-              <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
-            </div>
-
-            <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-              <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-              <div class="q-ml-md">
-                <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
-                <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
-              </div>
-            </div>
-
-            <!-- Recent Errors Section -->
-            <div v-if="claimParserFunction" class="q-pa-md info-box error-section">
-              <div class="row items-center q-mb-sm">
-                <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
-                <div class="col-auto">
+      <Transition name="vrl-drawer">
+        <div
+          v-if="showVrlInfo"
+          class="vrl-drawer-backdrop"
+          @click.self="showVrlInfo = false"
+        >
+          <aside class="vrl-drawer-panel">
+            <div class="tw:p-4">
+              <div class="tw:flex tw:items-center tw:mb-6">
+                <div class="tw:flex-1 tw:text-lg tw:font-bold">
+                  {{ t("settings.claimParserFunctionInfoTitle") }}
+                </div>
+                <div>
                   <OButton
-                    variant="ghost-muted"
-                    size="icon-xs-sq"
-                    @click="loadRecentErrors"
-                    :loading="loadingErrors"
+                    variant="ghost"
+                    size="icon"
+                    @click="showVrlInfo = false"
                   >
-                    <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-                    <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+                    <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
                   </OButton>
                 </div>
               </div>
 
-              <div v-if="loadingErrors" class="text-center q-py-md">
-                <q-spinner color="primary" size="sm" />
-              </div>
+              <div class="tw:text-sm">
+                <div class="tw:mb-4 tw:p-4 info-box">
+                  <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+                  <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
+                </div>
 
-              <div v-else-if="recentErrors.length === 0" class="text-grey-7 text-center q-py-sm">
-                {{ t("settings.noRecentErrors") }}
-              </div>
+                <div class="tw:mb-4 tw:p-4 info-box">
+                  <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+                  <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+                  <div class="tw:ml-4">
+                    <div class="tw:mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+                    <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
+                  </div>
+                </div>
 
-              <div v-else class="error-list">
-                <div
-                  v-for="(error, index) in recentErrors.slice(0, 3)"
-                  :key="index"
-                  class="error-item q-pa-sm q-mb-xs"
-                >
-                  <div class="row items-start q-mb-xs">
-                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
-                    <div class="col">
-                      <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
-                      <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>
+                <!-- Recent Errors Section -->
+                <div v-if="claimParserFunction" class="tw:p-4 info-box error-section">
+                  <div class="tw:flex tw:items-center tw:mb-2">
+                    <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+                    <div>
+                      <OButton
+                        variant="ghost-muted"
+                        size="icon-xs-sq"
+                        @click="loadRecentErrors"
+                        :loading="loadingErrors"
+                      >
+                        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
+                        <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+                      </OButton>
                     </div>
                   </div>
-                  <div class="text-caption error-message">{{ error.error }}</div>
-                </div>
 
-                <!-- Show More Button -->
-                <div class="q-mt-sm text-center">
-                  <OButton
-                    variant="ghost-primary"
-                    size="sm"
-                    @click="viewAllErrors"
-                  >
-                    {{ t('common.showMore') }}
-                    <template #icon-right><ExternalLink class="tw:size-3.5 tw:shrink-0" /></template>
-                  </OButton>
+                  <div v-if="loadingErrors" class="tw:text-center tw:py-4">
+                    <q-spinner color="primary" size="sm" />
+                  </div>
+
+                  <div v-else-if="recentErrors.length === 0" class="tw:text-center tw:py-2" style="color: var(--o2-text-muted)">
+                    {{ t("settings.noRecentErrors") }}
+                  </div>
+
+                  <div v-else class="error-list">
+                    <div
+                      v-for="(error, index) in recentErrors.slice(0, 3)"
+                      :key="index"
+                      class="error-item tw:p-2 tw:mb-1"
+                    >
+                      <div class="tw:flex tw:items-start tw:mb-1">
+                        <q-icon name="error" color="negative" size="xs" class="tw:mr-1 tw:mt-1" />
+                        <div class="tw:flex-1">
+                          <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
+                          <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
+                        </div>
+                      </div>
+                      <div class="tw:text-xs error-message">{{ error.error }}</div>
+                    </div>
+
+                    <!-- Show More Button -->
+                    <div class="tw:mt-2 tw:text-center">
+                      <OButton
+                        variant="ghost-primary"
+                        size="sm"
+                        @click="viewAllErrors"
+                      >
+                        {{ t('common.showMore') }}
+                        <template #icon-right><ExternalLink class="tw:size-3.5 tw:shrink-0" /></template>
+                      </OButton>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
-      </q-drawer>
+      </Transition>
     </div>
 
     <!-- Divider -->
@@ -831,6 +832,44 @@ const resetForm = () => {
 </script>
 
 <style scoped lang="scss">
+// VRL info drawer
+.vrl-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vrl-drawer-panel {
+  width: 28.125rem; // 450px
+  height: 100%;
+  background: var(--o2-card-bg);
+  box-shadow: -0.25rem 0 1.5rem rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+}
+
+.vrl-drawer-enter-active,
+.vrl-drawer-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.vrl-drawer-enter-active .vrl-drawer-panel,
+.vrl-drawer-leave-active .vrl-drawer-panel {
+  transition: transform 0.3s ease;
+}
+
+.vrl-drawer-enter-from,
+.vrl-drawer-leave-to {
+  opacity: 0;
+}
+
+.vrl-drawer-enter-from .vrl-drawer-panel,
+.vrl-drawer-leave-to .vrl-drawer-panel {
+  transform: translateX(100%);
+}
+
 .claim-parser-select {
   min-width: 400px;
 }

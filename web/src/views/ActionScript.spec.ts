@@ -35,9 +35,9 @@ describe('ActionScript.vue', () => {
             name: 'RouterView',
             template: '<div class="router-view-stub"></div>',
           },
-          QPage: {
-            name: 'QPage',
-            template: '<div class="q-page" data-test="alerts-page"><slot /></div>',
+          OPage: {
+            name: 'OPage',
+            template: '<div data-o2-page data-test="alerts-page"><slot /></div>',
           },
         },
       },
@@ -52,9 +52,9 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          QPage: {
-            name: 'QPage',
-            template: '<div class="q-page" data-test="alerts-page"><slot /></div>',
+          OPage: {
+            name: 'OPage',
+            template: '<div data-o2-page data-test="alerts-page"><slot /></div>',
           },
         },
       },
@@ -69,15 +69,15 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          QPage: {
-            name: 'QPage',
-            template: '<div class="q-page"><slot /></div>',
+          OPage: {
+            name: 'OPage',
+            template: '<div data-o2-page><slot /></div>',
           },
         },
       },
     });
 
-    expect(wrapper.find('.q-page').exists()).toBe(true);
+    expect(wrapper.find('[data-o2-page]').exists()).toBe(true);
   });
 
   it('should mount without errors', () => {
@@ -87,7 +87,7 @@ describe('ActionScript.vue', () => {
           plugins: [store, i18n],
           stubs: {
             RouterView: true,
-            QPage: true,
+            OPage: true,
           },
         },
       });
@@ -100,7 +100,7 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          QPage: true,
+          OPage: true,
         },
       },
     });
@@ -115,7 +115,7 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          QPage: true,
+          OPage: true,
         },
       },
     });

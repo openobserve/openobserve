@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="incident-detail-page" class="q-pa-none" style="height: calc(100vh - 50px); overflow: hidden;">
+  <OPage data-test="incident-detail-page" class="q-pa-none" style="height: calc(100vh - 50px); overflow: hidden;">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
     <!-- Header -->
     <div class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[68px] tw:px-[0.675rem] tw:mb-[0.675rem]">
@@ -1180,7 +1180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-spinner-hourglass size="lg" color="primary" />
     </div>
   </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

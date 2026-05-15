@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
+  <OPage
     class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts" setup>

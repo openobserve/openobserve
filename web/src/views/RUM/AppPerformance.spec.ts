@@ -158,8 +158,8 @@ describe("AppPerformance.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          QPage: {
-            template: '<div class="q-page" v-bind="$attrs"><slot /></div>',
+          OPage: {
+            template: '<div data-o2-page v-bind="$attrs"><slot /></div>',
           },
           QSeparator: {
             template: '<hr class="q-separator" />',
@@ -233,7 +233,7 @@ describe("AppPerformance.vue", () => {
       expect(componentInstance.store.state.selectedOrganization.identifier).toBe("test-org-123");
       
       // Alternative: check if the QPage component receives the key prop
-      const qPageComponent = wrapper.findComponent({ name: 'q-page' });
+      const qPageComponent = wrapper.findComponent({ name: 'OPage' });
       if (qPageComponent.exists()) {
         expect(qPageComponent.attributes('key')).toBe("test-org-123");
       } else {
@@ -278,7 +278,7 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QPage: { template: '<div class="q-page"><slot /></div>' },
+            OPage: { template: '<div data-o2-page><slot /></div>' },
             QSeparator: { template: '<hr />' },
             QBtn: { template: '<button></button>' },
             AutoRefreshInterval: { template: '<div></div>' },
@@ -303,7 +303,7 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QPage: { template: '<div class="q-page"><slot /></div>' },
+            OPage: { template: '<div data-o2-page><slot /></div>' },
             QSeparator: { template: '<hr />' },
             QBtn: { template: '<button></button>' },
             AutoRefreshInterval: { template: '<div></div>' },
