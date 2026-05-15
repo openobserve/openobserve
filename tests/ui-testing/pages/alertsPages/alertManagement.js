@@ -27,16 +27,9 @@ export class AlertManagement {
     async updateAlert(alertName) {
         await this.page.locator(this.locators.alertUpdateButton.replace('{alertName}', alertName)).first().click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        testLogger.info('Opened alert for editing', { alertName });
+        testLogger.info('Opened alert for editing (v3)', { alertName });
 
-        await expect(this.page.getByText(this.locators.alertSetupText).first()).toBeVisible({ timeout: 10000 });
-        await this.page.waitForTimeout(1000);
-
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(1000);
-        testLogger.info('Navigated to Step 2: Conditions');
-
+        // All fields are in a flat tab-based layout (v3 UI), no step navigation needed
         // Change operator from Contains to = to verify update functionality
         const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
         await expect(operatorDropdown).toBeVisible({ timeout: 5000 });
@@ -45,17 +38,6 @@ export class AlertManagement {
         await this.page.getByText('=', { exact: true }).click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Changed operator from Contains to =');
-
-        // Real-time alerts wizard: Step 2 -> Step 4 -> Step 6 (last)
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        testLogger.info('Navigated to Step 4: Alert Settings');
-
-        await this.page.getByRole('button', { name: 'Continue' }).click();
-        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await this.page.waitForTimeout(500);
-        testLogger.info('Navigated to Step 6: Advanced (last step)');
 
         await this.page.locator(this.locators.alertSubmitButton).click();
         await expect(this.page.getByText(this.locators.alertUpdatedMessage)).toBeVisible({ timeout: 30000 });
@@ -334,55 +316,63 @@ export class AlertManagement {
         testLogger.info('Found alert cell', { alertName });
 
         const alertRow = alertCell.locator('xpath=ancestor::tr');
-        const moreOptionsBtn = alertRow.locator('button').filter({ has: this.page.locator('[name="more_vert"], .q-icon') }).last();
+        const moreOptionsBtn = alertRow.locator(`[data-test="alert-list-${alertName}-more-options"]`);
         await moreOptionsBtn.waitFor({ state: 'visible', timeout: 5000 });
         await moreOptionsBtn.click();
         await this.page.waitForTimeout(500);
         testLogger.info('Clicked more options menu');
 
-        // Note: The menu text is just "Trigger" (from i18n key alerts.triggerAlert)
-        const triggerOption = this.page.getByText('Trigger', { exact: true }).first();
+        const triggerOption = this.page.locator(`[data-test="alert-list-${alertName}-trigger-alert"]`);
         await triggerOption.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Start watching for the PATCH /trigger API call BEFORE clicking,
+        // so we never miss it regardless of how fast the API responds.
+        const triggerApiResponse = this.page.waitForResponse(
+            resp =>
+                resp.request().method() === 'PATCH' &&
+                /\/alerts\/[^/?]+\/trigger/.test(resp.url()),
+            { timeout: 10000 }
+        );
+
         await triggerOption.click();
         testLogger.info('Clicked Trigger option');
 
-        // Wait for notification to appear
-        await this.page.waitForTimeout(2000);
-
-        // Check for success notification
-        const successNotification = this.page.getByText('Alert triggered successfully');
-        const isSuccess = await successNotification.isVisible({ timeout: 5000 }).catch(() => false);
-
-        if (isSuccess) {
-            testLogger.info('Alert trigger success notification received');
-            return true;
+        // Primary check: verify the API call was made and succeeded.
+        try {
+            const response = await triggerApiResponse;
+            const status = response.status();
+            if (response.ok()) {
+                testLogger.info('Alert trigger API call succeeded', { status });
+                return true;
+            }
+            const body = await response.json().catch(() => null);
+            testLogger.error('Alert trigger API call failed', { status, body });
+            return false;
+        } catch (apiErr) {
+            // API call not detected — fall back to notification polling.
+            testLogger.warn('Trigger API response not detected, falling back to notification check', { error: apiErr.message });
         }
 
-        // Check for error notification - can be "Failed to trigger alert" or "Error sending notification..."
-        const errorNotification = this.page.getByText(/Failed to trigger|Error sending notification/i);
-        const isError = await errorNotification.isVisible({ timeout: 2000 }).catch(() => false);
+        // Fallback: poll for the success toast (2s lifetime — use waitFor, not isVisible).
+        try {
+            await this.page.getByText('Alert triggered successfully').waitFor({ state: 'visible', timeout: 7000 });
+            testLogger.info('Alert trigger success notification received');
+            return true;
+        } catch (_) {
+            // not found — fall through to error check
+        }
 
-        if (isError) {
+        try {
+            const errorNotification = this.page.getByText(/Failed to trigger|Error sending notification/i);
+            await errorNotification.waitFor({ state: 'visible', timeout: 3000 });
             const errorText = await errorNotification.textContent().catch(() => 'Unknown error');
             testLogger.error('Alert trigger failed - error notification shown', { errorText });
             return false;
+        } catch (_) {
+            // no error notification either
         }
 
-        // Check for any other notification content
-        const notification = this.page.locator('.q-notification');
-        const hasNotification = await notification.isVisible({ timeout: 2000 }).catch(() => false);
-        if (hasNotification) {
-            const notificationText = await notification.textContent().catch(() => 'Unable to get text');
-            testLogger.warn('Found notification but not success/error match', { notificationText });
-            // If notification contains "success" text, consider it success
-            if (notificationText.toLowerCase().includes('success')) {
-                testLogger.info('Notification contains success - treating as successful');
-                return true;
-            }
-        } else {
-            testLogger.warn('No notification found at all after trigger');
-        }
-
+        testLogger.warn('No notification found after trigger');
         return false;
     }
 
@@ -466,11 +456,27 @@ export class AlertManagement {
     async openAlertDetailsDialog(alertName) {
         testLogger.info('Opening alert details dialog', { alertName });
 
+        // Try folder-specific search first
         await this.searchAlert(alertName);
         await this.page.waitForTimeout(1000);
 
-        const alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
-        await alertRow.waitFor({ state: 'visible', timeout: 10000 });
+        let alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
+        const rowVisible = await alertRow.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (!rowVisible) {
+            // Fallback: enable "search across folders" and retry
+            testLogger.info('Alert not found in current folder, retrying across all folders', { alertName });
+            const toggle = this.page.locator(this.locators.searchAcrossFoldersToggle);
+            if (await toggle.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await toggle.locator('div').nth(1).click({ force: true });
+                await this.page.waitForTimeout(500);
+            }
+            await this.searchAlert(alertName);
+            await this.page.waitForTimeout(1000);
+            alertRow = this.page.locator(`tr:has-text("${alertName}")`).first();
+        }
+
+        await alertRow.waitFor({ state: 'visible', timeout: 15000 });
 
         // Click the alert name cell (2nd column) to open details dialog
         const alertNameCell = alertRow.locator('td').nth(1);
