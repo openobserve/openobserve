@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           class="q-ml-xs"
         >
-          <Download class="tw:size-4" />
+          <OIcon name="download" size="sm" />
         </OButton>
       </q-td>
     </template>
@@ -80,6 +80,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import BillingService from "@/services/billings";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OIcon from '@/lib/core/Icon/OIcon.vue';
 
 export default defineComponent({
   name: "InvoiceHistory",
@@ -87,7 +88,7 @@ export default defineComponent({
     NoData,
     QTablePagination,
     OButton,
-    Download,
+    OIcon,
   },
   props: [],
   setup(props) {
