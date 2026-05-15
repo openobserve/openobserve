@@ -91,14 +91,14 @@ export interface InputEmits {
 }
 
 export interface InputSlots {
-  /** Content placed before the input (inside the border) */
+  /** Icon placed inside the border on the left — matches OButton's `#icon-left` pattern */
+  "icon-left"?: () => unknown;
+  /** Icon placed inside the border on the right — matches OButton's `#icon-right` pattern */
+  "icon-right"?: () => unknown;
+  /** Text prefix rendered inside the field (left) */
   prefix?: () => unknown;
-  /** Content placed after the input (inside the border) */
+  /** Text suffix rendered inside the field (right) */
   suffix?: () => unknown;
-  /** Prepended block placed outside the border on the left */
-  prepend?: () => unknown;
-  /** Appended block placed outside the border on the right */
-  append?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
    * Provide a `<q-tooltip>` element as the slot content.

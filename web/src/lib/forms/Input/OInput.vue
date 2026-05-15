@@ -229,12 +229,12 @@ const wrapperClasses = computed(() => [
 
     <!-- Input row -->
     <div :class="wrapperClasses">
-      <!-- Prepend slot (inside border, left — icon use) -->
+      <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
       <span
-        v-if="$slots.prepend"
+        v-if="$slots['icon-left']"
         class="tw:flex tw:items-center tw:ps-2 tw:text-input-addon-text tw:shrink-0 tw:select-none"
       >
-        <slot name="prepend" />
+        <slot name="icon-left" />
       </span>
 
       <!-- Prefix slot (inside border) -->
@@ -265,8 +265,8 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed',
           'tw:py-2',
-          $slots.prepend || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
-          $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
+          $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
           'tw:text-sm',
           autogrow ? 'tw:resize-none' : 'tw:resize-y',
         ]"
@@ -297,8 +297,8 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed',
           heightClasses[size ?? 'md'],
-          $slots.prepend || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
-          $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
+          $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
         ]"
         @input="handleInput"
         @blur="handleBlur"
@@ -335,12 +335,20 @@ const wrapperClasses = computed(() => [
         </svg>
       </button>
 
-      <!-- Suffix slot (inside border) -->
+      <!-- Suffix slot (inside border — text) -->
       <span
         v-if="$slots.suffix || suffix"
         class="tw:flex tw:items-center tw:pe-3 tw:text-input-addon-text tw:text-sm tw:shrink-0 tw:select-none"
       >
         <slot name="suffix">{{ suffix }}</slot>
+      </span>
+
+      <!-- Icon-right slot (inside border, right — matches OButton #icon-right pattern) -->
+      <span
+        v-if="$slots['icon-right']"
+        class="tw:flex tw:items-center tw:pe-2 tw:text-input-addon-text tw:shrink-0 tw:select-none"
+      >
+        <slot name="icon-right" />
       </span>
     </div>
 

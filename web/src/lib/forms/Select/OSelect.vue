@@ -684,7 +684,7 @@ const fieldWidthClass = computed(() => {
             :disabled="disabled"
             :class="[
               'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border',
-              $slots.prepend ? 'tw:ps-2' : 'tw:ps-3',
+              $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3',
               'tw:bg-select-bg',
               hasError
                 ? 'tw:border-select-border-error'
@@ -698,12 +698,12 @@ const fieldWidthClass = computed(() => {
               heightClasses[size ?? 'md'],
             ]"
           >
-            <!-- Prepend slot (inside trigger, left) -->
+            <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
             <span
-              v-if="$slots.prepend"
+              v-if="$slots['icon-left']"
               class="tw:flex tw:items-center tw:me-1.5 tw:text-select-placeholder tw:shrink-0"
             >
-              <slot name="prepend" />
+              <slot name="icon-left" />
             </span>
 
             <slot name="trigger" :value="modelValue">
