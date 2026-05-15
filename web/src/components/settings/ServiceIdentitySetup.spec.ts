@@ -475,7 +475,7 @@ describe("ServiceIdentitySetup", () => {
 
       // No public DOM trigger exists in the empty-state layout, so call the
       // exposed component method directly.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (wrapper.vm as any).openFieldMappingDialog();
       await wrapper.vm.$nextTick();
 
@@ -493,7 +493,7 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (wrapper.vm as any).openFieldMappingDialog();
       await wrapper.vm.$nextTick();
 
@@ -526,7 +526,7 @@ describe("ServiceIdentitySetup", () => {
 
       // Seed editableServiceFields via the public open-method so the saved
       // value reflects what the dialog would actually send.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (wrapper.vm as any).openFieldMappingDialog();
       await wrapper.vm.$nextTick();
 
@@ -569,7 +569,7 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const vm = wrapper.vm as any;
       vm.openFieldMappingDialog();
       vm.savingFieldMappings = true;
@@ -642,7 +642,7 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const vm = wrapper.vm as any;
       vm.openInsightDialog("k8s-namespace", "primary");
       await flushPromises();
@@ -657,7 +657,7 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (wrapper.vm as any).openInsightDialog("k8s-namespace", "primary");
       await flushPromises();
       expect(
@@ -693,7 +693,7 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const vm = wrapper.vm as any;
       // Drive open + populate the values we expect to be cleared on close.
       vm.detailsDialogVisible = true;

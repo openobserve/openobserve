@@ -1,5 +1,5 @@
 <template>
-  <OPage data-test="iam-page" class="q-pa-none tw:overflow-hidden">
+  <div class="tw:rounded-md q-pa-none tw:overflow-hidden" data-test="iam-page">
     <q-splitter
       v-model="splitterModel"
       unit="px"
@@ -40,7 +40,7 @@
         </div>
       </template>
     </q-splitter>
-  </OPage>
+  </div>
 </template>
 
 <script setup lang="ts">

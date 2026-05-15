@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPage class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Header bar -->
       <div
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else>
       <AddAiToolset @cancel:hideform="hideAddDialog" />
     </div>
-  </OPage>
+  </div>
 
   <!-- Delete confirmation -->
   <ConfirmDialog
