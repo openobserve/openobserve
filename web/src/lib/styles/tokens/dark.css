@@ -74,6 +74,12 @@
     --color-dropdown-item-destructive-text: var(--color-error-400);
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
+    /* Tooltip */
+    --color-tooltip-bg: var(--color-grey-800);
+    --color-tooltip-text: var(--color-grey-50);
+    --color-tooltip-border: var(--color-grey-600);
+    --color-tooltip-arrow: var(--color-grey-800);
+
     /* ToggleGroup */
     --color-toggle-item-hover-bg: var(--color-primary-950);
     --color-toggle-item-active-bg: var(--color-primary-900);
