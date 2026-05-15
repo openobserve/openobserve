@@ -790,7 +790,8 @@
     "no_keep_current": "Nee, blijf op de hoogte",
     "feature_correlation_management": "Correlatiebeheer",
     "feature_log_patterns": "Logpatronen",
-    "environment_type": "Omgevingstype"
+    "environment_type": "Omgevingstype",
+    "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe."
   },
   "login": {
     "userid": "Gebruikers-ID",

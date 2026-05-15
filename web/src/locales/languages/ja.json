@@ -790,7 +790,8 @@
     "no_keep_current": "いいえ、最新の状態に保つ",
     "feature_correlation_management": "相関管理",
     "feature_log_patterns": "ログパターン",
-    "environment_type": "環境タイプ"
+    "environment_type": "環境タイプ",
+    "license_allows_unlimited_ingestion": "現在のライセンスでは、無制限のデータ取り込みが可能です。"
   },
   "login": {
     "userid": "ユーザーID",
