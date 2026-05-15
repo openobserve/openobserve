@@ -100,11 +100,17 @@ export default defineComponent({
 
     // Fetch folders only when the drawer opens (matches old q-dialog behaviour where the
     // component mounted only on first open). Avoids an eager API call on page load.
+    // Also reset form state on close so stale unsaved data is never shown on reopen.
     watch(
       () => props.open,
       async (isOpen) => {
         if (isOpen) {
           await getFoldersList(store);
+        } else {
+          panelTitle.value = "";
+          activeFolderId.value = "default";
+          selectedDashboard.value = null;
+          activeTabId.value = null;
         }
       },
       { immediate: true },
