@@ -15,8 +15,8 @@ import {
   type TraceMetadata,
   type ServiceBreakdown,
 } from "@/ts/interfaces/traces/trace.types";
-import { getServiceColor } from "@/utils/traces/traceColors";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 /**
  * Composable for trace data processing
@@ -79,7 +79,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isSelected: false,
         isOnCriticalPath: false,
         resolvedIdentity,
-        color: getServiceColor(resolvedIdentity),
+        color: getOrSetServiceColor(resolvedIdentity),
         durationMs: node.durationMs || 0,
         durationPercent: 0,
         startOffsetMs,
@@ -139,7 +139,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isSelected: false,
         isOnCriticalPath: false,
         resolvedIdentity,
-        color: getServiceColor(resolvedIdentity),
+        color: getOrSetServiceColor(resolvedIdentity),
         durationMs: span.duration / 1000, // Convert from microseconds to milliseconds
         durationPercent: 0,
         startOffsetMs: (span.start_time - traceStartTime) / 1000000, // Convert from nanoseconds to milliseconds
@@ -335,7 +335,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         span_count: spanCount,
         total_duration_ms: totalDuration,
         percentage,
-        color: getServiceColor(serviceName),
+        color: getOrSetServiceColor(serviceName),
         has_errors: hasErrors,
         error_count: hasErrors ? metadata.error_spans : 0,
       });
