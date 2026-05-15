@@ -29,9 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!searchObj.data.transformType"
         >
           <template #tooltip>
-            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-              {{ getTransformLabelTooltip }}
-            </q-tooltip>
+            <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
           </template>
         </OSwitch>
       </div>
@@ -50,9 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-icon v-else :name="transformIcon" size="16px" />
             <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
-            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-              transformsLabel
-            }}</q-tooltip>
+            <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>
         </template>
         <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
@@ -127,13 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="fnSavedFunctionDialog"
     >
       <q-icon name="save" size="16px" />
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
-        {{
-          searchObj.data.transformType === "action"
-            ? t("search.saveActionDisabled")
-            : t("common.save")
-        }}
-      </q-tooltip>
+      <OTooltip
+        :content="searchObj.data.transformType === 'action' ? t('search.saveActionDisabled') : t('common.save')"
+        :side-offset="6"
+      />
     </OButton>
   </OButtonGroup>
 </template>
@@ -146,6 +139,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";

@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-tab-move-add-tab-btn"
         >
           <template #icon-left><q-icon name="add" /></template>
-          <q-tooltip>Add Tab</q-tooltip>
+          <OTooltip content="Add Tab" />
         </OButton>
         <AddTab
           v-model:open="showAddTabDialog"
@@ -74,10 +74,11 @@ import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton, OSelect, ODialog },
+  components: { AddTab, OButton, OSelect, ODialog, OTooltip },
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {

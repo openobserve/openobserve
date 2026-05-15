@@ -51,13 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="cursor-pointer tw:shrink-0"
             size="14px"
           >
-            <q-tooltip
-              anchor="center end"
-              self="center left"
-              class="tw:text-[12px]"
-            >
-              1 unit = 30px
-            </q-tooltip>
+            <OTooltip content="1 unit = 30px" />
           </q-icon>
         </div>
 
@@ -76,9 +70,10 @@ import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODrawer, OInput },
+  components: { ODrawer, OInput, OTooltip },
   props: {
     layout: {
       type: Object,

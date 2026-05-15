@@ -116,9 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alt="Metrics"
               style="width: 20px; height: 20px"
             />
-            <q-tooltip>
-              {{ t("traces.RedMetrics") }}
-            </q-tooltip>
+            <OTooltip :content="t('traces.RedMetrics')" />
           </div>
           <OButton
             data-test="traces-search-bar-reset-filters-btn"
@@ -127,9 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="resetFilters"
           >
             <q-icon name="restart_alt" size="16px" />
-            <q-tooltip>
-              {{ t("search.resetFilters") }}
-            </q-tooltip>
+            <OTooltip :content="t('search.resetFilters')" />
           </OButton>
           <!-- Error Only Toggle -->
           <div
@@ -147,9 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="1.1rem"
               class="tw:mx-1 tw:text-red-500"
             />
-            <q-tooltip>
-              {{ t("traces.showErrorOnly") }}
-            </q-tooltip>
+            <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
@@ -212,13 +206,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isLoading"
               :disabled="isLoading"
             >
-              <q-tooltip
+              <OTooltip
                 v-if="
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
-                >{{ t("search.autoRunEnabled") }}</q-tooltip
-              >
+                :content="t('search.autoRunEnabled')"
+              />
               <q-icon
                 v-if="
                   searchObj.meta.liveMode &&
@@ -325,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('service-graph-refresh')"
           >
             <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            <OTooltip :content="t('common.refresh')" />
           </OButton>
           <OToggleGroup
             :model-value="searchObj.meta.serviceGraphVisualizationType"
@@ -389,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('services-catalog-refresh')"
           >
             <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            <OTooltip :content="t('common.refresh')" />
           </OButton>
         </div>
       </div>
@@ -456,6 +450,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
@@ -486,6 +481,7 @@ export default defineComponent({
     ODropdownItem,
     OSwitch,
     OSelect,
+    OTooltip,
     Layers,
     Network,
     GitBranch,

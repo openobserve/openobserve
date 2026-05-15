@@ -291,6 +291,52 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 // Options API: also add to components: { OTooltip }
 ```
 
+**Quality checks — run after every OTooltip migration:**
+
+**1. Info icons must use the outline variant.**
+`OTooltip` is always paired with an info icon. That icon must never use the filled `"info"` name — always use `"info_outline"`:
+```vue
+<!-- ❌ WRONG — filled icon -->
+<q-icon name="info" size="18px">
+  <OTooltip content="..." />
+</q-icon>
+
+<!-- ✅ CORRECT — outline icon -->
+<q-icon name="info_outline" size="18px">
+  <OTooltip content="..." />
+</q-icon>
+```
+This applies to standalone icons too:
+```vue
+<!-- ❌ WRONG -->
+<q-icon name="info" /><OTooltip content="..." />
+
+<!-- ✅ CORRECT -->
+<q-icon name="info_outline" /><OTooltip content="..." />
+```
+
+**2. Never add font-size via `contentClass`.**
+`OTooltip` already applies `tw:text-xs` (12 px) internally. Adding `contentClass="tw:text-[12px]"` (or any other text size override) is redundant and must be removed:
+```vue
+<!-- ❌ WRONG — redundant font-size override -->
+<OTooltip :content="label" contentClass="tw:text-[12px]" />
+<OTooltip :content="label" contentClass="tw:text-[11px]" />
+<OTooltip :content="label" contentClass="tw:text-[10px]" />
+
+<!-- ✅ CORRECT — OTooltip default is already tw:text-xs -->
+<OTooltip :content="label" />
+```
+Only use `contentClass` for structural overrides that OTooltip has no dedicated prop for (e.g. custom layout utilities).
+
+**3. Width constraints belong on `max-width`, not `contentClass`.**
+```vue
+<!-- ❌ WRONG — width via contentClass -->
+<OTooltip :content="label" contentClass="tw:w-[300px]" />
+
+<!-- ✅ CORRECT — use the dedicated prop -->
+<OTooltip :content="label" max-width="300px" />
+```
+
 ---
 
 ### 10. OFormInput Validator Pattern — CRITICAL

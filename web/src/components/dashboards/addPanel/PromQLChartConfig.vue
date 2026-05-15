@@ -25,26 +25,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-config-aggregation"
     >
       <template #tooltip>
-        <q-tooltip max-width="300px">
-        <b>Aggregation Function - </b>
-        Determines how time-series data is converted to a single value.
-        <br /><br />
-        <b>Last:</b> Most recent value (default)
-        <br />
-        <b>First:</b> Oldest value
-        <br />
-        <b>Min/Max:</b> Minimum/Maximum value
-        <br />
-        <b>Avg:</b> Average of all values
-        <br />
-        <b>Sum:</b> Total of all values
-        <br />
-        <b>Count:</b> Number of data points
-        <br />
-        <b>Range:</b> Difference between max and min
-        <br />
-        <b>Diff:</b> Difference between last and first
-        </q-tooltip>
+        <OTooltip max-width="300px">
+          <template #content>
+            <b>Aggregation Function - </b>
+            Determines how time-series data is converted to a single value.
+            <br /><br />
+            <b>Last:</b> Most recent value (default)
+            <br />
+            <b>First:</b> Oldest value
+            <br />
+            <b>Min/Max:</b> Minimum/Maximum value
+            <br />
+            <b>Avg:</b> Average of all values
+            <br />
+            <b>Sum:</b> Total of all values
+            <br />
+            <b>Count:</b> Number of data points
+            <br />
+            <b>Range:</b> Difference between max and min
+            <br />
+            <b>Diff:</b> Difference between last and first
+          </template>
+        </OTooltip>
       </template>
     </OSelect>
 
@@ -58,10 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
-          <q-tooltip max-width="300px">
-          Name of the metric label containing latitude values. Default:
-          "latitude" or "lat"
-          </q-tooltip>
+          <OTooltip max-width="300px">
+            <template #content>
+              Name of the metric label containing latitude values. Default:
+              "latitude" or "lat"
+            </template>
+          </OTooltip>
         </template>
       </OInput>
 
@@ -73,10 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
-          <q-tooltip max-width="300px">
-          Name of the metric label containing longitude values. Default:
-          "longitude" or "lon"
-          </q-tooltip>
+          <OTooltip max-width="300px">
+            <template #content>
+              Name of the metric label containing longitude values. Default:
+              "longitude" or "lon"
+            </template>
+          </OTooltip>
         </template>
       </OInput>
 
@@ -88,10 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
-          <q-tooltip max-width="300px">
-          Name of the metric label containing weight values. Default:
-          "weight"
-          </q-tooltip>
+          <OTooltip max-width="300px">
+            <template #content>
+              Name of the metric label containing weight values. Default:
+              "weight"
+            </template>
+          </OTooltip>
         </template>
       </OInput>
     </div>
@@ -106,10 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
-          <q-tooltip max-width="300px">
-          Name of the metric label containing location names (e.g., country,
-          region). Default: "name"
-          </q-tooltip>
+          <OTooltip max-width="300px">
+            <template #content>
+              Name of the metric label containing location names (e.g., country,
+              region). Default: "name"
+            </template>
+          </OTooltip>
         </template>
       </OInput>
     </div>
@@ -125,20 +135,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-promql-table-mode"
       >
         <template #tooltip>
-          <q-tooltip max-width="300px">
-          <b>PromQL Table Mode - </b>
-          Controls how time-series data is displayed in the table.
-          <br /><br />
-          <b>Time Series:</b> Shows timestamp and value columns for selected
-          series with legend dropdown. <br /><br />
-          <b>Time Series with Metadata:</b> Shows timestamp, value, and all
-          metric labels (job, instance, etc.) for selected series with
-          legend dropdown. <br /><br />
-          <b>Aggregate:</b> Shows aggregated values across all series
-          without timestamps (no legend dropdown). <br /><br />
-          <b>Note:</b> The legend dropdown only appears in time series modes
-          when multiple series are present.
-          </q-tooltip>
+          <OTooltip max-width="300px">
+            <template #content>
+              <b>PromQL Table Mode - </b>
+              Controls how time-series data is displayed in the table.
+              <br /><br />
+              <b>Time Series:</b> Shows timestamp and value columns for selected
+              series with legend dropdown. <br /><br />
+              <b>Time Series with Metadata:</b> Shows timestamp, value, and all
+              metric labels (job, instance, etc.) for selected series with
+              legend dropdown. <br /><br />
+              <b>Aggregate:</b> Shows aggregated values across all series
+              without timestamps (no legend dropdown). <br /><br />
+              <b>Note:</b> The legend dropdown only appears in time series modes
+              when multiple series are present.
+            </template>
+          </OTooltip>
         </template>
       </OSelect>
       <template v-if="promqlTableMode === 'all'">
@@ -160,18 +172,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.tableAggregations") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
-              <q-tooltip class="bg-grey-8" max-width="350px">
-                <b>Table Aggregations - </b>
-                Select multiple aggregation functions to display as columns.
-                <br /><br />
-                Single aggregation: creates a "value" column
-                <br />
-                Multiple aggregations: creates "value_last", "value_sum", etc.
-                <br /><br />
-                Example: Selecting "last", "sum", "avg" will create three value
-                columns.
-              </q-tooltip>
+              <q-icon class="q-ml-xs" size="20px" name="info_outline" />
+              <OTooltip max-width="350px">
+                <template #content>
+                  <b>Table Aggregations - </b>
+                  Select multiple aggregation functions to display as columns.
+                  <br /><br />
+                  Single aggregation: creates a "value" column
+                  <br />
+                  Multiple aggregations: creates "value_last", "value_sum", etc.
+                  <br /><br />
+                  Example: Selecting "last", "sum", "avg" will create three value
+                  columns.
+                </template>
+              </OTooltip>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
@@ -227,20 +241,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
-                <q-tooltip class="bg-grey-8" max-width="400px">
-                  <b>Visible Columns</b>
-                  <br /><br />
-                  Specify which metric label columns to show in the table.
-                  <br /><br />
-                  <b>How to use:</b><br />
-                  • Select from dropdown (loaded from stream fields)<br />
-                  • Type custom column names and press Enter<br />
-                  • Leave empty to show all columns
-                  <br /><br />
-                  <b>Note:</b> This takes precedence over "Hidden Columns" if
-                  both are set.
-                </q-tooltip>
+              <q-icon class="q-ml-xs" size="18px" name="info_outline">
+                <OTooltip max-width="400px">
+                  <template #content>
+                    <b>Visible Columns</b>
+                    <br /><br />
+                    Specify which metric label columns to show in the table.
+                    <br /><br />
+                    <b>How to use:</b><br />
+                    • Select from dropdown (loaded from stream fields)<br />
+                    • Type custom column names and press Enter<br />
+                    • Leave empty to show all columns
+                    <br /><br />
+                    <b>Note:</b> This takes precedence over "Hidden Columns" if
+                    both are set.
+                  </template>
+                </OTooltip>
               </q-icon>
             </div>
           </template>
@@ -284,20 +300,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
-                <q-tooltip class="bg-grey-8" max-width="400px">
-                  <b>Hidden Columns</b>
-                  <br /><br />
-                  Specify which metric label columns to hide from the table.
-                  <br /><br />
-                  <b>How to use:</b><br />
-                  • Select from dropdown (loaded from stream fields)<br />
-                  • Type custom column names and press Enter<br />
-                  • All other columns will be shown
-                  <br /><br />
-                  <b>Tip:</b> Useful for hiding internal labels like __name__,
-                  le (histogram buckets), quantile, etc.
-                </q-tooltip>
+              <q-icon class="q-ml-xs" size="18px" name="info_outline">
+                <OTooltip max-width="400px">
+                  <template #content>
+                    <b>Hidden Columns</b>
+                    <br /><br />
+                    Specify which metric label columns to hide from the table.
+                    <br /><br />
+                    <b>How to use:</b><br />
+                    • Select from dropdown (loaded from stream fields)<br />
+                    • Type custom column names and press Enter<br />
+                    • All other columns will be shown
+                    <br /><br />
+                    <b>Tip:</b> Useful for hiding internal labels like __name__,
+                    le (histogram buckets), quantile, etc.
+                  </template>
+                </OTooltip>
               </q-icon>
             </div>
           </template>
@@ -345,13 +363,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <q-tooltip max-width="300px">
-            <b>Sticky First Column - </b>
-            Makes the first column stay fixed when scrolling horizontally.
-            <br /><br />
-            Useful for keeping the primary identifier visible (e.g., job,
-            instance).
-            </q-tooltip>
+            <OTooltip max-width="300px">
+              <template #content>
+                <b>Sticky First Column - </b>
+                Makes the first column stay fixed when scrolling horizontally.
+                <br /><br />
+                Useful for keeping the primary identifier visible (e.g., job,
+                instance).
+              </template>
+            </OTooltip>
           </template>
         </OSwitch>
 
@@ -377,20 +397,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.stickyColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
-                <q-tooltip class="bg-grey-8" max-width="400px">
-                  <b>Sticky Columns</b>
-                  <br /><br />
-                  Specify which columns should remain fixed when scrolling
-                  horizontally.
-                  <br /><br />
-                  <b>How to use:</b><br />
-                  • Select from dropdown (loaded from stream fields)<br />
-                  • Type custom column names and press Enter<br />
-                  • Columns will stay visible during horizontal scroll
-                  <br /><br />
-                  <b>Note:</b> Disabled when "Sticky First Column" is enabled.
-                </q-tooltip>
+              <q-icon class="q-ml-xs" size="18px" name="info_outline">
+                <OTooltip max-width="400px">
+                  <template #content>
+                    <b>Sticky Columns</b>
+                    <br /><br />
+                    Specify which columns should remain fixed when scrolling
+                    horizontally.
+                    <br /><br />
+                    <b>How to use:</b><br />
+                    • Select from dropdown (loaded from stream fields)<br />
+                    • Type custom column names and press Enter<br />
+                    • Columns will stay visible during horizontal scroll
+                    <br /><br />
+                    <b>Note:</b> Disabled when "Sticky First Column" is enabled.
+                  </template>
+                </OTooltip>
               </q-icon>
             </div>
           </template>
@@ -462,6 +484,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "PromQLChartConfig",
@@ -471,6 +494,7 @@ export default defineComponent({
     OSelect,
     OInput,
     OSwitch,
+    OTooltip,
   },
   props: {
     chartType: {

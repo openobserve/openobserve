@@ -46,7 +46,7 @@
       data-test="dashboard-variable-adhoc-add-selector"
     >
       <DynamicFilterIcon />
-      <q-tooltip>Add Dynamic Filter</q-tooltip>
+      <OTooltip content="Add Dynamic Filter" />
     </OButton>
   </div>
 </template>
@@ -59,12 +59,13 @@ import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "VariableAdHocValueSelector",
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
-  components: { DynamicFilterIcon, OButton, OInput, OSelect },
+  components: { DynamicFilterIcon, OButton, OInput, OSelect, OTooltip },
 
   setup(props: any, { emit }) {
     const store = useStore();

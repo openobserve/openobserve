@@ -93,17 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-step-value"
         >
           <template #tooltip>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              <b>Step - </b>
-              {{ t("dashboard.stepValueTooltip") }}
-              <br />
-              {{ t("dashboard.stepValueExample") }}
-            </q-tooltip>
+            <OTooltip max-width="250px">
+              <template #content>
+                <b>Step - </b>
+                {{ t("dashboard.stepValueTooltip") }}
+                <br />
+                {{ t("dashboard.stepValueExample") }}
+              </template>
+            </OTooltip>
           </template>
         </OInput>
 
@@ -122,16 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
-              <q-tooltip
-                anchor="bottom middle"
-                self="top middle"
-                style="font-size: 10px"
-                max-width="250px"
-              >
-                <span>
-                  {{ t("dashboard.useDefaultTimeTooltip") }}
-                </span>
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="250px" />
             </OButton>
           </div>
 
@@ -154,14 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :hide-relative-timezone="true"
                   data-test="dashboard-config-panel-time-picker"
                 />
-                <q-tooltip
-                  anchor="bottom middle"
-                  self="top middle"
-                  style="font-size: 11px"
-                  max-width="320px"
-                >
-                  {{ formattedPickerValue }}
-                </q-tooltip>
+                <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
               <q-icon
                 class="q-mr-xs q-ml-sm flex-shrink-0"
@@ -479,16 +460,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon
                   class="q-ml-xs"
                   size="20px"
-                  name="info"
+                  name="info_outline"
                   data-test="dashboard-config-promql-legend-info"
                 />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
-                  {{ t("dashboard.overrideMessage") }}
-                </q-tooltip>
+                <OTooltip :content="t('dashboard.overrideMessage')" />
               </div>
             </div>
           </template>
@@ -572,9 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-limit"
         >
           <template #tooltip>
-            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-              {{ t("dashboard.limitForQueryResult") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.limitForQueryResult')" />
           </template>
         </OInput>
 
@@ -600,11 +573,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-top_results"
         >
           <template #tooltip>
-            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
-              <b>{{ t("dashboard.topNTooltipTitle") }}</b>
-              <br /><br />
-              {{ t("dashboard.topNTooltipDescription") }}
-            </q-tooltip>
+            <OTooltip max-width="250px">
+              <template #content>
+                <b>{{ t("dashboard.topNTooltipTitle") }}</b>
+                <br /><br />
+                {{ t("dashboard.topNTooltipDescription") }}
+              </template>
+            </OTooltip>
           </template>
         </OInput>
 
@@ -622,14 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.addOthersSeriesTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="250px" />
           </template>
         </OSwitch>
 
@@ -642,14 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.connectNullValuesTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="250px" />
           </template>
         </OSwitch>
 
@@ -662,9 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-no-value-replacement"
         >
           <template #tooltip>
-            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-              {{ t("dashboard.noValueReplacementTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.noValueReplacementTooltip')" />
           </template>
         </OInput>
       </div>
@@ -730,11 +689,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-y_axis_min"
           >
             <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
-                <br />
-                {{ t("dashboard.yAxisMinTooltipDescription") }}
-              </q-tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
+                  <br />
+                  {{ t("dashboard.yAxisMinTooltipDescription") }}
+                </template>
+              </OTooltip>
             </template>
           </OInput>
           <OInput
@@ -751,11 +712,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-y_axis_max"
           >
             <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
-                <br />
-                {{ t("dashboard.yAxisMaxTooltipDescription") }}
-              </q-tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
+                  <br />
+                  {{ t("dashboard.yAxisMaxTooltipDescription") }}
+                </template>
+              </OTooltip>
             </template>
           </OInput>
         </div>
@@ -833,14 +796,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-axis-label-rotate"
           >
             <template #tooltip>
-              <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]" class="bg-grey-8">
-                <div>
-                  <span>{{ t("dashboard.axisLabelRotateTooltipText") }}</span>
-                  <br /><br />
-                  <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
-                  <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
-                </div>
-              </q-tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <div>
+                    <span>{{ t("dashboard.axisLabelRotateTooltipText") }}</span>
+                    <br /><br />
+                    <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                    <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
+                  </div>
+                </template>
+              </OTooltip>
             </template>
           </OInput>
           <OInput
@@ -859,14 +824,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-axis-label-truncate"
           >
             <template #tooltip>
-              <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]" class="bg-grey-8">
-                <div>
-                  <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
-                  <br /><br />
-                  <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
-                  <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
-                </div>
-              </q-tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <div>
+                    <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
+                    <br /><br />
+                    <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                    <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
+                  </div>
+                </template>
+              </OTooltip>
             </template>
           </OInput>
         </div>
@@ -997,9 +964,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-rows-per-page"
         >
           <template #tooltip>
-            <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
-              {{ t("dashboard.rowsPerPageTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="250px" />
           </template>
         </OInput>
       </div>
@@ -1033,14 +998,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('dashboard.pivotShowRowTotals') }}
             <OButton variant="ghost" size="icon" @click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-                max-width="250px"
-              >
-                {{ t("dashboard.pivotShowRowTotalsTooltip") }}
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
         </OSwitch>
@@ -1062,14 +1020,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('dashboard.pivotStickyColTotals') }}
             <OButton variant="ghost" size="icon" @click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-                max-width="250px"
-              >
-                {{ t("dashboard.pivotStickyColTotalsTooltip") }}
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.pivotStickyColTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
         </OSwitch>
@@ -1085,14 +1036,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('dashboard.pivotShowColTotals') }}
             <OButton variant="ghost" size="icon" @click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-                max-width="250px"
-              >
-                {{ t("dashboard.pivotShowColTotalsTooltip") }}
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
         </OSwitch>
@@ -1114,14 +1058,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t('dashboard.pivotStickyRowTotals') }}
             <OButton variant="ghost" size="icon" @click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-                max-width="250px"
-              >
-                {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.pivotStickyRowTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
         </OSwitch>
@@ -1149,14 +1086,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.configSectionValueTransformations") }}
           <OButton variant="ghost" size="icon" @click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.configSectionValueTransformationsTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.configSectionValueTransformationsTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1186,14 +1116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.configSectionFieldOverrides") }}
           <OButton variant="ghost" size="icon" @click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.configSectionFieldOverridesTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1238,9 +1161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-map-type"
           >
             <template #tooltip>
-              <q-tooltip class="bg-grey-8" max-width="250px">
-                {{ t("dashboard.mapsMapTypeTooltip") }}
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.mapsMapTypeTooltip')" max-width="250px" />
             </template>
           </OSelect>
         </div>
@@ -1486,13 +1407,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isBreakdownFieldEmpty || hasTimeShifts"
           >
             <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
-                <b>{{
-                  hasTimeShifts
-                    ? t("dashboard.trellisTimeShiftTooltip")
-                    : t("dashboard.trellisTooltip")
-                }}</b>
-              </q-tooltip>
+              <OTooltip max-width="250px">
+                <template #content>
+                  <b>{{
+                    hasTimeShifts
+                      ? t("dashboard.trellisTimeShiftTooltip")
+                      : t("dashboard.trellisTooltip")
+                  }}</b>
+                </template>
+              </OTooltip>
             </template>
           </OSelect>
         </div>
@@ -1520,13 +1443,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #tooltip>
-              <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle" max-width="250px">
-                <b>{{
-                  hasTimeShifts
-                    ? t("dashboard.trellisTimeShiftTooltip")
-                    : t("dashboard.trellisTooltip")
-                }}</b>
-              </q-tooltip>
+              <OTooltip max-width="250px">
+                <template #content>
+                  <b>{{
+                    hasTimeShifts
+                      ? t("dashboard.trellisTimeShiftTooltip")
+                      : t("dashboard.trellisTooltip")
+                  }}</b>
+                </template>
+              </OTooltip>
             </template>
           </OInput>
         </div>
@@ -1546,29 +1471,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="lg"
           >
             <template #tooltip>
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-              >
-                <div>
-                  <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
-                  <br /><br />
-                  {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
-                  <br /><br />
-                  <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
-                  <br /><br />
-                  <b>{{
-                    t("dashboard.groupMultiYAxisTrellisTooltipDisabled")
-                  }}</b>
-                  <br /><br />
-                  <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
-                  <br />
-                  {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
-                  <br />
-                  {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
-                </div>
-              </q-tooltip>
+              <OTooltip>
+                <template #content>
+                  <div>
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
+                    <br /><br />
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
+                    <br /><br />
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
+                    <br /><br />
+                    <b>{{
+                      t("dashboard.groupMultiYAxisTrellisTooltipDisabled")
+                    }}</b>
+                    <br /><br />
+                    <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
+                    <br />
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
+                    <br />
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
+                  </div>
+                </template>
+              </OTooltip>
             </template>
           </OSwitch>
         </div>
@@ -1624,14 +1547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.drilldownTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1672,16 +1588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              anchor="bottom middle"
-              self="top middle"
-              style="font-size: 10px"
-              max-width="250px"
-            >
-              <span>
-                {{ t("dashboard.comparisonAgainstTooltip") }}
-              </span>
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1751,14 +1658,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.markLinesTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1822,6 +1722,7 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
 
 import { markRaw, watchEffect, watch } from "vue";
@@ -1877,6 +1778,7 @@ export default defineComponent({
     StepMiddle,
     PromQLChartConfig,
     OButton,
+    OTooltip,
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {

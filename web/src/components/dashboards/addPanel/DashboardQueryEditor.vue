@@ -67,13 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="18px"
                 :data-test="`dashboard-panel-query-tab-visibility-${index}`"
               >
-                <q-tooltip>
-                  {{
-                    dashboardPanelData.layout.hiddenQueries.includes(index)
-                      ? t("dashboard.showQueryResults")
-                      : t("dashboard.hideQueryResults")
-                  }}
-                </q-tooltip>
+                <OTooltip
+                  :content="dashboardPanelData.layout.hiddenQueries.includes(index) ? t('dashboard.showQueryResults') : t('dashboard.hideQueryResults')"
+                />
               </q-icon>
               <q-icon
                 v-if="
@@ -222,14 +218,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left
                         ><q-icon name="info_outline"
                       /></template>
-                      <q-tooltip
-                        class="bg-grey-8"
-                        anchor="bottom middle"
-                        self="top right"
+                      <OTooltip
+                        :content="t('dashboard.vrlExtractionTooltip')"
                         max-width="250px"
-                      >
-                        {{ t("dashboard.vrlExtractionTooltip") }}
-                      </q-tooltip>
+                      />
                     </OButton>
                   </div>
                 </div>
@@ -276,6 +268,7 @@ import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -288,6 +281,7 @@ export default defineComponent({
     OButton,
     OSelect,
     OSwitch,
+    OTooltip,
   },
   emits: ["searchdata", "run-query"],
   methods: {

@@ -133,16 +133,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
-                    <q-tooltip
-                      class="bg-grey-8"
-                      anchor="top middle"
-                      self="bottom middle"
-                      max-width="250px"
-                    >
-                      Select a stream or use a variable like $streamVariable
-                      to dynamically choose the stream based on another
-                      value.
-                    </q-tooltip>
+                    <OTooltip max-width="250px">
+                      <template #content>
+                        Select a stream or use a variable like $streamVariable
+                        to dynamically choose the stream based on another
+                        value.
+                      </template>
+                    </OTooltip>
                   </template>
                 </OSelect>
               </div>
@@ -158,16 +155,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-field-select"
               >
                 <template #tooltip>
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    max-width="250px"
-                  >
-                    Select a field or use a variable like $fieldVariable. If
-                    stream uses a variable, field list will be empty - type
-                    field name manually.
-                  </q-tooltip>
+                  <OTooltip max-width="250px">
+                    <template #content>
+                      Select a field or use a variable like $fieldVariable. If
+                      stream uses a variable, field list will be empty - type
+                      field name manually.
+                    </template>
+                  </OTooltip>
                 </template>
               </OSelect>
               </div>
@@ -178,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('dashboard.DefaultSize')"
                   data-test="dashboard-variable-max-record-size"
                 >
-                  <template #tooltip><q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip></template>
+                  <template #tooltip><OTooltip :content="t('dashboard.maxRecordSize')" /></template>
                 </OInput>
               </div>
               <div>
@@ -196,12 +190,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="info_outline"
                     data-test="dashboard-variables-setting-filter-info"
                   >
-                    <q-tooltip style="width: 250px">
-                      In filters, you can use the value of another variable to
-                      filter the current variable's value. This can be done by
-                      using the other variable's name. For example:
-                      <span class="bg-highlight">$variableName</span>.
-                    </q-tooltip>
+                    <OTooltip max-width="250px">
+                      <template #content>
+                        In filters, you can use the value of another variable to
+                        filter the current variable's value. This can be done by
+                        using the other variable's name. For example:
+                        <span class="bg-highlight">$variableName</span>.
+                      </template>
+                    </OTooltip>
                   </q-icon>
                 </div>
                 <div class="row items-center" style="width: 100%">
@@ -332,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-custom-variable-select-all-checkbox"
                   @click="onCustomSelectAllClick"
                 >
-                  <template #tooltip><q-tooltip>Default - Select All</q-tooltip></template>
+                  <template #tooltip><OTooltip content="Default - Select All" /></template>
                 </OCheckbox>
               </div>
               <div class="tw:w-[2.62rem]"></div>
@@ -494,11 +490,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
             >
               <template #tooltip>
-                <q-tooltip max-width="300px">
-                  If enabled, single quotes will be escaped in the query. For
-                  example, a value like `O'Reilly` will be replaced as
-                  `O''Reilly`.
-                </q-tooltip>
+                <OTooltip max-width="300px">
+                  <template #content>
+                    If enabled, single quotes will be escaped in the query. For
+                    example, a value like `O'Reilly` will be replaced as
+                    `O''Reilly`.
+                  </template>
+                </OTooltip>
               </template>
             </OSwitch>
           </div>
@@ -557,6 +555,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
@@ -569,7 +568,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox },
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip },
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data

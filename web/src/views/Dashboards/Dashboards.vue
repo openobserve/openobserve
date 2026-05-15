@@ -54,13 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:whitespace-nowrap tw:shrink-0"
             >
               <template #tooltip>
-                <q-tooltip>
-                  {{
-                    searchAcrossFolders
-                      ? t("dashboard.searchSelf")
-                      : t("dashboard.searchAll")
-                  }}
-                </q-tooltip>
+                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
               </template>
             </OSwitch>
 
@@ -324,14 +318,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? props.value.slice(0, 30) + "..."
                           : props.value
                       }}
-                      <q-tooltip
+                      <OTooltip
                         v-if="props.value && props.value.length > 30"
-                        class="q-mt-lg tw:w-[300px]"
-                        anchor="top middle"
-                        self="bottom middle"
-                      >
-                        {{ props.value }}
-                      </q-tooltip>
+                        :content="props.value"
+                        max-width="300px"
+                      />
                     </div>
                   </q-td>
                 </template>
@@ -554,6 +545,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -627,6 +619,7 @@ export default defineComponent({
     OSwitch,
     ODrawer,
     AddDashboard,
+    OTooltip,
     AddDashboardFromGitHub,
     QTablePagination,
     NoData,

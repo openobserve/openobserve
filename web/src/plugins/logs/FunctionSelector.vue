@@ -25,9 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
       >
         <template #tooltip>
-          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-            {{ t("search.toggleFunctionEditor") }}
-          </q-tooltip>
+          <OTooltip :content="t('search.toggleFunctionEditor')" :side-offset="2" />
         </template>
       </OSwitch>
     </div>
@@ -40,9 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
           <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
-          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-            selectedFunctionTooltip
-          }}</q-tooltip>
+          <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
         </OButton>
       </template>
       <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
@@ -92,9 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="fnSavedFunctionDialog"
     >
       <q-icon name="save" size="16px" />
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
-        {{ t("common.save") }}
-      </q-tooltip>
+      <OTooltip :content="t('common.save')" :side-offset="6" />
     </OButton>
   </OButtonGroup>
 </template>
@@ -106,6 +100,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";

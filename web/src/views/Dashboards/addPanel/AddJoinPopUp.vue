@@ -154,13 +154,7 @@
             @click="handleAddCondition(argIndex)"
           >
             <template #icon-left><q-icon name="add" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              Add another clause
-            </q-tooltip>
+            <OTooltip content="Add another clause" />
           </OButton>
 
           <OButton
@@ -172,11 +166,7 @@
             :aria-label="t('panel.removeClause')"
           >
             <template #icon-left><q-icon name="close" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >Remove clause</q-tooltip>
+            <OTooltip content="Remove clause" />
           </OButton>
         </div>
       </div>
@@ -187,6 +177,7 @@
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   defineComponent,
   watch,
@@ -258,6 +249,7 @@ export default defineComponent({
   components: {
     OButton,
     OSelect,
+    OTooltip,
     StreamFieldSelect,
     LeftJoinSvg,
     LeftJoinTypeSvg,
