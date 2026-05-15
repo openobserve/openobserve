@@ -133,7 +133,7 @@ export class LogsPage {
         this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
-        this.qPageContainer = '[data-o2-page-container]';
+        this.qPageContainer = '[data-test="logs-page-container"]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
@@ -3457,8 +3457,11 @@ export class LogsPage {
         // Wait for the page to stabilize and check for "No events found" condition
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
+        // Wait for the container to be present before reading its text
+        await logsPage.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+
         // If no data is available, trigger a refresh and wait
-        const pageText = await logsPage.textContent();
+        const pageText = await logsPage.textContent({ timeout: 10000 }).catch(() => '');
         if (pageText.includes('No events found')) {
             testLogger.debug('No events found, attempting to refresh...');
             await this.clickRefreshButton();

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="tw:rounded-md logPage" id="logPage">
+  <div class="tw:rounded-md logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
