@@ -31,13 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
           </span>
           <div>
-            <q-input
+            <OInput
               data-test="dashboard-panel-name"
               v-model="dashboardPanelData.data.title"
               :label="t('panel.name') + '*'"
               class="q-ml-xl dynamic-input"
-              dense
-              borderless
               :style="inputStyle"
             />
           </div>
@@ -243,6 +241,7 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
@@ -257,6 +256,7 @@ export default defineComponent({
   components: {
     OButtonGroup,
     OButton,
+    OInput,
     ODropdown,
     ODropdownItem,
     DateTimePickerDashboard,

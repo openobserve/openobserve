@@ -27,25 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <p class="text-body2">{{ message }}</p>
       <div class="tw:flex tw:items-center tw:gap-2">
-        <q-select
-          dense
+        <OSelect
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="select-container o2-custom-select-dashboard tw:flex-1"
+          class="tw:flex-1"
           data-test="dashboard-tab-move-select"
-          borderless
-          hide-bottom-space
-        >
-          <!-- template when on options -->
-          <template v-slot:no-option>
-            <q-item data-test="dashboard-tab-move-select-no-option">
-              <q-item-section class="text-italic text-grey">
-                No Other Tabs Available
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
 
         <OButton
           variant="outline"
@@ -85,10 +73,11 @@ import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton, ODialog },
+  components: { AddTab, OButton, ODialog, OSelect },
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
@@ -96,7 +85,7 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");
-    const selectedMoveTabId: any = ref(null);
+    const selectedMoveTabId = ref<string | null>(null);
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit = ref(null);
@@ -144,7 +133,7 @@ export default defineComponent({
       await getTabOptions();
 
       // set selectedMoveTabId to newly created tab
-      selectedMoveTabId.value = { label: tabData.name, value: tabData.tabId };
+      selectedMoveTabId.value = tabData.tabId;
 
       // close add tab dialog
       showAddTabDialog.value = false;
@@ -162,7 +151,7 @@ export default defineComponent({
     };
 
     const onConfirm = () => {
-      emit("update:ok", selectedMoveTabId.value.value);
+      emit("update:ok", selectedMoveTabId.value);
     };
     return {
       t,

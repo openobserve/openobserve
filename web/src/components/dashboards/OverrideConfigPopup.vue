@@ -17,37 +17,23 @@
       class="q-mb-md flex items-start tw:w-full tw:flex"
       style="gap: 15px"
     >
-      <q-select
+      <OSelect
         v-model="overrideConfig.field.value"
         :label="t('dashboard.overrideConfigFieldLabel')"
         :options="columnsOptions"
-        :display-value="getFieldDisplayValue(overrideConfig.field.value)"
         style="width: 40%"
         :data-test="`dashboard-addpanel-config-unit-config-select-column-${index}`"
-        input-debounce="0"
-        emit-value
-        map-options
-        borderless
-        dense
-        class="tw:flex-1 o2-custom-select-dashboard"
-        hide-bottom-space
+        class="tw:flex-1"
       />
       <div class="tw:flex items-center" style="width: 60%; gap: 10px">
-        <q-select
-          v-model="overrideConfig.config[0].type"
-          :label="t('dashboard.overrideConfigTypeLabel')"
-          :options="configTypeOptions"
-          :disable="!overrideConfig.field.value"
-          style="width: 40%"
-          :data-test="`dashboard-addpanel-config-type-select-${index}`"
-          input-debounce="0"
-          emit-value
-          map-options
-          borderless
-          dense
-          class="o2-custom-select-dashboard"
-          @update:model-value="onConfigTypeChange(index)"
-          hide-bottom-space
+<OSelect
+            v-model="overrideConfig.config[0].type"
+            :label="t('dashboard.overrideConfigTypeLabel')"
+            :options="configTypeOptions"
+            :disabled="!overrideConfig.field.value"
+            style="width: 40%"
+            :data-test="`dashboard-addpanel-config-type-select-${index}`"
+            @update:model-value="onConfigTypeChange(index)"
         />
 
         <div
@@ -55,34 +41,13 @@
           class="tw:flex items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
-          <q-select
-            v-model="overrideConfig.config[0].value.unit"
-            :label="t('dashboard.overrideConfigUnitLabel')"
-            :options="unitOptions"
-            :disable="!overrideConfig.field.value"
-            style="flex-grow: 1; width: 50%"
-            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"
-            input-debounce="0"
-            emit-value
-            map-options
-            borderless
-            dense
-            class="tw:flex-1 o2-custom-select-dashboard"
-            hide-bottom-space
-          />
-          <q-input
+          <OSelect            v-model="overrideConfig.config[0].value.unit"           :label="t('dashboard.overrideConfigUnitLabel')"            :options="unitOptions"            :disabled="!overrideConfig.field.value"            style="flex-grow: 1; width: 50%"            :data-test="`dashboard-addpanel-config-unit-config-select-unit-${index}`"            class="tw:flex-1"          />
+          <OInput
             v-if="overrideConfig.config[0].value.unit === 'custom'"
             v-model="overrideConfig.config[0].value.customUnit"
             :label="t('dashboard.customunitLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            stack-label
-            dense
-            label-slot
             data-test="dashboard-config-unit"
             style="width: 50%"
-            borderless
-            hide-bottom-space
           />
         </div>
 
@@ -91,11 +56,10 @@
           class="tw:flex items-center"
           style="gap: 10px; flex-grow: 1; width: 60%"
         >
-          <q-checkbox
+          <OCheckbox
             v-model="overrideConfig.config[0].autoColor"
             :label="t('dashboard.overrideConfigUniqueValueColor')"
-            :disable="!overrideConfig.field.value"
-            dense
+            :disabled="!overrideConfig.field.value"
           />
         </div>
 
@@ -124,10 +88,13 @@ import {
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "OverrideConfigPopup",
-  components: { OButton, ODialog },
+  components: { OButton, ODialog, OSelect, OInput, OCheckbox },
   props: {
     open: {
       type: Boolean,

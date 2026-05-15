@@ -24,22 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-form greedy ref="addVariableForm" @submit="onSubmit">
           <div class="q-mt-md">
             <div class="q-mb-md">
-              <q-select
-                hint="Variables will be applied to all tabs and panels if global is selected."
+            <OSelect
+                helpText="Variables will be applied to all tabs and panels if global is selected."
                 v-model="variableData.scope"
                 :options="scopeOptions"
                 label="Select variable scope"
-                outlined
-                dense
-                emit-value
-                map-options
-                filled
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                class="showLabelOnTop"
-                popup-no-route-dismiss
-                popup-content-style="z-index: 10001"
                 data-test="dashboard-variable-scope-select"
               />
             </div>
@@ -177,55 +166,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col">
             <div>
-              <q-select
+              <OSelect
                 class="showLabelOnTop"
-                stack-label
-                input-debounce="0"
-                dense
                 v-model="variableData.type"
                 :options="variableTypes"
                 :label="t('dashboard.typeOfVariable')"
-                option-value="value"
-                map-options
-                emit-value
                 data-test="dashboard-variable-type-select"
-                borderless
-                hide-bottom-space
-              ></q-select>
+              />
             </div>
             <div class="text-body1 text-bold q-mt-sm">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="row">
               <div class="textbox col">
-                <q-input
+                <OInput
                   v-model="variableData.name"
-                  class="showLabelOnTop q-mr-sm"
+                  class="tw:mr-2"
                   :label="t('dashboard.nameOfVariable') + ' *'"
-                  dense
-                  borderless
-                  hide-bottom-space
-                  stack-label
-                  :rules="[
-                    (val: any) => !!val.trim() || 'Field is required!',
-                    (val: any) =>
-                      /^[a-zA-Z0-9_-]*$/.test(val) ||
-                      'Only letters, numbers, hyphens (-), and underscores (_) are allowed.',
-                  ]"
                   data-test="dashboard-variable-name"
-                ></q-input>
+                />
               </div>
               <div class="textbox col">
-                <q-input
+                <OInput
                   v-model="variableData.label"
-                  class="showLabelOnTop"
                   :label="t('dashboard.labelOfVariable')"
-                  dense
-                  stack-label
                   data-test="dashboard-variable-label"
-                  borderless
-                  hide-bottom-space
-                ></q-input>
+                />
               </div>
             </div>
             <div
@@ -239,21 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-if="variableData.type == 'query_values'">
               <div class="row">
-                <q-select
+                <OSelect
                   v-model="variableData.query_data.stream_type"
                   :label="t('dashboard.selectStreamType') + ' *'"
-                  :options="data.streamType"
-                  input-debounce="0"
-                  behavior="menu"
-                  hide-bottom-space
-                  borderless
-                  dense
-                  stack-label
-                  class="showLabelOnTop col no-case q-mr-sm q-mb-xs"
+                  :options="streamTypeOptions"
+                  class="tw:flex-1 tw:mr-2"
                   @update:model-value="streamTypeUpdated"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-type-select"
-                ></q-select>
+                />
                 <q-select
                   v-model="variableData.query_data.stream"
                   :label="t('dashboard.selectIndex') + ' *'"
@@ -380,26 +339,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </q-select>
               <div>
-                <q-input
-                  class="showLabelOnTop"
+                <OInput
                   type="number"
                   v-model.number="variableData.query_data.max_record_size"
                   :label="t('dashboard.DefaultSize')"
-                  dense
-                  stack-label
                   data-test="dashboard-variable-max-record-size"
-                  borderless
-                  hide-bottom-space
                 >
-                  <OButton
-                    variant="ghost"
-                    size="icon"
-                    data-test="dashboard-variable-max-record-size-info"
-                  >
-                    <template #icon-left><q-icon name="info" /></template>
-                    <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
-                  </OButton>
-                </q-input>
+                  <template #tooltip><q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip></template>
+                </OInput>
               </div>
               <div>
                 <div class="flex flex-row">
@@ -544,27 +491,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="textbox" v-if="['constant'].includes(variableData.type)">
-            <q-input
-              class="showLabelOnTop"
+            <OInput
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
               data-test="dashboard-variable-constant-value"
-              dense
-              stack-label
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-            ></q-input>
+            />
           </div>
           <div class="textbox" v-if="['textbox'].includes(variableData.type)">
-            <q-input
-              class="showLabelOnTop"
+            <OInput
               v-model="variableData.value"
               :label="t('dashboard.DefaultValue')"
               data-test="dashboard-variable-textbox-default-value"
-              dense
-              stack-label
-              borderless
-              hide-bottom-space
-            ></q-input>
+            />
           </div>
           <div v-if="variableData.type == 'custom'">
             <div class="tw:flex">
@@ -577,18 +515,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="tw:w-12 tw:flex tw:flex-col tw:items-center">
                 <span v-if="!variableData.multiSelect"> Default </span>
-                <q-checkbox
+                <OCheckbox
                   v-if="variableData.multiSelect"
-                  dense
                   v-model="customSelectAllModel"
                   data-test="dashboard-custom-variable-select-all-checkbox"
                   @click="onCustomSelectAllClick"
-                  class="tw:ml-[0.4rem]"
                 >
-                  <q-tooltip anchor="top middle" self="bottom middle">
-                    Default - Select All
-                  </q-tooltip>
-                </q-checkbox>
+                  <template #tooltip><q-tooltip>Default - Select All</q-tooltip></template>
+                </OCheckbox>
               </div>
               <div class="tw:w-[2.62rem]"></div>
             </div>
@@ -598,35 +532,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row"
             >
               <span class="tw:pt-3.5 tw:w-6">{{ index + 1 }}</span>
-              <q-input
-                dense
-                filled
-                outlined
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                class="col textbox q-mr-sm"
+              <OInput
+                class="tw:flex-1 tw:mr-2"
                 v-model="variableData.options[index].label"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="'Label ' + (index + 1)"
-                name="label"
               />
-              <q-input
-                dense
-                borderless
-                hide-bottom-space
-                :rules="[(val: any) => !!val.trim() || 'Field is required!']"
-                class="col textbox q-mr-sm"
+              <OInput
+                class="tw:flex-1 tw:mr-2"
                 v-model="variableData.options[index].value"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="'Value ' + (index + 1)"
-                name="value"
               />
               <div class="tw:flex tw:w-12 tw:item-center tw:justify-center">
-                <q-checkbox
-                  dense
+                <OCheckbox
                   v-model="variableData.options[index].selected"
                   :data-test="`dashboard-custom-variable-${index}-checkbox`"
                   @click="onCheckboxClick(index)"
-                  class="q-mb-lg"
                 />
               </div>
               <div>
@@ -659,17 +581,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="['query_values', 'custom'].includes(variableData.type)"
             class="q-mt-md"
           >
-            <q-toggle
+            <OSwitch
               v-model="variableData.multiSelect"
               :label="t('dashboard.multiSelect')"
               data-test="dashboard-query_values-show_multiple_values"
-              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
               size="lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
             />
           </div>
           <!-- default value for multi select variables -->
@@ -714,16 +630,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="flex-wrap: wrap"
               >
                 <div class="flex q-mr-sm" style="width: 50%">
-                  <q-input
-                    dense
-                    stack-label
-                    class="col textbox showLabelOnTop"
+                  <OInput
                     v-model="variableData.customMultiSelectValue[index]"
-                    name="value"
                     placeholder="Enter value"
                     :data-test="`dashboard-variable-custom-value-${index}`"
-                    borderless
-                    hide-bottom-space
                   />
                   <OButton
                     v-if="variableData.multiSelect"
@@ -756,52 +666,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- hide on dashboard toggle -->
           <div class="q-mt-md">
-            <q-toggle
+            <OSwitch
               v-model="variableData.hideOnDashboard"
               :label="t('dashboard.hideOnDashboard')"
               data-test="dashboard-variable-hide_on_dashboard"
-              class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
               size="lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
             />
           </div>
 
           <!-- escape single quotes toggle -->
           <div>
-            <div class="row items-center all-pointer-events">
-              <q-toggle
-                v-model="variableData.escapeSingleQuotes"
-                :label="t('dashboard.escapeSingleQuotes')"
-                class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
-                size="lg"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-toggle-button-lg-dark'
-                    : 'o2-toggle-button-lg-light'
-                "
-              />
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-limit-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
+            <OSwitch
+              v-model="variableData.escapeSingleQuotes"
+              :label="t('dashboard.escapeSingleQuotes')"
+              data-test="dashboard-variable-escape-single-quotes"
+              size="lg"
+            >
+              <template #tooltip>
+                <q-tooltip max-width="300px">
                   If enabled, single quotes will be escaped in the query. For
                   example, a value like `O'Reilly` will be replaced as
                   `O''Reilly`.
                 </q-tooltip>
-              </div>
-            </div>
+              </template>
+            </OSwitch>
           </div>
         </q-form>
       </div>
@@ -854,6 +742,10 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import useStreams from "@/composables/useStreams";
 import {
   buildVariablesDependencyGraph,
@@ -866,7 +758,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem },
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox },
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data
@@ -1020,6 +912,10 @@ export default defineComponent({
       { label: "Selected Tabs", value: "tabs" },
       { label: "Selected Panels", value: "panels" },
     ]);
+
+    const streamTypeOptions = computed(() =>
+      data.streamType.map((t: string) => ({ label: t, value: t })),
+    );
 
     const handleCustomSelectAll = () => {
       // if all values are selected, then check customSelectAllModel = true
@@ -1507,6 +1403,21 @@ export default defineComponent({
     };
 
     const onSubmit = () => {
+      // manual validation for migrated fields
+      if (!variableData.name?.trim()) {
+        showErrorNotification("Variable name is required.");
+        return;
+      }
+      if (!/^[a-zA-Z0-9_-]*$/.test(variableData.name)) {
+        showErrorNotification(
+          "Only letters, numbers, hyphens (-), and underscores (_) are allowed.",
+        );
+        return;
+      }
+      if (variableData.type === "constant" && !variableData.value?.trim()) {
+        showErrorNotification("Constant value is required.");
+        return;
+      }
       // first, validate form values
       addVariableForm.value.validate().then(async (valid: any) => {
         if (!valid) {
@@ -1838,6 +1749,7 @@ export default defineComponent({
       tabsOptions,
       groupedPanelsOptions,
       scopeOptions,
+      streamTypeOptions,
       editMode,
     };
   },

@@ -17,178 +17,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="promql-chart-config">
     <!-- Aggregation Function Selector -->
-    <q-select
+    <OSelect
       v-if="showAggregationConfig"
       v-model="aggregationValue"
       :options="aggregationOptions"
       :label="t('dashboard.aggregationFunction')"
-      borderless
-      dense
-      class="q-py-md showLabelOnTop"
-      stack-label
-      emit-value
-      map-options
       data-test="dashboard-config-aggregation"
     >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          {{ t("dashboard.aggregationFunction") }}
-          <q-icon class="q-ml-xs" size="20px" name="info" />
-          <q-tooltip class="bg-grey-8" max-width="300px">
-            <b>Aggregation Function - </b>
-            Determines how time-series data is converted to a single value.
-            <br /><br />
-            <b>Last:</b> Most recent value (default)
-            <br />
-            <b>First:</b> Oldest value
-            <br />
-            <b>Min/Max:</b> Minimum/Maximum value
-            <br />
-            <b>Avg:</b> Average of all values
-            <br />
-            <b>Sum:</b> Total of all values
-            <br />
-            <b>Count:</b> Number of data points
-            <br />
-            <b>Range:</b> Difference between max and min
-            <br />
-            <b>Diff:</b> Difference between last and first
-          </q-tooltip>
-        </div>
+      <template #tooltip>
+        <q-tooltip max-width="300px">
+        <b>Aggregation Function - </b>
+        Determines how time-series data is converted to a single value.
+        <br /><br />
+        <b>Last:</b> Most recent value (default)
+        <br />
+        <b>First:</b> Oldest value
+        <br />
+        <b>Min/Max:</b> Minimum/Maximum value
+        <br />
+        <b>Avg:</b> Average of all values
+        <br />
+        <b>Sum:</b> Total of all values
+        <br />
+        <b>Count:</b> Number of data points
+        <br />
+        <b>Range:</b> Difference between max and min
+        <br />
+        <b>Diff:</b> Difference between last and first
+        </q-tooltip>
       </template>
-    </q-select>
+    </OSelect>
 
     <!-- GeoMap Label Configuration -->
     <div v-if="chartType === 'geomap'" class="geomap-config">
-      <q-input
+      <OInput
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
         placeholder="latitude or lat"
-        borderless
-        dense
-        class="tw:mb-3 showLabelOnTop"
-        stack-label
+        class="tw:mb-3"
         data-test="dashboard-config-geo-lat-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.geoLatLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing latitude values. Default:
-              "latitude" or "lat"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <q-tooltip max-width="300px">
+          Name of the metric label containing latitude values. Default:
+          "latitude" or "lat"
+          </q-tooltip>
         </template>
-      </q-input>
+      </OInput>
 
-      <q-input
+      <OInput
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
         placeholder="longitude or lon"
-        borderless
-        dense
-        class="tw:mb-3 showLabelOnTop"
-        stack-label
+        class="tw:mb-3"
         data-test="dashboard-config-geo-lon-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.geoLonLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing longitude values. Default:
-              "longitude" or "lon"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <q-tooltip max-width="300px">
+          Name of the metric label containing longitude values. Default:
+          "longitude" or "lon"
+          </q-tooltip>
         </template>
-      </q-input>
+      </OInput>
 
-      <q-input
+      <OInput
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
         placeholder="weight"
-        borderless
-        dense
-        class="tw:mb-3 showLabelOnTop"
-        stack-label
+        class="tw:mb-3"
         data-test="dashboard-config-geo-weight-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.geoWeightLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing weight values. Default:
-              "weight"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <q-tooltip max-width="300px">
+          Name of the metric label containing weight values. Default:
+          "weight"
+          </q-tooltip>
         </template>
-      </q-input>
+      </OInput>
     </div>
 
     <!-- Maps Label Configuration -->
     <div v-if="chartType === 'maps'" class="maps-config">
-      <q-input
+      <OInput
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
         placeholder="country or location"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
+        class="tw:mb-3"
         data-test="dashboard-config-maps-name-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.mapsNameLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="300px">
-              Name of the metric label containing location names (e.g., country,
-              region). Default: "name"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <q-tooltip max-width="300px">
+          Name of the metric label containing location names (e.g., country,
+          region). Default: "name"
+          </q-tooltip>
         </template>
-      </q-input>
+      </OInput>
     </div>
 
     <!-- Table Configuration -->
     <div v-if="chartType === 'table'" class="table-config">
       <!-- PromQL Table Mode -->
-      <q-select
+      <OSelect
         v-show="isConfigOptionVisible('promqlTable', 'promql-table-mode')"
         v-model="promqlTableMode"
         :options="promqlTableModeOptions"
         :label="t('dashboard.promqlTableMode')"
-        borderless
-        dense
-        class="q-py-md showLabelOnTop"
-        stack-label
-        emit-value
-        map-options
         data-test="dashboard-config-promql-table-mode"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events">
-            {{ t("dashboard.promqlTableMode") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="400px">
-              <b>PromQL Table Mode - </b>
-              Controls how time-series data is displayed in the table.
-              <br /><br />
-              <b>Time Series:</b> Shows timestamp and value columns for selected
-              series with legend dropdown. <br /><br />
-              <b>Time Series with Metadata:</b> Shows timestamp, value, and all
-              metric labels (job, instance, etc.) for selected series with
-              legend dropdown. <br /><br />
-              <b>Aggregate:</b> Shows aggregated values across all series
-              without timestamps (no legend dropdown). <br /><br />
-              <b>Note:</b> The legend dropdown only appears in time series modes
-              when multiple series are present.
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <q-tooltip max-width="300px">
+          <b>PromQL Table Mode - </b>
+          Controls how time-series data is displayed in the table.
+          <br /><br />
+          <b>Time Series:</b> Shows timestamp and value columns for selected
+          series with legend dropdown. <br /><br />
+          <b>Time Series with Metadata:</b> Shows timestamp, value, and all
+          metric labels (job, instance, etc.) for selected series with
+          legend dropdown. <br /><br />
+          <b>Aggregate:</b> Shows aggregated values across all series
+          without timestamps (no legend dropdown). <br /><br />
+          <b>Note:</b> The legend dropdown only appears in time series modes
+          when multiple series are present.
+          </q-tooltip>
         </template>
-      </q-select>
+      </OSelect>
       <template v-if="promqlTableMode === 'all'">
         <q-select
           v-show="isConfigOptionVisible('promqlTable', 'table-aggregations')"
@@ -385,29 +337,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Sticky Columns
         </div>
 
-        <q-toggle
+        <OSwitch
           v-show="isConfigOptionVisible('promqlTable', 'sticky-first-column')"
           v-model="stickyFirstColumn"
+          label="Sticky First Column"
           data-test="dashboard-config-sticky-first-column"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
         >
-          <template v-slot:default>
-            <div
-              class="row items-center all-pointer-events tw:mb-[-5px] tw:ml-2"
-            >
-              {{ t("dashboard.stickyFirstColumn") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
-              <q-tooltip class="bg-grey-8" max-width="300px">
-                <b>Sticky First Column - </b>
-                Makes the first column stay fixed when scrolling horizontally.
-                <br /><br />
-                Useful for keeping the primary identifier visible (e.g., job,
-                instance).
-              </q-tooltip>
-            </div>
+          <template #tooltip>
+            <q-tooltip max-width="300px">
+            <b>Sticky First Column - </b>
+            Makes the first column stay fixed when scrolling horizontally.
+            <br /><br />
+            Useful for keeping the primary identifier visible (e.g., job,
+            instance).
+            </q-tooltip>
           </template>
-        </q-toggle>
+        </OSwitch>
 
         <q-select
           v-show="isConfigOptionVisible('promqlTable', 'sticky-columns')"
@@ -513,12 +459,18 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "PromQLChartConfig",
   components: {
     ColumnOrderPopUp,
     OButton,
+    OSelect,
+    OInput,
+    OSwitch,
   },
   props: {
     chartType: {

@@ -83,32 +83,14 @@
             <div class="color-section tw:shrink-0 tw:w-40">
               <div
                 v-if="series.color !== null"
-                class="tw:items-center tw:flex"
+                class="tw:items-center tw:flex tw:gap-1"
               >
-                <q-input
+                <OColor
                   v-model="series.color"
-                  style="width: 90%"
-                  class="input-spacing"
-                  dense
-                  borderless
-                  hide-bottom-space
-                >
-                  <template v-slot:append>
-                    <q-icon
-                      name="colorize"
-                      class="cursor-pointer"
-                      :ref="`colorize-icon-${index}`"
-                      @click="openColorPicker(index)"
-                    >
-                      <q-popup-proxy cover transition-show="scale">
-                        <q-color v-model="series.color" />
-                      </q-popup-proxy>
-                    </q-icon>
-                  </template>
-                </q-input>
+                  class="tw:flex-1"
+                />
                 <q-icon
                   :name="outlinedCancel"
-                  style="width: 10%"
                   class="cursor-pointer tw:align-middle"
                   size="xs"
                   title="Remove color"
@@ -152,6 +134,7 @@ import CommonAutoComplete from "./CommonAutoComplete.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
@@ -160,6 +143,7 @@ export default defineComponent({
     CommonAutoComplete,
     OButton,
     ODialog,
+    OColor,
   },
   props: {
     open: {
