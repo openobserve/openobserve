@@ -121,131 +121,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="streamTypeUpdated"
                   data-test="dashboard-variable-stream-type-select"
                 />
-                <q-select
+                <OSelect
                   v-model="variableData.query_data.stream"
                   :label="t('dashboard.selectIndex') + ' *'"
-                  :options="mergedStreamsFilteredOptions"
-                  input-debounce="0"
-                  behavior="menu"
-                  use-input
-                  borderless
-                  hide-bottom-space
-                  dense
-                  stack-label
-                  @filter="mergedStreamsFilterFn"
+                  :options="mergedStreamOptionsWithLabel"
+                  labelKey="_displayLabel"
+                  valueKey="name"
+                  searchable
+                  class="tw:flex-1"
                   @update:model-value="streamUpdated"
-                  option-value="name"
-                  option-label="name"
-                  emit-value
-                  class="showLabelOnTop col no-case"
-                  :rules="[(val: any) => !!val || 'Field is required!']"
                   data-test="dashboard-variable-stream-select"
                 >
-                  <template v-slot:label>
-                    <div class="row items-center all-pointer-events">
-                      {{ t("dashboard.selectIndex") + " *" }}
-                      <div>
-                        <q-icon
-                          class="q-ml-xs"
-                          size="16px"
-                          name="info"
-                          data-test="dashboard-variable-add-stream-info"
-                        />
-                        <q-tooltip
-                          class="bg-grey-8"
-                          anchor="top middle"
-                          self="bottom middle"
-                          max-width="250px"
-                        >
-                          Select a stream or use a variable like $streamVariable
-                          to dynamically choose the stream based on another
-                          value.
-                        </q-tooltip>
-                      </div>
-                    </div>
+                  <template #tooltip>
+                    <q-tooltip
+                      class="bg-grey-8"
+                      anchor="top middle"
+                      self="bottom middle"
+                      max-width="250px"
+                    >
+                      Select a stream or use a variable like $streamVariable
+                      to dynamically choose the stream based on another
+                      value.
+                    </q-tooltip>
                   </template>
-                  <template v-slot:option="scope">
-                    <q-item v-bind="scope.itemProps">
-                      <q-item-section>
-                        <q-item-label>
-                          {{ scope.opt.name }}
-                          <span
-                            v-if="
-                              scope.opt.name?.startsWith('$') ||
-                              scope.opt.name?.startsWith('{{')
-                            "
-                            class="text-grey-6 text-caption"
-                          >
-                            (variable)
-                          </span>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </template>
-                </q-select>
+                </OSelect>
               </div>
-              <q-select
+              <OSelect
                 v-model="variableData.query_data.field"
                 :label="t('dashboard.selectField') + ' *'"
-                stack-label
-                use-input
-                borderless
-                dense
-                hide-selected
-                fill-input
-                behavior="menu"
-                input-debounce="0"
-                :options="mergedFieldsFilteredOptions"
-                @filter="mergedFieldsFilterFn"
-                class="showLabelOnTop no-case"
-                option-value="name"
-                option-label="name"
-                emit-value
-                :rules="[(val: any) => !!val || 'Field is required!']"
+                :options="mergedFieldOptionsWithLabel"
+                labelKey="_displayLabel"
+                valueKey="name"
+                searchable
                 data-test="dashboard-variable-field-select"
               >
-                <template v-slot:label>
-                  <div class="row items-center all-pointer-events">
-                    {{ t("dashboard.selectField") + " *" }}
-                    <div>
-                      <q-icon
-                        class="q-ml-xs"
-                        size="16px"
-                        name="info"
-                        data-test="dashboard-variable-add-field-info"
-                      />
-                      <q-tooltip
-                        class="bg-grey-8"
-                        anchor="top middle"
-                        self="bottom middle"
-                        max-width="250px"
-                      >
-                        Select a field or use a variable like $fieldVariable. If
-                        stream uses a variable, field list will be empty - type
-                        field name manually.
-                      </q-tooltip>
-                    </div>
-                  </div>
+                <template #tooltip>
+                  <q-tooltip
+                    class="bg-grey-8"
+                    anchor="top middle"
+                    self="bottom middle"
+                    max-width="250px"
+                  >
+                    Select a field or use a variable like $fieldVariable. If
+                    stream uses a variable, field list will be empty - type
+                    field name manually.
+                  </q-tooltip>
                 </template>
-                <template v-slot:option="scope">
-                  <q-item v-bind="scope.itemProps">
-                    <q-item-section>
-                      <q-item-label>
-                        {{ scope.opt.name }}
-                        <span
-                          v-if="
-                            scope.opt.name?.startsWith('$') ||
-                            scope.opt.name?.startsWith('{{')
-                          "
-                          class="text-grey-6 text-caption"
-                        >
-                          (variable)
-                        </span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              </OSelect>
               <div>
                 <OInput
                   type="number"
@@ -286,49 +208,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
-                    <q-select
-                      emit-value
-                      dense
-                      hide-selected
-                      fill-input
+                    <OSelect
                       v-model="filter.name"
-                      :display-value="filter.name ? filter.name : ''"
-                      :options="fieldsFilteredOptions"
-                      input-debounce="0"
-                      behavior="menu"
-                      @update:model-value="filterUpdated(index, $event)"
-                      use-input
-                      stack-label
-                      option-label="name"
-                      data-test="dashboard-query-values-filter-name-selector"
-                      @filter="fieldsFilterFn"
+                      :options="data.currentFieldsList"
+                      labelKey="name"
+                      valueKey="name"
+                      searchable
                       :placeholder="filter.name ? '' : 'Select Field'"
-                      class="col no-case q-ml-sm"
-                      :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
-                      ]"
+                      :title="filter.name || undefined"
+                      @update:model-value="filterUpdated(index, $event)"
+                      data-test="dashboard-query-values-filter-name-selector"
                       style="max-width: 41%; width: 41%; flex-shrink: 0"
-                      ><q-tooltip v-if="filter.name">
-                        {{ filter.name }}
-                      </q-tooltip>
-                      <template v-slot:no-option>
-                        <q-item>
-                          <q-item-section class="text-italic text-grey"
-                            >No Data Found</q-item-section
-                          >
-                        </q-item>
+                    >
+                      <template #empty>
+                        <span class="tw:italic tw:text-gray-400">No Data Found</span>
                       </template>
-                    </q-select>
-                    <q-select
-                      dense
+                    </OSelect>
+                    <OSelect
                       v-model="filter.operator"
-                      :display-value="filter.operator ? filter.operator : ''"
                       style="width: 18%; flex-shrink: 0"
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
-                      :rules="[
-                        (val: any) => !!val.trim() || 'Field is required!',
-                      ]"
                       :options="[
                         '=',
                         '!=',
@@ -1537,22 +1437,34 @@ export default defineComponent({
       );
       return [...variableItems, ...(data.streams || [])];
     });
-    const {
-      filterFn: mergedStreamsFilterFn,
-      filteredOptions: mergedStreamsFilteredOptions,
-    } = useSelectAutoComplete(mergedStreamOptions, "name");
+    // Add display labels: append "(variable)" for $-prefixed or {{-prefixed option names
+    const mergedStreamOptionsWithLabel = computed(() =>
+      mergedStreamOptions.value.map((o: any) => ({
+        ...o,
+        _displayLabel:
+          o.name?.startsWith('$') || o.name?.startsWith('{{')
+            ? `${o.name} (variable)`
+            : o.name,
+      })),
+    );
 
-    // Merged field options: variables + fields for q-select
+    // Merged field options: variables + fields for OSelect
     const mergedFieldOptions = computed(() => {
       const variableItems = dashboardVariablesFilterItems.value.map(
         (v: any) => ({ name: v.value }),
       );
       return [...variableItems, ...(data.currentFieldsList || [])];
     });
-    const {
-      filterFn: mergedFieldsFilterFn,
-      filteredOptions: mergedFieldsFilteredOptions,
-    } = useSelectAutoComplete(mergedFieldOptions, "name");
+
+    const mergedFieldOptionsWithLabel = computed(() =>
+      mergedFieldOptions.value.map((o: any) => ({
+        ...o,
+        _displayLabel:
+          o.name?.startsWith('$') || o.name?.startsWith('{{')
+            ? `${o.name} (variable)`
+            : o.name,
+      })),
+    );
 
     // Add new custom value to the array
     const addCustomValue = () => {
@@ -1642,10 +1554,8 @@ export default defineComponent({
       filterUpdated,
       filterCycleError,
       dashboardVariablesFilterItems,
-      mergedStreamsFilterFn,
-      mergedStreamsFilteredOptions,
-      mergedFieldsFilterFn,
-      mergedFieldsFilteredOptions,
+      mergedStreamOptionsWithLabel,
+      mergedFieldOptionsWithLabel,
       addCustomValue,
       removeCustomValue,
       onCheckboxClick,
