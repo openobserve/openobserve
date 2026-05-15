@@ -119,9 +119,9 @@ const hasLabel = computed(
           : disabled
             ? 'tw:opacity-60 tw:bg-switch-disabled-track-off'
             : '',
-        'tw:outline-none',
+        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-switch-focus-ring',
-        'tw:transition-colors tw:duration-200',
+        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-200',
       ]"
     >
       <span

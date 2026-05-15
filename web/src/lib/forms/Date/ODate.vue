@@ -116,7 +116,8 @@ const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
 };
 
 const wrapperClasses = computed(() => [
-  "tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:transition-colors tw:duration-150",
+  "tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-datepicker-bg",
   hasError.value
     ? "tw:border-datepicker-error-border"
@@ -240,7 +241,7 @@ const wrapperClasses = computed(() => [
             class="tw:flex tw:items-center tw:justify-between tw:mb-3"
           >
             <DatePickerPrev
-              class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-colors tw:outline-none tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+              class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -262,7 +263,7 @@ const wrapperClasses = computed(() => [
             />
 
             <DatePickerNext
-              class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-colors tw:outline-none tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+              class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -310,7 +311,7 @@ const wrapperClasses = computed(() => [
                   <DatePickerCellTrigger
                     :day="date"
                     :month="month.value"
-                    class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-colors tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-unavailable:hover:bg-transparent"
+                    class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-unavailable:hover:bg-transparent"
                   >
                     {{ date.day }}
                   </DatePickerCellTrigger>
@@ -325,7 +326,7 @@ const wrapperClasses = computed(() => [
           <button
             type="button"
             :disabled="disabled"
-            class="tw:px-4 tw:py-1.5 tw:rounded tw:text-xs tw:font-medium tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:outline-none tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+            class="tw:px-4 tw:py-1.5 tw:rounded tw:text-xs tw:font-medium tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:hover:opacity-90 tw:transition-[box-shadow] tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
             @click="handleApply"
           >Apply</button>
         </div>

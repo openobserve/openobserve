@@ -73,8 +73,8 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       :disabled="props.disabled"
       :class="[
         'tw:shrink-0 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center',
-        'tw:transition-colors tw:duration-150',
-        'tw:outline-none',
+        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
+        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
         'tw:focus-visible:ring-2 tw:focus-visible:ring-radio-focus-ring',
         circleSize[resolvedSize],
         'tw:bg-radio-bg tw:border-radio-border',

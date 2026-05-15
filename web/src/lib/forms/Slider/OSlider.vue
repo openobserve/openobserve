@@ -163,7 +163,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :class="[
           'o2-slider-input',
           'tw:relative tw:z-10 tw:w-full tw:bg-transparent tw:appearance-none',
-          'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full',
+          'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full tw:transition-[box-shadow] tw:duration-150',
           trackHeight[resolvedSize],
           disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
         ]"

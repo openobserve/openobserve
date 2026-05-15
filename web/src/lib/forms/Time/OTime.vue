@@ -199,7 +199,8 @@ const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
 };
 
 const fieldClasses = computed(() => [
-  "tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:transition-colors tw:duration-150",
+  "tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-datepicker-bg",
   hasError.value
     ? "tw:border-datepicker-error-border"
@@ -300,7 +301,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:transition-colors tw:border-b-2',
+                'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'hour'
                   ? 'tw:text-datepicker-day-selected-bg tw:border-datepicker-day-selected-bg'
                   : 'tw:text-datepicker-heading-text tw:border-transparent tw:hover:text-datepicker-day-selected-bg',
@@ -312,7 +313,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:transition-colors tw:border-b-2',
+                'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'minute'
                   ? 'tw:text-datepicker-day-selected-bg tw:border-datepicker-day-selected-bg'
                   : 'tw:text-datepicker-heading-text tw:border-transparent tw:hover:text-datepicker-day-selected-bg',
@@ -325,7 +326,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:transition-colors tw:border-b-2',
+                  'tw:text-2xl tw:font-semibold tw:tabular-nums tw:rounded-sm tw:px-1 tw:pb-0.5 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                   clockMode === 'second'
                     ? 'tw:text-datepicker-day-selected-bg tw:border-datepicker-day-selected-bg'
                     : 'tw:text-datepicker-heading-text tw:border-transparent tw:hover:text-datepicker-day-selected-bg',
@@ -343,7 +344,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'tw:px-2.5 tw:py-1 tw:text-xs tw:font-medium tw:outline-none tw:transition-colors',
+                'tw:px-2.5 tw:py-1 tw:text-xs tw:font-medium tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 isAM
                   ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
                   : 'tw:text-datepicker-weekday-text tw:hover:bg-datepicker-clock-hover-bg',
@@ -355,7 +356,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'tw:px-2.5 tw:py-1 tw:text-xs tw:font-medium tw:outline-none tw:transition-colors',
+                'tw:px-2.5 tw:py-1 tw:text-xs tw:font-medium tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 !isAM
                   ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
                   : 'tw:text-datepicker-weekday-text tw:hover:bg-datepicker-clock-hover-bg',
@@ -434,7 +435,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'tw:rounded-full tw:transition-all tw:outline-none',
+                'tw:rounded-full tw:transition-all tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'hour'
                   ? 'tw:w-4 tw:h-2 tw:bg-datepicker-day-selected-bg'
                   : 'tw:size-2 tw:bg-datepicker-border tw:hover:bg-datepicker-weekday-text',
@@ -445,7 +446,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'tw:rounded-full tw:transition-all tw:outline-none',
+                'tw:rounded-full tw:transition-all tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'minute'
                   ? 'tw:w-4 tw:h-2 tw:bg-datepicker-day-selected-bg'
                   : 'tw:size-2 tw:bg-datepicker-border tw:hover:bg-datepicker-weekday-text',
@@ -457,7 +458,7 @@ const fieldClasses = computed(() => [
               v-if="withSeconds"
               type="button"
               :class="[
-                'tw:rounded-full tw:transition-all tw:outline-none',
+                'tw:rounded-full tw:transition-all tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'second'
                   ? 'tw:w-4 tw:h-2 tw:bg-datepicker-day-selected-bg'
                   : 'tw:size-2 tw:bg-datepicker-border tw:hover:bg-datepicker-weekday-text',
@@ -468,7 +469,7 @@ const fieldClasses = computed(() => [
           </div>
           <button
             type="button"
-            class="tw:text-xs tw:font-medium tw:text-datepicker-day-selected-bg tw:outline-none tw:hover:opacity-80"
+            class="tw:text-xs tw:font-medium tw:text-datepicker-day-selected-bg tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:hover:opacity-80 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150"
             data-test="otime-close"
             @click="popoverOpen = false"
           >Close</button>

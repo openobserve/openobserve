@@ -132,7 +132,8 @@ function formatSize(bytes: number) {
 }
 
 const wrapperClasses = computed(() => [
-  "tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:rounded-md tw:border tw:px-3 tw:py-2 tw:transition-colors tw:duration-150",
+  "tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:rounded-md tw:border tw:px-3 tw:py-2 tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   heightClasses[props.size ?? "md"],
   isDragging.value
     ? "tw:bg-file-drag-bg tw:border-file-drag-border"
