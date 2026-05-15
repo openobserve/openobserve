@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div v-if="loadingErrors" class="tw:text-center tw:py-4">
-                    <q-spinner color="primary" size="sm" />
+                    <OSpinner size="xs" />
                   </div>
 
                   <div v-else-if="recentErrors.length === 0" class="tw:text-center tw:py-2" style="color: var(--o2-text-muted)">
@@ -357,6 +357,7 @@ import { add, formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Domain {
   name: string;

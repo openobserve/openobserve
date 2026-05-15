@@ -106,7 +106,7 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <OSpinner size="md" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -325,6 +325,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { AlignLeft, FileJson } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default {
   name: "JsonPreview",
@@ -379,6 +380,7 @@ export default {
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OSpinner,
   },
   emits: [
     "copy",

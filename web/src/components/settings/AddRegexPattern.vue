@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       class="tw:flex tw:items-center tw:justify-center tw:h-[111px]"
                     >
-                      <q-spinner-hourglass color="primary" size="24px" />
+                      <OSpinner size="sm" />
                     </span>
                   </div>
                 </div>
@@ -354,6 +354,7 @@ import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -378,6 +379,7 @@ export default defineComponent({
     O2AIChat,
     OButton,
     ODrawer,
+    OSpinner,
   },
   setup(props, { emit }) {
     const { t } = useI18n();

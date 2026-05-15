@@ -177,11 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="full-width column flex-center q-mt-xs"
             style="font-size: 1.5rem"
           >
-            <q-spinner-hourglass
-              size="50px"
-              color="primary"
-              style="margin-top: 20vh"
-            />
+            <OSpinner size="lg" class="tw:mt-[20vh]" />
           </div>
           <div
             v-else
@@ -915,6 +911,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { t } = useI18n();
 const store = useStore();

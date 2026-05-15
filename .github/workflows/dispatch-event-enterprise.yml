@@ -3,7 +3,7 @@ name: initiate_enterprise_build
 on:
   pull_request:
     branches:
-      - "*"
+      - "**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
