@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <div
       class="col-12 flex tw:ml-2"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
     </div>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">

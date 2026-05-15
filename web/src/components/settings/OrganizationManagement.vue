@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <div>
       <q-table
         data-test="org-management-list-table"
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
       </div>
     </ODialog>
-  </OPage>
+  </div>
 </template>
 <script lang="ts">
 import {

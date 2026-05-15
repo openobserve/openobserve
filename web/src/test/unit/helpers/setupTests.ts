@@ -24,13 +24,6 @@ import "../../__mocks__/index";
 
 import { restHandlers } from "./handlers";
 import store from "./store";
-import OPage from "@/lib/core/Page/OPage.vue";
-
-// Register OPage globally for tests — replaces Quasar's q-page
-config.global.components = {
-  ...config.global.components,
-  OPage,
-};
 
 
 const server = setupServer(...restHandlers);

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPage class="relative-position">
+  <div class="tw:rounded-md relative-position">
     <div
       class="performance-error-dashboard"
       :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">

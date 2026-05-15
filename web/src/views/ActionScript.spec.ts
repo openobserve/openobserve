@@ -35,11 +35,7 @@ describe('ActionScript.vue', () => {
             name: 'RouterView',
             template: '<div class="router-view-stub"></div>',
           },
-          OPage: {
-            name: 'OPage',
-            template: '<div data-o2-page data-test="alerts-page"><slot /></div>',
-          },
-        },
+                  },
       },
     });
 
@@ -52,11 +48,7 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          OPage: {
-            name: 'OPage',
-            template: '<div data-o2-page data-test="alerts-page"><slot /></div>',
-          },
-        },
+                  },
       },
     });
 
@@ -69,15 +61,11 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          OPage: {
-            name: 'OPage',
-            template: '<div data-o2-page><slot /></div>',
-          },
-        },
+                  },
       },
     });
 
-    expect(wrapper.find('[data-o2-page]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-page"]').exists()).toBe(true);
   });
 
   it('should mount without errors', () => {
@@ -87,8 +75,7 @@ describe('ActionScript.vue', () => {
           plugins: [store, i18n],
           stubs: {
             RouterView: true,
-            OPage: true,
-          },
+            },
         },
       });
     }).not.toThrow();
@@ -100,8 +87,7 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          OPage: true,
-        },
+          },
       },
     });
 
@@ -115,8 +101,7 @@ describe('ActionScript.vue', () => {
         plugins: [store, i18n],
         stubs: {
           RouterView: true,
-          OPage: true,
-        },
+          },
       },
     });
 

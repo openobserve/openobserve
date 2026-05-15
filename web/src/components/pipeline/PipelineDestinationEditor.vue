@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage
-    class="q-pa-none o2-custom-bg"
+  <div class="tw:rounded-md q-pa-none o2-custom-bg"
   >
     <div
       class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
@@ -54,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts" setup>
