@@ -31,7 +31,12 @@ jobs:
         id: pr
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "pr_number=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+            PR_INPUT="${{ github.event.inputs.pr_number }}"
+            if ! [[ "$PR_INPUT" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::Invalid PR number: $PR_INPUT"
+              exit 1
+            fi
+            echo "pr_number=$PR_INPUT" >> "$GITHUB_OUTPUT"
           else
             echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
           fi
@@ -74,7 +79,6 @@ jobs:
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
           EXISTING_COMMENT_ID="${{ steps.find_comment.outputs.comment_id }}"
 
-          # Fetch existing comment body if it exists
           EXISTING_BODY=""
           if [ -n "$EXISTING_COMMENT_ID" ]; then
             EXISTING_BODY=$(gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
@@ -82,28 +86,29 @@ jobs:
 
           PR_DIFF=$(cat /tmp/pr_diff.txt)
           PR_COMMITS=$(cat /tmp/pr_commits.json)
+          DIFF_TRUNCATED=$(echo "$PR_DIFF" | head -n 4000)
 
-          # Build the prompt for DeepSeek
           SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
 
-          REVIEW_PROMPT=$(cat <<'PROMPT_END'
+          # Build the user prompt text
+          USER_PROMPT=$(printf '%s' "\
           ## Code Review Request
 
           **Repository:** ${{ github.repository }}
-          **PR Number:** PR_NUMBER_PLACEHOLDER
+          **PR Number:** ${PR_NUMBER}
 
           ### Commits
           \`\`\`json
-          COMMITS_PLACEHOLDER
+          ${PR_COMMITS}
           \`\`\`
 
           ### PR Diff
           \`\`\`diff
-          DIFF_PLACEHOLDER
+          ${DIFF_TRUNCATED}
           \`\`\`
 
           ### Existing Review Comment (if any)
-          EXISTING_BODY_PLACEHOLDER
+          ${EXISTING_BODY}
 
           ### Instructions
           Review the diff above and produce exactly a table of issues in this format:
@@ -126,48 +131,39 @@ jobs:
           - ONE table only, no extra sections or summaries
           - No praise or compliments
           - 2 sentences max per issue
-          - If no issues found, use "Status: LGTM ✅" with empty table
+          - If no issues found, use \"Status: LGTM ✅\" with empty table
           - Only flag bugs, security issues, and performance problems
-          - If existing review body shows issues that are now resolved, move them to "Resolved" section with strikethrough
-          - Output ONLY the comment content, nothing else
-          PROMPT_END
-          )
+          - If existing review body shows issues that are now resolved, move them to \"Resolved\" section with strikethrough
+          - Output ONLY the comment content, nothing else")
 
-          REVIEW_PROMPT="${REVIEW_PROMPT//PR_NUMBER_PLACEHOLDER/$PR_NUMBER}"
-          REVIEW_PROMPT="${REVIEW_PROMPT//COMMITS_PLACEHOLDER/$PR_COMMITS}"
+          # Build JSON payload safely using jq --arg (prevents command injection)
+          JSON_BODY=$(jq -n \
+            --arg model "deepseek-chat" \
+            --arg sys "$SYSTEM_PROMPT" \
+            --arg user "$USER_PROMPT" \
+            '{
+              model: $model,
+              messages: [
+                {role: "system", content: $sys},
+                {role: "user", content: $user}
+              ],
+              temperature: 0.3,
+              max_tokens: 4096
+            }')
 
-          # Truncate diff to avoid exceeding token limits (DeepSeek has 128K context)
-          DIFF_TRUNCATED=$(echo "$PR_DIFF" | head -n 4000)
-          REVIEW_PROMPT="${REVIEW_PROMPT//DIFF_PLACEHOLDER/$DIFF_TRUNCATED}"
-          REVIEW_PROMPT="${REVIEW_PROMPT//EXISTING_BODY_PLACEHOLDER/$EXISTING_BODY}"
-
-          # Escape for JSON
-          JSON_PROMPT=$(jq -Rs '.' <<< "$REVIEW_PROMPT")
-          JSON_SYSTEM=$(jq -Rs '.' <<< "$SYSTEM_PROMPT")
-
-          # Call DeepSeek API
           RESPONSE=$(curl -s https://api.deepseek.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-            -d "{
-              \"model\": \"deepseek-chat\",
-              \"messages\": [
-                {\"role\": \"system\", \"content\": $JSON_SYSTEM},
-                {\"role\": \"user\", \"content\": $JSON_PROMPT}
-              ],
-              \"temperature\": 0.3,
-              \"max_tokens\": 4096
-            }")
+            -d "$JSON_BODY")
 
           REVIEW_BODY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
 
           if [ -z "$REVIEW_BODY" ]; then
             echo "DeepSeek API returned empty response"
-            echo "Full response: $RESPONSE"
+            echo "Error: $(echo "$RESPONSE" | jq -r '.error.message // "unknown error"')"
             exit 1
           fi
 
-          # Save review body to file for the next step
           echo "$REVIEW_BODY" > /tmp/review_body.txt
 
       - name: Post or Update Review Comment
