@@ -23,23 +23,13 @@
     :primary-button-disabled="isFormValid"
     size="md"
     data-test="dashboard-drilldown-popup"
+    @update:open="(v) => { if (!v) $emit('close') }"
+    @click:primary="saveDrilldown"
+    @click:secondary="$emit('close')"
   >
-    <div
-      class="flex justify-between items-center q-pa-md"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span data-test="dashboard-drilldown-title" v-if="isEditMode"
-          >{{ t("dashboard.editDrilldown") }}
-        </span>
-        <span data-test="dashboard-drilldown-title" v-else>{{
-          t("dashboard.createDrilldown")
-        }}</span>
-      </div>
-      <div class="flex q-gutter-sm items-center">
-        <DrilldownUserGuide />
-      </div>
-    </div>
+     <template #header-right>
+      <DrilldownUserGuide />
+    </template>
     <OInput
       v-model="drilldownData.name"
       :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
@@ -286,6 +276,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
