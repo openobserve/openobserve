@@ -171,9 +171,9 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         'tw:disabled:bg-checkbox-disabled-bg',
         'tw:disabled:border-checkbox-disabled-border',
         // Focus
-        'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-checkbox-focus-ring',
+        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-checkbox-focus-ring',
         // Transition
-        'tw:transition-colors tw:duration-150',
+        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
         // Centering for indicator
         'tw:flex tw:items-center tw:justify-center',
       ]"

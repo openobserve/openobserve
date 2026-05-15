@@ -285,7 +285,7 @@ const isPlaceholder = computed(
 );
 
 const triggerClasses = computed(() => [
-  "tw:flex tw:items-center tw:gap-2 tw:w-full tw:min-h-10 tw:px-3 tw:rounded-md tw:border tw:text-sm tw:transition-colors tw:duration-150 tw:outline-none tw:bg-datepicker-bg",
+  "tw:flex tw:items-center tw:gap-2 tw:w-full tw:min-h-10 tw:px-3 tw:rounded-md tw:border tw:text-sm tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:bg-datepicker-bg",
   hasError.value
     ? "tw:border-datepicker-error-border"
     : "tw:border-datepicker-border tw:hover:border-datepicker-hover-border",
@@ -380,7 +380,7 @@ const triggerClasses = computed(() => [
           <button
             type="button"
             :class="[
-              'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:transition-colors tw:border-b-2',
+              'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
               activeTab === 'relative'
                 ? 'tw:font-medium tw:border-datepicker-day-selected-bg tw:text-datepicker-day-selected-bg'
                 : 'tw:border-transparent tw:text-datepicker-weekday-text tw:hover:text-datepicker-heading-text',
@@ -393,7 +393,7 @@ const triggerClasses = computed(() => [
           <button
             type="button"
             :class="[
-              'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:transition-colors tw:border-b-2',
+              'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
               activeTab === 'absolute'
                 ? 'tw:font-medium tw:border-datepicker-day-selected-bg tw:text-datepicker-day-selected-bg'
                 : 'tw:border-transparent tw:text-datepicker-weekday-text tw:hover:text-datepicker-heading-text',
@@ -427,7 +427,7 @@ const triggerClasses = computed(() => [
                 type="button"
                 :disabled="isRelativeDisabled(unit, val) || disabled"
                 :class="[
-                  'tw:w-8 tw:h-7 tw:rounded tw:text-xs tw:transition-colors tw:outline-none tw:tabular-nums',
+                  'tw:w-8 tw:h-7 tw:rounded tw:text-xs tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:tabular-nums',
                   stagedRelativeUnit === unit && stagedRelativeAmount === val && !isRelativeDisabled(unit, val)
                     ? 'tw:bg-datepicker-relative-btn-selected-bg tw:text-datepicker-relative-btn-selected-text'
                     : isRelativeDisabled(unit, val)
@@ -518,7 +518,7 @@ const triggerClasses = computed(() => [
                   :key="tz"
                   type="button"
                   :class="[
-                    'tw:w-full tw:text-left tw:px-2 tw:py-1 tw:text-xs tw:transition-colors tw:outline-none',
+                    'tw:w-full tw:text-left tw:px-2 tw:py-1 tw:text-xs tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                     stagedTimezone === tz
                       ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
                       : 'tw:text-datepicker-text tw:hover:bg-datepicker-relative-btn-hover-bg',
@@ -541,7 +541,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled || stagedRelativeAmount <= 0"
-              class="tw:px-4 tw:py-1.5 tw:rounded tw:text-sm tw:font-medium tw:transition-colors tw:outline-none tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="tw:px-4 tw:py-1.5 tw:rounded tw:text-sm tw:font-medium tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
             >Apply</button>
@@ -568,7 +568,7 @@ const triggerClasses = computed(() => [
                 class="tw:flex tw:items-center tw:justify-between tw:mb-3"
               >
                 <RangeCalendarPrev
-                  class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-colors tw:outline-none tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+                  class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -588,7 +588,7 @@ const triggerClasses = computed(() => [
                   class="tw:text-sm tw:font-medium tw:text-datepicker-heading-text"
                 />
                 <RangeCalendarNext
-                  class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-colors tw:outline-none tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+                  class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -635,7 +635,7 @@ const triggerClasses = computed(() => [
                       <RangeCalendarCellTrigger
                         :day="date"
                         :month="month.value"
-                        class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-colors tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-highlighted:bg-datepicker-day-range-bg tw:data-highlighted:text-datepicker-day-range-text tw:data-selection-start:bg-datepicker-day-selected-bg tw:data-selection-start:text-datepicker-day-selected-text tw:data-selection-end:bg-datepicker-day-selected-bg tw:data-selection-end:text-datepicker-day-selected-text"
+                        class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-highlighted:bg-datepicker-day-range-bg tw:data-highlighted:text-datepicker-day-range-text tw:data-selection-start:bg-datepicker-day-selected-bg tw:data-selection-start:text-datepicker-day-selected-text tw:data-selection-end:bg-datepicker-day-selected-bg tw:data-selection-end:text-datepicker-day-selected-text"
                       >{{ date.day }}</RangeCalendarCellTrigger>
                     </RangeCalendarCell>
                   </RangeCalendarGridRow>
@@ -717,7 +717,7 @@ const triggerClasses = computed(() => [
                   :key="tz"
                   type="button"
                   :class="[
-                    'tw:w-full tw:text-left tw:px-3 tw:py-1.5 tw:text-sm tw:transition-colors tw:outline-none',
+                    'tw:w-full tw:text-left tw:px-3 tw:py-1.5 tw:text-sm tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
                     stagedTimezone === tz
                       ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
                       : 'tw:text-datepicker-text tw:hover:bg-datepicker-relative-btn-hover-bg',
@@ -737,7 +737,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled"
-              class="tw:px-4 tw:py-1.5 tw:rounded tw:text-sm tw:font-medium tw:transition-colors tw:outline-none tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="tw:px-4 tw:py-1.5 tw:rounded tw:text-sm tw:font-medium tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
               data-test="datetimerange-apply"
               @click="handleApply"
             >Apply</button>
