@@ -710,26 +710,24 @@ describe("TablePaginationControls", () => {
   });
 
   describe("Layout and Styling", () => {
-    it("should have flex layout class", () => {
+    it("should have row layout class", () => {
       wrapper = createWrapper();
 
-      const mainDiv = wrapper.find("[data-test='dashboard-table-pagination-controls']");
+      const mainDiv = wrapper.find(".row.items-center");
       expect(mainDiv.exists()).toBe(true);
-      expect(mainDiv.classes()).toContain("tw:flex");
-      expect(mainDiv.classes()).toContain("tw:items-center");
     });
 
-    it("should have gap class when pagination is shown", () => {
+    it("should have q-gutter-sm class when pagination is shown", () => {
       wrapper = createWrapper({ showPagination: true });
 
-      const gutterDiv = wrapper.find(".tw\\:gap-1");
+      const gutterDiv = wrapper.find(".q-gutter-sm");
       expect(gutterDiv.exists()).toBe(true);
     });
 
-    it("should apply text-xs class to labels", () => {
+    it("should apply text-caption class to labels", () => {
       wrapper = createWrapper();
 
-      const captions = wrapper.findAll(".tw\\:text-xs");
+      const captions = wrapper.findAll(".text-caption");
       expect(captions.length).toBeGreaterThan(0);
     });
 
