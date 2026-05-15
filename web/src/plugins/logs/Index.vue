@@ -2245,14 +2245,6 @@ export default defineComponent({
       },
     );
 
-    watch(
-      () => splitterModel.value,
-      () => {
-        // rerender chart
-        window.dispatchEvent(new Event("resize"));
-      },
-    );
-
     // Auto-apply config changes that don't require API calls (similar to dashboard)
     const debouncedUpdateChartConfig = debounce(async (newVal) => {
       if (searchObj.meta.logsVisualizeToggle === "visualize") {
