@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OLayout
+  <div
     :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen']"
   >
     <header class="o2-app-header tw:shrink-0">
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <OPageContainer class="tw:flex-1 tw:min-w-0 tw:flex">
+      <div class="tw:flex-1 tw:min-w-0 tw:flex">
         <!-- Main Panel -->
         <main
           class="tw:flex tw:flex-col tw:min-h-0"
@@ -131,14 +131,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aiChatPayload="aiChatPayload"
           />
         </aside>
-    </OPageContainer>
+    </div>
     </div>
 
     <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
     <PredefinedThemes />
-  </OLayout>
+  </div>
 </template>
 
 <script lang="ts">
@@ -155,8 +155,6 @@ import {
   QSelect,
   useQuasar,
 } from "quasar";
-import OLayout from "@/lib/core/Layout/OLayout.vue";
-import OPageContainer from "@/lib/core/PageContainer/OPageContainer.vue";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
@@ -238,8 +236,6 @@ export default defineComponent({
     Header,
     WebinarBanner,
     "keep-alive": KeepAlive,
-    OLayout,
-    OPageContainer,
     ONavbar,
     "q-item": QItem,
     "q-item-label": QItemLabel,

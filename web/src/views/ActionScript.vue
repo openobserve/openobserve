@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" data-test="alerts-page" style="min-height: inherit">
     <RouterView />
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">

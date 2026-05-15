@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage class="search-job-inspector q-pa-none">
+  <div class="tw:rounded-md search-job-inspector q-pa-none">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
       </div>
     </ODialog>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">

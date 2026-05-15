@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPage :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
     <div
       ref="fullscreenDiv"
       :class="{
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :save-json-dashboard="saveJsonDashboard"
       />
     </div>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">
