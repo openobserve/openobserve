@@ -1333,117 +1333,67 @@ export default defineComponent({
       }
     };
 
-    const handleNoData = (panelType: any) => {
-      const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias || [],
-      );
-      const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias || [],
-      );
-      const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias || [],
-      );
-
-      const rows = data.value[0];
-
-      // Check if at least one row has all required non-null field values
-      // for the given chart type. Uses .some() to short-circuit on the
-      // first valid row found.
-      switch (panelType) {
-        case "area":
-        case "area-stacked":
-        case "bar":
-        case "h-bar":
-        case "stacked":
-        case "h-stacked":
-        case "line":
-        case "scatter":
-        case "gauge": {
-          return rows.some(
-            (row: any) =>
-              xAlias.every((x: any) => getDataValue(row, x) != null) &&
-              yAlias.every((y: any) => getDataValue(row, y) != null),
-          );
-        }
-        case "table": {
-          // For tables, check that at least one row has any non-null field
-          return rows.some(
-            (row: any) =>
-              xAlias.some((x: any) => getDataValue(row, x) != null) ||
-              yAlias.some((y: any) => getDataValue(row, y) != null),
-          );
-        }
-        case "metric": {
-          return rows.some((row: any) =>
-            yAlias.every((y: any) => getDataValue(row, y) != null),
-          );
-        }
-        case "heatmap": {
-          return rows.some(
-            (row: any) =>
-              xAlias.every((x: any) => getDataValue(row, x) != null) &&
-              yAlias.every((y: any) => getDataValue(row, y) != null) &&
-              zAlias.every((z: any) => getDataValue(row, z) != null),
-          );
-        }
-        case "pie":
-        case "donut": {
-          return rows.some((row: any) =>
-            yAlias.every((y: any) => getDataValue(row, y) != null),
-          );
-        }
-        case "maps":
-        case "geomap": {
-          return true;
-        }
-        case "sankey": {
-          const source = panelSchema.value.queries[0].fields.source.alias;
-          const target = panelSchema.value.queries[0].fields.target.alias;
-          const value = panelSchema.value.queries[0].fields.value.alias;
-          return rows.some(
-            (row: any) =>
-              source.every((s: any) => getDataValue(row, s) != null) &&
-              target.every((t: any) => getDataValue(row, t) != null) &&
-              value.every((v: any) => getDataValue(row, v) != null),
-          );
-        }
-        default:
-          break;
-      }
-    };
-
-    // Compute the value of the 'noData' variable
+    // Compute the value of the 'noData' variable.
+    // Instead of re-scanning raw rows, this checks the conversion output
+    // (panelData) which the pipeline already computed — O(1) property access.
     const noData = computed(() => {
-      // if panel type is 'html' or 'markdown', return an empty string
-      if (
-        panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown" ||
-        panelSchema.value.type == "custom_chart"
-      ) {
+      const type = panelSchema.value.type;
+
+      if (type === "html" || type === "markdown" || type === "custom_chart") {
         return "";
       }
-      // Check if the queryType is 'promql'
-      if (panelSchema.value?.queryType == "promql") {
-        // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
+
+      if (panelSchema.value?.queryType === "promql") {
         return filteredData.value?.length &&
           filteredData.value.some((item: any) => item?.result?.length)
-          ? "" // Return an empty string if there is data
-          : "No Data"; // Return "No Data" if there is no data
+          ? ""
+          : "No Data";
       }
 
-      // A rendered chart is already on screen — suppress "No Data" even if
-      // the raw data buffer is momentarily empty. This prevents a flicker on
-      // refresh where the executor resets state.data = [] before loading
-      // flips to true, transiently firing this computed with empty data.
-      if (panelData.value?.options?.series?.length > 0) {
+      const hasRawData = data.value?.length && data.value[0]?.length;
+
+      // During data buffer reset (executor clears state.data before reload),
+      // suppress "No Data" if a chart was already rendered to avoid flicker.
+      if (!hasRawData) {
+        return panelData.value?.chartType ? "" : "No Data";
+      }
+
+      // Raw data exists but conversion hasn't produced output yet — wait.
+      if (!panelData.value?.chartType) {
         return "";
       }
-      // The queryType is not 'promql'
-      return data.value.length &&
-        data.value[0]?.length &&
-        handleNoData(panelSchema.value.type)
-        ? ""
-        : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+
+      // Table renders raw rows; the conversion returns { rows, columns }.
+      if (type === "table") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+      }
+
+      // Maps/geomap handle their own empty state.
+      if (type === "geomap" || type === "maps") {
+        return "";
+      }
+
+      // Sankey returns { options: null } when data is invalid.
+      if (type === "sankey") {
+        return panelData.value?.options != null ? "" : "No Data";
+      }
+
+      // Metric/gauge series are always created by the converter
+      // (they use renderItem, not data arrays), so check the raw Y value.
+      if (type === "metric" || type === "gauge") {
+        const firstRow = data.value[0]?.[0];
+        const yAlias = panelSchema.value.queries[0].fields.y.map(
+          (it: any) => it.alias || [],
+        );
+        return yAlias.every((y: any) => getDataValue(firstRow, y) != null)
+          ? ""
+          : "No Data";
+      }
+
+      // For all other chart types (line, area, bar, scatter, heatmap, etc.),
+      // the series filter in the conversion pipeline already excluded series
+      // whose data is entirely null. Just check what survived.
+      return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
     });
 
     // when the error changes, emit the error
