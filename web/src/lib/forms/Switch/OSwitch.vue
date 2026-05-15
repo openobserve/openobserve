@@ -97,7 +97,7 @@ const hasLabel = computed(
     :class="[
       'tw:inline-flex tw:items-center tw:gap-2',
       labelPosition === 'left' ? 'tw:flex-row-reverse' : 'tw:flex-row',
-      disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
+      disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
     ]"
     @click="toggle"
   >
@@ -116,7 +116,7 @@ const hasLabel = computed(
         'tw:p-0.5 tw:items-center tw:bg-transparent tw:border-2',
         currentSizes.track,
         props.disabled
-          ? 'tw:border-switch-disabled-border tw:opacity-60'
+          ? 'tw:border-switch-disabled-border'
           : isChecked
             ? 'tw:border-switch-border'
             : 'tw:border-switch-border-off',

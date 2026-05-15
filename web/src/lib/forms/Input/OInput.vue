@@ -263,7 +263,7 @@ const wrapperClasses = computed(() => [
         :class="[
           'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
           'tw:text-input-text tw:placeholder:text-input-placeholder',
-          'tw:disabled:cursor-not-allowed',
+          'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
           'tw:py-2',
           $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
@@ -295,7 +295,7 @@ const wrapperClasses = computed(() => [
         :class="[
           'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
           'tw:text-input-text tw:placeholder:text-input-placeholder',
-          'tw:disabled:cursor-not-allowed',
+          'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
           heightClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',

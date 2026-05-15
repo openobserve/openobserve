@@ -740,9 +740,11 @@ const fieldWidthClass = computed(() => {
                 v-else
                 :class="[
                   'tw:flex-1 tw:text-start tw:truncate',
-                  hasSelection
-                    ? 'tw:text-select-text'
-                    : 'tw:text-select-placeholder',
+                  disabled
+                    ? 'tw:text-select-disabled-text'
+                    : hasSelection
+                      ? 'tw:text-select-text'
+                      : 'tw:text-select-placeholder',
                 ]"
               >
                 {{ hasSelection ? triggerDisplayLabel : placeholder }}
@@ -1074,9 +1076,11 @@ const fieldWidthClass = computed(() => {
             :placeholder="placeholder"
             :class="[
               'tw:flex-1 tw:text-start tw:truncate',
-              hasSelection
-                ? 'tw:text-select-text'
-                : 'tw:text-select-placeholder',
+              disabled
+                ? 'tw:text-select-disabled-text'
+                : hasSelection
+                  ? 'tw:text-select-text'
+                  : 'tw:text-select-placeholder',
             ]"
           >
             <slot name="trigger" :value="modelValue" />
