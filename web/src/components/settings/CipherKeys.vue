@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPage class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog" >
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       >
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else>
       <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
-  </OPage>
+  </div>
   <ConfirmDialog
     title="Delete Cipher Key"
     message="Are you sure you want to delete Cipher Key?"

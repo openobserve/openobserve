@@ -60,8 +60,7 @@ describe("IdentityAccessManagement.vue Component", () => {
             template: "<div>Router View</div>",
           },
           RouteTabs: true,
-          OPage: { template: '<div data-o2-page><slot /></div>' },
-          OButton: true,
+                    OButton: true,
         },
       },
     });
@@ -472,7 +471,7 @@ describe("IdentityAccessManagement.vue Component", () => {
   });
 
   describe("Template Rendering Tests", () => {
-    it("should render OPage element", () => {
+    it("should render page div", () => {
       expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
     });
 

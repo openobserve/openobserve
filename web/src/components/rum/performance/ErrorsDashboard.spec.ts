@@ -99,12 +99,7 @@ describe("ErrorsDashboard", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "OPage": {
-            name: "OPage",
-            template: '<div data-o2-page><slot /></div>',
-            props: ["class"]
-          },
-          "q-spinner-hourglass": {
+                    "q-spinner-hourglass": {
             name: "q-spinner-hourglass", 
             template: '<div class="q-spinner-hourglass"></div>',
             props: ["color", "size", "style"]

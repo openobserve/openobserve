@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage
-    class="q-pa-none tw:flex tw:flex-col"
+  <div class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -533,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("modelPricing.save") }}
       </OButton>
     </div>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts" setup>

@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage
-    class="q-pa-none"
+  <div class="tw:rounded-md q-pa-none"
     style="min-height: inherit; height: calc(100vh - 88px)"
   >
     <!-- Full-page Import View -->
@@ -892,7 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDialogMeta.onConfirm()"
       @update:cancel="resetConfirmDialog"
     />
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts" setup>

@@ -184,9 +184,6 @@ export const createMockI18n = () =>
 
 // Common Quasar component stubs
 export const createQuasarStubs = () => ({
-  OPage: {
-    template: "<div class='oo-page'><slot /></div>",
-  },
   QForm: {
     template: "<form class='create-cipher-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
     emits: ["submit"],
