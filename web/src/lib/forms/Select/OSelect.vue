@@ -270,6 +270,14 @@ watch(searchTerm, (value) => {
   emit("search", value);
 });
 
+// Clear the search term whenever the popover closes so re-opening the
+// dropdown always shows the full unfiltered option list.
+watch(popoverOpen, (open) => {
+  if (!open) {
+    searchTerm.value = "";
+  }
+});
+
 // ── Error state ────────────────────────────────────────────────────────────
 const effectiveError = computed(
   () => props.errorMessage || (props.error ? " " : null) || null,

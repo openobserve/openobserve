@@ -708,14 +708,14 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/plugins/correlation/DimensionFilterEditor.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
-- [ ] src/plugins/logs/FunctionSelector.vue
+- [x] src/plugins/logs/FunctionSelector.vue
 - [ ] src/plugins/logs/JsonPreview.vue
 - [ ] src/plugins/logs/SearchBar.vue
-- [ ] src/plugins/logs/TransformSelector.vue
+- [x] src/plugins/logs/TransformSelector.vue
 - [ ] src/plugins/logs/components/FieldList.vue
-- [ ] src/plugins/metrics/AddToDashboard.vue
-- [ ] src/plugins/metrics/MetricList.vue
-- [ ] src/plugins/traces/IndexList.vue
+- [x] src/plugins/metrics/AddToDashboard.vue
+- [x] src/plugins/metrics/MetricList.vue
+- [x] src/plugins/traces/IndexList.vue
 - [ ] src/plugins/traces/ServiceGraph.vue
 - [ ] src/plugins/traces/ServicesCatalog.vue
 - [ ] src/plugins/traces/TraceDetails.vue
@@ -856,16 +856,16 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/enterprise/components/billings/Billing.vue
 - [ ] src/plugins/correlation/DimensionFiltersBar.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
-- [ ] src/plugins/logs/DetailTable.vue
+- [x] src/plugins/logs/DetailTable.vue
 - [ ] src/plugins/logs/IndexList.vue
 - [ ] src/plugins/logs/JsonPreview.vue
 - [ ] src/plugins/logs/SearchBar.vue
 - [ ] src/plugins/logs/SearchResult.vue
-- [ ] src/plugins/logs/TransformSelector.vue
-- [ ] src/plugins/metrics/MetricList.vue
-- [ ] src/plugins/traces/IndexList.vue
+- [x] src/plugins/logs/TransformSelector.vue
+- [x] src/plugins/metrics/MetricList.vue
+- [x] src/plugins/traces/IndexList.vue
 - [ ] src/plugins/traces/LLMInsightsDashboard.vue
-- [ ] src/plugins/traces/SearchBar.vue
+- [x] src/plugins/traces/SearchBar.vue
 - [ ] src/plugins/traces/SearchResult.vue
 - [ ] src/plugins/traces/ServiceGraph.vue
 - [ ] src/plugins/traces/ServicesCatalog.vue
@@ -914,13 +914,13 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/rum/VideoPlayer.vue
 - [ ] src/components/settings/OrganizationSettings.vue
 - [ ] src/components/settings/ServiceIdentitySetup.vue
-- [ ] src/plugins/logs/DetailTable.vue
-- [ ] src/plugins/logs/FunctionSelector.vue
+- [x] src/plugins/logs/DetailTable.vue
+- [x] src/plugins/logs/FunctionSelector.vue
 - [ ] src/plugins/logs/IndexList.vue
 - [ ] src/plugins/logs/SearchBar.vue
-- [ ] src/plugins/logs/SearchHistory.vue
-- [ ] src/plugins/logs/TransformSelector.vue
-- [ ] src/plugins/traces/SearchBar.vue
+- [x] src/plugins/logs/SearchHistory.vue
+- [x] src/plugins/logs/TransformSelector.vue
+- [x] src/plugins/traces/SearchBar.vue
 - [ ] src/plugins/traces/TraceDetailsSidebar.vue
 - [x] src/views/Dashboards/Dashboards.vue
 
@@ -972,7 +972,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/reports/CreateReport.vue
 - [ ] src/components/settings/AddRegexPattern.vue
 - [ ] src/components/settings/General.vue
-- [ ] src/plugins/metrics/AddToDashboard.vue
+- [x] src/plugins/metrics/AddToDashboard.vue
 - [x] src/views/Dashboards/ImportDashboard.vue
 - [x] src/views/Dashboards/PanelLayoutSettings.vue
 - [ ] src/views/RUM/UploadSourceMaps.vue
