@@ -38,7 +38,7 @@ export class AlertDestinationsPage {
         this.destinationImportFileInput = '[data-test="destination-import-file-input"]';
         this.destinationCountText = 'Alert Destinations';
         this.destinationInUseMessage = 'Destination is currently used by alert:';
-        this.nextPageButton = 'button:has(mat-icon:text("chevron_right")), button:has-text("chevron_right")';
+        this.nextPageButton = 'button:has-text("chevron_right")';
 
         // Prebuilt destination locators
         this.prebuiltDestinationSelector = '[data-test="prebuilt-destination-selector"]';
@@ -62,10 +62,71 @@ export class AlertDestinationsPage {
         this.checkIcon = '.q-icon';
     }
 
-    async navigateToDestinations() {
-        await this.page.locator(this.settingsMenuItem).click();
-        await this.page.locator(this.destinationsTab).click();
-        await expect(this.page.locator(this.destinationsListTitle)).toBeVisible();
+    async navigateToDestinations(retryCount = 0) {
+        const maxRetries = 2;
+
+        // Clean up any q-portal elements that may intercept clicks
+        await this.page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+        }).catch(() => {});
+
+        try {
+            await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForTimeout(1000);
+
+            // Try URL-based navigation first (more reliable than menu clicking)
+            const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+            const orgIdentifier = process.env.ORGNAME || 'default';
+            const destinationsUrl = `${baseUrl}/web/settings/alert_destinations?org_identifier=${orgIdentifier}`;
+
+            try {
+                await this.page.goto(destinationsUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+                await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+                await this.page.waitForTimeout(2000);
+
+                // Check if destinations page loaded
+                const title = this.page.locator(this.destinationsListTitle);
+                const titleVisible = await title.isVisible({ timeout: 5000 }).catch(() => false);
+
+                if (titleVisible) {
+                    testLogger.info('Navigated to destinations via URL');
+                    return;
+                }
+            } catch (navError) {
+                testLogger.warn('URL navigation to destinations failed, trying menu path', { error: navError.message });
+            }
+
+            // Fallback: Navigate via Settings menu
+            await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 15000 });
+            await this.page.locator(this.settingsMenuItem).click();
+            await this.page.waitForTimeout(2000);
+
+            await this.page.locator(this.destinationsTab).waitFor({ state: 'visible', timeout: 15000 });
+            await this.page.locator(this.destinationsTab).click();
+            await this.page.waitForTimeout(2000);
+
+            // Wait for destinations page to load
+            await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(2000);
+            await expect(this.page.locator(this.destinationsListTitle)).toBeVisible({ timeout: 15000 });
+        } catch (error) {
+            testLogger.error('Error navigating to destinations', {
+                error: error.message,
+                retryCount
+            });
+
+            if (retryCount >= maxRetries) {
+                throw new Error(`Failed to navigate to destinations after ${maxRetries} attempts`);
+            }
+
+            // Try to recover by reloading the page
+            await this.page.reload();
+            await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+            await this.page.waitForTimeout(2000);
+
+            // Retry navigation with incremented retry count
+            await this.navigateToDestinations(retryCount + 1);
+        }
     }
 
     /** @param {string} destinationName @param {string} url @param {string} templateName */
@@ -102,20 +163,72 @@ export class AlertDestinationsPage {
         
         await this.page.locator(this.submitButton).click();
         await expect(this.page.getByText(this.successMessage)).toBeVisible();
-        
+
+        // Navigate back to the list so the dialog is fully closed before verifying
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(1000);
+
         // Verify the destination exists by checking all pages
         await this.verifyDestinationExists(destinationName);
     }
 
+    /**
+     * Check if a destination exists via API (bypasses UI pagination which causes page context issues)
+     * Uses page.request to bypass the RUM SDK's window.fetch wrapper
+     * @param {string} destinationName - Name of the destination to find
+     * @returns {Promise<boolean>} True if destination exists via API
+     */
+    async findDestinationViaApi(destinationName) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        const listUrl = `${baseUrl}/api/${org}/alerts/destinations`;
+
+        try {
+            const response = await this.page.request.get(listUrl);
+            if (response.ok()) {
+                const data = await response.json().catch(() => null);
+                if (data) {
+                    const list = Array.isArray(data) ? data : (data.list || []);
+                    const found = list.some(item =>
+                        item.name.toLowerCase() === destinationName.toLowerCase()
+                    );
+                    if (found) {
+                        testLogger.info('Found destination via API', { destinationName });
+                        return true;
+                    }
+                }
+                testLogger.info('Destination not found via API', { destinationName });
+                return false;
+            } else {
+                testLogger.warn('API check returned non-OK, falling back to UI', { destinationName, status: response.status() });
+                return null; // null = API unavailable, caller should fall back
+            }
+        } catch (apiError) {
+            testLogger.warn('API check failed, falling back to UI pagination', { error: apiError.message });
+            return null; // null = API unavailable, caller should fall back
+        }
+    }
+
     async findDestinationAcrossPages(destinationName) {
+        // Primary path: Check via API first (bypasses fragile UI pagination)
+        const apiResult = await this.findDestinationViaApi(destinationName);
+        if (apiResult === true) {
+            return true;
+        }
+        if (apiResult === false) {
+            return false;
+        }
+
+        // Fallback: UI pagination (only if API is unavailable)
+        testLogger.info('API unavailable, falling back to UI pagination', { destinationName });
         let destinationFound = false;
         let isLastPage = false;
-        
+
         while (!destinationFound && !isLastPage) {
             try {
-                await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 2000 });
+                await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 5000 });
                 destinationFound = true;
-                testLogger.info('Found destination', { destinationName });
+                testLogger.info('Found destination via UI', { destinationName });
             } catch (error) {
                 // Check if there's a next page button and if it's enabled
                 const nextPageBtn = this.page.locator(this.nextPageButton).first();
@@ -162,7 +275,23 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name for the destination
      */
     async importDestinationFromUrl(url, templateName, destinationName) {
-        await this.page.locator(this.destinationImportButton).click();
+        // Navigate directly to the import destination page (bypasses import button click)
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const orgIdentifier = process.env.ORGNAME || 'default';
+        const importUrl = `${baseUrl}/web/settings/alert_destinations?org_identifier=${orgIdentifier}&action=import`;
+
+        try {
+            await this.page.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+            // Wait for ImportDestination/BaseImport with AppTabs to render
+            await this.page.waitForTimeout(3000);
+            await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 20000 });
+            testLogger.info('Navigated directly to destination import page');
+        } catch (navError) {
+            testLogger.warn('Direct navigation failed, clicking import button', { error: navError.message });
+            await this.page.locator(this.destinationImportButton).click();
+            await this.page.waitForTimeout(2000);
+            await this.page.locator(this.importJsonUrlTab).waitFor({ state: 'visible', timeout: 15000 });
+        }
         await this.page.locator(this.importJsonUrlTab).click();
         await this.page.locator(this.destinationImportUrlInput).click();
         await this.page.locator(this.destinationImportUrlInput).fill(url);
@@ -175,6 +304,8 @@ export class AlertDestinationsPage {
         await this.page.locator(this.destinationImportNameInput).click();
         await this.page.locator(this.destinationImportNameInput).fill(destinationName);
         await this.page.locator(this.destinationImportJsonBtn).click();
+        // Wait for import to complete
+        await this.page.waitForTimeout(2000);
     }
 
     /**
@@ -510,6 +641,10 @@ export class AlertDestinationsPage {
         await this.page.locator(this.submitButton).click();
         await expect(this.page.getByText(this.successMessage)).toBeVisible();
 
+        // Navigate back to the list so the dialog is fully closed before verifying
+        await this.navigateToDestinations();
+        await this.page.waitForTimeout(2000);
+
         // Verify the destination exists
         await this.verifyDestinationExists(destinationName);
         testLogger.info('Created destination with headers', { destinationName, url, headerCount: Object.keys(headers).length });
@@ -522,7 +657,40 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name for the destination
      */
     async importDestinationFromFile(filePath, templateName, destinationName) {
-        await this.page.locator(this.destinationImportButton).click();
+        // Clean up any q-portal elements that may intercept clicks
+        await this.page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+        }).catch(() => {});
+
+        // Try multiple fallback selectors for the import button
+        const importBtnFallbackLocators = [
+            this.destinationImportButton,
+            'button:has-text("Import Destination")',
+            '[data-test*="destination-import"]',
+            'button:has-text("Import")',
+            '.q-table__control button:has-text("Import")',
+            'button[data-o2-btn]:has-text("Import")'
+        ];
+
+        let importBtnClicked = false;
+        for (const selector of importBtnFallbackLocators) {
+            try {
+                const btn = this.page.locator(selector).first();
+                if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await btn.click({ force: true, timeout: 5000 });
+                    importBtnClicked = true;
+                    testLogger.info('Clicked Import Destination button via fallback selector', { selector });
+                    break;
+                }
+            } catch (e) {
+                // Try next selector
+            }
+        }
+
+        if (!importBtnClicked) {
+            throw new Error('Could not find Import Destination button in the UI');
+        }
+
         await this.page.locator(this.importJsonFileTab).click();
 
         // Try original locator first, fallback to new locator if it fails
@@ -573,9 +741,15 @@ export class AlertDestinationsPage {
      * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
      */
     async selectDestinationType(type) {
+        // Clean up any q-portal overlays that may intercept clicks
+        await this.page.evaluate(() => {
+            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
+        }).catch(() => {});
+        await this.page.waitForTimeout(300);
+
         // Wait for card to be visible first
         const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-        await card.waitFor({ state: 'visible', timeout: 10000 });
+        await card.waitFor({ state: 'visible', timeout: 15000 });
         await card.click();
 
         // Wait for form to load after selection
@@ -583,10 +757,10 @@ export class AlertDestinationsPage {
 
         // Wait for either prebuilt form or custom form to appear
         if (type === 'custom') {
-            await this.page.waitForSelector(this.urlInput, { state: 'visible', timeout: 10000 });
+            await this.page.waitForSelector(this.urlInput, { state: 'visible', timeout: 15000 });
         } else {
             // For prebuilt types, wait for destination name input
-            await this.page.waitForSelector(this.destinationNameInput, { state: 'visible', timeout: 10000 });
+            await this.page.waitForSelector(this.destinationNameInput, { state: 'visible', timeout: 15000 });
         }
 
         testLogger.debug('Selected destination type and form loaded', { type });

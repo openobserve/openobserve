@@ -205,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-th auto-width>
                       <q-checkbox
                         v-model="props.selected"
+                        data-test="alert-list-select-all-checkbox"
                         size="sm"
                         class="o2-table-checkbox"
                         @update:model-value="props.select"
@@ -519,6 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   v-else
                                   class="flex items-center justify-center"
                                   clickable
+                                  :data-test="`alert-list-${props.row.name}-trigger-alert`"
                                   v-close-popup
                                   @click="triggerAlert(props.row)"
                                 >
