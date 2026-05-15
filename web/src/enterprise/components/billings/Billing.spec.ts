@@ -294,9 +294,36 @@ describe("Billing Component", () => {
   });
 
   describe("isUsageRoute Computed Property", () => {
-    it("should return true when route is usage", () => {
+    it("should return true when route is usage", async () => {
+      // Must mount with route=usage before mount because mock router is not reactive
       mockRouter.currentRoute.value.name = "usage";
-      expect(wrapper.vm.isUsageRoute).toBe(true);
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            'q-separator': true,
+            'q-splitter': {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            },
+            'q-tabs': true,
+            'q-route-tab': true,
+            'router-view': true,
+            'q-select': true,
+            'q-icon': true,
+            'ConfirmDialog': true,
+            'Usage': true,
+            'AppTabs': {
+              template: '<div></div>',
+              props: ['tabs', 'activeTab'],
+              emits: ['update:activeTab']
+            }
+          }
+        },
+      });
+      await testWrapper.vm.$nextTick();
+      expect(testWrapper.vm.isUsageRoute).toBe(true);
+      testWrapper.unmount();
     });
 
     it("should return false when route is plans", () => {
