@@ -1312,6 +1312,88 @@ pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// metrics for generic bytes cache
+pub static BYTES_CACHE_MEMORY_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "bytes_cache_memory_size",
+            "Total memory size (bytes) of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_ENTRY_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "bytes_cache_entry_count",
+            "Number of entries in a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_GC_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "bytes_cache_gc_time",
+            "Time spent per GC run for a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.2, 0.5, 1.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_GC_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_gc_total",
+            "Total number of GC runs of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_hits_total",
+            "Total number of hits of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
+pub static BYTES_CACHE_MISS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bytes_cache_miss_total",
+            "Total number of misses of a bytes cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["tag"],
+    )
+    .expect("Metric created")
+});
+
 // Tokio runtime metrics - consolidated into fewer metrics with different labels
 pub static TOKIO_RUNTIME_TASKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -1968,6 +2050,26 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 
+    // metrics for generic bytes cache
+    registry
+        .register(Box::new(BYTES_CACHE_MEMORY_SIZE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_ENTRY_COUNT.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_GC_TIME.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_GC_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BYTES_CACHE_MISS_TOTAL.clone()))
+        .expect("Metric registered");
+
     // tokio runtime metrics
     registry
         .register(Box::new(TOKIO_RUNTIME_TASKS.clone()))
@@ -2316,6 +2418,12 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
+        let _ = BYTES_CACHE_MEMORY_SIZE.clone();
+        let _ = BYTES_CACHE_ENTRY_COUNT.clone();
+        let _ = BYTES_CACHE_GC_TIME.clone();
+        let _ = BYTES_CACHE_GC_TOTAL.clone();
+        let _ = BYTES_CACHE_HITS_TOTAL.clone();
+        let _ = BYTES_CACHE_MISS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_TASKS.clone();
         let _ = TOKIO_RUNTIME_TASKS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_WORKER_METRICS.clone();

@@ -20,6 +20,7 @@ bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
+dashmap.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 hashlink.workspace = true
