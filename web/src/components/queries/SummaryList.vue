@@ -37,10 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -106,10 +106,11 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import { X } from 'lucide-vue-next';
 import { durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QTablePagination, NoData, OButton, X, OSpinner },
+  components: { QTablePagination, NoData, OButton, X, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,

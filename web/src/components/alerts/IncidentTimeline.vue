@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-        ><q-icon name="keyboard_arrow_up" size="18px" /><q-tooltip>Scroll to top</q-tooltip></OButton>
+        ><q-icon name="keyboard_arrow_up" size="18px" /><OTooltip content="Scroll to top" /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-        ><q-icon name="keyboard_arrow_down" size="18px" /><q-tooltip>Scroll to bottom</q-tooltip></OButton>
+        ><q-icon name="keyboard_arrow_down" size="18px" /><OTooltip content="Scroll to bottom" /></OButton>
       </div>
 
       <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
@@ -146,9 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }"
                         >
                           AI SRE
-                          <q-tooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" class="tw:max-w-sm" anchor="bottom left" self="top left">
-                            {{ getFailureTooltip(event) }}
-                          </q-tooltip>
+                          <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
                         </span>
                         <span class="tw:text-sm"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'"
@@ -289,10 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Input Area -->
         <div class="tw:flex-1 tw:relative">
-          <q-input
+          <OInput
             v-model="commentText"
             type="textarea"
-            outlined
             placeholder="Write a comment..."
             :rows="3"
             class="comment-input"
@@ -310,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="submitting"
               @click="submitComment"
               data-test="incident-timeline-comment-send"
-            ><q-icon name="send" size="16px" /><q-tooltip>Send comment</q-tooltip></OButton>
+            ><q-icon name="send" size="16px" /><OTooltip content="Send comment" /></OButton>
           </div>
         </div>
       </div>
@@ -327,6 +324,8 @@ import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 interface Props {
   orgId: string;

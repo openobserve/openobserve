@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-insights-refresh-btn"
             >
               <q-icon name="refresh" />
-              <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+              <OTooltip :content="t('common.refresh')" />
             </OButton>
           </div>
         </div>
@@ -97,28 +97,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="filter-label">{{ t("common.filters") }}:</span>
 
           <!-- Failed Only Toggle -->
-          <q-toggle
-            v-model="showFailedOnly"
-            :label="t('alerts.insights.filters.failedOnly')"
-            class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-            @update:model-value="onFilterChange"
-            data-test="failed-only-toggle"
+          <OSwitch
+          v-model="showFailedOnly"
+          :label="t('alerts.insights.filters.failedOnly')"
+          class="o2-toggle-button-sm"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+          @update:model-value="onFilterChange"
+          data-test="failed-only-toggle"
           >
-            <q-tooltip>{{ t("alerts.insights.filters.failedOnlyTooltip") }}</q-tooltip>
-          </q-toggle>
+          <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')">
+          </OTooltip>
+        </OSwitch>
 
           <!-- Silenced Only Toggle -->
-          <q-toggle
-            v-model="showSilencedOnly"
-            :label="t('alerts.insights.filters.silenced')"
-            class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-            @update:model-value="onFilterChange"
-            data-test="silenced-only-toggle"
+          <OSwitch
+          v-model="showSilencedOnly"
+          :label="t('alerts.insights.filters.silenced')"
+          class="o2-toggle-button-sm"
+          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
+          @update:model-value="onFilterChange"
+          data-test="silenced-only-toggle"
           >
-            <q-tooltip>{{ t("alerts.insights.filters.silencedTooltip") }}</q-tooltip>
-          </q-toggle>
+          <OTooltip :content="t('alerts.insights.filters.silencedTooltip')">
+          </OTooltip>
+            </OSwitch>
 
           <!-- Range Filter Chips -->
           <div
@@ -187,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #icon-left><q-icon name="settings" /></template>
         {{ t("alerts.insights.actions.configureDedup") }}
-        <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
+        <OTooltip :content="t('alerts.insights.actions.configureDedupTooltip')" />
       </OButton>
 
       <OButton
@@ -198,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #icon-left><q-icon name="edit" /></template>
         {{ t("alerts.insights.actions.editAlert") }}
-        <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
+        <OTooltip :content="t('alerts.insights.actions.editAlertTooltip')" />
       </OButton>
 
       <OButton
@@ -209,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #icon-left><q-icon name="history" /></template>
         {{ t("alerts.insights.actions.viewHistory") }}
-        <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
+        <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
       </OButton>
 
       <q-space />
@@ -221,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="close-actions-btn"
       >
         <q-icon name="close" />
-        <q-tooltip>Close actions</q-tooltip>
+        <OTooltip content="Close actions" />
       </OButton>
     </div>
 
@@ -295,6 +297,8 @@ import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 const router = useRouter();
 const route = useRoute();

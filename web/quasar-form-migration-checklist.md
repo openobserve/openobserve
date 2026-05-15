@@ -334,6 +334,85 @@ const onSubmit = () => {
 
 **Never** replace inline field validation with `showErrorNotification(...)` — that is a different UX and does not tell the user which field is wrong.
 
+#### When `$q.notify` is acceptable for validation
+
+`$q.notify` is only acceptable for validating fields that **never had `:rules`** in the original Quasar code — e.g., a code editor textarea or a field whose only feedback was always a toast. **Always verify via `git show main:path/to/file.vue` before deciding.**
+
+If the original field had `:rules`, the error must still appear inline below the field after migration — not as a toast.
+
+```typescript
+// Acceptable — original had NO :rules, content is a code editor (not a form field)
+if (content.trim() == "") {
+  $q.notify({ type: "warning", message: "Function body cannot be empty." });
+  return;
+}
+
+// NOT acceptable — original q-input had :rules; must use inline :error/:error-message instead
+if (!name.value.trim()) {
+  $q.notify({ message: "Name is required" }); // ❌ wrong — use error ref below the field
+}
+```
+
+---
+
+### 10b. q-select with custom `#option` slot → OSelect (drop custom slot, use built-in multi-select)
+
+Quasar's `q-select` supports a `#option` slot for fully custom per-item rendering (e.g. a label-click for single-select + a `q-toggle` for multi-toggle). **OSelect has no `#option` slot.**
+
+**Strategy — drop the custom slot and use OSelect's native multi-select checkboxes:**
+
+1. Replace `q-toggle` per-item with OSelect's built-in checkbox (automatic in `multiple` mode)
+2. Drop `#no-option` → use `#empty` slot instead
+3. Remove `@filter` — OSelect has built-in search; pass the full options array directly
+4. If the old code used Quasar's ref API (`hidePopup`, `updateInputValue`, `scrollTo`) via `this.$refs.select`, these are now exposed by OSelect via `defineExpose` — the call sites work unchanged
+5. Remove any per-item click handler that was only used for "single-select from multi" UX — this shortcut is dropped; standard checkbox toggling replaces it
+
+```vue
+<!-- Before -->
+<q-select
+  ref="streamSelect"
+  v-model="selectedStream"
+  :options="streamOptions"
+  multiple emit-value map-options use-input
+  @filter="filterStreamFn"
+  @update:model-value="onStreamChange"
+>
+  <template #no-option><q-item><q-item-section>No results</q-item-section></q-item></template>
+  <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
+    <q-item v-bind="itemProps">
+      <q-item-section @click="singleSelect(opt)">{{ opt.label }}</q-item-section>
+      <q-item-section side>
+        <q-toggle :model-value="selected" @update:model-value="toggleOption(opt.value)" />
+      </q-item-section>
+    </q-item>
+  </template>
+</q-select>
+
+<!-- After -->
+<OSelect
+  ref="streamSelect"
+  v-model="selectedStream"
+  :options="streamOptions"
+  multiple
+  @update:model-value="onStreamChange"
+>
+  <template #empty>No results</template>
+</OSelect>
+```
+
+**Ref API calls — no changes needed in the handler:**
+OSelect exposes `hidePopup()`, `updateInputValue(val)`, and `scrollTo(index)` via `defineExpose`, so existing handler code using `this.$refs.streamSelect.updateInputValue("")` continues to work as-is.
+
+**OTooltip placed inside q-select → wrap OSelect in a div:**
+If the original q-select had an OTooltip child (for hover-on-trigger), OTooltip can't be a child of OSelect's template. Move it into a wrapper div alongside OSelect — hovering the div (which OSelect fills) still triggers the tooltip:
+
+```vue
+<div class="tw:flex-1 tw:min-w-0">
+  <OSelect ref="streamSelect" v-model="selected" :options="opts" multiple class="tw:w-full" />
+  <OTooltip v-if="selected.length > 1" :content="selected.join(', ')" side="bottom" />
+</div>
+```
+
 ---
 
 ### 11. q-tooltip → OTooltip
@@ -700,19 +779,19 @@ Legend: `[ ]` = not done · `✅` = done
 ### q-checkbox → OCheckbox / OCheckboxGroup
 
 - [ ] src/components/AppTable.vue
-- [ ] src/components/actionScripts/ActionScripts.vue
+- ✅ src/components/actionScripts/ActionScripts.vue
 - [ ] src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertsDestinationList.vue
-- [ ] src/components/alerts/ImportAlert.vue
+- ✅ src/components/alerts/ImportAlert.vue
 - [ ] src/components/alerts/ImportSemanticGroups.vue
 - [ ] src/components/alerts/ImportSemanticGroupsDrawer.vue
-- [ ] src/components/alerts/OrganizationDeduplicationSettings.vue
+- ✅ src/components/alerts/OrganizationDeduplicationSettings.vue
 - [ ] src/components/alerts/PipelinesDestinationList.vue
-- [ ] src/components/alerts/SemanticFieldGroupsConfig.vue
+- ✅ src/components/alerts/SemanticFieldGroupsConfig.vue
 - [ ] src/components/alerts/TemplateList.vue
 - [ ] src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
-- [ ] src/components/common/DualListSelector.vue
+- ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/FieldValuesPanel.vue
 - ✅ src/components/dashboards/AddDashboardFromGitHub.vue
 - ✅ src/components/dashboards/OverrideConfigPopup.vue
@@ -721,25 +800,25 @@ Legend: `[ ]` = not done · `✅` = done
 - ✅ src/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue
 - ✅ src/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue
 - ✅ src/components/dashboards/settings/AddSettingVariable.vue
-- [ ] src/components/dashboards/settings/VariableCustomValueSelector.vue
-- [ ] src/components/dashboards/settings/VariableQueryValueSelector.vue
-- [ ] src/components/functions/EnrichmentTableList.vue
-- [ ] src/components/functions/FunctionList.vue
+- ✅ src/components/dashboards/settings/VariableCustomValueSelector.vue
+- ✅ src/components/dashboards/settings/VariableQueryValueSelector.vue
+- ✅ src/components/functions/EnrichmentTableList.vue
+- ✅ src/components/functions/FunctionList.vue
 - [ ] src/components/iam/groups/GroupRoles.vue
 - [ ] src/components/iam/groups/GroupServiceAccounts.vue
 - [ ] src/components/iam/groups/GroupUsers.vue
 - [ ] src/components/iam/roles/EntityPermissionTable.vue
 - [ ] src/components/iam/roles/PermissionsTable.vue
-- [ ] src/components/iam/serviceAccounts/ServiceAccountsList.vue
+- ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
 - [ ] src/components/iam/users/User.vue
-- [ ] src/components/ingestion/recommended/AWSQuickSetup.vue
+- ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
 - [ ] src/components/ingestion/recommended/AzureConfig.vue
 - [ ] src/components/login/GetStarted.vue
-- [ ] src/components/logstream/AssociatedRegexPatterns.vue
+- ✅ src/components/logstream/AssociatedRegexPatterns.vue
 - [ ] src/components/logstream/schema.vue
-- [ ] src/components/pipeline/PipelinesList.vue
-- [ ] src/components/pipelines/CreateBackfillJobDialog.vue
-- [ ] src/components/pipelines/EditBackfillJobDialog.vue
+- ✅ src/components/pipeline/PipelinesList.vue
+- ✅ src/components/pipelines/CreateBackfillJobDialog.vue
+- ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/queries/RunningQueriesList.vue
 - [ ] src/components/queries/SummaryList.vue
 - [ ] src/components/reports/ReportList.vue
@@ -747,15 +826,15 @@ Legend: `[ ]` = not done · `✅` = done
 - [ ] src/components/settings/BuiltInModelPricingTab.vue
 - [ ] src/components/settings/BuiltInPatternsTab.vue
 - [ ] src/components/settings/CipherKeys.vue
-- [ ] src/components/settings/ModelPricingList.vue
-- [ ] src/components/settings/Nodes.vue
+- ✅ src/components/settings/ModelPricingList.vue
+- ✅ src/components/settings/Nodes.vue
 - [ ] src/components/settings/RegexPatternList.vue
-- [ ] src/components/shared/filter/FilterCreatorPopup.vue
+- ✅ src/components/shared/filter/FilterCreatorPopup.vue
 - [ ] src/enterprise/components/EvalTemplateList.vue
 - [ ] src/plugins/correlation/CorrelatedLogsTable.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
-- [ ] src/plugins/traces/ServiceGraphNodeSidePanel.vue
-- [ ] src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+- ✅ src/plugins/traces/ServiceGraphNodeSidePanel.vue
+- ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 - ✅ src/views/Dashboards/addPanel/AddCondition.vue
 - [ ] src/views/LogStream.vue
@@ -774,29 +853,29 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/NLModeQueryBar.vue
 - [ ] src/components/O2AIChat.vue
 - [ ] src/components/QueryEditor.vue
-- [ ] src/components/actionScripts/ActionScripts.vue
-- [ ] src/components/actionScripts/EditScript.vue
+- ✅ src/components/actionScripts/ActionScripts.vue
+- ✅ src/components/actionScripts/EditScript.vue
 - [ ] src/components/actionScripts/ScriptToolbar.vue
 - [T] src/components/ai_toolsets/AddAiToolset.vue
-- [ ] src/components/alerts/AddAlert.vue
+- ✅ src/components/alerts/AddAlert.vue
 - [ ] src/components/alerts/AddDestination.vue
 - [ ] src/components/alerts/AddTemplate.vue
 - [ ] src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertsDestinationList.vue
-- [ ] src/components/alerts/DeduplicationConfig.vue
-- [ ] src/components/alerts/FieldsInput.vue
+- ✅ src/components/alerts/DeduplicationConfig.vue
+- ✅ src/components/alerts/FieldsInput.vue
 - [ ] src/components/alerts/FilterCondition.vue
-- [ ] src/components/alerts/ImportAlert.vue
-- [ ] src/components/alerts/ImportDestination.vue
-- [ ] src/components/alerts/ImportTemplate.vue
-- [ ] src/components/alerts/IncidentList.vue
-- [T] src/components/alerts/IncidentTimeline.vue
-- [ ] src/components/alerts/OrganizationDeduplicationSettings.vue
+- ✅ src/components/alerts/ImportAlert.vue
+- ✅ src/components/alerts/ImportDestination.vue
+- ✅ src/components/alerts/ImportTemplate.vue
+- ✅ src/components/alerts/IncidentList.vue
+- ✅ src/components/alerts/IncidentTimeline.vue
+- ✅ src/components/alerts/OrganizationDeduplicationSettings.vue
 - [ ] src/components/alerts/PipelinesDestinationList.vue
 - [ ] src/components/alerts/PrebuiltDestinationForm.vue
-- [ ] src/components/alerts/SemanticGroupItem.vue
+- ✅ src/components/alerts/SemanticGroupItem.vue
 - [ ] src/components/alerts/TemplateList.vue
-- [ ] src/components/alerts/VariablesInput.vue
+- ✅ src/components/alerts/VariablesInput.vue
 - [T] src/components/alerts/steps/Advanced.vue
 - [ ] src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/alerts/steps/Deduplication.vue
@@ -806,12 +885,12 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/cipherkeys/AddCipherKey.vue
 - [ ] src/components/cipherkeys/AddOpenobserveType.vue *(also has autogrow — use OTextarea for those fields)*
 - [ ] src/components/common/BaseImport.vue
-- [ ] src/components/common/DualListSelector.vue
+- ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/FieldValuesPanel.vue
-- [ ] src/components/common/sidebar/AddFolder.vue
-- [ ] src/components/common/sidebar/FieldList.vue
-- [ ] src/components/common/sidebar/FolderList.vue
-- [ ] src/components/common/sidebar/MoveAcrossFolders.vue
+- ✅ src/components/common/sidebar/AddFolder.vue
+- ✅ src/components/common/sidebar/FieldList.vue
+- ✅ src/components/common/sidebar/FolderList.vue
+- ✅ src/components/common/sidebar/MoveAcrossFolders.vue
 - [ ] src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboard.vue
 - ✅ src/components/dashboards/AddFolder.vue
@@ -823,7 +902,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/dashboards/addPanel/ColorBySeriesPopUp.vue
 - ✅ src/components/dashboards/addPanel/CommonAutoComplete.vue
 - ✅ src/components/dashboards/addPanel/ConfigPanel.vue *(mixed — normal + autogrow fields)*
-- [ ] src/components/dashboards/addPanel/ConfigPanelSearch.vue
+- ✅ src/components/dashboards/addPanel/ConfigPanelSearch.vue
 - ✅ src/components/dashboards/addPanel/FieldList.vue
 - ✅ src/components/dashboards/addPanel/PromQLChartConfig.vue
 - ✅ src/components/dashboards/addPanel/ValueMappingPopUp.vue
@@ -834,13 +913,13 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
 - ✅ src/components/dashboards/settings/VariableAdHocValueSelector.vue
 - ✅ src/components/dashboards/tabs/AddTab.vue
-- [ ] src/components/functions/AddEnrichmentTable.vue
-- [ ] src/components/functions/AssociatedStreamFunction.vue
-- [ ] src/components/functions/EnrichmentSchema.vue
-- [ ] src/components/functions/EnrichmentTableList.vue
-- [ ] src/components/functions/FunctionList.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/functions/StreamRouting.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AssociatedStreamFunction.vue
+- ✅ src/components/functions/EnrichmentSchema.vue
+- ✅ src/components/functions/EnrichmentTableList.vue
+- ✅ src/components/functions/FunctionList.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/functions/StreamRouting.vue
 - [ ] src/components/iam/groups/AddGroup.vue
 - [ ] src/components/iam/groups/AppGroups.vue
 - [ ] src/components/iam/groups/GroupRoles.vue
@@ -853,7 +932,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/iam/roles/AppRoles.vue
 - [ ] src/components/iam/roles/EditRole.vue
 - [ ] src/components/iam/serviceAccounts/AddServiceAccount.vue
-- [ ] src/components/iam/serviceAccounts/ServiceAccountsList.vue
+- ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/iam/users/MemberInvitation.vue
 - [ ] src/components/iam/users/UpdateRole.vue
@@ -876,7 +955,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/login/Login.vue
 - [ ] src/components/login/SsoLogin.vue
 - [ ] src/components/logstream/AddStream.vue
-- [T] src/components/logstream/AssociatedRegexPatterns.vue *(mixed — normal + autogrow fields)*
+- [T] src/components/logstream/AssociatedRegexPatterns.vue *(mixed — normal + autogrow fields)* ✅
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - [ ] src/components/logstream/StreamFieldInputs.vue
 - [ ] src/components/logstream/schema.vue
@@ -885,10 +964,10 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/pipeline/NodeForm/LlmEvaluation.vue
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - [ ] src/components/pipeline/PipelineEditor.vue
-- [ ] src/components/pipeline/PipelinesList.vue
+- ✅ src/components/pipeline/PipelinesList.vue
 - [ ] src/components/pipeline/StreamSelection.vue
-- [ ] src/components/pipelines/CreateBackfillJobDialog.vue
-- [ ] src/components/pipelines/EditBackfillJobDialog.vue
+- ✅ src/components/pipelines/CreateBackfillJobDialog.vue
+- ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/promql/components/OperationsList.vue
 - [ ] src/components/promql/components/PromQLBuilderOptions.vue
 - [ ] src/components/queries/RunningQueries.vue
@@ -907,8 +986,8 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/settings/ImportRegexPattern.vue
 - [T] src/components/settings/License.vue
 - [ ] src/components/settings/ModelPricingEditor.vue
-- [ ] src/components/settings/ModelPricingList.vue
-- [ ] src/components/settings/Nodes.vue
+- ✅ src/components/settings/ModelPricingList.vue
+- ✅ src/components/settings/Nodes.vue
 - [ ] src/components/settings/OrganizationManagement.vue
 - [ ] src/components/settings/OrganizationSettings.vue
 - [ ] src/components/settings/RegexPatternList.vue
@@ -921,17 +1000,17 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
-- [ ] src/plugins/logs/JsonPreview.vue
-- [ ] src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/JsonPreview.vue
+- ✅ src/plugins/logs/SearchBar.vue
 - ✅ src/plugins/logs/TransformSelector.vue
-- [ ] src/plugins/logs/components/FieldList.vue
+- ✅ src/plugins/logs/components/FieldList.vue
 - ✅ src/plugins/metrics/AddToDashboard.vue
 - ✅ src/plugins/metrics/MetricList.vue
 - ✅ src/plugins/traces/IndexList.vue
-- [ ] src/plugins/traces/ServiceGraph.vue
-- [ ] src/plugins/traces/ServicesCatalog.vue
-- [ ] src/plugins/traces/TraceDetails.vue
-- [ ] src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+- ✅ src/plugins/traces/ServiceGraph.vue
+- ✅ src/plugins/traces/ServicesCatalog.vue
+- ✅ src/plugins/traces/TraceDetails.vue
+- ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 - [ ] src/views/AwsMarketplaceSetup.vue
 - [ ] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/Dashboards.vue
@@ -959,8 +1038,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 - [ ] src/components/ResumePipelineDialog.vue
 - ✅ src/components/dashboards/settings/TabsDeletePopUp.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/logstream/AssociatedRegexPatterns.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/logstream/AssociatedRegexPatterns.vue
 - [ ] src/components/settings/DomainManagement.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
 
@@ -971,22 +1050,22 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/CustomDateTimePicker.vue
 - [ ] src/components/DateTime.vue
 - [ ] src/components/DateTimePicker.vue
-- [ ] src/components/actionScripts/ActionScripts.vue
-- [ ] src/components/actionScripts/EditScript.vue
+- ✅ src/components/actionScripts/ActionScripts.vue
+- ✅ src/components/actionScripts/EditScript.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
-- [ ] src/components/alerts/AddAlert.vue
+- ✅ src/components/alerts/AddAlert.vue
 - [ ] src/components/alerts/AddDestination.vue
-- [ ] src/components/alerts/AlertHistory.vue
+- ✅ src/components/alerts/AlertHistory.vue
 - [ ] src/components/alerts/AlertList.vue
-- [ ] src/components/alerts/DeduplicationConfig.vue
-- [ ] src/components/alerts/FieldsInput.vue
-- [ ] src/components/alerts/FilterCondition.vue
+- ✅ src/components/alerts/DeduplicationConfig.vue
+- ✅ src/components/alerts/FieldsInput.vue
+- ✅ src/components/alerts/FilterCondition.vue
 - [ ] src/components/alerts/ImportAlert.vue
-- [ ] src/components/alerts/ImportDestination.vue
-- [ ] src/components/alerts/ImportTemplate.vue
+- ✅ src/components/alerts/ImportDestination.vue
+- ✅ src/components/alerts/ImportTemplate.vue
 - [ ] src/components/alerts/PrebuiltDestinationForm.vue
-- [ ] src/components/alerts/QueryEditorDialog.vue
-- [ ] src/components/alerts/SemanticFieldGroupsConfig.vue
+- ✅ src/components/alerts/QueryEditorDialog.vue
+- ✅ src/components/alerts/SemanticFieldGroupsConfig.vue
 - [ ] src/components/alerts/steps/Advanced.vue
 - [ ] src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/alerts/steps/Deduplication.vue
@@ -1023,18 +1102,18 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/SinglePanelMove.vue
 - ✅ src/components/dashboards/settings/TabsDeletePopUp.vue
 - ✅ src/components/dashboards/settings/VariableAdHocValueSelector.vue
-- [ ] src/components/dashboards/settings/VariableCustomValueSelector.vue
-- [ ] src/components/dashboards/settings/VariableQueryValueSelector.vue
-- [ ] src/components/functions/AssociatedStreamFunction.vue
-- [ ] src/components/functions/StreamRouting.vue
-- [ ] src/components/functions/TestFunction.vue
+- ✅ src/components/dashboards/settings/VariableCustomValueSelector.vue
+- ✅ src/components/dashboards/settings/VariableQueryValueSelector.vue
+- ✅ src/components/functions/AssociatedStreamFunction.vue
+- ✅ src/components/functions/StreamRouting.vue
+- ✅ src/components/functions/TestFunction.vue
 - [ ] src/components/iam/groups/GroupUsers.vue
 - [ ] src/components/iam/quota/Quota.vue
 - [ ] src/components/iam/roles/EditRole.vue
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/iam/users/MemberInvitation.vue
 - [ ] src/components/iam/users/UpdateRole.vue
-- [ ] src/components/ingestion/recommended/AWSQuickSetup.vue
+- ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
 - [ ] src/components/logstream/AddStream.vue
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - [ ] src/components/logstream/StreamFieldInputs.vue
@@ -1062,27 +1141,27 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/settings/DomainManagement.vue
 - [ ] src/components/settings/ModelPricingEditor.vue
 - [ ] src/components/settings/ServiceIdentitySetup.vue
-- [ ] src/components/shared/filter/FilterCreatorPopup.vue
+- ✅ src/components/shared/filter/FilterCreatorPopup.vue
 - [ ] src/components/shared/grid/Pagination.vue
 - [ ] src/enterprise/components/EvalTemplateEditor.vue
 - [ ] src/enterprise/components/billings/Billing.vue
 - [ ] src/plugins/correlation/DimensionFiltersBar.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/DetailTable.vue
-- [ ] src/plugins/logs/IndexList.vue
-- [ ] src/plugins/logs/JsonPreview.vue
-- [ ] src/plugins/logs/SearchBar.vue
-- [ ] src/plugins/logs/SearchResult.vue
+- ✅ src/plugins/logs/IndexList.vue
+- ✅ src/plugins/logs/JsonPreview.vue
+- ✅ src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/SearchResult.vue
 - ✅ src/plugins/logs/TransformSelector.vue
 - ✅ src/plugins/metrics/MetricList.vue
 - ✅ src/plugins/traces/IndexList.vue
-- [ ] src/plugins/traces/LLMInsightsDashboard.vue
+- ✅ src/plugins/traces/LLMInsightsDashboard.vue
 - ✅ src/plugins/traces/SearchBar.vue
-- [ ] src/plugins/traces/SearchResult.vue
-- [ ] src/plugins/traces/ServiceGraph.vue
-- [ ] src/plugins/traces/ServicesCatalog.vue
-- [ ] src/plugins/traces/TraceDetails.vue
-- [ ] src/plugins/traces/TraceEvaluationsView.vue
+- ✅ src/plugins/traces/SearchResult.vue
+- ✅ src/plugins/traces/ServiceGraph.vue
+- ✅ src/plugins/traces/ServicesCatalog.vue
+- ✅ src/plugins/traces/TraceDetails.vue
+- ✅ src/plugins/traces/TraceEvaluationsView.vue
 - [ ] src/views/AwsMarketplaceSetup.vue
 - [ ] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
@@ -1096,12 +1175,12 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/NLModeQueryBar.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
 - [ ] src/components/alerts/AddDestination.vue
-- [ ] src/components/alerts/AlertInsights.vue
+- ✅ src/components/alerts/AlertInsights.vue
 - [ ] src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/ImportDestination.vue
 - [ ] src/components/alerts/PrebuiltDestinationForm.vue
-- [ ] src/components/alerts/QueryEditorDialog.vue
-- [ ] src/components/alerts/SemanticGroupItem.vue
+- ✅ src/components/alerts/QueryEditorDialog.vue
+- ✅ src/components/alerts/SemanticGroupItem.vue
 - [ ] src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/alerts/steps/QueryConfig.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
@@ -1111,7 +1190,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/addPanel/PromQLChartConfig.vue
 - ✅ src/components/dashboards/settings/AddSettingVariable.vue
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
-- [ ] src/components/functions/AssociatedStreamFunction.vue
+- ✅ src/components/functions/AssociatedStreamFunction.vue
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - [ ] src/components/logstream/schema.vue
@@ -1128,12 +1207,12 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/plugins/logs/DetailTable.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
-- [ ] src/plugins/logs/IndexList.vue
-- [ ] src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/IndexList.vue
+- ✅ src/plugins/logs/SearchBar.vue
 - ✅ src/plugins/logs/SearchHistory.vue
 - ✅ src/plugins/logs/TransformSelector.vue
 - ✅ src/plugins/traces/SearchBar.vue
-- [ ] src/plugins/traces/TraceDetailsSidebar.vue
+- ✅ src/plugins/traces/TraceDetailsSidebar.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 
 ---
@@ -1141,7 +1220,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 ### q-form → OForm
 
 - [ ] src/components/actionScripts/ActionScripts.vue
-- [ ] src/components/actionScripts/EditScript.vue
+- ✅ src/components/actionScripts/EditScript.vue
 - [ ] src/components/actionScripts/ScriptToolbar.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
 - [ ] src/components/alerts/AddAlert.vue
@@ -1151,8 +1230,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddCipherKey.vue
 - [ ] src/components/common/BaseImport.vue
-- [ ] src/components/common/sidebar/AddFolder.vue
-- [ ] src/components/common/sidebar/MoveAcrossFolders.vue
+- ✅ src/components/common/sidebar/AddFolder.vue
+- ✅ src/components/common/sidebar/MoveAcrossFolders.vue
 - [ ] src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboard.vue
 - ✅ src/components/dashboards/AddFolder.vue
@@ -1160,10 +1239,10 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/AddSettingVariable.vue
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
 - ✅ src/components/dashboards/tabs/AddTab.vue
-- [ ] src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
 - [ ] src/components/functions/AddFunction.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/functions/TestFunction.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/functions/TestFunction.vue
 - [ ] src/components/iam/organizations/AddUpdateOrganization.vue
 - [ ] src/components/iam/serviceAccounts/AddServiceAccount.vue
 - [ ] src/components/iam/users/AddUser.vue
@@ -1179,7 +1258,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/pipeline/NodeForm/Query.vue
 - [ ] src/components/pipeline/NodeForm/Stream.vue
 - [ ] src/components/pipeline/StreamSelection.vue
-- [ ] src/components/pipelines/CreateBackfillJobDialog.vue
+- ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - [ ] src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/reports/CreateReport.vue
 - [ ] src/components/settings/AddRegexPattern.vue
@@ -1194,11 +1273,11 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 ### q-file → OFile / OFormFile
 
 - [ ] src/components/actionScripts/EditScript.vue
-- [ ] src/components/alerts/ImportAlert.vue
+- ✅ src/components/alerts/ImportAlert.vue
 - [ ] src/components/alerts/ImportSemanticGroups.vue
 - [ ] src/components/alerts/ImportSemanticGroupsDrawer.vue
 - [ ] src/components/common/BaseImport.vue
-- [ ] src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
 - [ ] src/components/settings/General.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
 
@@ -1247,7 +1326,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 ### q-option-group → OOptionGroup / OFormOptionGroup
 
-- [ ] src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
 
 ---
 
@@ -1271,31 +1350,31 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/QueryPlanDialog.vue
 - [ ] src/components/TelemetryCorrelationPanel.vue
 - [ ] src/components/ThemeSwitcher.vue
-- [ ] src/components/actionScripts/ActionScripts.vue
-- [ ] src/components/actionScripts/EditScript.vue
+- ✅ src/components/actionScripts/ActionScripts.vue
+- ✅ src/components/actionScripts/EditScript.vue
 - [ ] src/components/actionScripts/ScriptEditor.vue
 - [ ] src/components/actionScripts/ScriptToolbar.vue
-- [ ] src/components/alerts/AddAlert.vue
+- ✅ src/components/alerts/AddAlert.vue
 - [ ] src/components/alerts/AlertHistory.vue
-- [ ] src/components/alerts/AlertHistoryDrawer.vue
-- [ ] src/components/alerts/AlertInsights.vue
+- ✅ src/components/alerts/AlertHistoryDrawer.vue
+- ✅ src/components/alerts/AlertInsights.vue
 - [ ] src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertSummary.vue
-- [ ] src/components/alerts/DedupSummaryCards.vue
-- [ ] src/components/alerts/DeduplicationConfig.vue
-- [ ] src/components/alerts/FilterCondition.vue
-- [ ] src/components/alerts/FilterGroup.vue
+- ✅ src/components/alerts/DedupSummaryCards.vue
+- ✅ src/components/alerts/DeduplicationConfig.vue
+- ✅ src/components/alerts/FilterCondition.vue
+- ✅ src/components/alerts/FilterGroup.vue
 - [ ] src/components/alerts/IncidentAlertTriggersTable.vue
-- [ ] src/components/alerts/IncidentDetailDrawer.vue
-- [ ] src/components/alerts/IncidentList.vue
+- ✅ src/components/alerts/IncidentDetailDrawer.vue
+- ✅ src/components/alerts/IncidentList.vue
 - [ ] src/components/alerts/IncidentServiceGraph.vue
 - [ ] src/components/alerts/IncidentTableOfContents.vue
-- [ ] src/components/alerts/IncidentTimeline.vue
-- [ ] src/components/alerts/OrganizationDeduplicationSettings.vue
-- [ ] src/components/alerts/QueryEditorDialog.vue
-- [ ] src/components/alerts/SemanticFieldGroupsConfig.vue
-- [ ] src/components/alerts/SemanticGroupItem.vue
-- [ ] src/components/alerts/VariablesInput.vue
+- ✅ src/components/alerts/IncidentTimeline.vue
+- ✅ src/components/alerts/OrganizationDeduplicationSettings.vue
+- ✅ src/components/alerts/QueryEditorDialog.vue
+- ✅ src/components/alerts/SemanticFieldGroupsConfig.vue
+- ✅ src/components/alerts/SemanticGroupItem.vue
+- ✅ src/components/alerts/VariablesInput.vue
 - [ ] src/components/alerts/steps/Advanced.vue
 - [ ] src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/alerts/steps/CompareWithPast.vue
@@ -1306,9 +1385,9 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/common/AppTabs.vue
-- [ ] src/components/common/DualListSelector.vue
+- ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/ShareButton.vue
-- [ ] src/components/common/sidebar/FieldList.vue
+- ✅ src/components/common/sidebar/FieldList.vue
 - [ ] src/components/cross-linking/CrossLinkUserGuide.vue
 - [ ] src/components/dashboards/ExportDashboard.vue
 - [ ] src/components/dashboards/PanelContainer.vue
@@ -1331,14 +1410,14 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/dashboards/settings/VariableSettings.vue
 - [ ] src/components/dashboards/tabs/TabList.vue
 - [ ] src/components/dashboards/viewPanel/ViewPanel.vue
-- [ ] src/components/functions/EnrichmentTableList.vue
-- [ ] src/components/functions/FunctionList.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/functions/TestFunction.vue
+- ✅ src/components/functions/EnrichmentTableList.vue
+- ✅ src/components/functions/FunctionList.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/functions/TestFunction.vue
 - [ ] src/components/iam/groups/GroupUsers.vue
-- [ ] src/components/iam/serviceAccounts/ServiceAccountsList.vue
+- ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
 - [ ] src/components/ingestion/recommended/AWSIntegrationTile.vue
-- [ ] src/components/ingestion/recommended/AWSQuickSetup.vue
+- ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
 - [ ] src/components/ingestion/recommended/AzureIntegrationTile.vue
 - [ ] src/components/ingestion/recommended/KubernetesConfig.vue
 - [ ] src/components/logstream/schema.vue
@@ -1346,10 +1425,10 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - [ ] src/components/pipeline/NodeSidebar.vue
 - [ ] src/components/pipeline/PipelineEditor.vue
-- [ ] src/components/pipeline/PipelinesList.vue
+- ✅ src/components/pipeline/PipelinesList.vue
 - [ ] src/components/pipelines/BackfillJobsList.vue
-- [ ] src/components/pipelines/CreateBackfillJobDialog.vue
-- [ ] src/components/pipelines/EditBackfillJobDialog.vue
+- ✅ src/components/pipelines/CreateBackfillJobDialog.vue
+- ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/pipelines/PipelineHistory.vue
 - [ ] src/components/promql/components/LabelFilterEditor.vue
 - [ ] src/components/promql/components/OperationsList.vue
@@ -1364,8 +1443,8 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/settings/DomainManagement.vue
 - [ ] src/components/settings/General.vue
 - [ ] src/components/settings/ModelPricingEditor.vue
-- [ ] src/components/settings/ModelPricingList.vue
-- [ ] src/components/settings/Nodes.vue
+- ✅ src/components/settings/ModelPricingList.vue
+- ✅ src/components/settings/Nodes.vue
 - [ ] src/components/settings/OrgStorageSettings.vue
 - [ ] src/components/settings/OrganizationManagement.vue
 - [ ] src/components/settings/ServiceIdentitySetup.vue
@@ -1380,31 +1459,31 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/plugins/correlation/DimensionFiltersBar.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
-- [ ] src/plugins/logs/IndexList.vue
-- [ ] src/plugins/logs/JsonPreview.vue
-- [ ] src/plugins/logs/SearchBar.vue
-- [ ] src/plugins/logs/SearchJobInspector.vue
-- [ ] src/plugins/logs/SearchResult.vue
-- [ ] src/plugins/logs/SyntaxGuide.vue
+- ✅ src/plugins/logs/IndexList.vue
+- ✅ src/plugins/logs/JsonPreview.vue
+- ✅ src/plugins/logs/SearchBar.vue
+- ✅ src/plugins/logs/SearchJobInspector.vue
+- ✅ src/plugins/logs/SearchResult.vue
+- ✅ src/plugins/logs/SyntaxGuide.vue
 - ✅ src/plugins/logs/TransformSelector.vue
-- [ ] src/plugins/logs/components/FieldListPagination.vue
-- [ ] src/plugins/logs/patterns/PatternCard.vue
+- ✅ src/plugins/logs/components/FieldListPagination.vue
+- ✅ src/plugins/logs/patterns/PatternCard.vue
 - [ ] src/plugins/pipelines/CustomNode.vue
-- [ ] src/plugins/traces/LLMInsightsDashboard.vue
+- ✅ src/plugins/traces/LLMInsightsDashboard.vue
 - ✅ src/plugins/traces/SearchBar.vue
-- [ ] src/plugins/traces/SearchResult.vue
-- [ ] src/plugins/traces/ServiceGraph.vue
-- [ ] src/plugins/traces/ServiceGraphEdgeSidePanel.vue
-- [ ] src/plugins/traces/ServiceGraphNodeSidePanel.vue
-- [ ] src/plugins/traces/ServicesCatalog.vue
-- [ ] src/plugins/traces/SyntaxGuide.vue
-- [ ] src/plugins/traces/ThreadView.vue
-- [ ] src/plugins/traces/TraceDetails.vue
-- [ ] src/plugins/traces/TraceEvaluationsView.vue
-- [ ] src/plugins/traces/components/SpanKindBadge.vue
-- [ ] src/plugins/traces/components/TraceErrorTab.vue
-- [ ] src/plugins/traces/components/TracesSearchResultList.vue
-- [ ] src/plugins/traces/metrics/TracesAnalysisDashboard.vue
+- ✅ src/plugins/traces/SearchResult.vue
+- ✅ src/plugins/traces/ServiceGraph.vue
+- ✅ src/plugins/traces/ServiceGraphEdgeSidePanel.vue
+- ✅ src/plugins/traces/ServiceGraphNodeSidePanel.vue
+- ✅ src/plugins/traces/ServicesCatalog.vue
+- ✅ src/plugins/traces/SyntaxGuide.vue
+- ✅ src/plugins/traces/ThreadView.vue
+- ✅ src/plugins/traces/TraceDetails.vue
+- ✅ src/plugins/traces/TraceEvaluationsView.vue
+- ✅ src/plugins/traces/components/SpanKindBadge.vue
+- ✅ src/plugins/traces/components/TraceErrorTab.vue
+- ✅ src/plugins/traces/components/TracesSearchResultList.vue
+- ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 
 #### views/
 

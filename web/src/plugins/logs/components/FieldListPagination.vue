@@ -37,49 +37,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="opt.slot === 'user_defined_slot'">
             <q-icon name="person" class="tw:text-[12px]!"></q-icon>
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
-            <q-tooltip
+            <OTooltip
               data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
-              anchor="center right"
-              self="center left"
+              :content="t('search.userDefinedSchemaLabel')"
               max-width="18.75rem"
-              class="text-body2"
-            >
-              <span class="text-bold" color="white">{{
-                t("search.userDefinedSchemaLabel")
-              }}</span>
-            </q-tooltip>
+              side="right"
+              align="center"
+            />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
-            <q-tooltip
+            <OTooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
-              anchor="center right"
-              self="center left"
               max-width="18.75rem"
-              class="text-body2"
+              side="right"
+              align="center"
             >
-              <span class="text-bold" color="white">{{
-                t("search.allFieldsLabel")
-              }}</span>
-              <q-separator color="white" class="q-mt-xs q-mb-xs" />
-              {{ t("search.allFieldsWarningMsg") }}
-            </q-tooltip>
+              <template #content>
+                <span class="tw:font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <hr class="tw:my-1 tw:opacity-50" />
+                {{ t("search.allFieldsWarningMsg") }}
+              </template>
+            </OTooltip>
           </template>
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <q-icon name="info" class="tw:text-[12px]!" />
+            <q-icon name="info_outline" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
-            <q-tooltip
-              anchor="center right"
-              self="center left"
+            <OTooltip
+              :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
-              class="text-body2"
-            >
-              <span class="text-bold" color="white">{{
-                t("search.showOnlyInterestingFields")
-              }}</span>
-            </q-tooltip>
+              side="right"
+              align="center"
+            />
           </template>
           <template v-else>{{ opt.label }}</template>
         </OToggleGroupItem>
@@ -103,35 +94,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-if="opt.slot === 'all_fields_slot'">
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
-            <q-tooltip
+            <OTooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
-              anchor="center right"
-              self="center left"
               max-width="18.75rem"
-              class="text-body2"
+              side="right"
+              align="center"
             >
-              <span class="text-bold" color="white">{{
-                t("search.allFieldsLabel")
-              }}</span>
-              <q-separator color="white" class="q-mt-xs q-mb-xs" />
-              {{ t("search.allFieldsWarningMsg") }}
-            </q-tooltip>
+              <template #content>
+                <span class="tw:font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <hr class="tw:my-1 tw:opacity-50" />
+                {{ t("search.allFieldsWarningMsg") }}
+              </template>
+            </OTooltip>
           </template>
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <q-icon name="info" class="tw:text-[12px]!" />
+            <q-icon name="info_outline" class="tw:text-[12px]!" />
             <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
-            <q-tooltip
-              anchor="center right"
-              self="center left"
+            <OTooltip
+              :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
-              class="text-body2"
-            >
-              <span class="text-bold" color="white">{{
-                t("search.showOnlyInterestingFields")
-              }}</span>
-            </q-tooltip>
+              side="right"
+              align="center"
+            />
           </template>
           <template v-else>{{ opt.label }}</template>
         </OToggleGroupItem>
@@ -142,15 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
       <!-- Pagination -->
       <div v-if="pagesNumber > 1" class="field-list-pagination">
-        <q-tooltip
+        <OTooltip
           data-test="logs-page-fields-list-pagination-tooltip"
-          anchor="center left"
-          self="center right"
+          :content="'Total Fields: ' + totalFieldsCount"
           max-width="18.75rem"
-          class="text-body2"
-        >
-          Total Fields: {{ totalFieldsCount }}
-        </q-tooltip>
+          side="left"
+          align="center"
+        />
 
         <!-- First page button -->
         <OButton
@@ -196,17 +180,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="cursor-pointer reset-icon"
           @click="$emit('reset-fields')"
         />
-        <q-tooltip
+        <OTooltip
           data-test="logs-page-fields-list-reset-tooltip"
-          anchor="center left"
-          self="center right"
+          :content="t('search.resetFields')"
           max-width="18.75rem"
-          class="text-body2"
-        >
-          <span class="text-bold" color="white">{{
-            t("search.resetFields")
-          }}</span>
-        </q-tooltip>
+          side="left"
+          align="center"
+        />
       </div>
     </div>
   </div>
@@ -218,6 +198,7 @@ import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const { t } = useI18n();
 

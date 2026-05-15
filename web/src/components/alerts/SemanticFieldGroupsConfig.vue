@@ -28,18 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Category Filter -->
     <div class="row q-col-gutter-md q-mb-md">
       <div class="col-12 col-md-4">
-        <q-select
+        <OSelect
           data-test="semantic-group-category-select"
           v-model="selectedCategory"
           :options="categoryOptions"
           :label="t('correlation.category')"
           :hint="t('correlation.categoryHint')"
-          dense
-          borderless
-          stack-label
           class="showLabelOnTop"
-          emit-value
-          map-options
           style="max-width: 100%"
         >
           <template v-slot:option="scope">
@@ -55,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </template>
-        </q-select>
+        </OSelect>
       </div>
       <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
         <OButton
@@ -120,18 +115,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="text-subtitle1 q-mb-sm">
         {{ t("correlation.deduplicateFields") }} *
-        <q-tooltip>{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip>
+        <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
       <div class="text-caption text-grey-7 q-mb-md">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="fingerprint-checkboxes">
-        <q-checkbox
+        <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
           :key="group.id"
           v-model="localFingerprintFields"
-          :val="group.id"
+          :value="group.id"
           :label="group.display"
           class="fingerprint-checkbox"
           @update:model-value="emitUpdate"
@@ -172,6 +167,9 @@ import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 const store = useStore();
 const { t } = useI18n();

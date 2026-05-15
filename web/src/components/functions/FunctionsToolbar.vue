@@ -20,23 +20,17 @@
       <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
         {{ t('function.addFunction') }}
       </div>
-      <q-form ref="addFunctionForm" class="o2-input tw:flex tw:items-center tw:gap-6">
+      <div class="o2-input tw:flex tw:items-center tw:gap-6">
         <div class="tw:flex tw:items-center">
-          <q-input
+          <OInput
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
             class="q-pa-none tw:w-full"
-            stack-label
-            borderless
-            dense
             v-bind:readonly="disableName"
-            v-bind:disable="disableName"
-            :rules="[
-              (val: any) => !!val || 'Field is required!',
-              isValidMethodName,
-            ]"
-            no-error-icon
+            v-bind:disabled="disableName"
+            :error="showInputError && !!nameError"
+            :error-message="nameError"
             tabindex="0"
             style="min-width: 300px"
             @update:model-value="onUpdate"
@@ -45,55 +39,47 @@
           <q-icon
             :key="functionName"
             v-if="isValidMethodName() !== true && showInputError"
-            :name="outlinedInfo"
+            name="info_outline"
             size="20px"
             class="q-ml-xs cursor-pointer"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
+            <OTooltip
+              side="right"
+              align="center"
               max-width="300px"
-              :offset="[2, 0]"
-              class="tw:text-[12px]"
-            >
-              {{ isValidMethodName() }}
-            </q-tooltip>
+              :side-offset="2"
+              :content="isValidMethodName() !== true ? String(isValidMethodName()) : ''"
+            />
           </q-icon>
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="tw:flex tw:items-center tw:gap-4">
-          <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
-            <q-radio
-              v-model="selectedTransType"
-              val="0"
-              size="xs"
-              class="tw:mb-0"
-            />
-            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
-          </div>
-          <!-- JavaScript option only shown in _meta organization -->
-          <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
-            <q-radio
-              v-model="selectedTransType"
-              val="1"
-              size="xs"
-              class="tw:mb-0"
-            />
-            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
-          </div>
+          <ORadioGroup v-model="selectedTransType" class="tw:flex tw:items-center tw:gap-4">
+            <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
+              <ORadio value="0" />
+              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+            </div>
+            <!-- JavaScript option only shown in _meta organization -->
+            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
+              <ORadio value="1" />
+              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+            </div>
+          </ORadioGroup>
           <!-- Info icon with tooltip -->
           <q-icon
             name="info_outline"
             size="xs"
             class="tw:cursor-pointer"
           >
-            <q-tooltip class="bg-grey-8">
-              <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
-              <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
-            </q-tooltip>
+            <OTooltip>
+              <template #content>
+                <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+              </template>
+            </OTooltip>
           </q-icon>
         </div>
-      </q-form>
+      </div>
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
       <OButton
@@ -160,8 +146,11 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { Maximize, Play } from "lucide-vue-next";
 const { t } = useI18n();
 
@@ -210,6 +199,13 @@ const isValidMethodName = () => {
   );
 };
 
+const nameError = computed(() => {
+  if (!showInputError.value) return '';
+  if (!functionName.value) return 'Field is required!';
+  const check = isValidMethodName();
+  return check === true ? '' : String(check);
+});
+
 const onUpdate = () => {
   showInputError.value = true;
 };
@@ -251,7 +247,14 @@ const getBtnLogo = computed(() => {
         : getImageURL('images/common/ai_icon_gradient.svg')
     })
 
-defineExpose({ addFunctionForm });
+defineExpose({
+  addFunctionForm: {
+    validate: async () => {
+      showInputError.value = true;
+      return !!functionName.value && isValidMethodName() === true;
+    },
+  },
+});
 </script>
 <style scoped lang="scss">
 .functions-toolbar {

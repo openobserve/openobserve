@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
   >
     <HelpCircle :size="14" />
-    <q-tooltip>{{ t("search.syntaxGuideLabel") }}</q-tooltip>
+    <OTooltip :content="t('search.syntaxGuideLabel')" />
     <q-menu
       data-test="syntax-guide-menu"
       class="syntax-guide-menu"
@@ -142,11 +142,12 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { HelpCircle } from "lucide-vue-next";
 
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
-  components: { OButton, HelpCircle },
+  components: { OButton, HelpCircle, OTooltip },
   props: {
     sqlmode: {
       type: Boolean,

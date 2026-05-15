@@ -28,77 +28,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator />
       <div>
-        <q-form ref="addJSTransformForm" @submit="onSubmit">
           <div class="row">
-            <q-input
+            <OInput
               v-model="formData.name"
               :label="t('function.name')"
-              color="input-border"
-              bg-color="input-bg"
-              class="col-12 q-py-md showLabelOnTop text-grey-8 text-bold"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="isUpdating"
-              v-bind:disable="isUpdating"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              tabindex="0"
+              class="col-12 q-py-md"
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              :error="!!nameError"
+              :error-message="nameError"
+              @update:model-value="nameError = ''"
             />
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="col-12 q-py-md">
               <div class="text-grey-8 text-bold tw:mb-2">{{ t('function.dataSource') }}</div>
-              <q-option-group
+              <OOptionGroup
                 v-model="formData.source"
                 :options="sourceOptions"
-                color="primary"
-                inline
+                orientation="horizontal"
               />
             </div>
 
             <!-- Upload File Option -->
-            <q-file
+            <OFile
               v-if="!isUpdating && formData.source === 'file'"
-              filled
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
-              class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
-              stack-label
-              outlined
+              class="col-12 q-py-md"
               accept=".csv"
-              dense
-              :rules="[(val: any) => !!val || 'CSV File is required!']"
-              hide-bottom-space
-            >
-              <template v-slot:prepend>
-                <q-icon name="attachment" />
-              </template>
-            </q-file>
+              :error="!!fileError"
+              :error-message="fileError"
+              @update:model-value="fileError = ''"
+            />
 
             <!-- File Upload for Update Mode (only for file-based tables) -->
-            <q-file
+            <OFile
               v-if="isUpdating && formData.source === 'file'"
-              filled
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
-              class="col-12 q-py-md showLabelOnTop lookup-table-file-uploader"
-              stack-label
-              outlined
+              class="col-12 q-py-md"
               accept=".csv"
-              dense
-              :rules="[(val: any) => !!val || 'CSV File is required!']"
-              hide-bottom-space
-            >
-              <template v-slot:prepend>
-                <q-icon name="attachment" />
-              </template>
-            </q-file>
+              :error="!!fileError"
+              :error-message="fileError"
+              @update:model-value="fileError = ''"
+            />
 
             <!-- Append Toggle for File Upload (only when updating file-based tables) -->
             <div v-if="isUpdating && formData.source === 'file'" class="col-12">
-              <q-toggle
-                class="q-py-md text-grey-8 text-bold lookup-table-append-toggle"
+              <OSwitch
+                class="q-py-md lookup-table-append-toggle"
                 v-model="formData.append"
                 :label="t('function.appendData')"
               />
@@ -107,11 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url'" class="col-12 q-py-md">
               <div class="text-grey-8 text-bold tw:mb-2">Update Mode</div>
-              <q-option-group
+              <OOptionGroup
                 v-model="formData.updateMode"
                 :options="updateModeOptions"
-                color="primary"
-                inline
+                orientation="horizontal"
               />
             </div>
 
@@ -169,28 +147,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')" class="col-12">
-              <q-input
+              <OInput
                 v-model="formData.url"
                 :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-md showLabelOnTop text-grey-8 text-bold"
-                stack-label
-                outlined
-                filled
-                dense
+                class="q-py-md"
                 placeholder="https://example.com/data.csv"
-                :rules="[
-                  (val: any) => {
-                    if (formData.updateMode === 'reload') return true;
-                    return !!val || 'URL is required!';
-                  },
-                  (val: any) => {
-                    if (formData.updateMode === 'reload' || !val) return true;
-                    return (val.startsWith('http://') || val.startsWith('https://')) || 'URL must start with http:// or https://';
-                  }
-                ]"
-                tabindex="0"
+                :error="!!urlError"
+                :error-message="urlError"
+                @update:model-value="urlError = ''"
               >
                 <template v-slot:hint>
                   <div class="tw:text-xs">
@@ -202,34 +166,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </template>
-              </q-input>
+              </OInput>
             </div>
 
             <!-- From URL Option (only for new tables) -->
             <div v-if="!isUpdating && formData.source === 'url'" class="col-12">
-              <q-input
+              <OInput
                 v-model="formData.url"
-                :label="'CSV File URL'"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-md showLabelOnTop text-grey-8 text-bold"
-                stack-label
-                outlined
-                filled
-                dense
+                label="CSV File URL"
+                class="q-py-md"
                 placeholder="https://example.com/data.csv"
-                :rules="[
-                  (val: any) => !!val || 'URL is required!',
-                  (val: any) => (val && (val.startsWith('http://') || val.startsWith('https://'))) || 'URL must start with http:// or https://'
-                ]"
-                tabindex="0"
+                :error="!!urlError"
+                :error-message="urlError"
+                @update:model-value="urlError = ''"
               >
                 <template v-slot:hint>
                   <div class="tw:text-xs">
                     Must be a publicly accessible CSV file
                   </div>
                 </template>
-              </q-input>
+              </OInput>
             </div>
           </div>
 
@@ -248,12 +204,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm-action"
-              type="submit"
+              @click="onSubmit"
             >
               {{ t('function.save') }}
             </OButton>
           </div>
-        </q-form>
+        </div>
       </div>
     </div>
   </div>
@@ -268,6 +224,10 @@ import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 const defaultValue: any = () => {
   return {
@@ -282,7 +242,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "AddEnrichmentTable",
-  components: { OButton },
+  components: { OButton, OInput, OFile, OOptionGroup, OSwitch },
   props: {
     modelValue: {
       type: Object,
@@ -298,6 +258,9 @@ export default defineComponent({
     const store: any = useStore();
     const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
+    const nameError = ref("");
+    const fileError = ref("");
+    const urlError = ref("");
     const formData: any = ref(defaultValue());
     const indexOptions = ref([]);
     const { t } = useI18n();
@@ -342,6 +305,30 @@ export default defineComponent({
     };
 
     const onSubmit = () => {
+      // Validate required fields
+      nameError.value = "";
+      fileError.value = "";
+      urlError.value = "";
+      if (!formData.value.name?.toString().trim()) {
+        nameError.value = "Field is required!";
+        return;
+      }
+      if (formData.value.source === 'file' && !formData.value.file) {
+        fileError.value = "CSV File is required!";
+        return;
+      }
+      if (formData.value.source === 'url' && formData.value.updateMode !== 'reload') {
+        const url = formData.value.url;
+        if (!url) {
+          urlError.value = "URL is required!";
+          return;
+        }
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          urlError.value = "URL must start with http:// or https://";
+          return;
+        }
+      }
+
       const dismiss = q.notify({
         spinner: true,
         message: "Please wait...",
@@ -499,6 +486,9 @@ export default defineComponent({
       onSubmit,
       sourceOptions,
       updateModeOptions,
+      nameError,
+      fileError,
+      urlError,
     };
   },
   created() {

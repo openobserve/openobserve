@@ -38,32 +38,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Enable Deduplication -->
       <div class="tw:mb-6">
-        <q-checkbox
+        <OCheckbox
           data-test="organization-deduplication-enable-checkbox"
           v-model="localConfig.enabled"
           :label="t('alerts.correlation.enableOrgLevel')"
-          dense
           @update:model-value="emitUpdate"
         >
-          <q-tooltip>
-            {{ t('alerts.correlation.enableOrgLevelTooltip') }}
-          </q-tooltip>
-        </q-checkbox>
+          <OTooltip :content="t('alerts.correlation.enableOrgLevelTooltip')" />
+        </OCheckbox>
       </div>
 
       <!-- Cross-Alert Deduplication -->
       <div class="tw:mb-6" v-if="localConfig.enabled">
-        <q-checkbox
+        <OCheckbox
           data-test="organizationdeduplication-enable-cross-alert-checkbox"
           v-model="localConfig.alert_dedup_enabled"
           :label="t('alerts.correlation.enableCrossAlert')"
-          dense
           @update:model-value="emitUpdate"
         >
-          <q-tooltip>
-            {{ t('alerts.correlation.enableCrossAlertTooltip') }}
-          </q-tooltip>
-        </q-checkbox>
+          <OTooltip :content="t('alerts.correlation.enableCrossAlertTooltip')" />
+        </OCheckbox>
       </div>
 
       <!-- Cross-Alert Fingerprint Groups -->
@@ -76,28 +70,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              style="font-size: 12px"
-            >
-              {{ t('alerts.correlation.fingerprintGroupsTooltip') }}
-            </q-tooltip>
+            <OTooltip
+              side="right"
+              align="center"
+              :content="t('alerts.correlation.fingerprintGroupsTooltip')"
+            />
           </q-icon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
         </div>
         <div class="tw:flex tw:flex-col tw:gap-2">
-          <q-checkbox
+          <OCheckbox
             v-for="group in localSemanticGroups"
             :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
             :key="group.id"
             :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
             @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
             :label="`${group.display} (${group.id})`"
-            dense
           />
           <div
             v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
@@ -118,25 +108,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              style="font-size: 12px"
-            >
-              {{ t('alerts.correlation.defaultWindowTooltip') }}
-            </q-tooltip>
+            <OTooltip
+              side="right"
+              align="center"
+              :content="t('alerts.correlation.defaultWindowTooltip')"
+            />
           </q-icon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
-        <q-input
+        <OInput
           data-test="organizationdeduplication-default-window-input"
           v-model.number="localConfig.time_window_minutes"
           type="number"
-          dense
-          borderless
           min="1"
           :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
           :class="
@@ -171,6 +156,9 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 const store = useStore();
 const $q = useQuasar();

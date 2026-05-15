@@ -49,18 +49,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-service-accounts-selection-search-input"
           class="q-mr-md"
         >
-          <q-input
+          <OInput
             data-test="service-accounts-list-search-input"
             v-model="userSearchKey"
-            borderless
-            dense
             class=" no-border o2-search-input tw:h-[36px] tw:w-[200px]"
             placeholder="Search Service Accounts"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
             </template>
-          </q-input>
+          </OInput>
         </div>
       </div>
       <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto card-container">
@@ -82,9 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('iam.serviceAccounts')"
           >
             <template v-slot:select="slotProps: any">
-              <q-checkbox
+              <OCheckbox
                 :data-test="`iam-service-accounts-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
-                size="xs"
                 v-model="slotProps.column.row.isInGroup"
                 class="filter-check-box cursor-pointer"
                 @click="toggleUserSelection(slotProps.column.row)"
@@ -107,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import AppTable from "@/components/AppTable.vue";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+  import OInput from "@/lib/forms/Input/OInput.vue";
+  import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
   import { computed, watch } from "vue";

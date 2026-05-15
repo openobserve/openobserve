@@ -37,21 +37,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Search Input -->
         <div style="width: 100%;" class="flex folder-item q-py-xs">
-          <q-input
+          <OInput
             v-model="searchQuery"
-            dense
-            borderless
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
-            style="width: 100%;"
             clearable
             class="tw:mx-2 q-px-xs"
-            :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              <q-icon class="o2-search-input-icon" name="search" />
             </template>
-          </q-input>
+          </OInput>
         </div>
       </div>
       <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
@@ -137,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
   <script lang="ts">
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -204,6 +201,7 @@ export default defineComponent({
       OTabs,
       OTab,
       OButton,
+      OInput,
     },
     props: {
       type: {

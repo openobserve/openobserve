@@ -40,12 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-name-badge"
             >
               {{ alertDetails.name }}
-              <q-tooltip
+              <OTooltip
                 v-if="alertDetails.name && alertDetails.name.length > 35"
-                class="tw:text-xs"
-              >
-                {{ alertDetails.name }}
-              </q-tooltip>
+                :content="alertDetails.name"
+              />
             </span>
             <!-- Alert Type Badge -->
             <div
@@ -262,22 +260,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:cursor-default"
                           data-test="alert-history-status-chip"
                         >
-                          <q-tooltip
+                          <OTooltip
                             v-if="props.row.error"
-                            max-width="300px"
-                            class="tw:text-xs tw:break-words"
-                          >
-                            {{ props.row.error }}
-                          </q-tooltip>
+                            :max-width="'300px'"
+                            :content="props.row.error"
+                          />
                         </q-chip>
                       </template>
                       <template v-else-if="col.name === 'timestamp'">
                         <span class="tw:text-[13px]">{{
                           formatTimestamp(props.row.timestamp)
                         }}</span>
-                        <q-tooltip class="tw:text-xs">
-                          {{ formatTimestampFull(props.row.timestamp) }}
-                        </q-tooltip>
+                        <OTooltip :content="formatTimestampFull(props.row.timestamp)" />
                       </template>
                       <template v-else-if="col.name === 'evaluation_time'">
                         <span class="tw:text-[13px] tw:tabular-nums">
@@ -386,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="anomaly-details-copy-sql-btn"
                   >
                     <q-icon name="content_copy" />
-                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
                 <pre
@@ -454,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-details-copy-conditions-btn"
                   >
                     <q-icon name="content_copy" />
-                    <q-tooltip>{{ t("alerts.alertDetails.copy") }}</q-tooltip>
+                    <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
                 <!-- Code content — scrolls internally -->
@@ -525,6 +519,7 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 // Composables
 const { t } = useI18n();

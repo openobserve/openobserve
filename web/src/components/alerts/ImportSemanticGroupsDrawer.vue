@@ -113,10 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleAddition(group.id)"
               >
                 <q-item-section side>
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
-                    color="positive"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -156,12 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleModification(mod.proposed.id)"
               >
                 <q-item-section side>
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="
                       selectedModifications.includes(mod.proposed.id)
                     "
                     @update:model-value="toggleModification(mod.proposed.id)"
-                    color="warning"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -338,6 +336,7 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface SemanticGroup {
   id: string;

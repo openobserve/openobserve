@@ -36,9 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ]"
       >
         {{ pipelineName }}
-        <q-tooltip v-if="pipelineName && pipelineName.length > 25" class="tw:text-xs">
-          {{ pipelineName }}
-        </q-tooltip>
+        <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
       </span>
     </template>
 
@@ -100,23 +98,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="tw:col-span-7">
-                  <q-input
-                    v-model.number="formData.chunkPeriodMinutes"
+                  <OInput
+                    v-model="formData.chunkPeriodMinutes"
                     type="number"
-                    borderless
-                    dense
                     :placeholder="String(scheduleFrequency || 60)"
-                    :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
+                    :error="!!chunkPeriodError"
+                    :error-message="chunkPeriodError"
+                    @update:model-value="chunkPeriodError = ''"
                     data-test="chunk-period-input"
                   >
-                    <template v-slot:append>
-                      <q-icon name="info_outline" size="18px" color="grey-6">
-                        <q-tooltip class="tw:text-xs">
-                          Default: {{ scheduleFrequency || 60 }} minutes
-                        </q-tooltip>
+                    <template #append>
+                      <q-icon name="info_outline" size="18px">
+                        <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
                       </q-icon>
                     </template>
-                  </q-input>
+                  </OInput>
                 </div>
               </div>
 
@@ -131,29 +127,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="tw:col-span-7">
-                  <q-input
-                    v-model.number="formData.delayBetweenChunks"
+                  <OInput
+                    v-model="formData.delayBetweenChunks"
                     type="number"
-                    borderless
-                    dense
                     placeholder="5"
-                    :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
+                    :error="!!delayBetweenError"
+                    :error-message="delayBetweenError"
+                    @update:model-value="delayBetweenError = ''"
                     data-test="delay-between-chunks-input"
                   >
-                    <template v-slot:append>
-                      <q-icon name="info_outline" size="18px" color="grey-6">
-                        <q-tooltip class="tw:text-xs">
-                          Default: 5 seconds
-                        </q-tooltip>
+                    <template #append>
+                      <q-icon name="info_outline" size="18px">
+                        <OTooltip content="Default: 5 seconds" />
                       </q-icon>
                     </template>
-                  </q-input>
+                  </OInput>
                 </div>
               </div>
 
               <!-- Delete Before Backfill -->
               <div class="tw:pt-2">
-                <q-checkbox
+                <OCheckbox
                   v-model="formData.deleteBeforeBackfill"
                   label="Delete existing data before backfill"
                   data-test="delete-before-backfill-checkbox"
@@ -244,6 +238,9 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { X, ChevronsUpDown } from "lucide-vue-next";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
@@ -275,6 +272,8 @@ const showAdvanced = ref(false);
 const showDeleteConfirmation = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
+const chunkPeriodError = ref("");
+const delayBetweenError = ref("");
 const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 
 const formData = ref({
@@ -337,6 +336,8 @@ const resetForm = () => {
   };
   showAdvanced.value = false;
   errorMessage.value = "";
+  chunkPeriodError.value = "";
+  delayBetweenError.value = "";
 
   // Reset the DateTime component to default
   if (dateTimeRef.value) {
@@ -350,6 +351,20 @@ const onCancel = () => {
 };
 
 const onSubmit = async () => {
+  // Validate optional numeric range fields
+  let hasError = false;
+  if (formData.value.chunkPeriodMinutes !== null && formData.value.chunkPeriodMinutes !== undefined &&
+    (formData.value.chunkPeriodMinutes < 1 || formData.value.chunkPeriodMinutes > 1440)) {
+    chunkPeriodError.value = "Must be between 1 and 1440";
+    hasError = true;
+  }
+  if (formData.value.delayBetweenChunks !== null && formData.value.delayBetweenChunks !== undefined &&
+    (formData.value.delayBetweenChunks < 1 || formData.value.delayBetweenChunks > 3600)) {
+    delayBetweenError.value = "Must be between 1 and 3600";
+    hasError = true;
+  }
+  if (hasError) return;
+
   // Validate time range
   if (formData.value.startTimeMicros <= 0 || formData.value.endTimeMicros <= 0) {
     $q.notify({

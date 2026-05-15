@@ -28,25 +28,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-stream-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
       >
-        <q-select
+        <OSelect
           v-model="activeStream"
-          :options="
-            availableStreams.length > 0
-              ? availableStreams.map((s) => ({ label: s, value: s }))
-              : []
-          "
-          dense
-          borderless
-          emit-value
-          map-options
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          labelKey="label"
+          valueKey="value"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          :disabled="availableStreams.length === 0"
           @update:model-value="onStreamChange"
-          :disable="availableStreams.length === 0"
-        >
-          <q-tooltip v-if="availableStreams.length === 0">
-            No LLM streams available.
-          </q-tooltip>
-        </q-select>
+        />
+        <OTooltip v-if="availableStreams.length === 0" content="No LLM streams available." />
       </div>
     </div>
 
@@ -208,6 +199,8 @@ import KpiSparkline from "./KpiSparkline.vue";
 import LLMTrendPanel from "./LLMTrendPanel.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
 

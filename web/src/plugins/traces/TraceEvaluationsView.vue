@@ -38,22 +38,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
       <div class="tw:flex tw:justify-end tw:items-center">
         <div class="tw:flex tw:items-center tw:gap-2">
           <span class="tw:text-xs tw:font-medium tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.templateLabel") }}</span>
-          <q-select
+          <OSelect
             v-model="selectedTemplate"
             :options="availableTemplates"
-            option-value="id"
-            option-label="name"
-            emit-value
-            map-options
-            dense
-            outlined
+            valueKey="id"
+            labelKey="name"
             class="eval-template-dropdown"
             @update:model-value="onTemplateChange"
           >
             <template v-slot:prepend>
               <q-icon name="assignment" size="14px" color="primary" />
             </template>
-          </q-select>
+          </OSelect>
         </div>
       </div>
 
@@ -340,9 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 <div v-if="selectedTemplateData?.dimensions?.length" class="tw:flex tw:items-center tw:gap-1">
                   <span class="tw:text-[10px] tw:text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.passThreshold") }}</span>
                   <q-icon name="info_outline" size="12px" color="grey-6">
-                    <q-tooltip class="tw:text-xs" max-width="220px">
-                      {{ $t("traces.evaluations.passThresholdTooltip") }}
-                    </q-tooltip>
+                    <OTooltip :content="$t('traces.evaluations.passThresholdTooltip')" max-width="220px" />
                   </q-icon>
                 </div>
               </div>
@@ -404,9 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       }"
                     ></div>
                   </div>
-                  <q-tooltip v-if="dim.reasoning" class="tw:text-xs" max-width="250px">
-                    {{ dim.reasoning }}
-                  </q-tooltip>
+                  <OTooltip v-if="dim.reasoning" :content="dim.reasoning" max-width="250px" />
                 </div>
               </div>
             </div>
@@ -460,12 +452,16 @@ import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "TraceEvaluationsView",
   components: {
     LLMContentRenderer,
     OSpinner,
+    OSelect,
+    OTooltip,
   },
   props: {
     evalData: {

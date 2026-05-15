@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="inspector-close-button"
             >
               <X :size="16" />
-              <q-tooltip>Close</q-tooltip>
+              <OTooltip content="Close" />
             </OButton>
           </div>
         </div>
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="hasNoData ? (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500') : (store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600')"
                 >
                   {{ hasNoData ? 'NA' : traceId }}
-                  <q-tooltip v-if="!hasNoData" class="tw:text-xs">{{ traceId }}</q-tooltip>
+                  <OTooltip v-if="!hasNoData" :content="traceId" />
                 </div>
               </div>
             </div>
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <Copy v-if="!copiedSql" :size="16" />
               <Check v-else :size="16" />
-          <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
+          <OTooltip :content="copiedSql ? 'Copied!' : 'Copy SQL'" />
         </OButton>
       </template>
       <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
@@ -410,6 +410,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { X, Copy, Check } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface ProfileEvent {
   timestamp: string;
@@ -455,6 +456,7 @@ export default defineComponent({
     Copy,
     Check,
     OSpinner,
+    OTooltip,
   },
   setup() {
     const router = useRouter();

@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="percentile-refresh-button"
         >
           <RefreshCw class="tw:size-3.5 tw:shrink-0" />
-          <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
+          <OTooltip :content="t('latencyInsights.refreshTooltip')" />
         </OButton>
       </div>
     </template>
@@ -135,10 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <!-- Search Input -->
-                  <q-input
+                  <OInput
                     v-model="dimensionSearchText"
-                    dense
-                    borderless
                     :placeholder="t('search.searchDimension')"
                     clearable
                     class="tw:w-full"
@@ -150,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-[1.2rem]! tw:text-[var(--o2-text-3)]"
                       />
                     </template>
-                  </q-input>
+                  </OInput>
                 </div>
 
                 <!-- Dimension List -->
@@ -165,14 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="dimension-list-item tw:border-none!"
                     >
                       <q-item-section side>
-                        <q-checkbox
+                        <OCheckbox
                           :model-value="
                             selectedDimensions.includes(dimension.value)
                           "
                           @update:model-value="toggleDimension(dimension.value)"
-                          color="primary"
                           size="xs"
-                          dense
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
                       </q-item-section>
@@ -181,15 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
                         >
                           {{ dimension.label }}
-                          <q-tooltip
-                            anchor="top middle"
-                            self="bottom middle"
-                            :offset="[0, 8]"
+                          <OTooltip
+                            side="top"
+                            align="center"
+                            :side-offset="8"
                             :delay="500"
                             max-width="300px"
-                          >
-                            {{ dimension.label }}
-                          </q-tooltip>
+                            :content="dimension.label"
+                          />
                         </q-item-label>
                       </q-item-section>
                     </q-item>
@@ -331,6 +326,9 @@ import {
   selectTraceDimensions,
 } from "@/composables/useDimensionSelector";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),

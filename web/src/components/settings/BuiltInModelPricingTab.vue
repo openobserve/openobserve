@@ -21,12 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
         <div class="tw:flex tw:gap-3">
-          <q-input
+          <OInput
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
-            borderless
-            dense
-            flat
             clearable
             class="no-border tw:w-[220px]"
             data-test="built-in-model-pricing-search"
@@ -34,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-slot:prepend>
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <!-- Refresh -->
@@ -84,10 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Checkbox -->
         <template #body-cell-select="props">
           <q-td :props="props">
-            <q-checkbox
+            <OCheckbox
               v-model="props.row.selected"
-              dense
-              size="xs"
               :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
             />
           </q-td>
@@ -198,6 +193,8 @@ import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface ModelTier {
   name: string;
@@ -217,7 +214,7 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton, OSpinner },
+  components: { OButton, OSpinner, OInput, OCheckbox },
   emits: ["import-models"],
   setup(props, { emit }) {
     const { t } = useI18n();

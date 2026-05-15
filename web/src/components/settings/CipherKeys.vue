@@ -27,17 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("cipherKey.header") }}
             </div>
             <div class="col-auto flex">
-              <q-input
+              <OInput
                 v-model="filterQuery"
-                borderless
-                dense
                 class="q-ml-auto no-border o2-search-input"
                 :placeholder="t('cipherKey.search')"
               >
                 <template #prepend>
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
-              </q-input>
+              </OInput>
               <OButton
                 variant="primary"
                 size="sm-action"
@@ -63,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #no-data><NoData /></template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
@@ -118,9 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                   class="o2-table-checkbox"
                 />
@@ -180,6 +177,8 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { Pencil, Trash2 } from 'lucide-vue-next';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -191,6 +190,8 @@ export default defineComponent({
     OButton,
     Pencil,
     Trash2,
+    OInput,
+    OCheckbox,
   },
   setup() {
     const store = useStore();

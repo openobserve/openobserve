@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="copyStackTrace(props.row['exception.stacktrace'])"
                   >
                     <q-icon name="content_copy" />
-                    <q-tooltip>{{ t("traces.copyStacktrace") }}</q-tooltip>
+                    <OTooltip :content="t('traces.copyStacktrace')" />
                   </OButton>
                 </div>
                 <div
@@ -282,6 +282,7 @@ import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
   span: object;

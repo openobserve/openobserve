@@ -648,17 +648,10 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
             <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
-              <q-toggle
-                class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:py-0!"
-                size="xs"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-toggle-button-xs-dark'
-                    : 'o2-toggle-button-xs-light'
-                "
+              <OSwitch
                 v-model="eventsWrap"
                 label="Wrap"
+                size="sm"
               />
             </div>
             <!-- TenstackTable for events -->
@@ -955,6 +948,7 @@ import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1013,6 +1007,7 @@ export default defineComponent({
     DbSpanDetails,
     TraceErrorTab,
     OSpinner,
+    OSwitch,
   },
   emits: [
     "close",

@@ -170,22 +170,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #top-right>
       <div class="field-list-search-container">
-        <q-input
+        <OInput
           data-test="log-search-index-list-field-search-input"
           :model-value="filterField"
           @update:model-value="$emit('update:filter-field', $event)"
           data-cy="index-field-search-input"
-          borderless
-          dense
           clearable
-          debounce="1"
+          :debounce="1"
           :placeholder="t('search.searchField')"
           class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
             <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
           </template>
-        </q-input>
+        </OInput>
         <q-tr v-if="loadingStream == true">
           <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
@@ -228,6 +226,7 @@ import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
 import FieldListPagination from "./FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { t } = useI18n();

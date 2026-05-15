@@ -159,14 +159,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="group.userId || 'User'"
           >
             <q-icon name="person" size="16px" />
-            <q-tooltip
+            <OTooltip
               v-if="group.userId"
-              anchor="bottom middle"
-              self="top middle"
-              :offset="[0, 6]"
-            >
-              {{ group.userId }}
-            </q-tooltip>
+              :content="group.userId"
+              side="bottom"
+              align="center"
+              :side-offset="6"
+            />
           </div>
           <div class="thread-user-row__text">{{ group.userQuery }}</div>
         </div>
@@ -324,6 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   spans: any[];

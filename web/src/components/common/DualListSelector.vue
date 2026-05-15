@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Priority Order (Left) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ leftTitle }}</div>
-      <q-input v-model="searchLeft" dense outlined placeholder="Search..." class="tw:mb-3">
+      <OInput v-model="searchLeft" placeholder="Search..." class="tw:mb-3">
         <template #prepend><q-icon name="search" /></template>
-      </q-input>
+      </OInput>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
         <q-list dense>
           <q-item
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addSelected"
       >
         <q-icon name="arrow_back" size="16px" />
-        <q-tooltip>Add selected</q-tooltip>
+        <OTooltip content="Add selected" />
       </OButton>
       <OButton
         variant="outline"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addAll"
       >
         <q-icon name="keyboard_double_arrow_left" size="16px" />
-        <q-tooltip>Add all</q-tooltip>
+        <OTooltip content="Add all" />
       </OButton>
       <OButton
         variant="outline"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="removeSelected"
       >
         <q-icon name="arrow_forward" size="16px" />
-        <q-tooltip>Remove selected</q-tooltip>
+        <OTooltip content="Remove selected" />
       </OButton>
       <OButton
         variant="outline"
@@ -108,16 +108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="removeAll"
       >
         <q-icon name="keyboard_double_arrow_right" size="16px" />
-        <q-tooltip>Remove all</q-tooltip>
+        <OTooltip content="Remove all" />
       </OButton>
     </div>
 
     <!-- Available Items (Right) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ rightTitle }}</div>
-      <q-input v-model="searchRight" dense outlined placeholder="Search..." class="tw:mb-3">
+      <OInput v-model="searchRight" placeholder="Search..." class="tw:mb-3">
         <template #prepend><q-icon name="search" /></template>
-      </q-input>
+      </OInput>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
         <q-list dense>
           <q-item
@@ -128,10 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :active="rightSelected.includes(item.value)"
           >
             <q-item-section>
-              <q-checkbox
+              <OCheckbox
                 :model-value="rightSelected.includes(item.value)"
                 @click.stop="toggleRightSelection(item.value)"
-                dense
               />
             </q-item-section>
             <q-item-section>{{ item.label }}</q-item-section>
@@ -150,6 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 interface Item {
   label: string;

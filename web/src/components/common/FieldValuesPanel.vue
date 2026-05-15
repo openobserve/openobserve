@@ -19,10 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Value search input — only when fetched count hits the limit -->
     <div v-if="showValueSearch" class="value-search-container q-mb-xs">
       <div class="value-search-input-wrap">
-        <q-input
+        <OInput
           v-model="valueSearchTerm"
-          dense
-          borderless
           clearable
           :placeholder="`Search ${fieldName} values…`"
           @clear="valueSearchTerm = ''"
@@ -30,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #prepend>
             <q-icon name="search" size="0.875rem" />
           </template>
-        </q-input>
+        </OInput>
       </div>
     </div>
 
@@ -129,13 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Checkbox for multi-select — uses :model-value + @update to
                  separate user-initiated changes from parent-sync updates,
                  preventing re-emit loops when the parent reflects query state. -->
-            <q-checkbox
+            <OCheckbox
               v-if="showMultiSelect"
               :model-value="selectedValues"
-              :val="value.key"
-              :color="checkboxColor(value.key)"
-              size="xs"
-              dense
+              :value="value.key"
               class="q-mr-xs"
               @update:model-value="handleUserCheckboxChange"
               @click.stop
@@ -198,6 +193,8 @@ import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface FieldValues {
   isLoading: boolean;

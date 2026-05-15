@@ -34,13 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #url-input-section="{ url, updateUrl }">
       <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
         <div style="width: calc(69%)" class="q-pr-sm">
-          <q-input
+          <OInput
             data-test="alert-import-url-input"
             :model-value="url"
             @update:model-value="updateUrl"
             :placeholder="t('dashboard.addURL')"
-            borderless
-            style="padding: 10px 0px;"
           />
         </div>
 
@@ -61,28 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #file-input-section="{ jsonFiles, updateFiles }">
       <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
         <div style="width: calc(69%)" class="q-pr-sm">
-          <q-file
+          <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
             @update:model-value="updateFiles"
-            filled
-            bottom-slots
             :label="t('dashboard.dropFileMsg')"
             accept=".json"
             multiple
-          >
-            <template v-slot:prepend>
-              <q-icon name="cloud_upload" @click.stop.prevent />
-            </template>
-            <template v-slot:append>
-              <q-icon
-                name="close"
-                @click.stop.prevent="updateFiles(null)"
-                class="cursor-pointer"
-              />
-            </template>
-            <template v-slot:hint> .json files only </template>
-          </q-file>
+            drop-zone
+            help-text=".json files only"
+          />
         </div>
         <div style="width: calc(30%); position: relative; bottom: 21px;">
           <SelectFolderDropDown
@@ -131,18 +117,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ errorMessage.message }}
 
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="alert-import-name-input"
                       :model-value="userSelectedAlertName[index] || ''"
                       :label="t('alerts.name') + ' *'"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
-                      tabindex="0"
+                      :error="!userSelectedAlertName[index]?.toString().trim()"
+                      error-message="Field is required!"
                       @update:model-value="(val) => {
                         userSelectedAlertName[index] = val;
                         updateAlertName(val, index);
@@ -160,29 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-select
+                    <OSelect
                       data-test="alert-import-stream-name-input"
                       :model-value="userSelectedStreamName[index] || ''"
                       :options="streamList"
                       :label="t('alerts.stream_name') + ' *'"
-                      :popup-content-style="{
-                        textTransform: 'lowercase',
-                      }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
+                      searchable
+                      :error="!userSelectedStreamName[index]"
+                      error-message="Field is required!"
                       @update:model-value="(val) => {
                         userSelectedStreamName[index] = val;
                         updateStreamFields(val, index);
                       }"
-                      behavior="menu"
                     />
                   </div>
                 </span>
@@ -195,62 +164,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div>
-                    <q-select
+                    <OSelect
                       data-test="alert-import-destination-name-input"
                       :model-value="userSelectedDestinations[index] || []"
                       :options="filteredDestinations"
-                      @filter="filterDestinations"
                       label="Destinations *"
-                      :popup-content-style="{
-                        textTransform: 'lowercase',
-                      }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      stack-label
-                      dense
-                      use-input
                       multiple
-                      :input-debounce="400"
-                      behavior="menu"
-                      :rules="[
-                        (val: any) => !!val || 'Field is required!',
-                      ]"
+                      searchable
+                      @search="filterDestinations"
                       style="width: 300px"
+                      :error="!userSelectedDestinations[index]?.length"
+                      error-message="Field is required!"
                       @update:model-value="(val) => {
                         userSelectedDestinations[index] = val;
                         updateUserSelectedDestinations(val, index);
                       }"
-                    >
-                      <template v-slot:option="scope">
-                        <q-item
-                          v-bind="scope.itemProps"
-                          :data-test="`add-alert-destination-${scope.opt}-select-item`"
-                        >
-                          <q-item-section side>
-                            <q-checkbox
-                              data-test="alert-import-destination-checkbox"
-                              :model-value="
-                                userSelectedDestinations[index]?.includes(
-                                  scope.opt,
-                                ) ?? false
-                              "
-                              dense
-                              @update:model-value="
-                                toggleDestination(scope.opt, index)
-                              "
-                            />
-                          </q-item-section>
-                          <q-item-section>
-                            <q-item-label
-                              data-test="alert-import-destination-label"
-                              >{{ scope.opt }}</q-item-label
-                            >
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
+                    />
                   </div>
                 </span>
                 <span
@@ -262,29 +191,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div>
-                    <q-select
+                    <OSelect
                       data-test="alert-import-stream-type-input"
                       :model-value="userSelectedStreamType[index] || ''"
                       :options="streamTypes"
                       :label="t('alerts.streamType') + ' *'"
-                      :popup-content-style="{
-                        textTransform: 'lowercase',
-                      }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      stack-label
-                      outlined
-                      filled
-                      dense
+                      style="width: 300px"
+                      :error="!userSelectedStreamType[index]"
+                      error-message="Field is required!"
                       @update:model-value="(val) => {
                         userSelectedStreamType[index] = val;
                         updateStreams(val, index);
                       }"
-                      :rules="[
-                        (val: any) => !!val || 'Field is required!',
-                      ]"
-                      style="width: 300px"
                     />
                   </div>
                 </span>
@@ -297,32 +215,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div>
-                    <q-select
+                    <OSelect
                       data-test="alert-import-timezone-input"
                       :model-value="userSelectedTimezone[index] || ''"
                       :options="filteredTimezone"
-                      :label="'Timezone *'"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      stack-label
-                      outlined
-                      filled
-                      dense
+                      label="Timezone *"
+                      searchable
+                      @search="timezoneFilterFn"
+                      style="width: 300px"
+                      :error="!userSelectedTimezone[index]"
+                      error-message="Field is required!"
                       @update:model-value="(val) => {
                         userSelectedTimezone[index] = val;
                         updateTimezone(val, index);
                       }"
-                      @filter="timezoneFilterFn"
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      behavior="menu"
-                      :rules="[
-                        (val: any) => !!val || 'Field is required!',
-                      ]"
-                      style="width: 300px"
                     />
                   </div>
                 </span>
@@ -335,31 +241,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-select
+                    <OSelect
                       data-test="alert-import-org-id-input"
                       :model-value="userSelectedOrgId[index] || null"
                       :options="organizationDataList"
-                      :label="'Organization Id'"
-                      :popup-content-style="{
-                        textTransform: 'lowercase',
-                      }"
-                      color="input-border"
-                      bg-color="input-bg"
-                      class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
+                      label="Organization Id"
+                      labelKey="label"
+                      valueKey="value"
                       @update:model-value="(val) => {
                         userSelectedOrgId[index] = val;
                         updateOrgId(val?.value || val, index);
                       }"
-                      behavior="menu"
-                    >
-                    </q-select>
+                    />
                   </div>
                 </span>
 
@@ -405,6 +298,7 @@ import {
   ref,
   onMounted,
   computed,
+  watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -415,6 +309,9 @@ import anomalyDetectionService from "../../services/anomaly_detection";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -427,6 +324,9 @@ export default defineComponent({
   components: {
     BaseImport,
     SelectFolderDropDown,
+    OInput,
+    OSelect,
+    OFile,
   },
   props: {
     destinations: {
@@ -506,7 +406,7 @@ export default defineComponent({
         return {
           label: org.identifier,
           value: org.identifier,
-          disable:
+          disabled:
             !org.identifier ||
             org.identifier !== store.state.selectedOrganization.identifier,
         };
@@ -518,6 +418,17 @@ export default defineComponent({
         return destination.name;
       });
     });
+
+    // Keep filteredDestinations in sync with the destinations prop so the
+    // dropdown is pre-populated on first open (OSelect @search only fires
+    // on user input, not on initial open like Quasar's @filter).
+    watch(
+      () => props.destinations,
+      () => {
+        filteredDestinations.value = getFormattedDestinations.value;
+      },
+      { immediate: true, deep: true },
+    );
 
     const userSelectedTimezone = ref<string[]>([]);
 
@@ -1191,20 +1102,15 @@ export default defineComponent({
       }
     };
 
-    const filterDestinations = (val: string, update: Function) => {
+    const filterDestinations = (val: string) => {
       if (val === "") {
-        update(() => {
-          filteredDestinations.value = getFormattedDestinations.value;
-        });
+        filteredDestinations.value = getFormattedDestinations.value;
         return;
       }
-
-      update(() => {
-        filteredDestinations.value = getFormattedDestinations.value.filter(
-          (destination: string) =>
-            destination.toLowerCase().includes(val.toLowerCase()),
-        );
-      });
+      filteredDestinations.value = getFormattedDestinations.value.filter(
+        (destination: string) =>
+          destination.toLowerCase().includes(val.toLowerCase()),
+      );
     };
 
     const toggleDestination = (destination: string, index: number) => {
@@ -1239,20 +1145,15 @@ export default defineComponent({
       }
     };
 
-    const timezoneFilterFn = (val: string, update: Function) => {
+    const timezoneFilterFn = (val: string) => {
       if (val === "") {
-        update(() => {
-          filteredTimezone.value = timezoneOptions;
-        });
+        filteredTimezone.value = timezoneOptions;
         return;
       }
-
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredTimezone.value = timezoneOptions.filter((timezone: string) =>
-          timezone.toLowerCase().includes(needle),
-        );
-      });
+      const needle = val.toLowerCase();
+      filteredTimezone.value = timezoneOptions.filter((timezone: string) =>
+        timezone.toLowerCase().includes(needle),
+      );
     };
 
     const updateActiveFolderId = (newVal: any) => {
