@@ -75,11 +75,10 @@ class="tw:mr-1" />
                   data-test="select-all-columns"
                 >
                   <q-item-section avatar>
-                    <q-checkbox
+                    <OCheckbox
                       :model-value="areAllColumnsSelected"
                       :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
                       @update:model-value="toggleSelectAll"
-                      dense
                     />
                   </q-item-section>
                   <q-item-section>
@@ -106,11 +105,10 @@ class="tw:mr-1" />
                   class="column-item"
                 >
                   <q-item-section avatar>
-                    <q-checkbox
+                    <OCheckbox
                       :model-value="visibleColumns.has(field)"
                       @update:model-value="toggleColumnVisibility(field)"
-                      :disable="field === '_timestamp'"
-                      dense
+                      :disabled="field === '_timestamp'"
                     />
                   </q-item-section>
                   <q-item-section>
@@ -260,6 +258,7 @@ import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();

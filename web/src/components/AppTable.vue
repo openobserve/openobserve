@@ -49,20 +49,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoData class="q-mb-lg" />
       </template>
       <template v-slot:header-selection="scope" v-if="selection === 'multiple'">
-        <q-checkbox
+        <OCheckbox
           v-model="scope.selected"
-          size="sm"
           class="o2-table-checkbox"
-
         />
       </template>
       <template v-slot:header="props">
         <q-tr :props="props" class="!tw:bg-[var(--o2-table-header-bg)]">
           <!-- Add checkbox header when selection is enabled -->
           <q-th auto-width v-if="selection === 'multiple'">
-            <q-checkbox
+            <OCheckbox
               v-model="props.selected"
-              size="sm"
               class="o2-table-checkbox"
             />
           </q-th>
@@ -95,9 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        </template>
       <template v-slot:body-selection="scope" v-if="selection === 'multiple'">
         <q-td auto-width>
-          <q-checkbox
+          <OCheckbox
             v-model="scope.selected"
-            size="sm"
             class="o2-table-checkbox"
           />
         </q-td>
@@ -106,9 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tr :props="props" :key="`m_${props.row.index}`">
           <!-- Add checkbox column when selection is enabled -->
           <q-td auto-width v-if="selection === 'multiple'">
-            <q-checkbox
+            <OCheckbox
               v-model="props.selected"
-              size="sm"
               class="o2-table-checkbox"
             />
           </q-td>
@@ -174,6 +169,7 @@ import { ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { computed,watch  } from "vue";
 import NoData from "./shared/grid/NoData.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 const props = defineProps({
   columns: {
     type: Array,
