@@ -103,13 +103,31 @@ async fn check_license_permission(user_id: &str, method: &str) -> Result<(), any
     Ok(())
 }
 
+#[inline]
+fn redact(license: &str) -> String {
+    format!(
+        "{}*****{}",
+        &license[0..3],
+        &license[license.len() - 3..license.len()]
+    )
+}
+
 pub async fn get_license_info(Headers(_email): Headers<UserEmail>) -> Response {
+    let o2_cfg = o2_enterprise::enterprise::common::config::get_config();
+
     // we want anyone to be able to see the license info, so we bypass
     // all the permission checks here.
     let (key, license) = match get_license().await {
         Some((k, l)) => (Some(k), Some(l)),
         None => (None, None),
     };
+
+    let key = if o2_cfg.common.redact_license_key {
+        key.map(|v| redact(&v))
+    } else {
+        key
+    };
+
     let res = LicenseResponse {
         key,
         license,
@@ -130,7 +148,7 @@ pub async fn store_license(
         return MetaHttpResponse::forbidden("Unauthorized Access to license");
     }
 
-    if let Err(e) = check_license(&req.key).await {
+    if let Err(e) = check_license(&req.raw_key, &req.key).await {
         return MetaHttpResponse::bad_request(e.to_string());
     };
 

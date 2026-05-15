@@ -249,6 +249,7 @@ async fn run_no_ingestion_daily() {
             ),
             now_micros() - hour_micros(24), // last 24 hours
             now_micros(),
+            false,
         )
         .await
         {

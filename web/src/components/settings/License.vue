@@ -394,7 +394,7 @@ export default defineComponent({
         console.error("Error updating license:", error);
         $q.notify({
           type: "negative",
-          message: t("about.failed_to_update_license"),
+          message: t("about.failed_to_update_license")+" : "+(error?.response?.data?.message || "unexpected error"),
         });
       } finally {
         updating.value = false;
