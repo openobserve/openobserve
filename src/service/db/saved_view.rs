@@ -26,6 +26,15 @@ use crate::{
 pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 
 pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Error> {
+    if view_exists_with_name(org_id, &view.view_name)
+        .await
+        .is_some()
+    {
+        return Err(Error::Message(format!(
+            "Saved view with name '{}' already exists in this organization",
+            view.view_name
+        )));
+    }
     let view_id = config::ider::uuid();
     let view = View {
         org_id: org_id.into(),
@@ -49,6 +58,14 @@ pub async fn update_view(
     view_id: &str,
     view: &UpdateViewRequest,
 ) -> Result<View, Error> {
+    if let Some(existing_id) = view_exists_with_name(org_id, &view.view_name).await
+        && existing_id != view_id
+    {
+        return Err(Error::Message(format!(
+            "Saved view with name '{}' already exists in this organization",
+            view.view_name
+        )));
+    }
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     let updated_view = match get_view(org_id, view_id).await {
         Ok(original_view) => View {
@@ -97,4 +114,15 @@ pub async fn delete_view(org_id: &str, view_id: &str) -> Result<(), Error> {
     let key = format!("{SAVED_VIEWS_KEY_PREFIX}/{org_id}/{view_id}");
     db::delete(&key, false, db::NO_NEED_WATCH, None).await?;
     Ok(())
+}
+
+/// Check if a saved view with the given name already exists in the org.
+/// Returns `Some(view_id)` if found, `None` otherwise.
+async fn view_exists_with_name(org_id: &str, view_name: &str) -> Option<String> {
+    let views = get_views_list_only(org_id).await.ok()?;
+    views
+        .views
+        .iter()
+        .find(|v| v.view_name.eq_ignore_ascii_case(view_name))
+        .map(|v| v.view_id.clone())
 }

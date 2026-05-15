@@ -23,7 +23,7 @@ pub struct CreateViewRequest {
     /// deserialize as required.
     pub data: serde_json::Value,
 
-    /// User-readable name of the view, doesn't need to be unique.
+    /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
 }
 
@@ -34,7 +34,7 @@ pub struct UpdateViewRequest {
     /// deserialize as required.
     pub data: serde_json::Value,
 
-    /// User-readable name of the view, doesn't need to be unique.
+    /// User-readable name of the view, must be unique within the organization.
     pub view_name: String,
 }
 
