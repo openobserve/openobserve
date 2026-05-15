@@ -52,7 +52,8 @@ fn create_cli_app() -> Command {
             Command::new("reset")
                 .about("reset openobserve data")
                 .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs", true))
-                .arg(arg!("time", 't', "time", "timestamp in microseconds, only used by file-list-jobs (default: 0)")),
+                .arg(arg!("time", 't', "time", "timestamp in microseconds, only used by file-list-jobs (default: 0)"))
+                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, only used by file-list-jobs (default: all streams)")),
             Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
@@ -254,6 +255,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .get_one::<String>("time")
                         .map(|s| s.parse::<i64>().unwrap_or(0))
                         .unwrap_or(0);
+                    let stream = command.get_one::<String>("stream").map(|s| s.as_str());
                     // check if any compactor node is running in the cluster
                     let nodes = infra::cluster::list_nodes().await.unwrap_or_default();
                     let compactor_nodes: Vec<_> = nodes
@@ -283,11 +285,17 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         );
                     }
                     // 1. reset file offset in meta table
-                    let n = db::compact::files::reset_offset(time).await?;
-                    println!("reset {n} compact file offsets to {time}");
-                    // 2. set all file list jobs to pending
-                    let rows = infra_file_list::set_job_pending(&[]).await?;
-                    println!("reset {rows} file_list_jobs to pending");
+                    let n = db::compact::files::reset_offset(time, stream).await?;
+                    println!(
+                        "reset {n} compact file offsets to {time} (stream: {})",
+                        stream.unwrap_or("*")
+                    );
+                    // 2. set file list jobs to pending
+                    let rows = infra_file_list::set_job_pending(&[], time, stream).await?;
+                    println!(
+                        "reset {rows} file_list_jobs to pending (offsets >= {time}, stream: {})",
+                        stream.unwrap_or("*")
+                    );
                 }
                 _ => {
                     return Err(anyhow::anyhow!(

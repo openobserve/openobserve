@@ -345,7 +345,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
 
     if !need_release_ids.is_empty() {
         // release those jobs
-        if let Err(e) = infra_file_list::set_job_pending(&need_release_ids).await {
+        if let Err(e) = infra_file_list::set_job_pending(&need_release_ids, 0, None).await {
             log::error!("[COMPACTOR] set_job_pending failed: {e}");
         }
     }
