@@ -82,7 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span>&nbsp;</span> 
       </q-form>
-  </div>
+    </q-card-section>
+  </q-card>
 </template>
 
 <script lang="ts">

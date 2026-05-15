@@ -81,10 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-muted"
                 size="icon-xs-sq"
                 :title="showAdvanced ? 'Collapse' : 'Expand'"
-                @click.stop
+                :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
+                @click.stop="showAdvanced = !showAdvanced"
                 class="expand-toggle-btn-wrapper"
-              >
-                icon-left="unfold-more"
               />
             </div>
             <div v-show="showAdvanced" class="section-content">

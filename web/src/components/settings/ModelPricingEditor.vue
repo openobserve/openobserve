@@ -246,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon name="delete" size="sm" />
                   </OButton>
+                </div>
               </div>
 
               <!-- Tier Body -->

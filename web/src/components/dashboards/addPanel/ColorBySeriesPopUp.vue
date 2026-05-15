@@ -140,7 +140,6 @@
         </draggable>
       </div>
       <!-- Footer Buttons -->
-    </div>
     <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
       <OButton
         variant="outline"
@@ -158,7 +157,7 @@
         >Save</OButton
       >
     </div>
-  </div>
+  </ODialog>
 </template>
 <script lang="ts">
 import { computed, ref, nextTick } from "vue";

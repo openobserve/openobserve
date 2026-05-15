@@ -752,6 +752,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="confirmDeleteSelected"
               icon-left="delete"
+            >
               {{ t("modelPricing.deleteSelected", { count: selectedCount }) }}
             </OButton>
             <QTablePagination

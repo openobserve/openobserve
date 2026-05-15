@@ -474,7 +474,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { GitBranch } from "lucide-vue-next";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 

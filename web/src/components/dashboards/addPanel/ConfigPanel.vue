@@ -2241,7 +2241,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.drilldown") }}
-          <OButton`n            variant="ghost"`n            size="icon"`n            data-test="dashboard-addpanel-config-drilldown-info"`n            @click.stop`n            icon-left="info-outline"`n          >
+          <OButton
+            variant="ghost"
+            size="icon"
+            data-test="dashboard-addpanel-config-drilldown-info"
+            @click.stop
+            icon-left="info-outline"
+          >
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"
@@ -2283,7 +2289,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.comparisonAgainst") }}
-          <OButton`n            variant="ghost"`n            size="icon"`n            data-test="dashboard-addpanel-config-time-shift-info"`n            @click.stop`n            icon-left="info-outline"`n          >
+          <OButton
+            variant="ghost"
+            size="icon"
+            data-test="dashboard-addpanel-config-time-shift-info"
+            @click.stop
+            icon-left="info-outline"
+          >
             <q-tooltip
               anchor="bottom middle"
               self="top middle"
@@ -2356,7 +2368,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.markLines") }}
-          <OButton`n            variant="ghost"`n            size="icon"`n            data-test="dashboard-addpanel-config-markline-info"`n            @click.stop`n            icon-left="info-outline"`n          >
+          <OButton
+            variant="ghost"
+            size="icon"
+            data-test="dashboard-addpanel-config-markline-info"
+            @click.stop
+            icon-left="info-outline"
+          >
             <q-tooltip
               class="bg-grey-8"
               anchor="bottom middle"

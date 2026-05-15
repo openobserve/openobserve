@@ -408,6 +408,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { Copy, Check } from "lucide-vue-next";
 
 
 interface ProfileEvent {
@@ -450,6 +451,8 @@ export default defineComponent({
     OButton,
     ODrawer,
     ODialog,
+    Copy,
+    Check,
   },
   setup() {
     const router = useRouter();

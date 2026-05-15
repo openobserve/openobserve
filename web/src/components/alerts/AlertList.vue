@@ -905,6 +905,7 @@ export default defineComponent({
     OIcon,
     ODialog,
   },
+  emits: [
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
@@ -2907,7 +2908,6 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
-      filterQuery,
       alertStateLoadingMap,
       templates,
       routeTo,

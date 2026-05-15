@@ -217,6 +217,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface ConformDelete {
   visible: boolean;
@@ -232,6 +233,7 @@ export default defineComponent({
     OButton,
     OIcon,
   },
+  setup() {
     const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);

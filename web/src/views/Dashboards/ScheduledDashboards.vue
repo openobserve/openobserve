@@ -121,7 +121,6 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
-import AppTabs from "@/components/common/AppTabs.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { Database, CalendarClock } from "lucide-vue-next";
