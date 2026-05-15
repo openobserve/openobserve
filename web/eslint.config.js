@@ -132,14 +132,14 @@ export default [
           element: 'q-btn-dropdown',
           message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
         },
-        {
-          element: 'q-badge',
-          message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-badge>.'
-        },
-        {
-          element: 'q-chip',
-          message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.'
-        },
+        // {
+        //   element: 'q-badge',
+        //   message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-badge>.'
+        // },
+        // {
+        //   element: 'q-chip',
+        //   message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.'
+        // },
         {
           element: 'q-dialog',
           message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
@@ -160,22 +160,22 @@ export default [
           element: 'q-spinner-gears',
           message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-gears>.'
         },
-        {
-          element: 'q-circular-progress',
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-circular-progress>.'
-        },
-        {
-          element: 'q-linear-progress',
-          message: 'Use <OProgressBar> from "@/lib/data/ProgressBar/OProgressBar.vue" instead of <q-linear-progress>.'
-        },
-        {
-          element: 'q-inner-loading',
-          message: 'Use <OInnerLoading> from "@/lib/feedback/InnerLoading/OInnerLoading.vue" instead of <q-inner-loading>.'
-        },
-        {
-          element: 'q-skeleton',
-          message: 'Use <OSkeleton> from "@/lib/feedback/Skeleton/OSkeleton.vue" instead of <q-skeleton>.'
-        }
+        // {
+        //   element: 'q-circular-progress',
+        //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-circular-progress>.'
+        // },
+        // {
+        //   element: 'q-linear-progress',
+        //   message: 'Use <OProgressBar> from "@/lib/data/ProgressBar/OProgressBar.vue" instead of <q-linear-progress>.'
+        // },
+        // {
+        //   element: 'q-inner-loading',
+        //   message: 'Use <OInnerLoading> from "@/lib/feedback/InnerLoading/OInnerLoading.vue" instead of <q-inner-loading>.'
+        // },
+        // {
+        //   element: 'q-skeleton',
+        //   message: 'Use <OSkeleton> from "@/lib/feedback/Skeleton/OSkeleton.vue" instead of <q-skeleton>.'
+        // }
         // {        //   element: 'q-stepper',
         //   message: 'Use <OStepper> from "@/lib/navigation/Stepper/OStepper.vue" instead of <q-stepper>.'
         // },
