@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::{search::PaginatedResponse, stream::StreamType}, metrics, utils::json};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -292,6 +292,17 @@ pub async fn get_latest_sessions(
         .into_iter()
         .collect();
 
+    if all_trace_ids.is_empty() {
+        return MetaHttpResponse::json(PaginatedResponse {
+            took: 0,
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+            trace_id,
+            function_error: String::new(),
+        });
+    }
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
     let trace_ids_sql = all_trace_ids.join("','");
     let query_sql = format!(
@@ -405,17 +416,15 @@ pub async fn get_latest_sessions(
         ])
         .inc();
 
-    let mut resp: HashMap<&str, json::Value> = HashMap::new();
-    resp.insert("took", json::Value::from((time * 1000.0) as usize));
-    resp.insert("total", json::Value::from(sessions_data.len()));
-    resp.insert("from", json::Value::from(from));
-    resp.insert("size", json::Value::from(size));
-    resp.insert("hits", json::to_value(sessions_data).unwrap());
-    resp.insert("trace_id", json::Value::from(trace_id));
-    if !range_error.is_empty() {
-        resp.insert("function_error", json::Value::String(range_error));
-    }
-    MetaHttpResponse::json(resp)
+    MetaHttpResponse::json(PaginatedResponse {
+        took: (time * 1000.0) as usize,
+        total: sessions_data.len(),
+        from,
+        size,
+        hits: sessions_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        trace_id,
+        function_error: range_error,
+    })
 }
 
 struct TraceDetail {
