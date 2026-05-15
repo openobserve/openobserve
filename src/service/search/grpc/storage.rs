@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, ops::Bound, sync::Arc};
+use std::{collections::HashSet, ops::Bound, path::PathBuf, sync::Arc};
 
 use arrow_schema::Schema;
 use config::{
@@ -65,6 +65,7 @@ use crate::service::{
         caching_directory::CachingDirectory,
         footer_cache::FooterCache,
         reader::{PuffinDirReader, warm_up_terms},
+        recording_directory::RecordingDirectory,
     },
 };
 
@@ -726,6 +727,7 @@ async fn search_tantivy_index(
     idx_optimize_rule: Option<IndexOptimizeMode>,
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult)> {
+    let start = std::time::Instant::now();
     let file_account = parquet_file.account.clone();
     let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
@@ -752,17 +754,17 @@ async fn search_tantivy_index(
     // open the tantivy index
     log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
-    let puffin_dir = Arc::new(
-        get_tantivy_directory(
-            trace_id,
-            &file_account,
-            &ttv_file_name,
-            parquet_file.meta.index_size,
-        )
-        .await?,
-    );
-    let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
-    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let puffin = get_tantivy_directory(
+        trace_id,
+        &file_account,
+        &ttv_file_name,
+        parquet_file.meta.index_size,
+    )
+    .await?;
+    let recording = Arc::new(RecordingDirectory::new(puffin));
+    let puffin_dir: Arc<dyn Directory> = recording.clone();
+    let footer_cache = FooterCache::from_directory(&ttv_file_name, puffin_dir.clone()).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, footer_cache);
     let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
 
     let index = tantivy::Index::open(reader_directory)?;
@@ -839,7 +841,24 @@ async fn search_tantivy_index(
     if !file_in_range {
         need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
     }
+    let ops = recording.ops();
+    let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
+    for op in &ops {
+        let entry = per_file.entry(op.path.clone()).or_default();
+        entry.0 += 1;
+        entry.1 += op.num_bytes;
+    }
+    let mut files: Vec<_> = per_file.iter().collect();
+    files.sort_by_key(|(p, _)| p.to_owned());
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, before warmup fetched {} KB across {} ops / {} files, took: {} ms",
+        ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
+        ops.len(),
+        files.len(),
+        start.elapsed().as_millis()
+    );
 
+    let start = std::time::Instant::now();
     warm_up_terms(
         &searcher,
         &warm_terms,
@@ -847,7 +866,27 @@ async fn search_tantivy_index(
         need_fast_field,
     )
     .await?;
+    let ops = recording.drain_ops();
+    if !ops.is_empty() {
+        let mut per_file: HashMap<PathBuf, (usize, usize)> = HashMap::new();
+        for op in &ops {
+            let entry = per_file.entry(op.path.clone()).or_default();
+            entry.0 += 1;
+            entry.1 += op.num_bytes;
+        }
+        let mut files: Vec<_> = per_file.iter().collect();
+        files.sort_by_key(|(p, _)| p.to_owned());
+        log::info!(
+            "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name}, after warmup fetched {} KB across {} ops / {} files, took: {} ms",
+            ops.iter().map(|o| o.num_bytes).sum::<usize>() / 1024,
+            ops.len(),
+            files.len(),
+            start.elapsed().as_millis()
+        );
+    }
 
+    let start = std::time::Instant::now();
+    let ttv_file_name_clone = ttv_file_name.clone();
     // search the index
     let trace_id_clone = trace_id.to_string();
     let res = tokio::task::spawn_blocking(move || match idx_optimize_rule {
@@ -885,7 +924,12 @@ async fn search_tantivy_index(
         }
     })
     .await??;
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name_clone}, search index took: {} ms",
+        start.elapsed().as_millis()
+    );
 
+    let start = std::time::Instant::now();
     let key = parquet_file.key.to_string();
     let mut percent = 0.0;
     let result = match res {
@@ -931,6 +975,10 @@ async fn search_tantivy_index(
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: file: {ttv_file_name_clone}, process tantivy result took: {} ms",
+        start.elapsed().as_millis()
+    );
 
     // cache the result if the memory size is less than the limit
     if cfg.common.inverted_index_result_cache_enabled

@@ -1267,6 +1267,12 @@ pub struct Common {
     )]
     pub inverted_index_result_cache_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_ENABLED",
+        default = true,
+        help = "Toggle footer cache for inverted index files."
+    )]
+    pub inverted_index_footer_cache_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
@@ -1806,6 +1812,12 @@ pub struct Limit {
         help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_ENTRIES",
+        default = 1000,
+        help = "Maximum number of entries in the inverted index footer cache."
+    )]
+    pub inverted_index_footer_cache_max_entries: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -3447,6 +3459,9 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
         cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    }
+    if cfg.limit.inverted_index_footer_cache_max_entries == 0 {
+        cfg.limit.inverted_index_footer_cache_max_entries = 10000;
     }
     if cfg.limit.inverted_index_skip_threshold == 0 {
         cfg.limit.inverted_index_skip_threshold = 35;

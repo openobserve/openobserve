@@ -13,12 +13,66 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, LazyLock},
+};
 
 use anyhow::{Result, anyhow, ensure};
 use bytes::Buf;
+use dashmap::DashMap;
+use parking_lot::Mutex;
 
 use super::*;
+
+pub struct GlobalPuffinMetaCache {
+    readers: DashMap<String, Arc<PuffinMeta>>,
+    cacher: Mutex<VecDeque<String>>,
+    max_entries: usize,
+}
+
+pub static GLOBAL_PUFFIN_META_CACHE: LazyLock<Arc<GlobalPuffinMetaCache>> =
+    LazyLock::new(|| Arc::new(GlobalPuffinMetaCache::default()));
+
+impl GlobalPuffinMetaCache {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            readers: DashMap::new(),
+            cacher: Mutex::new(VecDeque::new()),
+            max_entries,
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<Arc<PuffinMeta>> {
+        self.readers.get(key).map(|r| r.clone())
+    }
+
+    pub fn put(&self, key: String, value: Arc<PuffinMeta>) {
+        let mut w = self.cacher.lock();
+        if w.len() >= self.max_entries {
+            for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
+                if let Some(k) = w.pop_front() {
+                    self.readers.remove(&k);
+                } else {
+                    break;
+                }
+            }
+        }
+        w.push_back(key.clone());
+        drop(w);
+        self.readers.insert(key, value);
+    }
+}
+
+impl Default for GlobalPuffinMetaCache {
+    fn default() -> Self {
+        Self::new(
+            config::get_config()
+                .limit
+                .inverted_index_footer_cache_max_entries,
+        )
+    }
+}
 
 #[derive(Debug)]
 pub struct PuffinBytesReader {
@@ -118,6 +172,15 @@ impl PuffinFooterBytesReader {
 
 impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
+        // check global cache first
+        let cfg = config::get_config();
+        if cfg.common.inverted_index_footer_cache_enabled {
+            let key = self.source.location.to_string();
+            if let Some(cached_meta) = GLOBAL_PUFFIN_META_CACHE.get(&key) {
+                return Ok((*cached_meta).clone());
+            }
+        }
+
         // read footer
         if self.source.size < FOOTER_SIZE {
             return Err(anyhow!(
@@ -185,7 +248,15 @@ impl PuffinFooterBytesReader {
         self.metadata = Some(self.parse_payload(&payload.slice(MAGIC_SIZE as usize..))?);
         self.validate_payload()?;
 
-        Ok(self.metadata.unwrap())
+        let meta = self.metadata.unwrap();
+
+        // store in global cache
+        if cfg.common.inverted_index_footer_cache_enabled {
+            let key = self.source.location.to_string();
+            GLOBAL_PUFFIN_META_CACHE.put(key, Arc::new(meta.clone()));
+        }
+
+        Ok(meta)
     }
 
     fn parse_payload(&self, bytes: &[u8]) -> Result<PuffinMeta> {

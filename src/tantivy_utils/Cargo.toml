@@ -14,6 +14,7 @@ bitflags = "2.11"
 byteorder.workspace = true
 bytes.workspace = true
 config.workspace = true
+dashmap.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 infra.workspace = true

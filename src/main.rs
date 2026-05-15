@@ -742,8 +742,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             let handle = handle.clone();
             async move {
                 shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
             }
         });
 
@@ -821,8 +820,7 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             let handle = handle.clone();
             async move {
                 shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
             }
         });
 

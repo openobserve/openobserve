@@ -14,14 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     ops::Range,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use byteorder::ByteOrder;
 use bytes::Bytes;
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tantivy::{Directory, ReloadPolicy, directory::OwnedBytes};
@@ -162,11 +163,94 @@ impl FooterCache {
         })
     }
 
-    pub async fn from_directory(source: Arc<dyn Directory>) -> tantivy::Result<Self> {
+    /// Load a [`FooterCache`] from the given `source` directory, checking the global
+    /// cache identified by `key` first. On cache miss, reads the raw bytes from the
+    /// directory, caches them, and parses them.
+    pub async fn from_directory(
+        key: &str,
+        source: Arc<dyn Directory>,
+    ) -> tantivy::Result<Arc<Self>> {
+        let cfg = config::get_config();
+        if cfg.common.inverted_index_footer_cache_enabled {
+            config::metrics::FOOTER_CACHE_REQUESTS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+            let start = std::time::Instant::now();
+            if let Some(cached_bytes) = GLOBAL_FOOTER_CACHE.get(key) {
+                let time = start.elapsed().as_millis();
+                config::metrics::FOOTER_CACHE_HITS_TOTAL
+                    .with_label_values::<&str>(&[])
+                    .inc();
+                let data = OwnedBytes::new(cached_bytes.to_vec());
+                let start = std::time::Instant::now();
+                let result = Ok(Arc::new(Self::from_bytes(data)?));
+                let parse_time = start.elapsed().as_millis();
+                log::info!("file: {key}, lock time {time} ms, parse time {parse_time} ms",);
+                return result;
+            }
+            let file = source.get_file_handle(Path::new(FOOTER_CACHE))?;
+            let data = file.read_bytes_async(0..file.len()).await?;
+            GLOBAL_FOOTER_CACHE.put(key.to_string(), data.as_ref().to_vec().into());
+            Ok(Arc::new(Self::from_bytes(data)?))
+        } else {
+            Self::from_directory_uncached(source).await.map(Arc::new)
+        }
+    }
+
+    async fn from_directory_uncached(source: Arc<dyn Directory>) -> tantivy::Result<Self> {
         let path = std::path::Path::new(FOOTER_CACHE);
         let file = source.get_file_handle(path)?;
         let data = file.read_bytes_async(0..file.len()).await?;
         Self::from_bytes(data)
+    }
+}
+
+pub struct GlobalFooterCache {
+    readers: DashMap<String, Bytes>,
+    cacher: parking_lot::Mutex<VecDeque<String>>,
+    max_entries: usize,
+}
+
+pub static GLOBAL_FOOTER_CACHE: LazyLock<Arc<GlobalFooterCache>> =
+    LazyLock::new(|| Arc::new(GlobalFooterCache::default()));
+
+impl GlobalFooterCache {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            readers: DashMap::new(),
+            cacher: parking_lot::Mutex::new(VecDeque::new()),
+            max_entries,
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<Bytes> {
+        self.readers.get(key).map(|r| r.clone())
+    }
+
+    pub fn put(&self, key: String, value: Bytes) {
+        let mut w = self.cacher.lock();
+        if w.len() >= self.max_entries {
+            for _ in 0..(std::cmp::max(1, self.max_entries / 10)) {
+                if let Some(k) = w.pop_front() {
+                    self.readers.remove(&k);
+                } else {
+                    break;
+                }
+            }
+        }
+        w.push_back(key.clone());
+        drop(w);
+        self.readers.insert(key, value);
+    }
+}
+
+impl Default for GlobalFooterCache {
+    fn default() -> Self {
+        Self::new(
+            config::get_config()
+                .limit
+                .inverted_index_footer_cache_max_entries,
+        )
     }
 }
 
@@ -625,7 +709,7 @@ mod tests {
     async fn test_footer_cache_from_directory_nonexistent() {
         let ram_directory = Arc::new(RamDirectory::create());
 
-        let result = FooterCache::from_directory(ram_directory).await;
+        let result = FooterCache::from_directory("test_key", ram_directory).await;
         assert!(result.is_err());
     }
 
@@ -645,7 +729,7 @@ mod tests {
             .atomic_write(std::path::Path::new(FOOTER_CACHE), &cache_bytes)
             .unwrap();
 
-        let result = FooterCache::from_directory(ram_directory).await;
+        let result = FooterCache::from_directory("test_key", ram_directory).await;
         assert!(result.is_ok());
 
         let loaded_cache = result.unwrap();
