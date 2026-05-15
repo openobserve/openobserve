@@ -136,8 +136,8 @@ const triggerClasses = computed<string>(() => {
         <component :is="icon as Component" v-else-if="icon" class="tw:size-4" />
         <span v-else aria-hidden="true">{{ name }}</span>
       </button>
-      <!-- Vertical connector line below the indicator -->
-      <div class="tw:flex-1 tw:w-px tw:mt-1 tw:bg-stepper-connector" aria-hidden="true" />
+      <!-- Vertical connector line below the indicator (hidden for the last step via CSS) -->
+      <div class="tw:flex-1 tw:w-px tw:mt-1 tw:bg-stepper-connector tw:[.o-step:last-child_&]:hidden" aria-hidden="true" />
     </div>
 
     <!-- Right column: title button + content panel -->
