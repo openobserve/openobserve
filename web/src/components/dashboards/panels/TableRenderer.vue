@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
           <!-- Default: dashboard pagination controls -->
-          <div class="tw:flex tw:items-center tw:w-full tw:border-t tw:border-t-[var(--o2-border-color)] tw:py-0.5 tw:px-3" data-test="dashboard-table-pagination">
-            <div class="tw:flex-1" />
+          <div class="row items-center full-width" data-test="dashboard-table-pagination">
+            <q-space />
             <TablePaginationControls
               :show-pagination="showPagination"
               :pagination="scope.pagination"

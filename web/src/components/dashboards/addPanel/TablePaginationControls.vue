@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center tw:h-6" data-test="dashboard-table-pagination-controls">
+  <div class="row items-center" data-test="dashboard-table-pagination-controls">
     <!-- Records per page dropdown: only when pagination is enabled -->
-    <div v-if="showPagination" class="tw:flex tw:items-center tw:gap-1">
-      <span class="tw:text-xs" data-test="dashboard-table-rows-per-page-label"
+    <div v-if="showPagination" class="row items-center q-gutter-sm">
+      <span class="text-caption" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
       <q-select
@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         borderless
         dense
         options-dense
-        class="pagination-select"
+        class="q-table__select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="tw:text-xs tw:px-1" data-test="dashboard-table-row-count">
+    <span class="text-caption q-pa-sm" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 
@@ -43,38 +43,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="pagesNumber > 1"
         variant="ghost"
-        size="icon-chip"
+        size="icon"
         :disabled="isFirstPage"
         @click="$emit('firstPage')"
       >
-        <template #icon-left><q-icon name="first_page" size="16px" /></template>
+        <template #icon-left><q-icon name="first_page" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
         variant="ghost"
-        size="icon-chip"
+        size="icon"
         :disabled="isFirstPage"
         @click="$emit('prevPage')"
       >
-        <template #icon-left><q-icon name="chevron_left" size="16px" /></template>
+        <template #icon-left><q-icon name="chevron_left" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
         variant="ghost"
-        size="icon-chip"
+        size="icon"
         :disabled="isLastPage"
         @click="$emit('nextPage')"
       >
-        <template #icon-left><q-icon name="chevron_right" size="16px" /></template>
+        <template #icon-left><q-icon name="chevron_right" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
         variant="ghost"
-        size="icon-chip"
+        size="icon"
         :disabled="isLastPage"
         @click="$emit('lastPage')"
       >
-        <template #icon-left><q-icon name="last_page" size="16px" /></template>
+        <template #icon-left><q-icon name="last_page" /></template>
       </OButton>
     </template>
   </div>
@@ -147,38 +147,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.pagination-select {
-  min-height: 24px !important;
-  max-height: 24px !important;
-  font-size: 12px;
-
-  :deep(.q-field__inner) {
-    min-height: 24px !important;
-  }
-
-  :deep(.q-field__control) {
-    min-height: 24px !important;
-    height: 24px !important;
-    padding: 0;
-  }
-
-  :deep(.q-field__native) {
-    min-height: 24px !important;
-    height: 24px !important;
-    padding: 0 4px;
-    line-height: 24px;
-  }
-
-  :deep(.q-field__append) {
-    min-height: 24px !important;
-    height: 24px !important;
-    padding: 0;
-  }
-
-  :deep(.q-field__marginal) {
-    height: 24px !important;
-  }
-}
-</style>
