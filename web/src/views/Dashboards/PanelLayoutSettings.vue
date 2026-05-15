@@ -25,62 +25,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @click:primary="submitForm()"
   >
-  <div
+    <div
     class="q-pa-none tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
-    <q-form ref="panelFormRef" @submit="savePanelLayout">
-      <div class="q-mx-md">
-        <div
-          data-test="panel-layout-settings-height"
-          class="o2-input"
-          style="padding-top: 12px"
-        >
-          <q-input
-            v-model.number="updatedLayout.h"
-            :label="t('dashboard.panelHeight') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            hide-bottom-space
-            dense
-            type="number"
-            :rules="[
-              (val: any) => {
-                if (val === null || val === undefined || val === '') {
-                  return t('common.required'); // If value is empty or null
-                }
-                return val > 0 ? true : t('common.valueMustBeGreaterThanZero'); // Ensure value is greater than 0
-              },
-            ]"
-            style="min-width: 220px"
-            data-test="panel-layout-settings-height-input"
-          />
+    <div class="q-mx-md">
+      <div
+        data-test="panel-layout-settings-height"
+        class="o2-input"
+        style="padding-top: 12px"
+      >
+        <OInput
+          v-model.number="updatedLayout.h"
+          :label="t('dashboard.panelHeight') + ' *'"
+          type="number"
+          style="min-width: 220px"
+          :error-message="heightError"
+          :error="!!heightError"
+          @update:model-value="heightError = ''"
+          data-test="panel-layout-settings-height-input"
+        />
 
-          <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
-            <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
-            <q-icon
-              name="info_outline"
-              class="cursor-pointer tw:shrink-0"
-              size="14px"
-            >
-              <q-tooltip
-                anchor="center end"
-                self="center left"
-                class="tw:text-[12px]"
-              >
-                1 unit = 30px
-              </q-tooltip>
-            </q-icon>
-          </div>
-
-       
+        <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
+          <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+          <q-icon
+            name="info_outline"
+            class="cursor-pointer tw:shrink-0"
+            size="14px"
+          >
+            <OTooltip content="1 unit = 30px" />
+          </q-icon>
         </div>
+
+     
       </div>
-    </q-form>
+    </div>
   </div>
   </ODrawer>
 </template>
@@ -92,9 +72,11 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODrawer },
+  components: { ODrawer, OInput, OTooltip },
   props: {
     layout: {
       type: Object,
@@ -111,16 +93,24 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
-    const panelFormRef = ref(null);
     const updatedLayout = ref({ ...props.layout });
+    const heightError = ref("");
 
     const savePanelLayout = () => {
       emit("save:layout", { ...updatedLayout.value });
     };
 
     const submitForm = () => {
-      panelFormRef.value?.submit();
+      if (!updatedLayout.value.h || updatedLayout.value.h <= 0) {
+        heightError.value = !updatedLayout.value.h
+          ? t("common.required")
+          : t("common.valueMustBeGreaterThanZero");
+        return;
+      }
+      heightError.value = "";
+      savePanelLayout();
     };
+
 
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
@@ -141,7 +131,7 @@ export default defineComponent({
       submitForm,
       getRowCount,
       updatedLayout,
-      panelFormRef,
+      heightError,
     };
   },
 });

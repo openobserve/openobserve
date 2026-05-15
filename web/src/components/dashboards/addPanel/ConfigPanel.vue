@@ -20,13 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mb-sm tw:font-semibold">
         {{ t("dashboard.description") }}
       </div>
-      <q-input
-        borderless
+      <OTextarea
         v-model="dashboardPanelData.data.description"
         autogrow
-        class="showLabelOnTop el-border"
         data-test="dashboard-config-description"
-        hide-bottom-space
       />
     </div>
   </div>
@@ -79,57 +76,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-mb-sm tw:font-semibold">
             {{ t("dashboard.description") }}
           </div>
-          <q-input
-            borderless
+          <OTextarea
             v-model="dashboardPanelData.data.description"
             autogrow
-            class="showLabelOnTop el-border"
             data-test="dashboard-config-description"
-            hide-bottom-space
           />
         </div>
 
-        <q-input
+        <OInput
           v-if="promqlMode"
           v-show="isConfigOptionVisible('general', 'step')"
           v-model="dashboardPanelData.data.config.step_value"
           type="text"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
+          :label="t('dashboard.stepValue')"
           :placeholder="t('dashboard.intervalInputPlaceholder')"
           data-test="dashboard-config-step-value"
-          hide-bottom-space
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.stepValue") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-top_results-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  max-width="250px"
-                >
-                  <b>Step - </b>
-                  {{ t("dashboard.stepValueTooltip") }}
-                  <br />
-                  {{ t("dashboard.stepValueExample") }}
-                </q-tooltip>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="250px">
+              <template #content>
+                <b>Step - </b>
+                {{ t("dashboard.stepValueTooltip") }}
+                <br />
+                {{ t("dashboard.stepValueExample") }}
+              </template>
+            </OTooltip>
           </template>
-        </q-input>
+        </OInput>
 
         <!-- Panel Default Time Configuration -->
         <div
@@ -137,31 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mb-sm"
         >
           <div class="row items-center">
-            <q-toggle
+            <OSwitch
               v-model="useDefaultTime"
               :label="t('dashboard.panelTimeEnabled')"
               data-test="dashboard-config-allow-panel-time"
-              @update:model-value="onToggleDefaultTime"
-              class="tw:h-[36px] o2-toggle-button-lg"
               size="lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
+              @change="onToggleDefaultTime"
             />
             <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop>
               <template #icon-left><q-icon name="info_outline" /></template>
-              <q-tooltip
-                anchor="bottom middle"
-                self="top middle"
-                style="font-size: 10px"
-                max-width="250px"
-              >
-                <span>
-                  {{ t("dashboard.useDefaultTimeTooltip") }}
-                </span>
-              </q-tooltip>
+              <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="250px" />
             </OButton>
           </div>
 
@@ -184,14 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :hide-relative-timezone="true"
                   data-test="dashboard-config-panel-time-picker"
                 />
-                <q-tooltip
-                  anchor="bottom middle"
-                  self="top middle"
-                  style="font-size: 11px"
-                  max-width="320px"
-                >
-                  {{ formattedPickerValue }}
-                </q-tooltip>
+                <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
               <q-icon
                 class="q-mr-xs q-ml-sm flex-shrink-0"
@@ -296,58 +247,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body o2-input">
-        <q-toggle
+        <OSwitch
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'show-legends')"
           v-model="dashboardPanelData.data.config.show_legends"
           :label="t('dashboard.showLegendsLabel')"
           data-test="dashboard-config-show-legend"
-          class="tw:h-[30px] o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
 
-        <q-select
+        <OSelect
           v-if="shouldShowLegendPosition(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-position')"
-          borderless
           v-model="dashboardPanelData.data.config.legends_position"
           :options="legendsPositionOptions"
-          dense
           :label="t('dashboard.legendsPositionLabel')"
-          class="showLabelOnTop"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.legends_position ?? 'Auto'
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-legend-position"
-          hide-bottom-space
-        >
-        </q-select>
+        />
 
-        <q-select
+        <OSelect
           v-if="shouldShowLegendType(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-type')"
-          borderless
           v-model="dashboardPanelData.data.config.legends_type"
           :options="legendTypeOptions"
-          dense
           :label="t('dashboard.legendsType')"
-          class="showLabelOnTop"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.legends_type ?? 'Auto'
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-legends-scrollable"
-          hide-bottom-space
-        >
-        </q-select>
+        />
 
         <div
           v-show="isConfigOptionVisible('legend', 'legend-size')"
@@ -358,21 +287,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="shouldShowLegendWidth(dashboardPanelData)"
             class="input-container"
           >
-            <q-input
+            <OInput
               v-model.number="legendWidthValue"
               :label="t('common.legendWidth')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop config-legend-input"
-              stack-label
-              borderless
-              dense
-              label-slot
-              :type="'number'"
+              type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-width"
-              hide-bottom-space
-            ></q-input>
+            />
             <div
               class="unit-container"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
@@ -417,21 +338,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="shouldShowLegendHeight(dashboardPanelData)"
             class="input-container"
           >
-            <q-input
+            <OInput
               v-model.number="legendHeightValue"
               :label="t('dashboard.legendHeight')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop config-legend-input"
-              stack-label
-              borderless
-              dense
-              label-slot
-              :type="'number'"
+              type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-height"
-              hide-bottom-space
-            ></q-input>
+            />
             <div
               class="unit-container"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
@@ -472,24 +385,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-select
+        <OSelect
           v-if="shouldApplyChartAlign(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'chart-align')"
-          borderless
           v-model="dashboardPanelData.data.config.chart_align"
           :options="chartAlignOptions"
-          dense
           :label="t('dashboard.chartAlign')"
-          class="showLabelOnTop"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.chart_align ?? 'Auto'
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-chart-align"
-          hide-bottom-space
-        >
-        </q-select>
+        />
 
         <div
           v-if="
@@ -555,16 +460,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon
                   class="q-ml-xs"
                   size="20px"
-                  name="info"
+                  name="info_outline"
                   data-test="dashboard-config-promql-legend-info"
                 />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
-                  {{ t("dashboard.overrideMessage") }}
-                </q-tooltip>
+                <OTooltip :content="t('dashboard.overrideMessage')" />
               </div>
             </div>
           </template>
@@ -589,72 +488,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body o2-input">
-        <q-select
+        <OSelect
           v-show="isConfigOptionVisible('data', 'unit')"
-          borderless
           v-model="dashboardPanelData.data.config.unit"
           :options="unitOptions"
-          dense
           :label="t('dashboard.unitLabel')"
-          class="showLabelOnTop selectedLabel"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.unit
-              ? unitOptions.find(
-                  (it) => it.value == dashboardPanelData.data.config.unit,
-                )?.label
-              : 'Default'
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-unit"
-        >
-        </q-select>
+        />
 
-        <q-input
+        <OInput
           v-if="dashboardPanelData.data.config.unit == 'custom'"
           v-show="isConfigOptionVisible('data', 'custom-unit')"
           v-model="dashboardPanelData.data.config.unit_custom"
           :label="t('dashboard.customunitLabel')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          dense
-          label-slot
           data-test="dashboard-config-custom-unit"
-          borderless
-          hide-bottom-space
         />
 
-        <q-input
+        <OInput
           v-show="isConfigOptionVisible('data', 'decimals')"
           type="number"
           v-model.number="dashboardPanelData.data.config.decimals"
-          value="2"
           min="0"
           max="100"
-          borderless
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.config.decimals =
                 typeof value == 'number' && value >= 0 ? value : 2)
           "
-          :rules="[
-            (val: any) =>
-              (val >= 0 && val <= 100) || t('dashboard.decimalsMustBeBetween'),
-          ]"
           :label="t('dashboard.decimals')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          hide-bottom-space
-          dense
-          label-slot
           data-test="dashboard-config-decimals"
         />
 
-        <q-input
+        <OInput
           v-if="
             !promqlMode &&
             !dashboardPanelData.data.queries[
@@ -667,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].config.limit
           "
-          :value="0"
+          type="number"
           :min="0"
           @update:model-value="
             (value: any) =>
@@ -675,44 +542,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.layout.currentQueryIndex
               ].config.limit = value ? value : 0)
           "
-          :label="t('dashboard.limit')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
           placeholder="0"
-          :type="'number'"
+          :label="t('dashboard.queryLimit')"
           data-test="dashboard-config-limit"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.queryLimit") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-limit-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
-                  {{ t("dashboard.limitForQueryResult") }}
-                </q-tooltip>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.limitForQueryResult')" />
           </template>
-        </q-input>
+        </OInput>
 
-        <q-input
+        <OInput
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results')"
           v-model.number="dashboardPanelData.data.config.top_results"
+          type="number"
           :min="0"
           @update:model-value="
             (value: any) =>
@@ -720,157 +563,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? value
                 : null)
           "
-          :label="t('dashboard.topResults')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
           :placeholder="t('dashboard.placeholderAll')"
-          :type="'number'"
-          :disable="
+          :disabled="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ]?.fields?.breakdown?.length == 0
           "
+          :label="t('dashboard.showTopNValues')"
           data-test="dashboard-config-top_results"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.showTopNValues") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-top_results-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  max-width="250px"
-                >
-                  <b>{{ t("dashboard.topNTooltipTitle") }}</b>
-                  <br />
-                  <br />
-                  {{ t("dashboard.topNTooltipDescription") }}
-                </q-tooltip>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="250px">
+              <template #content>
+                <b>{{ t("dashboard.topNTooltipTitle") }}</b>
+                <br /><br />
+                {{ t("dashboard.topNTooltipDescription") }}
+              </template>
+            </OTooltip>
           </template>
-        </q-input>
+        </OInput>
 
-        <div
-          class="row items-center"
+        <OSwitch
           v-if="shouldShowTopResultsConfig(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'top-results-others')"
+          v-model="dashboardPanelData.data.config.top_results_others"
+          :label="t('dashboard.addOthersSeries')"
+          data-test="dashboard-config-top_results_others"
+          :disabled="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields?.breakdown?.length == 0
+          "
+          size="lg"
         >
-          <q-toggle
-            v-model="dashboardPanelData.data.config.top_results_others"
-            :label="t('dashboard.addOthersSeries')"
-            data-test="dashboard-config-top_results_others"
-            :disable="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.breakdown?.length == 0
-            "
-            class="tw:h-[36px] o2-toggle-button-lg"
-            size="lg"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-lg-dark'
-                : 'o2-toggle-button-lg-light'
-            "
-          >
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-top_results-others-info"
-            >
-              <q-tooltip
-                class="bg-grey-8"
-                anchor="top middle"
-                self="bottom middle"
-                max-width="250px"
-              >
-                {{ t("dashboard.addOthersSeriesTooltip") }}
-              </q-tooltip>
-            </q-icon>
-          </q-toggle>
-        </div>
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="250px" />
+          </template>
+        </OSwitch>
 
-        <q-toggle
+        <OSwitch
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('data', 'connect-nulls')"
           v-model="dashboardPanelData.data.config.connect_nulls"
           :label="t('dashboard.connectNullValues')"
           data-test="dashboard-config-connect-null-values"
-          class="tw:h-[36px] o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         >
-          <q-icon
-            class="q-ml-xs"
-            size="20px"
-            name="info"
-            data-test="dashboard-config-connect-null-values-info"
-          >
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.connectNullValuesTooltip") }}
-            </q-tooltip>
-          </q-icon>
-        </q-toggle>
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="250px" />
+          </template>
+        </OSwitch>
 
-        <q-input
+        <OInput
           v-if="shouldShowNoValueReplacement(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('data', 'no-value-replacement')"
           v-model="dashboardPanelData.data.config.no_value_replacement"
-          :label="t('dashboard.noValueReplacement')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          dense
-          label-slot
           placeholder="-"
+          :label="t('dashboard.noValueReplacement')"
           data-test="dashboard-config-no-value-replacement"
-          borderless
-          hide-bottom-space
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.noValueReplacement") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-limit-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                >
-                  {{ t("dashboard.noValueReplacementTooltip") }}
-                </q-tooltip>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.noValueReplacementTooltip')" />
           </template>
-        </q-input>
+        </OInput>
       </div>
     </q-expansion-item>
 
@@ -891,19 +646,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <q-input
+        <OInput
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-width')"
           v-model.number="dashboardPanelData.data.config.axis_width"
           :label="t('common.axisWidth')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
-          :type="'number'"
+          type="number"
           :placeholder="t('dashboard.auto')"
           @update:model-value="
             (value: any) =>
@@ -911,41 +659,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 value !== '' ? value : null)
           "
           data-test="dashboard-config-axis-width"
-        >
-        </q-input>
+        />
 
-        <q-toggle
+        <OSwitch
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-border')"
           v-model="dashboardPanelData.data.config.axis_border_show"
           :label="t('dashboard.showBorder')"
           data-test="dashboard-config-axis-border"
-          class="tw:h-[36px] o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
 
         <div
-          style="width: 100%; display: flex; gap: 16px"
+          class="tw:flex tw:gap-2"
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'y-axis')"
         >
-          <q-input
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
             v-model.number="dashboardPanelData.data.config.y_axis_min"
-            color="input-border"
-            bg-color="input-bg"
-            style="width: 50%"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
+            type="number"
             :placeholder="t('dashboard.auto')"
+            :label="t('common.yAxisMin')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.y_axis_min =
@@ -953,41 +688,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="dashboard-config-y_axis_min"
           >
-            <template v-slot:label>
-              <div style="display: flex; align-items: center; gap: 4px">
-                <span>{{ t("common.yAxisMin") }}</span>
-                <q-icon
-                  name="info"
-                  size="20px"
-                  style="cursor: pointer"
-                  data-test="dashboard-config-y_axis_min-info"
-                >
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    :offset="[0, 8]"
-                  >
-                    <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
-                    <br />
-                    {{ t("dashboard.yAxisMinTooltipDescription") }}
-                  </q-tooltip>
-                </q-icon>
-              </div>
+            <template #tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <b>{{ t("dashboard.yAxisMinTooltipTitle") }}</b>
+                  <br />
+                  {{ t("dashboard.yAxisMinTooltipDescription") }}
+                </template>
+              </OTooltip>
             </template>
-          </q-input>
-          <q-input
+          </OInput>
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
             v-model.number="dashboardPanelData.data.config.y_axis_max"
-            color="input-border"
-            bg-color="input-bg"
-            style="width: 50%"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
+            type="number"
             :placeholder="t('dashboard.auto')"
+            :label="t('common.yAxisMax')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.y_axis_max =
@@ -995,44 +711,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="dashboard-config-y_axis_max"
           >
-            <template v-slot:label>
-              <div style="display: flex; align-items: center; gap: 4px">
-                <span>{{ t("common.yAxisMax") }}</span>
-                <q-icon
-                  name="info"
-                  size="20px"
-                  style="cursor: pointer"
-                  data-test="dashboard-config-y_axis_max-info"
-                >
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    :offset="[0, 8]"
-                  >
-                    <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
-                    <br />
-                    {{ t("dashboard.yAxisMaxTooltipDescription") }}
-                  </q-tooltip>
-                </q-icon>
-              </div>
+            <template #tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <b>{{ t("dashboard.yAxisMaxTooltipTitle") }}</b>
+                  <br />
+                  {{ t("dashboard.yAxisMaxTooltipDescription") }}
+                </template>
+              </OTooltip>
             </template>
-          </q-input>
+          </OInput>
         </div>
 
-        <q-toggle
+        <OSwitch
           v-if="shouldShowGridlines(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'gridlines')"
           v-model="dashboardPanelData.data.config.show_gridlines"
           :label="t('dashboard.showGridlines')"
           data-test="dashboard-config-show-gridlines"
-          class="tw:h-[36px] o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
       </div>
     </q-expansion-item>
@@ -1054,43 +751,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <q-select
+        <OSelect
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-position')"
-          borderless
           v-model="dashboardPanelData.data.config.label_option.position"
           :options="labelPositionOptions"
-          dense
           :label="t('dashboard.labelPosition')"
-          class="showLabelOnTop selectedLabel"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.label_option.position
-              ? labelPositionOptions.find(
-                  (it) =>
-                    it.value ==
-                    dashboardPanelData.data.config.label_option.position,
-                )?.label
-              : t('dashboard.none')
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-label-position"
-        >
-        </q-select>
+        />
 
-        <q-input
+        <OInput
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-rotate')"
           v-model.number="dashboardPanelData.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
-          :type="'number'"
+          type="number"
           placeholder="0"
           @update:model-value="
             (value: any) =>
@@ -1098,26 +775,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 value !== '' ? value : 0)
           "
           data-test="dashboard-config-label-rotate"
-        >
-        </q-input>
+        />
 
         <div
-          style="width: 100%; display: flex; gap: 16px"
+          class="tw:flex tw:gap-2"
           v-if="shouldShowAxisLabelConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'axis-label')"
         >
-          <q-input
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
             v-model.number="dashboardPanelData.data.config.axis_label_rotate"
-            color="input-border"
-            bg-color="input-bg"
-            style="width: 50%"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
+            type="number"
             placeholder="0"
+            :label="t('dashboard.axisLabelRotate')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.axis_label_rotate =
@@ -1125,83 +795,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="dashboard-config-axis-label-rotate"
           >
-            <template v-slot:label>
-              <div style="display: flex; align-items: center; gap: 4px">
-                <span>{{ t("dashboard.axisLabelRotate") }}</span>
-                <q-icon
-                  name="info"
-                  size="20px"
-                  style="cursor: pointer"
-                  data-test="dashboard-config-axis-label-rotate-info"
-                >
-                  <q-tooltip
-                    anchor="top middle"
-                    self="bottom middle"
-                    :offset="[0, 8]"
-                    class="bg-grey-8"
-                  >
-                    <div>
-                      <span>{{
-                        t("dashboard.axisLabelRotateTooltipText")
-                      }}</span>
-                      <br /><br />
-                      <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
-                      <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
-                    </div>
-                  </q-tooltip>
-                </q-icon>
-              </div>
+            <template #tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <div>
+                    <span>{{ t("dashboard.axisLabelRotateTooltipText") }}</span>
+                    <br /><br />
+                    <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                    <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
+                  </div>
+                </template>
+              </OTooltip>
             </template>
-          </q-input>
-          <q-input
+          </OInput>
+          <OInput
+            class="tw:flex-1 tw:min-w-0"
             v-model.number="
               dashboardPanelData.data.config.axis_label_truncate_width
             "
-            color="input-border"
-            bg-color="input-bg"
-            style="width: 50%"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
+            type="number"
             placeholder="0"
+            :label="t('dashboard.axisLabelTruncate')"
             @update:model-value="
               (value: any) =>
                 (dashboardPanelData.data.config.axis_label_truncate_width =
                   value !== '' ? value : null)
             "
-            data-test="dashboard-config-axis-label-truncate-width"
+            data-test="dashboard-config-axis-label-truncate"
           >
-            <template v-slot:label>
-              <div style="display: flex; align-items: center; gap: 4px">
-                <span>{{ t("dashboard.axisLabelTruncate") }}</span>
-                <q-icon
-                  name="info"
-                  size="20px"
-                  style="cursor: pointer"
-                  data-test="dashboard-config-axis-label-truncate-info"
-                >
-                  <q-tooltip
-                    anchor="top middle"
-                    self="bottom middle"
-                    :offset="[0, 8]"
-                    class="bg-grey-8"
-                  >
-                    <div>
-                      <span>{{
-                        t("dashboard.axisLabelTruncateTooltipText")
-                      }}</span>
-                      <br /><br />
-                      <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
-                      <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
-                    </div>
-                  </q-tooltip>
-                </q-icon>
-              </div>
+            <template #tooltip>
+              <OTooltip :side-offset="8">
+                <template #content>
+                  <div>
+                    <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
+                    <br /><br />
+                    <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
+                    <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
+                  </div>
+                </template>
+              </OTooltip>
             </template>
-          </q-input>
+          </OInput>
         </div>
       </div>
     </q-expansion-item>
@@ -1223,82 +857,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body o2-input">
-        <q-select
+        <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'symbol')"
-          borderless
           v-model="dashboardPanelData.data.config.show_symbol"
           :options="showSymbol"
-          dense
           :label="t('dashboard.showSymbol')"
-          class="showLabelOnTop selectedLabel"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.show_symbol
-              ? showSymbol.find(
-                  (it: any) =>
-                    it.value == dashboardPanelData.data.config.show_symbol,
-                )?.label
-              : 'No'
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-show_symbol"
-        >
-          <template v-slot:option="scope">
-            <q-item v-bind="scope.itemProps">
-              <q-item-section avatar style="height: 20px">
-                <q-icon>
-                  <component :is="scope.opt.iconComponent"></component>
-                </q-icon>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ scope.opt.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
 
-        <q-select
+        <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'interpolation')"
-          borderless
           v-model="dashboardPanelData.data.config.line_interpolation"
           :options="lineInterpolationOptions"
-          dense
           :label="t('dashboard.lineInterpolation')"
-          class="showLabelOnTop selectedLabel"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.line_interpolation
-              ? lineInterpolationOptions.find(
-                  (it: any) =>
-                    it.value ==
-                    dashboardPanelData.data.config.line_interpolation,
-                )?.label
-              : 'smooth'
-          }`"
+          :valueKey="'value'"
+          :labelKey="'label'"
           data-test="dashboard-config-line_interpolation"
-        >
-          <template v-slot:option="scope">
-            <q-item v-bind="scope.itemProps">
-              <q-item-section avatar>
-                <q-icon>
-                  <component :is="scope.opt.iconComponent"></component>
-                </q-icon>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ scope.opt.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
 
-        <q-input
+        <OInput
           v-if="shouldShowLineThickness(dashboardPanelData, promqlMode)"
           v-show="isConfigOptionVisible('lineStyle', 'line-thickness')"
           v-model.number="dashboardPanelData.data.config.line_thickness"
-          :value="1.5"
+          type="number"
           :min="0"
           @update:model-value="
             (value: any) =>
@@ -1306,18 +891,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 typeof value == 'number' && value >= 0 ? value : 1.5)
           "
           :label="t('dashboard.lineThickness')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
           :placeholder="t('dashboard.lineThicknessDefault')"
-          :type="'number'"
           data-test="dashboard-config-line_thickness"
-        >
-        </q-input>
+        />
       </div>
     </q-expansion-item>
 
@@ -1339,107 +915,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <q-toggle
+        <OSwitch
           v-show="isConfigOptionVisible('table', 'wrap')"
           v-model="dashboardPanelData.data.config.wrap_table_cells"
           :label="t('dashboard.wraptext')"
           data-test="dashboard-config-wrap-table-cells"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
 
-        <q-toggle
+        <OSwitch
           v-if="!promqlMode"
           v-show="isConfigOptionVisible('table', 'transpose')"
           v-model="dashboardPanelData.data.config.table_transpose"
           :label="t('dashboard.tableTranspose')"
           data-test="dashboard-config-table_transpose"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          :disabled="isPivotMode"
           size="lg"
-          :disable="isPivotMode"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
 
-        <q-toggle
+        <OSwitch
           v-if="!promqlMode"
           v-show="isConfigOptionVisible('table', 'dynamic-columns')"
           v-model="dashboardPanelData.data.config.table_dynamic_columns"
           :label="t('dashboard.tableDynamicColumns')"
           data-test="dashboard-config-table_dynamic_columns"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
+          :disabled="isPivotMode"
           size="lg"
-          :disable="isPivotMode"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
 
-        <q-toggle
+        <OSwitch
           v-show="isConfigOptionVisible('table', 'pagination')"
           v-model="dashboardPanelData.data.config.table_pagination"
           :label="t('dashboard.pagination')"
           data-test="dashboard-config-show-pagination"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
 
-        <q-input
+        <OInput
           v-if="dashboardPanelData.data.config.table_pagination"
           v-show="isConfigOptionVisible('table', 'rows-per-page')"
           v-model.number="
             dashboardPanelData.data.config.table_pagination_rows_per_page
           "
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          dense
-          label-slot
-          data-test="dashboard-config-rows-per-page"
-          borderless
-          hide-bottom-space
           type="number"
           :placeholder="t('dashboard.auto')"
-          min="1"
+          :min="1"
+          :label="t('dashboard.rowsPerPage')"
+          data-test="dashboard-config-rows-per-page"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.rowsPerPage") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-rows-per-page-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  max-width="250px"
-                >
-                  {{ t("dashboard.rowsPerPageTooltip") }}
-                </q-tooltip>
-              </div>
-            </div>
+          <template #tooltip>
+            <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="250px" />
           </template>
-        </q-input>
+        </OInput>
       </div>
     </q-expansion-item>
 
@@ -1460,34 +987,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <q-toggle
+        <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
           v-model="dashboardPanelData.data.config.table_pivot_show_row_totals"
-          :label="t('dashboard.pivotShowRowTotals')"
           data-test="dashboard-config-pivot-row-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.pivotShowRowTotalsTooltip") }}
-            </q-tooltip>
-          </OButton>
-        </q-toggle>
+          <template #label>
+            {{ t('dashboard.pivotShowRowTotals') }}
+            <OButton variant="ghost" size="icon" @click.stop>
+              <template #icon-left><q-icon name="info_outline" /></template>
+              <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="250px" />
+            </OButton>
+          </template>
+        </OSwitch>
 
-        <q-toggle
+        <OSwitch
           v-if="
             !promqlMode &&
             isPivotMode &&
@@ -1497,57 +1013,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('pivotTable', 'pivot-sticky-col-totals')
           "
           v-model="dashboardPanelData.data.config.table_pivot_sticky_col_totals"
-          :label="t('dashboard.pivotStickyColTotals')"
           data-test="dashboard-config-pivot-sticky-col-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg tw:pl-4"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.pivotStickyColTotalsTooltip") }}
-            </q-tooltip>
-          </OButton>
-        </q-toggle>
+          <template #label>
+            {{ t('dashboard.pivotStickyColTotals') }}
+            <OButton variant="ghost" size="icon" @click.stop>
+              <template #icon-left><q-icon name="info_outline" /></template>
+              <OTooltip :content="t('dashboard.pivotStickyColTotalsTooltip')" max-width="250px" />
+            </OButton>
+          </template>
+        </OSwitch>
 
-        <q-toggle
+        <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-col-totals')"
           v-model="dashboardPanelData.data.config.table_pivot_show_col_totals"
-          :label="t('dashboard.pivotShowColTotals')"
           data-test="dashboard-config-pivot-col-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.pivotShowColTotalsTooltip") }}
-            </q-tooltip>
-          </OButton>
-        </q-toggle>
+          <template #label>
+            {{ t('dashboard.pivotShowColTotals') }}
+            <OButton variant="ghost" size="icon" @click.stop>
+              <template #icon-left><q-icon name="info_outline" /></template>
+              <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="250px" />
+            </OButton>
+          </template>
+        </OSwitch>
 
-        <q-toggle
+        <OSwitch
           v-if="
             !promqlMode &&
             isPivotMode &&
@@ -1557,28 +1051,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('pivotTable', 'pivot-sticky-row-totals')
           "
           v-model="dashboardPanelData.data.config.table_pivot_sticky_row_totals"
-          :label="t('dashboard.pivotStickyRowTotals')"
           data-test="dashboard-config-pivot-sticky-row-totals"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg tw:pl-4"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         >
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.pivotStickyRowTotalsTooltip") }}
-            </q-tooltip>
-          </OButton>
-        </q-toggle>
+          <template #label>
+            {{ t('dashboard.pivotStickyRowTotals') }}
+            <OButton variant="ghost" size="icon" @click.stop>
+              <template #icon-left><q-icon name="info_outline" /></template>
+              <OTooltip :content="t('dashboard.pivotStickyRowTotalsTooltip')" max-width="250px" />
+            </OButton>
+          </template>
+        </OSwitch>
       </div>
     </q-expansion-item>
 
@@ -1603,14 +1086,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.configSectionValueTransformations") }}
           <OButton variant="ghost" size="icon" @click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.configSectionValueTransformationsTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.configSectionValueTransformationsTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1640,14 +1116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.configSectionFieldOverrides") }}
           <OButton variant="ghost" size="icon" @click.stop>
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.configSectionFieldOverridesTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -1680,125 +1149,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body o2-input">
-        <q-select
+        <div
           v-if="dashboardPanelData.data.type == 'maps'"
-          borderless
-          v-model="dashboardPanelData.data.config.map_type.type"
-          :options="mapTypeOptions"
-          dense
-          :label="t('dashboard.mapTypeLabel')"
-          class="showLabelOnTop"
-          stack-label
-          emit-value
-          data-test="dashboard-config-map-type"
-          hide-bottom-space
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.mapsMapType") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
-              <q-tooltip class="bg-grey-8" max-width="250px">
-                {{ t("dashboard.mapsMapTypeTooltip") }}
-              </q-tooltip>
-            </div>
-          </template>
-        </q-select>
+          <OSelect
+            v-model="dashboardPanelData.data.config.map_type.type"
+            :options="mapTypeOptions"
+            :valueKey="'value'"
+            :labelKey="'label'"
+            :label="t('dashboard.mapsMapType')"
+            data-test="dashboard-config-map-type"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('dashboard.mapsMapTypeTooltip')" max-width="250px" />
+            </template>
+          </OSelect>
+        </div>
 
-        <q-select
+        <OSelect
           v-if="dashboardPanelData.data.type == 'geomap'"
-          borderless
           v-model="dashboardPanelData.data.config.base_map.type"
           :options="basemapTypeOptions"
-          dense
+          :valueKey="'value'"
+          :labelKey="'label'"
           :label="t('dashboard.basemapLabel')"
-          class="showLabelOnTop"
-          stack-label
-          emit-value
-          :display-value="'OpenStreetMap'"
           data-test="dashboard-config-basemap"
-          hide-bottom-space
-        >
-        </q-select>
+        />
 
         <div v-if="dashboardPanelData.data.type == 'geomap'">
           <span>{{ t("dashboard.initialView") }}</span>
-          <div class="row">
-            <q-input
+          <div class="row tw:gap-2">
+            <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lat"
-              :value="0"
+              :label="t('dashboard.latitudeLabel')"
+              type="number"
               @blur="
                 handleBlur(dashboardPanelData.data.config.map_view, 0, 'lat')
               "
-              :label="t('dashboard.latitudeLabel')"
-              color="input-border"
-              bg-color="input-bg"
-              class="col q-mr-sm q-py-md showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              label-slot
-              :type="'number'"
               data-test="dashboard-config-latitude"
-              hide-bottom-space
-            >
-            </q-input>
-            <q-input
+            />
+            <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lng"
-              :value="0"
+              :label="t('dashboard.longitudeLabel')"
+              type="number"
               @blur="
                 handleBlur(dashboardPanelData.data.config.map_view, 0, 'lng')
               "
-              :label="t('dashboard.longitudeLabel')"
-              color="input-border"
-              bg-color="input-bg"
-              class="col q-mr-sm q-py-md showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              label-slot
-              :type="'number'"
               data-test="dashboard-config-longitude"
-              hide-bottom-space
-            >
-            </q-input>
+            />
           </div>
-          <q-input
+          <OInput
             v-model.number="dashboardPanelData.data.config.map_view.zoom"
-            :value="1"
+            :label="t('dashboard.zoomLabel')"
+            type="number"
             @blur="
               handleBlur(dashboardPanelData.data.config.map_view, 1, 'zoom')
             "
-            :label="t('dashboard.zoomLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
             data-test="dashboard-config-zoom"
-            hide-bottom-space
-          >
-          </q-input>
+          />
 
-          <q-select
+          <OSelect
             v-model="dashboardPanelData.data.config.map_symbol_style.size"
             :label="t('dashboard.symbolsize')"
-            borderless
             :options="symbolOptions"
-            dense
-            class="showLabelOnTop"
-            stack-label
-            emit-value
-            :display-value="`${dashboardPanelData.data.config.map_symbol_style.size}`"
+            :valueKey="'value'"
+            :labelKey="'label'"
             data-test="dashboard-config-symbol"
-            hide-bottom-space
-          >
-          </q-select>
+          />
 
-          <div class="row">
-            <q-input
+          <div class="row tw:gap-2">
+            <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-if="
                 dashboardPanelData.data.config.map_symbol_style.size ===
                 'by Value'
@@ -1807,7 +1230,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.data.config.map_symbol_style.size_by_value
                   .min
               "
-              :value="1"
+              :label="t('dashboard.minimum')"
+              type="number"
+              :min="0"
               @blur="
                 handleBlur(
                   dashboardPanelData.data.config.map_symbol_style.size_by_value,
@@ -1815,22 +1240,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'min',
                 )
               "
-              :label="t('dashboard.minimum')"
-              color="input-border"
-              bg-color="input-bg"
-              class="col-6 q-py-md showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              label-slot
-              :type="'number'"
               data-test="dashboard-config-map-symbol-min"
-              :min="0"
-              hide-bottom-space
-            >
-            </q-input>
-
-            <q-input
+            />
+            <OInput
+              class="tw:flex-1 tw:min-w-0"
               v-if="
                 dashboardPanelData.data.config.map_symbol_style.size ===
                 'by Value'
@@ -1839,7 +1252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.data.config.map_symbol_style.size_by_value
                   .max
               "
-              :value="100"
+              :label="t('dashboard.maximum')"
+              type="number"
+              :min="0"
               @blur="
                 handleBlur(
                   dashboardPanelData.data.config.map_symbol_style.size_by_value,
@@ -1847,30 +1262,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'max',
                 )
               "
-              :label="t('dashboard.maximum')"
-              color="input-border"
-              bg-color="input-bg"
-              class="col-6 q-py-md showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              label-slot
-              :type="'number'"
               data-test="dashboard-config-map-symbol-max"
-              :min="0"
-              hide-bottom-space
-            >
-            </q-input>
+            />
           </div>
 
-          <q-input
+          <OInput
             v-if="
               dashboardPanelData.data.config.map_symbol_style.size === 'fixed'
             "
             v-model.number="
               dashboardPanelData.data.config.map_symbol_style.size_fixed
             "
-            :value="2"
+            :label="t('dashboard.fixedValue')"
+            type="number"
             @blur="
               handleBlur(
                 dashboardPanelData.data.config.map_symbol_style,
@@ -1878,51 +1282,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'size_fixed',
               )
             "
-            :label="t('dashboard.fixedValue')"
-            color="input-border"
-            bg-color="input-bg"
-            class="col-6 q-py-md showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
             data-test="dashboard-config-map-symbol-fixed"
-            hide-bottom-space
-          >
-          </q-input>
+          />
 
-          <q-select
-            borderless
+          <OSelect
             v-model="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.layer_type
             "
             :options="layerTypeOptions"
-            dense
             :label="t('dashboard.layerType')"
-            class="showLabelOnTop"
-            stack-label
-            emit-value
-            :display-value="`${
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].config.layer_type
-            }`"
+            :valueKey="'value'"
+            :labelKey="'label'"
             data-test="dashboard-config-layer-type"
-            hide-bottom-space
-          >
-          </q-select>
+          />
 
-          <q-input
+          <OInput
             v-if="!isWeightFieldPresent"
             v-model.number="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.weight_fixed
             "
-            :value="1"
+            :label="t('common.weight')"
+            type="number"
             @blur="
               handleBlur(
                 dashboardPanelData.data.queries[
@@ -1932,19 +1316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'weight_fixed',
               )
             "
-            :label="t('common.weight')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            label-slot
-            :type="'number'"
             data-test="dashboard-config-weight"
-            hide-bottom-space
-          >
-          </q-input>
+          />
         </div>
       </div>
     </q-expansion-item>
@@ -1967,69 +1340,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <q-input
+        <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.min
           "
-          :value="0"
+          type="number"
+          :label="t('dashboard.gaugeMinValue')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.min = value ? value : 0)
           "
-          :label="t('dashboard.gaugeMinValue')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
-          :type="'number'"
           data-test="dashboard-config-gauge-min"
-        >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.gaugeMinValue") }}
-            </div>
-          </template>
-        </q-input>
-        <q-input
+        />
+        <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-max')"
           v-model.number="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].config.max
           "
-          :value="100"
+          type="number"
+          :label="t('dashboard.gaugeMaxValue')"
+          placeholder="100"
           @update:model-value="
             (value: any) =>
               (dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.max = value ? value : 100)
           "
-          :label="t('dashboard.gaugeMaxValue')"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          label-slot
-          placeholder="100"
-          :type="'number'"
           data-test="dashboard-config-gauge-max"
-        >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.gaugeMaxValue") }}
-            </div>
-          </template>
-        </q-input>
+        />
       </div>
     </q-expansion-item>
 
@@ -2051,71 +1396,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expand-icon-class="text-grey-6"
     >
       <div class="config-section-body">
-        <q-select
-          v-show="isConfigOptionVisible('layout', 'trellis-layout')"
-          :label="t('dashboard.trellisLayout')"
-          data-test="dashboard-trellis-chart"
-          borderless
-          v-model="dashboardPanelData.data.config.trellis.layout"
-          :options="trellisOptions"
-          dense
-          class="showLabelOnTop"
-          stack-label
-          emit-value
-          :display-value="`${
-            dashboardPanelData.data.config.trellis?.layout ??
-            t('dashboard.none')
-          }`"
-          :disable="isBreakdownFieldEmpty || hasTimeShifts"
-          hide-bottom-space
-        >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.trellisLayout") }}
-              <div>
-                <q-icon
-                  class="q-ml-xs"
-                  size="20px"
-                  name="info"
-                  data-test="dashboard-config-top_results-info"
-                />
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  max-width="250px"
-                >
+        <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
+          <OSelect
+            :label="t('dashboard.trellisLayout')"
+            data-test="dashboard-trellis-chart"
+            v-model="dashboardPanelData.data.config.trellis.layout"
+            :options="trellisOptions"
+            :valueKey="'value'"
+            :labelKey="'label'"
+            :disabled="isBreakdownFieldEmpty || hasTimeShifts"
+          >
+            <template #tooltip>
+              <OTooltip max-width="250px">
+                <template #content>
                   <b>{{
                     hasTimeShifts
                       ? t("dashboard.trellisTimeShiftTooltip")
                       : t("dashboard.trellisTooltip")
                   }}</b>
-                </q-tooltip>
-              </div>
-            </div>
-          </template>
-        </q-select>
+                </template>
+              </OTooltip>
+            </template>
+          </OSelect>
+        </div>
 
         <div
           v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
           v-show="isConfigOptionVisible('layout', 'trellis-columns')"
         >
-          <q-input
-            borderless
+          <OInput
             v-model.number="
               dashboardPanelData.data.config.trellis.num_of_columns
             "
-            :label="t('dashboard.numOfColumns')"
-            class="q-mr-sm showLabelOnTop"
-            stack-label
-            dense
-            :type="'number'"
+            type="number"
             :placeholder="t('dashboard.auto')"
+            :label="t('dashboard.numOfColumns')"
             data-test="trellis-chart-num-of-columns"
-            :disable="isBreakdownFieldEmpty || hasTimeShifts"
+            :disabled="isBreakdownFieldEmpty || hasTimeShifts"
             :min="1"
             :max="16"
-            hide-bottom-space
             @update:model-value="
               (value: any) =>
                 dashboardPanelData.data.config.trellis.num_of_columns > 16
@@ -2123,32 +1442,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : value
             "
           >
-            <template v-slot:label>
-              <div class="row items-center all-pointer-events">
-                {{ t("dashboard.numOfColumns") }}
-                <div>
-                  <q-icon
-                    class="q-ml-xs"
-                    size="20px"
-                    name="info"
-                    data-test="dashboard-config-top_results-info"
-                  />
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    max-width="250px"
-                  >
-                    <b>{{
-                      hasTimeShifts
-                        ? t("dashboard.trellisTimeShiftTooltip")
-                        : t("dashboard.trellisTooltip")
-                    }}</b>
-                  </q-tooltip>
-                </div>
-              </div>
+            <template #tooltip>
+              <OTooltip max-width="250px">
+                <template #content>
+                  <b>{{
+                    hasTimeShifts
+                      ? t("dashboard.trellisTimeShiftTooltip")
+                      : t("dashboard.trellisTooltip")
+                  }}</b>
+                </template>
+              </OTooltip>
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <div
@@ -2159,49 +1464,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('layout', 'trellis-group-by')"
           class="row items-center"
         >
-          <q-toggle
+          <OSwitch
             v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
             :label="t('dashboard.groupMultiYAxisTrellis')"
             data-test="dashboard-config-trellis-group-by-y-axis"
-            class="tw:h-[36px] o2-toggle-button-lg"
             size="lg"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-lg-dark'
-                : 'o2-toggle-button-lg-light'
-            "
-          />
-          <div>
-            <q-icon
-              class="q-ml-xs"
-              size="20px"
-              name="info"
-              data-test="dashboard-config-trellis-group-by-y-axis-info"
-            />
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              <div>
-                <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
-                <br /><br />
-                {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
-                <br /><br />
-                <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
-                <br /><br />
-                <b>{{
-                  t("dashboard.groupMultiYAxisTrellisTooltipDisabled")
-                }}</b>
-                <br /><br />
-                <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
-                <br />
-                {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
-                <br />
-                {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
-              </div>
-            </q-tooltip>
-          </div>
+          >
+            <template #tooltip>
+              <OTooltip>
+                <template #content>
+                  <div>
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
+                    <br /><br />
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
+                    <br /><br />
+                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
+                    <br /><br />
+                    <b>{{
+                      t("dashboard.groupMultiYAxisTrellisTooltipDisabled")
+                    }}</b>
+                    <br /><br />
+                    <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
+                    <br />
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
+                    <br />
+                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
+                  </div>
+                </template>
+              </OTooltip>
+            </template>
+          </OSwitch>
         </div>
       </div>
     </q-expansion-item>
@@ -2255,14 +1547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.drilldownTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -2303,16 +1588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              anchor="bottom middle"
-              self="top middle"
-              style="font-size: 10px"
-              max-width="250px"
-            >
-              <span>
-                {{ t("dashboard.comparisonAgainstTooltip") }}
-              </span>
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -2382,14 +1658,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop
           >
             <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="bottom middle"
-              self="top middle"
-              max-width="250px"
-            >
-              {{ t("dashboard.markLinesTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="250px" />
           </OButton>
         </div>
       </template>
@@ -2425,6 +1694,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -2449,6 +1722,7 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
 
 import { markRaw, watchEffect, watch } from "vue";
@@ -2481,6 +1755,10 @@ export default defineComponent({
   components: {
     OTabs,
     OTab,
+    OInput,
+    OTextarea,
+    OSelect,
+    OSwitch,
     ConfigPanelSearch,
     Drilldown,
     ValueMapping,
@@ -2500,6 +1778,7 @@ export default defineComponent({
     StepMiddle,
     PromQLChartConfig,
     OButton,
+    OTooltip,
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
@@ -3461,6 +2740,8 @@ export default defineComponent({
   gap: 12px;
   padding: 8px 8px;
   margin-left: 12px;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .config-no-results {

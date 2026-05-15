@@ -30,7 +30,7 @@ module.exports = defineConfig({
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry failed tests: 0 times on CI and locally */
+  /* Retry failed tests: 3 times on CI, 0 times locally */
   retries: 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 5 : 5,

@@ -188,9 +188,10 @@ export default [
         //   element: 'q-stepper-navigation',
         //   message: 'Remove <q-stepper-navigation> \u2014 place Back/Continue buttons in a single nav div outside </OStepper>.'
         // },
-        // {        //   element: 'q-tooltip',
+        // {
+        //   element: 'q-tooltip',
         //   message: 'Use <OTooltip> from "@/lib/overlay/Tooltip/OTooltip.vue" instead of <q-tooltip>.'
-        // }
+        // },
         // {
         //   element: 'q-drawer',
         //   message: 'Use <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" instead of <q-drawer>.'
@@ -215,6 +216,58 @@ export default [
         //   element: 'q-separator',
         //   message: 'Use <OSeparator> from "@/lib/core/Separator/OSeparator.vue" instead of <q-separator>.'
         // }
+        // {
+        //   element: 'q-checkbox',
+        //   message: 'Use <OCheckbox> / <OCheckboxGroup> from "@/lib/forms/Checkbox/OCheckbox.vue" instead of <q-checkbox>. For form-bound fields use <OFormCheckbox>.'
+        // },
+        // {
+        //   element: 'q-input',
+        //   message: 'Use <OInput> from "@/lib/forms/Input/OInput.vue" instead of <q-input>. For textarea use <OTextarea>. For form-bound fields use <OFormInput> / <OFormTextarea>.'
+        // },
+        // {
+        //   element: 'q-radio',
+        //   message: 'Use <ORadio> inside <ORadioGroup> from "@/lib/forms/Radio/" instead of <q-radio>. Wrap items in <ORadioGroup v-model="...">.'
+        // },
+        // {
+        //   element: 'q-select',
+        //   message: 'Use <OSelect> from "@/lib/forms/Select/OSelect.vue" instead of <q-select>. For form-bound fields use <OFormSelect>.'
+        // },
+        // {
+        //   element: 'q-toggle',
+        //   message: 'Use <OSwitch> from "@/lib/forms/Switch/OSwitch.vue" instead of <q-toggle>. For form-bound fields use <OFormSwitch>.'
+        // },
+        // {
+        //   element: 'q-slider',
+        //   message: 'Use <OSlider> from "@/lib/forms/Slider/OSlider.vue" instead of <q-slider>. For form-bound fields use <OFormSlider>.'
+        // },
+        // {
+        //   element: 'q-range',
+        //   message: 'Use <ORange> from "@/lib/forms/Range/ORange.vue" instead of <q-range>. For form-bound fields use <OFormRange>.'
+        // },
+        // {
+        //   element: 'q-file',
+        //   message: 'Use <OFile> from "@/lib/forms/File/OFile.vue" instead of <q-file>. For form-bound fields use <OFormFile>.'
+        // },
+        // {
+        //   element: 'q-date',
+        //   message: 'Use <ODate> from "@/lib/forms/Date/ODate.vue" instead of <q-date>. For form-bound fields use <OFormDate>.'
+        // },
+        // {
+        //   element: 'q-time',
+        //   message: 'Use <OTime> from "@/lib/forms/Time/OTime.vue" instead of <q-time>. For form-bound fields use <OFormTime>.'
+        // },
+        // {
+        //   element: 'q-color',
+        //   message: 'Use <OColor> from "@/lib/forms/Color/OColor.vue" instead of <q-color>. For form-bound fields use <OFormColor>.'
+        // },
+        // {
+        //   element: 'q-option-group',
+        //   message: 'Use <OOptionGroup> from "@/lib/forms/OptionGroup/OOptionGroup.vue" instead of <q-option-group>. For form-bound fields use <OFormOptionGroup>.'
+        // },
+        // {
+        //   element: 'q-form',
+        //   message: 'Use <OForm> from "@/lib/forms/OForm.vue" instead of <q-form>.'
+        // },
       ],
       'no-restricted-imports': [
         'error',

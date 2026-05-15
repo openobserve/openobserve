@@ -29,36 +29,19 @@
         "
       >
         <div style="width: 90%">
-          <q-select
+          <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"
             :options="markLineTypeOptions"
-            input-debounce="0"
-            behavior="menu"
-            borderless
-            dense
-            style="width: 100%"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            emit-value
+            class="tw:w-full"
             :data-test="`dashboard-config-markline-type-${index}`"
-            hide-bottom-space
-          ></q-select>
-          <q-input
+          />
+          <OInput
             v-model="dashboardPanelData.data.config.mark_line[index].name"
             :label="t('dashboard.markLineLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            dense
-            borderless
-            label-slot
-            style="width: 100%"
             :data-test="`dashboard-config-markline-name-${index}`"
-            hide-bottom-space
           />
-          <q-input
+          <OInput
             v-if="
               ['xAxis', 'yAxis'].includes(
                 dashboardPanelData.data.config.mark_line[index].type,
@@ -66,16 +49,7 @@
             "
             v-model="dashboardPanelData.data.config.mark_line[index].value"
             :label="t('dashboard.markLineValue')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            borderless
-            stack-label
-            dense
-            label-slot
-            style="width: 100%"
             :data-test="`dashboard-config-markline-value-${index}`"
-            hide-bottom-space
           />
         </div>
 
@@ -106,10 +80,12 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MarkLineConfig",
-  components: { OButton },
+  components: { OButton, OSelect, OInput },
   setup() {
     const store = useStore();
     const { t } = useI18n();

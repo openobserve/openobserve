@@ -59,18 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-show="tab === 'table'"
         class="col-auto flex justify-end align-center q-pr-md"
       >
-        <q-toggle
+        <OSwitch
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
-          class="o2-toggle-button-xs"
-          size="xs"
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
+          size="sm"
           @update:model-value="toggleWrapLogDetails"
         />
       </div>
@@ -424,6 +417,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
@@ -438,7 +432,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSpinner },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner },
   emits: [
     "showPrevDetail",
     "showNextDetail",

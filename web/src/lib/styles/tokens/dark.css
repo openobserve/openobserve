@@ -6,6 +6,16 @@
 :root.dark,
 .dark :root,
 .dark {
+    /*
+     * Tell the browser to render native UI (date/time/color picker icons,
+     * scrollbars, autofill backgrounds, etc.) in dark theme. Without this,
+     * Chromium's default ::-webkit-calendar-picker-indicator stays dark
+     * gray and disappears against the dark input background. This is
+     * inherited by every descendant, so a single declaration on the dark
+     * root flips every native widget at once.
+     */
+    color-scheme: dark;
+
     /* --- Text --- */
     --color-text-primary: var(--color-grey-50);
     --color-text-secondary: var(--color-grey-400);
@@ -124,6 +134,105 @@
     /* RefreshButton — staleness dot (slightly muted in dark mode) */
     --color-refresh-dot-stale: var(--color-warning-500);
     --color-refresh-dot-critical: var(--color-error-400);
+
+    /* Input (OInput, OTextarea) */
+    --color-input-bg: var(--color-surface-panel);
+    --color-input-border: var(--color-border-strong);
+    --color-input-disabled-bg: var(--color-surface-subtle);
+    --color-input-disabled-text: var(--color-text-secondary);
+    --color-input-placeholder: var(--color-text-disabled);
+    --color-input-error-text: var(--color-error-400);
+    --color-input-border-error: var(--color-error-400);
+
+    /* Select (OSelect) */
+    --color-select-bg: var(--color-surface-panel);
+    --color-select-border: var(--color-border-strong);
+    --color-select-disabled-bg: var(--color-surface-subtle);
+    --color-select-disabled-text: var(--color-text-secondary);
+    --color-select-placeholder: var(--color-text-disabled);
+    --color-select-error-text: var(--color-error-400);
+    --color-select-border-error: var(--color-error-400);
+    --color-select-content-bg: var(--color-surface-overlay);
+    --color-select-content-border: var(--color-border-default);
+    --color-select-item-hover-bg: var(--color-primary-900);
+    --color-select-item-selected-bg: var(--color-primary-800);
+    --color-select-item-selected-text: var(--color-primary-200);
+    --color-select-item-disabled: var(--color-text-disabled);
+
+    /* Switch (OSwitch) */
+    --color-switch-border: var(--color-primary-500);
+    --color-switch-border-off: var(--color-grey-600);
+    --color-switch-thumb-off: var(--color-grey-500);
+    --color-switch-thumb-on: var(--color-primary-500);
+    --color-switch-disabled-border: var(--color-grey-500);
+    --color-switch-disabled-thumb: var(--color-grey-500);
+
+    /* Checkbox (OCheckbox) */
+    --color-checkbox-bg: var(--color-surface-panel);
+    --color-checkbox-border: var(--color-border-strong);
+    --color-checkbox-checked-bg: var(--color-primary-500);
+    --color-checkbox-checked-border: var(--color-primary-500);
+    --color-checkbox-disabled-bg: var(--color-surface-subtle);
+    --color-checkbox-disabled-border: var(--color-border-default);
+
+    /* Radio (ORadio) */
+    --color-radio-bg: var(--color-surface-panel);
+    --color-radio-border: var(--color-border-strong);
+    --color-radio-checked-border: var(--color-primary-500);
+    --color-radio-checked-dot: var(--color-primary-500);
+    --color-radio-disabled-bg: var(--color-surface-subtle);
+    --color-radio-disabled-border: var(--color-border-default);
+
+    /* Slider (OSlider) */
+    --color-slider-track: var(--color-grey-700);
+    --color-slider-track-fill: var(--color-primary-500);
+    --color-slider-thumb: var(--color-primary-500);
+    --color-slider-thumb-border: var(--color-surface-panel);
+    --color-slider-disabled-track: var(--color-grey-800);
+    --color-slider-disabled-track-fill: var(--color-grey-700);
+    --color-slider-disabled-thumb: var(--color-grey-600);
+
+    /* File (OFile) */
+    --color-file-bg: var(--color-surface-panel);
+    --color-file-border: var(--color-border-strong);
+    --color-file-disabled-bg: var(--color-surface-subtle);
+    --color-file-disabled-border: var(--color-border-default);
+    --color-file-error-border: var(--color-error-400);
+    --color-file-chip-bg: var(--color-primary-900);
+    --color-file-chip-text: var(--color-primary-200);
+    --color-file-chip-remove: var(--color-primary-200);
+    --color-file-drag-bg: var(--color-primary-950);
+    --color-file-drag-border: var(--color-primary-400);
+
+    /* Date / Time / Color (ODate, OTime, OColor) */
+    --color-datepicker-bg: var(--color-surface-panel);
+    --color-datepicker-border: var(--color-border-strong);
+    --color-datepicker-disabled-bg: var(--color-surface-subtle);
+    --color-datepicker-disabled-border: var(--color-border-default);
+    --color-datepicker-error-border: var(--color-error-400);
+    --color-datepicker-segment-focus-bg: var(--color-primary-500);
+    --color-datepicker-segment-focus-text: var(--color-white);
+    /* DatePicker calendar popup */
+    --color-datepicker-popup-bg: var(--color-surface-overlay);
+    --color-datepicker-popup-border: var(--color-border-default);
+    --color-datepicker-day-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-selected-bg: var(--color-primary-500);
+    --color-datepicker-day-today-border: var(--color-primary-400);
+    --color-datepicker-day-outside-text: var(--color-text-disabled);
+    --color-datepicker-nav-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-range-bg: var(--color-primary-900);
+    --color-datepicker-day-range-text: var(--color-primary-200);
+    --color-datepicker-clock-face-bg: var(--color-surface-panel);
+    --color-datepicker-clock-header-bg: var(--color-primary-800);
+    --color-datepicker-clock-selected-bg: var(--color-primary-500);
+    --color-datepicker-clock-hover-bg: var(--color-primary-900);
+    --color-datepicker-relative-btn-bg: var(--color-surface-panel);
+    --color-datepicker-relative-btn-selected-bg: var(--color-primary-500);
+    --color-datepicker-relative-btn-hover-bg: var(--color-primary-900);
+
+    /* Color picker */
+    --color-colorpicker-popup-bg: var(--color-surface-overlay);
+    --color-colorpicker-popup-border: var(--color-border-default);
 
     /* Dialog */
     --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);

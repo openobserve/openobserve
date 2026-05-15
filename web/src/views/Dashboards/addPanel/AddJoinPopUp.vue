@@ -22,14 +22,11 @@
           <LeftJoinSvg class="tw:h-[21px]" />
           <label>Join</label>
         </div>
-        <q-select
-          dense
-          filled
+        <OSelect
           v-model="mainStream"
           :options="[]"
-          :disable="true"
+          disabled
           label="Joining Stream"
-          class="o2-custom-select-dashboard"
           data-test="dashboard-config-panel-join-from"
         />
       </div>
@@ -81,22 +78,12 @@
           <label>On</label>
         </div>
 
-        <q-select
-          filled
-          dense
+        <OSelect
           v-model="modelValue.stream"
           :options="filteredStreamOptions"
-          emit-value
-          map-options
           label="On Stream"
-          class="o2-custom-select-dashboard"
           data-test="dashboard-config-panel-join-to"
-          use-input
-          input-debounce="0"
-          behavior="menu"
-          hide-selected
-          fill-input
-          @filter="filterStreamOptions"
+          @search="onStreamSearch"
         />
       </div>
     </div>
@@ -143,14 +130,9 @@
           </div>
 
           <div class="field-container">
-            <q-select
-              behavior="menu"
-              borderless
+            <OSelect
               v-model="modelValue.conditions[argIndex].operation"
-              :options="operationOptions"
-              dense
-              filled
-              class="o2-custom-select-dashboard"
+              :options="operationSelectOptions"
               label="Select Operation"
               :data-test="`dashboard-join-condition-operation-${argIndex}`"
             />
@@ -172,13 +154,7 @@
             @click="handleAddCondition(argIndex)"
           >
             <template #icon-left><q-icon name="add" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >
-              Add another clause
-            </q-tooltip>
+            <OTooltip content="Add another clause" />
           </OButton>
 
           <OButton
@@ -190,11 +166,7 @@
             :aria-label="t('panel.removeClause')"
           >
             <template #icon-left><q-icon name="close" /></template>
-            <q-tooltip
-              class="bg-grey-8"
-              anchor="top middle"
-              self="bottom middle"
-            >Remove clause</q-tooltip>
+            <OTooltip content="Remove clause" />
           </OButton>
         </div>
       </div>
@@ -204,6 +176,8 @@
 
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   defineComponent,
   watch,
@@ -274,6 +248,8 @@ export default defineComponent({
 
   components: {
     OButton,
+    OSelect,
+    OTooltip,
     StreamFieldSelect,
     LeftJoinSvg,
     LeftJoinTypeSvg,
@@ -339,6 +315,7 @@ export default defineComponent({
     const streamOptions = ref<StreamOption[]>([]);
     const filteredStreamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
+    const operationSelectOptions = operationOptions.map((op) => ({ label: op, value: op }));
 
     /**
      * Determines if join summary should be shown
@@ -520,6 +497,17 @@ export default defineComponent({
       });
     }
 
+    function onStreamSearch(val: string): void {
+      if (!val) {
+        filteredStreamOptions.value = [...streamOptions.value];
+        return;
+      }
+      const needle = val.toLowerCase();
+      filteredStreamOptions.value = streamOptions.value.filter((stream) =>
+        stream.label.toLowerCase().includes(needle),
+      );
+    }
+
     /**
      * Handles join type change
      */
@@ -581,8 +569,7 @@ export default defineComponent({
     return {
       t,
       store,
-      operationOptions,
-      filteredStreamOptions,
+      operationOptions,      operationSelectOptions,      filteredStreamOptions,
       showJoinSummary,
       joinTypeLabel,
       localJoinType,
@@ -590,6 +577,7 @@ export default defineComponent({
       getJoinTypeLabelClass,
       getStreamsBasedJoinIndex,
       filterStreamOptions,
+      onStreamSearch,
       handleJoinTypeChange,
       handleAddCondition,
       handleRemoveCondition,

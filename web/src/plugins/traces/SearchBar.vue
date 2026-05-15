@@ -105,27 +105,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
           >
-            <q-toggle
+            <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
-            >
-            </q-toggle>
+              size="sm"
+            />
             <img
               :src="metricsIcon"
               alt="Metrics"
               style="width: 20px; height: 20px"
             />
-            <q-tooltip>
-              {{ t("traces.RedMetrics") }}
-            </q-tooltip>
+            <OTooltip :content="t('traces.RedMetrics')" />
           </div>
           <OButton
             data-test="traces-search-bar-reset-filters-btn"
@@ -134,36 +125,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="resetFilters"
           >
             <q-icon name="restart_alt" size="16px" />
-            <q-tooltip>
-              {{ t("search.resetFilters") }}
-            </q-tooltip>
+            <OTooltip :content="t('search.resetFilters')" />
           </OButton>
           <!-- Error Only Toggle -->
           <div
             class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
           >
-            <q-toggle
+            <OSwitch
               data-test="traces-search-bar-error-only-toggle-btn"
               v-model="searchObj.meta.showErrorOnly"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
+              size="sm"
               @update:model-value="onErrorOnlyToggle"
-            >
-            </q-toggle>
+            />
             <q-icon
               name="error"
               size="1.1rem"
               class="tw:mx-1 tw:text-red-500"
             />
-            <q-tooltip>
-              {{ t("traces.showErrorOnly") }}
-            </q-tooltip>
+            <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
           <syntax-guide
             data-test="logs-search-bar-sql-mode-toggle-btn"
@@ -226,13 +206,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isLoading"
               :disabled="isLoading"
             >
-              <q-tooltip
+              <OTooltip
                 v-if="
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
-                >{{ t("search.autoRunEnabled") }}</q-tooltip
-              >
+                :content="t('search.autoRunEnabled')"
+              />
               <q-icon
                 v-if="
                   searchObj.meta.liveMode &&
@@ -339,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('service-graph-refresh')"
           >
             <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            <OTooltip :content="t('common.refresh')" />
           </OButton>
           <OToggleGroup
             :model-value="searchObj.meta.serviceGraphVisualizationType"
@@ -366,15 +346,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
-          <q-select
+          <OSelect
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
-            dense
-            borderless
             class="tw:w-[7.5rem] tw:min-h-[2rem]! tw:h-[2rem]!"
-            emit-value
-            map-options
-            :disable="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+            :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onServiceGraphLayoutChange"
           />
         </div>
@@ -407,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('services-catalog-refresh')"
           >
             <q-icon name="refresh" size="16px" />
-            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+            <OTooltip :content="t('common.refresh')" />
           </OButton>
         </div>
       </div>
@@ -472,6 +448,9 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
@@ -500,6 +479,9 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    OSwitch,
+    OSelect,
+    OTooltip,
     Layers,
     Network,
     GitBranch,

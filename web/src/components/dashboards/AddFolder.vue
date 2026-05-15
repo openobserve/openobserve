@@ -16,35 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-px-md q-py-sm">
-      <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
-        <q-input
-          v-model="folderData.name"
+      <OForm ref="addFolderForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
+        <OFormInput
+          name="name"
           :label="t('dashboard.nameOfVariable') + '*'"
-          class="q-py-none showLabelOnTop"
           data-test="dashboard-folder-add-name"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
         />
         <span>&nbsp;</span>
-        <q-input
-          v-model="folderData.description"
+        <OFormInput
+          name="description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
           data-test="dashboard-folder-add-description"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
         />
-
-
-      </q-form>
+      </OForm>
   </div>
 </template>
 
@@ -57,6 +42,8 @@ import { getImageURL } from "../../utils/zincutils";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 const defaultValue = () => {
   return {
@@ -68,7 +55,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddFolder",
-  components: {},
+  components: { OForm, OFormInput },
   props: {
     folderId: {
       type: String,
@@ -102,12 +89,14 @@ export default defineComponent({
     const { track } = useReo();
 
     const onSubmit = useLoading(async () => {
-      await addFolderForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
+      const valid = await addFolderForm.value.validate();
+      if (!valid) return;
+      // Sync form values back to local state
+      const vals = addFolderForm.value.form.state.values as { name: string; description: string };
+      folderData.value.name = vals.name ?? folderData.value.name;
+      folderData.value.description = vals.description ?? folderData.value.description;
 
-        try {
+      try {
           //if edit mode
           if (props.editMode) {
             await updateFolder(
@@ -148,7 +137,8 @@ export default defineComponent({
           page: "Dashboards",
         });
       });
-    });
+
+    const submit = () => onSubmit.execute();
 
     const submit = () => onSubmit.execute();
 

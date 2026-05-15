@@ -29,62 +29,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
-          <div class="flex q-ml-auto tw:ps-2">
-            <q-input
+          <div class="tw:flex tw:flex-row tw:gap-x-2 tw:justify-end tw:items-center">
+            <OInput
               v-model="dynamicQueryModel"
-              dense
-              borderless
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
                   : t('dashboard.search')
               "
-              data-test="dashboard-search"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-              class="o2-search-input"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-dark'
-                  : 'o2-search-input-light'
-              "
-              hide-bottom-space
+              data-test="dashboard-search"
             >
-              <template #prepend>
-                <q-icon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search"
-                />
+              <template #icon-left>
+                <q-icon name="search" />
               </template>
-            </q-input>
-          </div>
-          <div class="tw:mb-2">
-            <q-toggle
+            </OInput>
+
+            <OSwitch
               data-test="dashboard-search-across-folders-toggle"
               v-model="searchAcrossFolders"
               label="All Folders"
               size="lg"
-              class="q-ml-sm tw:h-[36px] o2-toggle-button-lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
+              class="tw:whitespace-nowrap tw:shrink-0"
             >
-            </q-toggle>
-            <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-              {{
-                searchAcrossFolders
-                  ? t("dashboard.searchSelf")
-                  : t("dashboard.searchAll")
-              }}
-            </q-tooltip>
-          </div>
+              <template #tooltip>
+                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
+              </template>
+            </OSwitch>
+
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -130,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t(`dashboard.add`) }}
           </OButton>
+          </div>
         </div>
       </div>
     </div>
@@ -181,35 +155,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="2px"
                   ></q-separator>
                   <!-- Search Input -->
-                  <div style="width: 100%" class="flex folder-item q-py-xs">
-                    <q-input
+                  <div class="flex folder-item q-py-xs tw:w-full tw:px-2">
+                    <OInput
                       v-model="folderSearchQuery"
-                      dense
-                      borderless
                       data-test="folder-search"
                       placeholder="Search Folder"
-                      style="width: 100%"
                       clearable
-                      class="tw:mx-2 q-px-xs"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-search-input-dark'
-                          : 'o2-search-input-light'
-                      "
-                      hide-bottom-space
+                      class="tw:w-full"
                     >
-                      <template #prepend>
-                        <q-icon
-                          class="o2-search-input-icon"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'o2-search-input-icon-dark'
-                              : 'o2-search-input-icon-light'
-                          "
-                          name="search"
-                        />
+                      <template #icon-left>
+                        <q-icon name="search" />
                       </template>
-                    </q-input>
+                    </OInput>
                     <div></div>
                   </div>
                 </div>
@@ -361,14 +318,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? props.value.slice(0, 30) + "..."
                           : props.value
                       }}
-                      <q-tooltip
+                      <OTooltip
                         v-if="props.value && props.value.length > 30"
-                        class="q-mt-lg tw:w-[300px]"
-                        anchor="top middle"
-                        self="bottom middle"
-                      >
-                        {{ props.value }}
-                      </q-tooltip>
+                        :content="props.value"
+                        max-width="300px"
+                      />
                     </div>
                   </q-td>
                 </template>
@@ -591,8 +545,11 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 // @ts-nocheck
 import {
   computed,
@@ -658,8 +615,11 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    OInput,
+    OSwitch,
     ODrawer,
     AddDashboard,
+    OTooltip,
     AddDashboardFromGitHub,
     QTablePagination,
     NoData,

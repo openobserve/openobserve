@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-end tw:gap-2">
     <!-- select new folder -->
-    <q-select
+    <OSelect
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
       :options="
@@ -26,18 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         })
       "
       data-test="index-dropdown-stream_type"
-      input-debounce="0"
-      behavior="menu"
-      borderless
-      dense
-      class="showLabelOnTop no-case o2-custom-select-dashboard tw:flex-1"
-    >
-      <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
-      </template>
-    </q-select>
+      labelKey="label"
+      class="tw:flex-1"
+    />
 
     <OButton
       data-test="dashboard-folder-move-new-add"
@@ -77,11 +68,12 @@ import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, ODrawer },
+  components: { AddFolder, OButton, ODrawer, OSelect },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -108,34 +100,23 @@ export default defineComponent({
       }
     };
 
-    const getInitialFolderValue = () => {
+    const getInitialFolderValue = (): string => {
       // priority: activeFolderId > query.folder > default
-      // use activeFolderId if available
-      // else use router query if available
-      // else use default
+      const folderId = props.activeFolderId ?? route.query.folder ?? "default";
       const activeFolderData = store.state.organizationData.folders.find(
-        (item: any) =>
-          item.folderId ===
-          (props.activeFolderId ?? route.query.folder ?? "default"),
+        (item: any) => item.folderId === folderId,
       );
-
-      return {
-        label: activeFolderData?.name ?? "default",
-        value: activeFolderData?.folderId ?? "default",
-      };
+      return activeFolderData?.folderId ?? "default";
     };
 
-    //dropdown selected folder index
-    const selectedFolder = ref(getInitialFolderValue());
+    //dropdown selected folder id (primitive string for OSelect)
+    const selectedFolder = ref<string>(getInitialFolderValue());
     const { t } = useI18n();
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;
       if (newFolder && newFolder.data) {
-        selectedFolder.value = {
-          label: newFolder.data.name,
-          value: newFolder.data.folderId,
-        };
+        selectedFolder.value = newFolder.data.folderId;
       }
     };
 
@@ -158,8 +139,15 @@ export default defineComponent({
 
     watch(
       () => selectedFolder.value,
-      () => {
-        emit("folder-selected", selectedFolder.value);
+      (folderId) => {
+        const folder = store.state.organizationData.folders.find(
+          (item: any) => item.folderId === folderId,
+        );
+        // emit {label, value} for backward compatibility with parents
+        emit("folder-selected", {
+          label: folder?.name ?? folderId,
+          value: folderId,
+        });
       },
     );
 
@@ -177,10 +165,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.q-select .q-field__control-container .q-field__native {
-  height: 1rem !important;
-  min-height: 1rem !important;
-}
-</style>

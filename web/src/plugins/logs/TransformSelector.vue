@@ -22,23 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
     <div class="tw:flex tw:items-center">
       <div class="tw:flex tw:items-center">
-        <q-toggle
+        <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.showTransformEditor"
-          class="o2-toggle-button-xs"
-          size="xs"
-          flat
-          :disable="!searchObj.data.transformType"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
+          size="sm"
+          :disabled="!searchObj.data.transformType"
         >
-          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-            {{ getTransformLabelTooltip }}
-          </q-tooltip>
-        </q-toggle>
+          <template #tooltip>
+            <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
+          </template>
+        </OSwitch>
       </div>
       <ODropdown v-model:open="functionModel" side="bottom" align="start">
         <template #trigger>
@@ -55,9 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <q-icon v-else :name="transformIcon" size="16px" />
             <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
-            <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">{{
-              transformsLabel
-            }}</q-tooltip>
+            <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>
         </template>
         <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
@@ -67,38 +58,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="logs-transform-type o2-input q-mx-sm"
             style="padding-top: 0"
           >
-            <q-select
+            <OSelect
               v-if="isActionsEnabled"
               v-model="searchObj.data.transformType"
               :options="transformTypes"
               :label="t('search.transformType')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
-              emit-value
-              filled
-              dense
+              class="tw:py-1"
               clearable
               @update:model-value="updateTransforms()"
             />
           </div>
           <div>
-            <q-input
+            <OInput
               v-model="searchTerm"
-              dense
-              filled
-              borderless
               clearable
-              debounce="300"
+              :debounce="300"
               :placeholder="t('search.searchSavedFunction')"
               data-test="function-search-input"
             >
-              <template #prepend>
+              <template #icon-left>
                 <q-icon name="search" />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
           <div v-if="filteredTransformOptions.length">
@@ -142,13 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="fnSavedFunctionDialog"
     >
       <q-icon name="save" size="16px" />
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 6]">
-        {{
-          searchObj.data.transformType === "action"
-            ? t("search.saveActionDisabled")
-            : t("common.save")
-        }}
-      </q-tooltip>
+      <OTooltip
+        :content="searchObj.data.transformType === 'action' ? t('search.saveActionDisabled') : t('common.save')"
+        :side-offset="6"
+      />
     </OButton>
   </OButtonGroup>
 </template>
@@ -158,6 +136,10 @@ import { computed, ref, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";

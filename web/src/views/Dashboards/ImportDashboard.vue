@@ -83,22 +83,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab == 'import_json_url'"
                 class="editor-container-url card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
+                <div class="tw:mx-2 q-mt-md tw:pb-2">
                   <div style="width: calc(100% - 10px)" class="flex full-width">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
                       class="q-pr-sm"
                     >
-                      <q-input
+                      <OInput
                         v-model="url"
                         :label="t('dashboard.addURL')"
                         style="padding: 10px"
-                        stack-label
-                        label-slot
-                        :loading="isLoading == ImportType.URL"
-                        borderless
-                        hide-bottom-space
                       />
                     </div>
 
@@ -122,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model:query="jsonStr"
                     language="json"
                   />
-                </q-form>
+                </div>
               </div>
               <div
                 v-if="activeTab == 'import_json_file'"
                 class="dashboard-import-json-container card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
+                <div class="tw:mx-2 q-mt-md tw:pb-2">
                   <div style="width: calc(100% - 10px)" class="flex full-width">
                     <div
                       data-test="dashboard-import-file-input"
@@ -192,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
 
                   <div></div>
-                </q-form>
+                </div>
               </div>
             </div>
           </template>
@@ -224,23 +219,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorMessage.message }}
                       <div style="width: 300px">
-                        <q-input
+                        <OInput
                           v-model="dashboardTitles[errorIndex]"
-                          :label="'Dashboard Title'"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          stack-label
-                          dense
-                          tabindex="0"
+                          label="Dashboard Title"
                           @update:model-value="
                             updateDashboardTitle(
                               dashboardTitles[errorIndex],
                               errorMessage.dashboardIndex,
                             )
                           "
-                          borderless
-                          hide-bottom-space
                         />
                       </div>
                     </span>
@@ -250,22 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorMessage.message }}
                       <div style="width: 300px">
-                        <q-select
+                        <OSelect
                           v-model="streamTypes[errorIndex]"
-                          :options="streamTypeOptions"
-                          :label="'Stream Type'"
-                          :popup-content-style="{
-                            textTransform: 'lowercase',
-                          }"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="q-py-sm showLabelOnTop no-case"
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
+                          :options="streamTypeSelectOptions"
+                          label="Stream Type"
                           @update:model-value="
                             updateStreamType(
                               streamTypes[errorIndex],
@@ -275,9 +250,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               errorMessage.queryIndex,
                             )
                           "
-                          behavior="menu"
-                          borderless
-                          hide-bottom-space
                         />
                       </div>
                     </span>
@@ -320,6 +292,8 @@ import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { Upload, Link } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -371,6 +345,7 @@ export default defineComponent({
     const dashboardTitles = reactive({});
     const streamTypes = reactive({});
     const streamTypeOptions = ["logs", "metrics", "traces"];
+    const streamTypeSelectOptions = streamTypeOptions.map((t) => ({ label: t, value: t }));
     // import type values
     const ImportType = {
       FILES: "files",
@@ -875,11 +850,12 @@ export default defineComponent({
       updateDashboardTitle,
       updateStreamType,
       streamTypeOptions,
+      streamTypeSelectOptions,
       dashboardTitles,
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton },
+  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect },
 });
 </script>
 

@@ -30,18 +30,13 @@
     <template #header-right>
       <DrilldownUserGuide />
     </template>
-    <q-input
+    <OInput
       v-model="drilldownData.name"
       :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md q-mb-lg showLabelOnTop"
-      stack-label
-      borderless
+      :error-message="nameError"
+      :error="!!nameError"
+      @update:model-value="nameError = ''"
       data-test="dashboard-config-panel-drilldown-name"
-      dense
-      :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-      :lazy-rules="true"
     />
     <div
       style="display: flex; flex-direction: row; gap: 10px; align-items: center"
@@ -136,90 +131,34 @@
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
         <div class="dropdownDiv">
-          <q-select
+          <OSelect
             v-model="drilldownData.data.folder"
             :options="folderList"
-            emit-value
             :label="t('dashboard.selectFolderDrilldown')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            borderless
-            dense
-            style="width: 100%"
-            :loading="getFoldersListLoading.isLoading.value"
-            :disable="getFoldersListLoading.isLoading.value"
+            class="tw:w-full"
+            :disabled="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
-            hide-bottom-space
-          >
-            <!-- template when on options -->
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-italic text-grey">
-                  {{ t("dashboard.noFoldersAvailable") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.folder">
-          <q-select
+          <OSelect
             v-model="drilldownData.data.dashboard"
             :options="dashboardList"
-            emit-value
             :label="t('dashboard.selectDashboardDrilldown')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            borderless
-            dense
-            style="width: 100%"
-            :loading="getDashboardListLoading.isLoading.value"
-            :disable="getDashboardListLoading.isLoading.value"
+            class="tw:w-full"
+            :disabled="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
-            hide-bottom-space
-          >
-            <!-- template when on options -->
-            <template v-slot:no-option>
-              <q-item
-                data-test="dashboard-drilldown-no-dashboard-available-option"
-              >
-                <q-item-section class="text-italic text-grey">
-                  {{ t("dashboard.noDashboardsAvailable") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
         </div>
         <div class="dropdownDiv" v-if="drilldownData.data.dashboard">
-          <q-select
+          <OSelect
             v-model="drilldownData.data.tab"
             :options="tabList"
-            emit-value
             :label="t('dashboard.selectTabDrilldown')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            borderless
-            dense
-            style="width: 100%"
-            :loading="getTabListLoading.isLoading.value"
-            :disable="getTabListLoading.isLoading.value"
+            class="tw:w-full"
+            :disabled="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
-            hide-bottom-space
-          >
-            <!-- template when on options -->
-            <template v-slot:no-option>
-              <q-item data-test="dashboard-drilldown-no-tab-available-option">
-                <q-item-section class="text-italic text-grey">
-                  {{ t("dashboard.noTabAvailable") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
         </div>
 
         <!-- array of variables name and its values -->
@@ -288,36 +227,24 @@
       </div>
       <!-- radio button for new tab -->
       <div style="margin-top: 10px">
-        <q-toggle
+        <OSwitch
           :label="t('dashboard.passAllCurrentVariables')"
-          left-label
+          labelPosition="left"
           v-model="drilldownData.data.passAllVariables"
           data-test="dashboard-drilldown-pass-all-variables"
-          class="tw:h-[36px] tw:ml-1 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
       </div>
     </div>
 
     <!-- radio button for new tab -->
     <div style="margin-top: 10px">
-      <q-toggle
+      <OSwitch
         :label="t('dashboard.openInNewTab')"
-        left-label
+        labelPosition="left"
         v-model="drilldownData.targetBlank"
         data-test="dashboard-drilldown-open-in-new-tab"
-        class="tw:h-[36px] tw:ml-1 o2-toggle-button-lg"
         size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
       />
     </div>
 
@@ -349,6 +276,9 @@ import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGu
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import { useLoading } from "@/composables/useLoading";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -364,6 +294,9 @@ export default defineComponent({
     CommonAutoComplete,
     QueryEditor,
     OButton,
+    OInput,
+    OSelect,
+    OSwitch,
   },
   props: {
     open: {
@@ -425,6 +358,8 @@ export default defineComponent({
         ],
       },
     });
+    const nameError = ref("");
+
     const drilldownData = ref(
       props?.isEditMode
         ? JSON.parse(
@@ -639,6 +574,11 @@ export default defineComponent({
     });
 
     const saveDrilldown = () => {
+      if (!drilldownData.value.name.trim()) {
+        nameError.value = t("common.required");
+        return;
+      }
+      nameError.value = "";
       // if editmode then made changes
       // else add new drilldown
       if (props?.isEditMode) {
@@ -845,6 +785,7 @@ export default defineComponent({
       outlinedDashboard,
       dashboardPanelData,
       drilldownData,
+      nameError,
       outlinedDelete,
       store,
       folderList,

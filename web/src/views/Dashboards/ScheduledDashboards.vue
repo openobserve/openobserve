@@ -31,19 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <q-input
+        <OInput
           data-test="alert-list-search-input"
           v-model="scheduledFilterQuery"
-          borderless
-          dense
-          class="no-border tw:border tw:border-[var(--q-color-button-border,#d1d5db)] tw:rounded-md tw:px-2 tw:h-9"
           :placeholder="t('reports.search')"
-          hide-bottom-space
         >
-          <template #prepend>
+          <template #icon-left>
             <q-icon name="search" class="cursor-pointer" />
           </template>
-        </q-input>
+        </OInput>
 
         <OButton
           variant="primary"
@@ -122,6 +118,7 @@ import { getImageURL } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { Database, CalendarClock } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
