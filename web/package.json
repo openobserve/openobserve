@@ -84,7 +84,7 @@
   "devDependencies": {
     "@cypress/vue": "^6.0.2",
     "@cypress/webpack-dev-server": "^5.4.1",
-    "@iconify-json/material-symbols-light": "^1.2.71",
+    "@iconify-json/material-symbols": "^1.2.72",
     "@quasar/vite-plugin": "^1.10.0",
     "@rushstack/eslint-patch": "^1.15.0",
     "@tailwindcss/postcss": "^4.1.18",
