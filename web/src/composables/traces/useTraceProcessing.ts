@@ -45,6 +45,19 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         ? (node.startTimeUs - traceStartTimeUs) / 1000
         : node.startTimeMs || 0;
 
+      const resolvedIdentity = resolveSpanIdentity({
+        span_kind: node.spanKind,
+        service_name: node.serviceName || "unknown",
+        operation_name: node.operationName || "unknown",
+        attributes: node.attributes || {},
+        span_id: node.spanId || node.span_id || "",
+        trace_id: node.traceId || node.trace_id || "",
+        start_time: 0,
+        end_time: 0,
+        duration: 0,
+        _timestamp: 0,
+      } as Span);
+
       // Convert old format to EnrichedSpan
       const enrichedSpan: EnrichedSpan = {
         span_id: node.spanId || node.span_id,
@@ -65,7 +78,8 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isExpanded: true,
         isSelected: false,
         isOnCriticalPath: false,
-        color: node.style?.color || "#9CA3AF",
+        resolvedIdentity,
+        color: getServiceColor(resolvedIdentity),
         durationMs: node.durationMs || 0,
         durationPercent: 0,
         startOffsetMs,
