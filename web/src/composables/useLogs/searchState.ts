@@ -173,6 +173,8 @@ export const searchState = () => {
       searchObj.loadingCounter = false;
       searchObj.loadingStream = false;
       searchObj.loadingSavedView = false;
+      searchObj.meta.isInitialLoad = true;
+      searchObj.meta.isSearching = false;
 
       await nextTick();
 

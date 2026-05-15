@@ -302,8 +302,10 @@ const useLogs = () => {
         await getJobData();
       }
       refreshData();
+      searchObj.meta.isInitialLoad = false;
     } catch (e: any) {
       searchObj.loading = false;
+      searchObj.meta.isInitialLoad = false;
     }
   };
 
