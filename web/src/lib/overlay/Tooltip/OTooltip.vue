@@ -18,7 +18,6 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   delay: 700,
   maxWidth: "320px",
   disabled: false,
-  arrow: false,
 });
 
 defineSlots<TooltipSlots>();
@@ -52,9 +51,25 @@ onMounted(() => {
 
 onUnmounted(() => cleanupFn?.());
 
+const effectiveSideOffset = computed(() => props.sideOffset);
+
+// Using filter:drop-shadow instead of CSS border so the bubble and the arrow SVG
+// child are composited together first — the drop-shadow then traces the combined
+// speech-bubble silhouette with no seam at the arrow base.
+const contentStyle = computed(() => ({
+  maxWidth: props.maxWidth,
+  filter: [
+    'drop-shadow(1px 0 0 var(--color-tooltip-border))',
+    'drop-shadow(-1px 0 0 var(--color-tooltip-border))',
+    'drop-shadow(0 1px 0 var(--color-tooltip-border))',
+    'drop-shadow(0 -1px 0 var(--color-tooltip-border))',
+    'drop-shadow(0 2px 6px rgba(0,0,0,0.10))',
+  ].join(' '),
+}));
+
 const contentClasses = computed(() => [
   "tw:z-[7000] tw:px-2.5 tw:py-1.5",
-  "tw:bg-[var(--color-tooltip-bg)] tw:border tw:border-[var(--color-tooltip-border)] tw:rounded-md tw:shadow-sm",
+  "tw:bg-[var(--color-tooltip-bg)] tw:rounded-md",
   "tw:text-xs tw:text-[var(--color-tooltip-text)] tw:leading-relaxed",
   "tw:data-[state=delayed-open]:animate-in tw:data-[state=delayed-open]:fade-in-0 tw:data-[state=delayed-open]:zoom-in-95",
   "tw:data-[state=instant-open]:animate-in tw:data-[state=instant-open]:fade-in-0",
@@ -82,13 +97,17 @@ const contentClasses = computed(() => [
         <TooltipContent
           :side="side"
           :align="align"
-          :side-offset="sideOffset"
+          :side-offset="effectiveSideOffset"
           :align-offset="alignOffset"
-          :style="{ maxWidth }"
+          :style="contentStyle"
           :class="contentClasses"
         >
           <slot name="content">{{ content }}</slot>
-          <TooltipArrow v-if="arrow" :class="'tw:fill-[var(--color-tooltip-arrow)]'" />
+          <TooltipArrow
+            :width="10"
+            :height="5"
+            :class="'tw:fill-[var(--color-tooltip-arrow)]'"
+          />
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
@@ -113,13 +132,17 @@ const contentClasses = computed(() => [
           <TooltipContent
             :side="side"
             :align="align"
-            :side-offset="sideOffset"
+            :side-offset="effectiveSideOffset"
             :align-offset="alignOffset"
-            :style="{ maxWidth }"
+            :style="contentStyle"
             :class="contentClasses"
           >
             <slot name="content">{{ content }}</slot>
-            <TooltipArrow v-if="arrow" :class="'tw:fill-[var(--color-tooltip-arrow)]'" />
+            <TooltipArrow
+              :width="10"
+              :height="5"
+              :class="'tw:fill-[var(--color-tooltip-arrow)]'"
+            />
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>

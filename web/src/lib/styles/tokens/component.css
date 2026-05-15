@@ -128,10 +128,10 @@
   --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
   /* Tooltip */
-  --color-tooltip-bg: var(--color-surface-overlay);
+  --color-tooltip-bg: var(--color-primary-100);
   --color-tooltip-text: var(--color-text-primary);
-  --color-tooltip-border: var(--color-border-default);
-  --color-tooltip-arrow: var(--color-surface-overlay);
+  --color-tooltip-border: var(--color-border-strong);
+  --color-tooltip-arrow: var(--color-primary-100);
 
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);

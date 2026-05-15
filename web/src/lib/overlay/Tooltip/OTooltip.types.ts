@@ -26,8 +26,6 @@ export interface TooltipProps {
   disabled?: boolean;
   /** Controlled open state — omit for uncontrolled */
   open?: boolean;
-  /** Show a small arrow pointing at the trigger */
-  arrow?: boolean;
   /** Extra CSS class applied to the tooltip bubble element */
   contentClass?: string;
 }
