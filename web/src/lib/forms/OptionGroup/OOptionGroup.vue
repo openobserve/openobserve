@@ -71,7 +71,7 @@ function handleCheckbox(val: (string | number)[]) {
       <slot name="label">{{ label }}</slot>
       <q-icon
         v-if="$slots.tooltip"
-        name="info"
+        name="info_outline"
         size="16px"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         :class="[

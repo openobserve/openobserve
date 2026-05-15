@@ -107,7 +107,7 @@ const wrapperClasses = computed(() => [
       {{ label }}
       <q-icon
         v-if="$slots.tooltip"
-        name="info"
+        name="info_outline"
         size="16px"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
