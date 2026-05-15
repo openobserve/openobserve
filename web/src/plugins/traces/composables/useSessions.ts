@@ -30,8 +30,7 @@ export interface SessionDetail {
   tokens: number;
   cost: number;
   errorCount: number;
-  warnCount: number;
-  status: "ok" | "warn" | "error";
+  status: "ok" | "error";
 }
 
 export interface SessionTraceRow {
@@ -39,16 +38,12 @@ export interface SessionTraceRow {
   startTimeMicros: number;
   durationNanos: number;
   spanCount: number;
-  /** Sum of LLM call spans (gen_ai.operation.name is set). */
-  llmCallCount: number;
-  /** Sum of tool spans (tool_name is set OR operation_name = 'execute_tool'). */
-  toolCallCount: number;
   inputTokens: number;
   outputTokens: number;
   tokens: number;
   cost: number;
   errorCount: number;
-  status: "ok" | "warn" | "error";
+  status: "ok" | "error";
   model: string | null;
 }
 
@@ -280,8 +275,6 @@ export function useSessions() {
         // would 1000× under-render through formatDuration.
         durationNanos: endNanos > startNanos ? endNanos - startNanos : 0,
         spanCount,
-        llmCallCount: 0,
-        toolCallCount: 0,
         inputTokens: Number(r.gen_ai_usage_input_tokens) || 0,
         outputTokens: Number(r.gen_ai_usage_output_tokens) || 0,
         tokens: Number(r.gen_ai_usage_total_tokens) || 0,
@@ -327,7 +320,6 @@ export function useSessions() {
       tokens: totalTokens,
       cost: totalCost,
       errorCount: totalErrors,
-      warnCount: 0,
       status: totalErrors > 0 ? "error" : "ok",
     };
 
