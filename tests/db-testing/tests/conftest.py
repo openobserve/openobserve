@@ -74,7 +74,7 @@ def ingest_test_data(openobserve_base_url, auth_credentials, test_org, test_stre
     """
     def _ingest(data: list[dict], stream_name: str = None):
         stream = stream_name or test_stream
-        url = f"{openobserve_base_url}/api/{test_org}/{stream}/_json"
+        url = f"{openobserve_base_url.rstrip('/')}/api/{test_org}/{stream}/_json"
 
         response = requests.post(
             url,
@@ -99,7 +99,7 @@ def query_api(openobserve_base_url, auth_credentials, test_org):
     Fixture to query OpenObserve via API.
     """
     def _query(sql: str, stream_name: str):
-        url = f"{openobserve_base_url}/api/{test_org}/_search"
+        url = f"{openobserve_base_url.rstrip('/')}/api/{test_org}/_search"
 
         # Use a wider time range - last 24 hours to now + 1 hour
         now_micros = int(time.time() * 1000000)

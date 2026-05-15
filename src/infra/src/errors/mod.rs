@@ -131,6 +131,8 @@ pub enum DbError {
     TemplateError(#[from] TemplateError),
     #[error("PutAlert# {0}")]
     PutAlert(#[from] PutAlertError),
+    #[error("PutAnomalyConfig# {0}")]
+    PutAnomalyConfig(#[from] PutAnomalyConfigError),
 }
 
 #[derive(ThisError, Debug)]
@@ -151,6 +153,12 @@ pub enum PutDashboardError {
     MissingOwner,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
+}
+
+#[derive(ThisError, Debug)]
+pub enum PutAnomalyConfigError {
+    #[error("error creating anomaly config with folder that does not exist")]
+    FolderDoesNotExist,
 }
 
 #[derive(ThisError, Debug)]
