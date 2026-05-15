@@ -1,0 +1,189 @@
+name: DeepSeek PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: string
+
+env:
+  REVIEW_MARKER: "<!-- deepseek-pr-review -->"
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository 
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set PR number
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_number=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find existing review comment
+        id: find_comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${{ steps.pr.outputs.pr_number }}/comments" \
+            --jq '[.[] | select(.body | contains("deepseek-pr-review")) | .id] | last // empty')
+
+          if [ -n "$COMMENT_ID" ]; then
+            echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
+            echo "Found existing review comment: $COMMENT_ID"
+          else
+            echo "comment_id=" >> "$GITHUB_OUTPUT"
+            echo "No existing review comment found, will create new one"
+          fi
+
+      - name: Get PR diff and commits
+        id: pr_context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+
+          gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
+
+          gh pr view "$PR_NUMBER" --json commits --jq '[.commits[] | {sha: .oid, author: .authors[0].login, message: .messageHeadline}]' > /tmp/pr_commits.json
+
+          echo "diff_lines=$(wc -l < /tmp/pr_diff.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Request DeepSeek Review
+        id: deepseek_review
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+          EXISTING_COMMENT_ID="${{ steps.find_comment.outputs.comment_id }}"
+
+          # Fetch existing comment body if it exists
+          EXISTING_BODY=""
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            EXISTING_BODY=$(gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
+          fi
+
+          PR_DIFF=$(cat /tmp/pr_diff.txt)
+          PR_COMMITS=$(cat /tmp/pr_commits.json)
+
+          # Build the prompt for DeepSeek
+          SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
+
+          REVIEW_PROMPT=$(cat <<'PROMPT_END'
+          ## Code Review Request
+
+          **Repository:** ${{ github.repository }}
+          **PR Number:** PR_NUMBER_PLACEHOLDER
+
+          ### Commits
+          \`\`\`json
+          COMMITS_PLACEHOLDER
+          \`\`\`
+
+          ### PR Diff
+          \`\`\`diff
+          DIFF_PLACEHOLDER
+          \`\`\`
+
+          ### Existing Review Comment (if any)
+          EXISTING_BODY_PLACEHOLDER
+
+          ### Instructions
+          Review the diff above and produce exactly a table of issues in this format:
+
+          \`\`\`
+          <!-- deepseek-pr-review -->
+          ## Code Review
+
+          **Status:** [X issues / LGTM ✅] | **Commit count:** [N]
+
+          | File | Issue | Severity |
+          |------|-------|----------|
+          | \`file:line\` | Brief description. Fix: suggestion | High/Med/Low |
+
+          ### Resolved
+          - ~~Previously fixed issues that are now resolved~~
+          \`\`\`
+
+          STRICT RULES:
+          - ONE table only, no extra sections or summaries
+          - No praise or compliments
+          - 2 sentences max per issue
+          - If no issues found, use "Status: LGTM ✅" with empty table
+          - Only flag bugs, security issues, and performance problems
+          - If existing review body shows issues that are now resolved, move them to "Resolved" section with strikethrough
+          - Output ONLY the comment content, nothing else
+          PROMPT_END
+          )
+
+          REVIEW_PROMPT="${REVIEW_PROMPT//PR_NUMBER_PLACEHOLDER/$PR_NUMBER}"
+          REVIEW_PROMPT="${REVIEW_PROMPT//COMMITS_PLACEHOLDER/$PR_COMMITS}"
+
+          # Truncate diff to avoid exceeding token limits (DeepSeek has 128K context)
+          DIFF_TRUNCATED=$(echo "$PR_DIFF" | head -n 4000)
+          REVIEW_PROMPT="${REVIEW_PROMPT//DIFF_PLACEHOLDER/$DIFF_TRUNCATED}"
+          REVIEW_PROMPT="${REVIEW_PROMPT//EXISTING_BODY_PLACEHOLDER/$EXISTING_BODY}"
+
+          # Escape for JSON
+          JSON_PROMPT=$(jq -Rs '.' <<< "$REVIEW_PROMPT")
+          JSON_SYSTEM=$(jq -Rs '.' <<< "$SYSTEM_PROMPT")
+
+          # Call DeepSeek API
+          RESPONSE=$(curl -s https://api.deepseek.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+            -d "{
+              \"model\": \"deepseek-chat\",
+              \"messages\": [
+                {\"role\": \"system\", \"content\": $JSON_SYSTEM},
+                {\"role\": \"user\", \"content\": $JSON_PROMPT}
+              ],
+              \"temperature\": 0.3,
+              \"max_tokens\": 4096
+            }")
+
+          REVIEW_BODY=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$REVIEW_BODY" ]; then
+            echo "DeepSeek API returned empty response"
+            echo "Full response: $RESPONSE"
+            exit 1
+          fi
+
+          # Save review body to file for the next step
+          echo "$REVIEW_BODY" > /tmp/review_body.txt
+
+      - name: Post or Update Review Comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REVIEW_BODY=$(cat /tmp/review_body.txt)
+          EXISTING_COMMENT_ID="${{ steps.find_comment.outputs.comment_id }}"
+
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            # Update existing comment
+            gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
+              -X PATCH -f body="$REVIEW_BODY"
+            echo "Updated existing review comment: $EXISTING_COMMENT_ID"
+          else
+            # Create new comment
+            gh pr comment "${{ steps.pr.outputs.pr_number }}" --body "$REVIEW_BODY"
+            echo "Created new review comment"
+          fi
