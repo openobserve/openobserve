@@ -16,6 +16,7 @@ const props = withDefaults(defineProps<SwitchProps>(), {
 
 const emit = defineEmits<SwitchEmits>();
 
+  
 defineSlots<SwitchSlots>();
 
 // ── Local state — immediate visual feedback ────────────────────────────────
