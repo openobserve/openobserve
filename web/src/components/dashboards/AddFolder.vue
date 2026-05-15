@@ -140,8 +140,6 @@ export default defineComponent({
 
     const submit = () => onSubmit.execute();
 
-    const submit = () => onSubmit.execute();
-
     return {
       t,
       disableColor,
