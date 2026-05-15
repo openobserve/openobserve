@@ -123,7 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPage>
-  </div>
   </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
