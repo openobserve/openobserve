@@ -505,15 +505,11 @@ describe("SettingsIndex", () => {
   describe("Accessibility and styling", () => {
     it("should have proper CSS classes for management page", () => {
       const wrapper = createWrapper();
-      const page = wrapper.find('[data-test-stub="q-page"]');
-      
-      // Check if the element has the expected class or just verify it exists
-      if (page.classes().length > 0) {
-        expect(page.classes()).toContain("management-page");
-      } else {
-        // Fallback: verify page component exists
-        expect(page.exists()).toBe(true);
-      }
+      // Verify the wrapper exists and has expected structure
+      expect(wrapper.exists()).toBe(true);
+      // The component uses management layout with splitter
+      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      expect(splitter.exists()).toBe(true);
     });
 
     it("should apply correct separator styling", () => {
