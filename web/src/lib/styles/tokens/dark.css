@@ -91,6 +91,10 @@
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
 
+    /* Collapsible */
+    --color-collapsible-trigger-hover-bg: var(--color-primary-900);
+    --color-collapsible-trigger-active-bg: var(--color-primary-800);
+
     /* Badge — tokens that change on dark backgrounds */
     /* default: invert to dark surface + light text */
     --color-badge-default-solid-bg: var(--color-grey-700);

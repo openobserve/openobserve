@@ -164,6 +164,18 @@
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
 
+  /* Card */
+  --color-card-bg: var(--color-surface-panel);
+  --color-card-text: var(--color-text-primary);
+
+  /* Collapsible */
+  --color-collapsible-label: var(--color-text-primary);
+  --color-collapsible-caption: var(--color-text-secondary);
+  --color-collapsible-icon: var(--color-text-secondary);
+  --color-collapsible-trigger-hover-bg: var(--color-primary-50);
+  --color-collapsible-trigger-active-bg: var(--color-primary-100);
+  --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+
   /* Stepper */
   --color-stepper-indicator-default: var(--color-border-strong);
   --color-stepper-indicator-default-text: var(--color-text-primary);
@@ -441,6 +453,18 @@
   --color-tabs-focus-ring: var(--color-tabs-focus-ring);
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
+
+  /* Card */
+  --color-card-bg: var(--color-card-bg);
+  --color-card-text: var(--color-card-text);
+
+  /* Collapsible */
+  --color-collapsible-label: var(--color-collapsible-label);
+  --color-collapsible-caption: var(--color-collapsible-caption);
+  --color-collapsible-icon: var(--color-collapsible-icon);
+  --color-collapsible-trigger-hover-bg: var(--color-collapsible-trigger-hover-bg);
+  --color-collapsible-trigger-active-bg: var(--color-collapsible-trigger-active-bg);
+  --color-collapsible-trigger-focus-ring: var(--color-collapsible-trigger-focus-ring);
 
   /* Dialog */
   --color-dialog-overlay: var(--color-dialog-overlay);
