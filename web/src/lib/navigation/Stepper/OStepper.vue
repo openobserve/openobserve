@@ -88,14 +88,14 @@ function indicatorClasses(step: StepRegistration): string {
 }
 
 function titleClasses(step: StepRegistration): string {
-  if (step.name === props.modelValue) return 'tw:text-xs tw:font-medium tw:mt-2 tw:text-stepper-title-active'
-  if (step.done) return 'tw:text-xs tw:font-medium tw:mt-2 tw:text-stepper-title-done'
-  return 'tw:text-xs tw:font-medium tw:mt-2 tw:text-stepper-title-default'
+  if (step.name === props.modelValue) return 'tw:text-xs tw:font-medium tw:text-stepper-title-active'
+  if (step.done) return 'tw:text-xs tw:font-medium tw:text-stepper-title-done'
+  return 'tw:text-xs tw:font-medium tw:text-stepper-title-default'
 }
 
 function triggerClasses(step: StepRegistration): string {
   const base = [
-    'tw:flex tw:flex-col tw:items-center tw:px-2 tw:py-1.5',
+    'tw:flex tw:flex-row tw:items-center tw:gap-2 tw:px-2 tw:py-1.5',
     'tw:rounded-md tw:outline-none tw:select-none',
     'tw:transition-colors tw:duration-150',
   ].join(' ')
@@ -150,14 +150,15 @@ function triggerClasses(step: StepRegistration): string {
               />
               <span v-else>{{ step.name }}</span>
             </span>
-            <!-- Title -->
-            <span :class="titleClasses(step)">{{ step.title }}</span>
-            <!-- Description (optional subtitle) -->
-            <span
-              v-if="step.description"
-              class="tw:text-[11px] tw:text-text-secondary tw:text-center tw:mt-0.5 tw:leading-tight"
-            >
-              {{ step.description }}
+            <!-- Title + Description (stacked vertically, right of indicator) -->
+            <span class="tw:flex tw:flex-col tw:items-start tw:min-w-0">
+              <span :class="titleClasses(step)">{{ step.title }}</span>
+              <span
+                v-if="step.description"
+                class="tw:text-[11px] tw:text-text-secondary tw:mt-0.5 tw:leading-tight"
+              >
+                {{ step.description }}
+              </span>
             </span>
           </button>
         </div>
@@ -165,7 +166,7 @@ function triggerClasses(step: StepRegistration): string {
         <!-- Connector line between consecutive steps -->
         <div
           v-if="index < sortedSteps.length - 1"
-          class="tw:h-px tw:flex-1 tw:shrink tw:mt-5 tw:mx-1 tw:min-w-[8px]"
+          class="tw:h-px tw:flex-1 tw:shrink tw:mt-4 tw:mx-1 tw:min-w-[8px]"
           :class="step.done ? 'tw:bg-stepper-connector-done' : 'tw:bg-stepper-connector'"
           aria-hidden="true"
         />
