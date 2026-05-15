@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="multi-time-range-alerts-add-btn"
           variant="outline"
           size="sm"
-          :disable="isComparisonDisabled"
+          :disabled="isComparisonDisabled"
           @click="addTimeShift"
         >
           {{ t('alerts.compareWithPast.addComparisonWindow') }}
