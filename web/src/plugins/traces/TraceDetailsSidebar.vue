@@ -371,15 +371,15 @@ class="tw:h-full tw:overflow-y-auto">
           name="preview"
           class="llm-preview-panel q-pa-md"
         >
-          <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
+          <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="flex io-container tw:w-full!"
+              class="flex io-container tw:w-full! tw:h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -446,7 +446,7 @@ class="tw:h-full tw:overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -2076,6 +2076,10 @@ export default defineComponent({
   }
 }
 
+:deep(.span_details_tab-panels .o-tab-panel) {
+  height: 100%;
+}
+
 :deep(.traces-correlated-metrics-container) {
   .q-splitter--vertical .q-splitter__separator {
     height: 100% !important;
@@ -2650,25 +2654,13 @@ body.body--dark {
   }
 }
 
-.llm-preview-panel {
+.llm-preview-container {
   overflow: hidden; // Prevent scroll at panel level
 
   .section-label {
     color: var(--o2-text-primary);
     font-size: 14px;
     margin-bottom: 0.5rem;
-  }
-
-  .io-container {
-    display: flex;
-    gap: 0.5rem;
-    width: calc(100vw - 350px);
-    height: calc(
-      100vh - 17.2rem
-    ); // Fixed height for the container (with 2-row toolbar for LLM spans)
-    max-height: calc(100vh - 17.2rem);
-    align-items: stretch; // Ensure equal heights
-    overflow: hidden; // Prevent scroll at outer level
   }
 
   .io-section {
