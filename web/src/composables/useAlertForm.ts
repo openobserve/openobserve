@@ -730,7 +730,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return true;
   };
 
+  // Generation counter to discard stale async responses when the user switches
+  // tabs (e.g. builder → SQL) before the API call completes.
+  const generateRequestId = ref(0);
+
   const generateSqlFromBackend = async () => {
+    const requestId = ++generateRequestId.value;
+
     try {
       // If no stream name or not custom mode, nothing to do
       if (!formData.value.stream_name) {
@@ -792,6 +798,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         payload,
       );
 
+      // Discard if a newer request was started (e.g. user changed tabs or
+      // conditions before this response arrived).
+      if (requestId !== generateRequestId.value) return;
+
       if (response.data && response.data.sql) {
         generatedSqlQuery.value = response.data.sql;
         previewQuery.value = response.data.sql;
@@ -800,6 +810,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         previewAlertRef.value?.refreshData();
       }
     } catch (error) {
+      // Discard stale error fallback if a newer request has started.
+      if (requestId !== generateRequestId.value) return;
+
       console.error("Error generating SQL from backend:", error);
       const localSql = generateSqlQueryLocal();
       generatedSqlQuery.value = localSql;
@@ -2303,10 +2316,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       } else if (newType === "custom") {
         previewQuery.value = "";
         isUsingBackendSql.value = false;
-        // Restore aggregation enabled state from form data — switching from
-        // PromQL/SQL to custom loses it otherwise, and the generate_sql payload
-        // would skip the aggregation block even when it's configured.
-        isAggregationEnabled.value = !!formData.value.query_condition.aggregation;
         debouncedGenerateSql();
       }
     },

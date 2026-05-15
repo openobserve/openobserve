@@ -2270,7 +2270,8 @@
       "addNewDestination": "새 목적지 추가",
       "destinationRequired": "목적지가 하나 이상 필요합니다!",
       "disabledNotificationsInfo": "예외 항목 탐지는 계속 실행되고 결과를 _anomalies 스트림에 기록합니다.이상 징후가 감지되면 알림을 받을 수 있도록 하세요."
-    }
+    },
+    "anomalyName": "예외 항목 이름"
   },
   "alert_templates": {
     "header": "템플릿",

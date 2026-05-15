@@ -246,9 +246,9 @@ describe("CodeQueryEditor", () => {
       expect(wrapper.props("suggestions")).toEqual(suggestions);
     });
 
-    it("should have empty suggestions array as default", () => {
+    it("should have null suggestions as default", () => {
       const wrapper = createWrapper({ suggestions: undefined });
-      expect(wrapper.props("suggestions")).toEqual([]);
+      expect(wrapper.props("suggestions")).toBeNull();
     });
 
     it("should accept debounceTime prop", () => {
@@ -556,6 +556,184 @@ describe("CodeQueryEditor", () => {
       expect(mockEditorObj.addCommand).toHaveBeenCalled();
       const firstCall = mockEditorObj.addCommand.mock.calls[0];
       expect(firstCall[2]).toBe("ctrlenter");
+    });
+  });
+
+  // Tests for the bug fix: suggestions=[] must not fall back to defaultSuggestions.
+  // When a parent passes an explicit empty array (e.g. effectiveSuggestions during
+  // value context), the Monaco provider must return no function suggestions.
+  describe("suggestions prop — function suggestions gated by null vs []", () => {
+    let getElementByIdSpy: ReturnType<typeof vi.spyOn>;
+
+    afterEach(() => {
+      getElementByIdSpy?.mockRestore();
+    });
+
+    // Snapshot the registerCompletionItemProvider call count before mounting,
+    // then wait for our mount to push a new call. Using a baseline (instead of
+    // vi.clearAllMocks + waiting for addCommand) avoids a race under parallel
+    // CI load where a previous test's still-running setupEditor would satisfy
+    // vi.waitFor on addCommand BEFORE our component had registered its provider.
+    const mountAndWait = async (props: any = {}) => {
+      const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
+      const registerFn = vi.mocked(
+        monacoApi.languages.registerCompletionItemProvider,
+      );
+      const baselineIndex = registerFn.mock.calls.length;
+
+      const fakeEl = document.createElement("div");
+      getElementByIdSpy = vi
+        .spyOn(document, "getElementById")
+        .mockReturnValue(fakeEl);
+      mount(CodeQueryEditor, {
+        props: { editorId: "test-editor", query: "SELECT * FROM logs", ...props },
+        global: { plugins: [store] },
+      });
+
+      await vi.waitFor(
+        () => {
+          expect(registerFn.mock.calls.length).toBeGreaterThan(baselineIndex);
+        },
+        { timeout: 5000 },
+      );
+      return baselineIndex;
+    };
+
+    const captureProvideCompletionItems = async (baselineIndex: number) => {
+      const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
+      const calls = vi.mocked(
+        monacoApi.languages.registerCompletionItemProvider,
+      ).mock.calls;
+      // Use the first call AFTER the baseline — that is unambiguously our mount.
+      return calls[baselineIndex][1].provideCompletionItems as Function;
+    };
+
+    const callProvider = (fn: Function, text = "") => {
+      const mockModel = {
+        getValueInRange: vi.fn(() => text),
+        getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
+      };
+      return fn(mockModel, { lineNumber: 1, column: 1 });
+    };
+
+    const hasFunctionSuggestion = (result: any) =>
+      result.suggestions.some(
+        (s: any) =>
+          typeof s.label === "string" &&
+          (s.label.startsWith("match_all") || s.label.startsWith("fuzzy_match")),
+      );
+
+    it("includes function suggestions when suggestions prop is null (default)", async () => {
+      const baselineIndex = await mountAndWait({ suggestions: null });
+      const fn = await captureProvideCompletionItems(baselineIndex);
+      const result = callProvider(fn);
+      expect(hasFunctionSuggestion(result)).toBe(true);
+    });
+
+    it("includes no function suggestions when suggestions prop is [] (explicit empty)", async () => {
+      const baselineIndex = await mountAndWait({ suggestions: [] });
+      const fn = await captureProvideCompletionItems(baselineIndex);
+      const result = callProvider(fn);
+      expect(hasFunctionSuggestion(result)).toBe(false);
+    });
+
+    it("includes provided suggestions when suggestions prop has items", async () => {
+      const customSuggestion = {
+        label: (_kw: string) => `custom_fn('${_kw}')`,
+        kind: "Text",
+        insertText: (_kw: string) => `custom_fn('${_kw}')`,
+      };
+      const baselineIndex = await mountAndWait({ suggestions: [customSuggestion] });
+      const fn = await captureProvideCompletionItems(baselineIndex);
+      const result = callProvider(fn, "SELECT");
+      const found = result.suggestions.some(
+        (s: any) => typeof s.label === "string" && s.label.startsWith("custom_fn"),
+      );
+      expect(found).toBe(true);
+    });
+  });
+
+  // Tests for validateDoubleQuotes.
+  // The detection regex is tested directly here — this avoids async Monaco mock
+  // coordination while still covering every pattern the component will flag.
+  describe("validateDoubleQuotes — detection regex", () => {
+    // Mirror of the regex used in validateDoubleQuotes in CodeQueryEditor.vue.
+    // Update here if the regex changes in the component.
+    const makeRegex = () =>
+      /(?:NOT\s+LIKE|NOT\s+IN\s*\(|!=|<>|>=|<=|=|>|<|LIKE|IN\s*\()\s*("[^'"]*'|'[^'"]*"|"[^"]*")/gi;
+
+    const findInvalidQuotes = (text: string): string[] => {
+      const r = makeRegex();
+      const matches: string[] = [];
+      let m;
+      while ((m = r.exec(text)) !== null) matches.push(m[1]);
+      return matches;
+    };
+
+    // ── double-quoted values ────────────────────────────────────────────────
+
+    it('flags = "value"', () => {
+      expect(findInvalidQuotes(`WHERE http_endpoint = "test"`)).toEqual([`"test"`]);
+    });
+
+    it('flags != "value"', () => {
+      expect(findInvalidQuotes(`WHERE status != "error"`)).toEqual([`"error"`]);
+    });
+
+    it('flags LIKE "%value%"', () => {
+      expect(findInvalidQuotes(`WHERE msg LIKE "%error%"`)).toEqual([`"%error%"`]);
+    });
+
+    it('flags NOT LIKE "value"', () => {
+      expect(findInvalidQuotes(`WHERE path NOT LIKE "%admin%"`)).toEqual([`"%admin%"`]);
+    });
+
+    it('flags IN ("value")', () => {
+      expect(findInvalidQuotes(`WHERE status IN ("200")`)).toEqual([`"200"`]);
+    });
+
+    it("flags every double-quoted value across multiple conditions", () => {
+      expect(
+        findInvalidQuotes(`WHERE status = "200" AND env = "prod"`),
+      ).toEqual([`"200"`, `"prod"`]);
+    });
+
+    it('flags double-quoted URL path: = "/api/v1/payments"', () => {
+      expect(
+        findInvalidQuotes(`WHERE http_endpoint = "/api/v1/payments"`),
+      ).toEqual([`"/api/v1/payments"`]);
+    });
+
+    // ── mismatched quotes ───────────────────────────────────────────────────
+
+    it('flags mismatched open-double close-single: = "value\'', () => {
+      expect(findInvalidQuotes(`WHERE field = "test'`)).toEqual([`"test'`]);
+    });
+
+    it("flags mismatched open-single close-double: = 'value\"", () => {
+      expect(findInvalidQuotes(`WHERE field = 'test"`)).toEqual([`'test"`]);
+    });
+
+    // ── valid cases — must NOT be flagged ────────────────────────────────────
+
+    it("does NOT flag single-quoted values", () => {
+      expect(findInvalidQuotes(`WHERE status = 'ok' AND env = 'prod'`)).toEqual([]);
+    });
+
+    it("does NOT flag numeric values", () => {
+      expect(findInvalidQuotes(`WHERE status = 200 AND code >= 400`)).toEqual([]);
+    });
+
+    it('does NOT flag double-quoted table names in FROM clause', () => {
+      expect(
+        findInvalidQuotes(`SELECT * FROM "test_table" WHERE status = 200`),
+      ).toEqual([]);
+    });
+
+    it("does NOT flag a valid URL path in single quotes", () => {
+      expect(
+        findInvalidQuotes(`WHERE http_endpoint = '/api/v1/payments'`),
+      ).toEqual([]);
     });
   });
 });

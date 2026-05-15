@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div style="height: 100%; position: relative">
       <TableRenderer
+        ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
         :wrap-cells="config.wrap_table_cells"
         :value-mapping="config.mappings ?? []"
@@ -99,6 +100,7 @@ export default defineComponent({
     const store = useStore();
     const filter = ref("");
     const loading = ref(false);
+    const innerTableRef = ref<any>(null);
 
     // Extract columns and rows from processed data
     const tableColumns = computed(() => {
@@ -225,10 +227,19 @@ export default defineComponent({
     // Make config reactive to prop changes
     const config = computed(() => props.config || {});
 
+    const downloadTableAsCSV = (title?: string) => {
+      innerTableRef.value?.downloadTableAsCSV(title);
+    };
+
+    const downloadTableAsJSON = (title?: string) => {
+      innerTableRef.value?.downloadTableAsJSON(title);
+    };
+
     return {
       filter,
       store,
       loading,
+      innerTableRef,
       tableColumns,
       tableRows,
       filteredTableRows,
@@ -237,6 +248,8 @@ export default defineComponent({
       legendOptions,
       showLegendFooter,
       config,
+      downloadTableAsCSV,
+      downloadTableAsJSON,
     };
   },
 });

@@ -550,9 +550,10 @@ export default defineComponent({
       queryType,
       (newType) => {
         // Disable aggregation when switching to sql or promql
+        // Only update local state — do not emit to parent so the composable
+        // preserves the builder-mode isAggregationEnabled value across tab switches.
         if (newType !== "custom") {
           localIsAggregationEnabled.value = false;
-          emit("update:isAggregationEnabled", false);
         } else {
           // Re-enable aggregation if it was previously enabled
           localIsAggregationEnabled.value = props.isAggregationEnabled;

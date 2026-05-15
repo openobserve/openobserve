@@ -2574,6 +2574,7 @@
     "additional_settings":"Additional Settings",
     "alertNamePlaceholder": "Alert name",
     "anomalyNamePlaceholder": "Anomaly name",
+    "anomalyName": "Anomaly Name",
     "folder": "Folder",
     "selectStreamTypeFirst": "Select a stream type first",
     "previewEmptyState": "Select a stream type and stream name to see a preview",

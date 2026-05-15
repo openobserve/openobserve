@@ -797,16 +797,24 @@ test.describe("Autocomplete Value Suggestions - Edge Cases", () => {
         await pm.logsPage.selectStream(streamName);
         await runQueryAndWaitForResults(page, pm);
 
-        const fieldButtons = page.locator(pm.logsPage.allFieldExpandButtons);
-        const firstButton = fieldButtons.first();
-        const dataTest = await firstButton.getAttribute('data-test');
-        const fieldName = dataTest.replace('log-search-expand-', '').replace('-field-btn', '');
+        // Find a field that has a real string value captured in IndexedDB, and
+        // use a prefix of that value as the partial input. This keeps the test
+        // realistic — in value context the dropdown only shows stored values, so
+        // the partial must actually match one of them (hard-coded prefixes like
+        // 'par' only worked previously because function suggestions incorrectly
+        // leaked through in value context and embedded the typed word in their
+        // labels).
+        const fieldWithValues = await findFieldWithStringValues(page, pm, orgName, streamName);
+        expect(fieldWithValues).not.toBeNull();
 
-        await firstButton.click();
-        await page.waitForTimeout(2000);
+        const { fieldName, stringValue } = fieldWithValues;
+        const partial = stringValue.substring(0, Math.min(2, stringValue.length));
 
-        // Type with opening quote and partial value
-        await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE ${fieldName} = 'par`);
+        await setQueryEditorContent(
+            page,
+            pm,
+            `SELECT * FROM "${streamName}" WHERE ${fieldName} = '${partial}`,
+        );
         await page.waitForTimeout(500);
         await page.keyboard.press('Control+Space');
 
