@@ -55,7 +55,7 @@ use crate::service::{
     file_list,
     search::{
         grpc::{
-            tantivy_result::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
+            tantivy::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
         },
         index::IndexCondition,
@@ -1124,7 +1124,7 @@ mod tests {
 
     use super::*;
     use crate::service::search::{
-        grpc::tantivy_result::TantivyResult,
+        grpc::tantivy::TantivyResult,
         index::{Condition, IndexCondition},
     };
 
