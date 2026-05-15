@@ -188,9 +188,10 @@ export default [
         //   element: 'q-stepper-navigation',
         //   message: 'Remove <q-stepper-navigation> \u2014 place Back/Continue buttons in a single nav div outside </OStepper>.'
         // },
-        // {        //   element: 'q-tooltip',
+        // {
+        //   element: 'q-tooltip',
         //   message: 'Use <OTooltip> from "@/lib/overlay/Tooltip/OTooltip.vue" instead of <q-tooltip>.'
-        // }
+        // },
         // {
         //   element: 'q-drawer',
         //   message: 'Use <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" instead of <q-drawer>.'

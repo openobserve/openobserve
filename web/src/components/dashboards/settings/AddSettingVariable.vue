@@ -47,7 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 label="Select tabs"
                 multiple
                 searchable
-                @update:model-value="updatePanels"
+                :error-message="fieldErrors.tabs"
+                :error="!!fieldErrors.tabs"
+                @update:model-value="updatePanels(); fieldErrors.tabs = ''"
                 data-test="dashboard-variable-tabs-select"
               />
             </div>
@@ -68,6 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 multiple
                 searchable
                 class="tw:mb-3"
+                :error-message="fieldErrors.panels"
+                :error="!!fieldErrors.panels"
+                @update:model-value="fieldErrors.panels = ''"
                 data-test="dashboard-variable-panels-select"
               />
             </div>
@@ -91,6 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="variableData.name"
                   class="tw:mr-2"
                   :label="t('dashboard.nameOfVariable') + ' *'"
+                  :error-message="fieldErrors.name"
+                  :error="!!fieldErrors.name"
+                  @update:model-value="fieldErrors.name = ''"
                   data-test="dashboard-variable-name"
                 />
               </div>
@@ -118,7 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('dashboard.selectStreamType') + ' *'"
                   :options="streamTypeOptions"
                   class="tw:flex-1 tw:mr-2"
-                  @update:model-value="streamTypeUpdated"
+                  :error-message="fieldErrors.streamType"
+                  :error="!!fieldErrors.streamType"
+                  @update:model-value="streamTypeUpdated(); fieldErrors.streamType = ''"
                   data-test="dashboard-variable-stream-type-select"
                 />
                 <OSelect
@@ -129,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   valueKey="name"
                   searchable
                   class="tw:flex-1"
-                  @update:model-value="streamUpdated"
+                  :error-message="fieldErrors.stream"
+                  :error="!!fieldErrors.stream"
+                  @update:model-value="streamUpdated(); fieldErrors.stream = ''"
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
@@ -215,7 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchable
                       :placeholder="filter.name ? '' : 'Select Field'"
                       :title="filter.name || undefined"
-                      @update:model-value="filterUpdated(index, $event)"
+                      :error-message="filterNameErrors[index as number]"
+                      :error="!!filterNameErrors[index as number]"
+                      @update:model-value="filterUpdated(index, $event); filterNameErrors[index as number] = ''"
                       data-test="dashboard-query-values-filter-name-selector"
                       style="max-width: 41%; width: 41%; flex-shrink: 0"
                     >
@@ -227,6 +241,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="filter.operator"
                       style="width: 18%; flex-shrink: 0"
                       class="operator"
+                      :error-message="filterOperatorErrors[index as number]"
+                      :error="!!filterOperatorErrors[index as number]"
+                      @update:model-value="filterOperatorErrors[index as number] = ''"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :options="[
                         '=',
@@ -301,6 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               v-model="variableData.value"
               :label="t('dashboard.ValueOfVariable') + ' *'"
+              :error-message="fieldErrors.constantValue"
+              :error="!!fieldErrors.constantValue"
+              @update:model-value="fieldErrors.constantValue = ''"
               data-test="dashboard-variable-constant-value"
             />
           </div>
@@ -344,6 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="variableData.options[index].label"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="'Label ' + (index + 1)"
+                :error-message="optionLabelErrors[index as number]"
+                :error="!!optionLabelErrors[index as number]"
+                @update:model-value="optionLabelErrors[index as number] = ''"
               />
               <OInput
                 class="tw:flex-1 tw:mr-2"
@@ -577,6 +600,20 @@ export default defineComponent({
     // Store selected tabs and panels
     const selectedTabs = ref<string[]>([]);
     const selectedPanels = ref<string[]>([]);
+
+    // Inline validation error messages for migrated OSelect/OInput fields
+    const fieldErrors = reactive({
+      name: "",
+      tabs: "",
+      panels: "",
+      streamType: "",
+      stream: "",
+      constantValue: "",
+    });
+    // Per-item errors for filter rows and custom option rows
+    const filterNameErrors = ref<string[]>([]);
+    const filterOperatorErrors = ref<string[]>([]);
+    const optionLabelErrors = ref<string[]>([]);
 
     // Format tabs for selection from dashboard data
     const tabsOptions = computed(() =>
@@ -1213,19 +1250,71 @@ export default defineComponent({
     };
 
     const onSubmit = () => {
-      // manual validation for migrated fields
-      if (!variableData.name?.trim()) {
-        showErrorNotification("Variable name is required.");
-        return;
-      }
-      if (!/^[a-zA-Z0-9_-]*$/.test(variableData.name)) {
-        showErrorNotification(
-          "Only letters, numbers, hyphens (-), and underscores (_) are allowed.",
+      // Inline validation for migrated OInput/OSelect fields
+      fieldErrors.name = !variableData.name?.trim()
+        ? "Variable name is required."
+        : !/^[a-zA-Z0-9_-]*$/.test(variableData.name)
+          ? "Only letters, numbers, hyphens (-), and underscores (_) are allowed."
+          : "";
+      fieldErrors.tabs =
+        (variableData.scope === "tabs" || variableData.scope === "panels") &&
+        selectedTabs.value.length === 0
+          ? "At least one tab is required."
+          : "";
+      fieldErrors.panels =
+        variableData.scope === "panels" && selectedPanels.value.length === 0
+          ? "At least one panel is required."
+          : "";
+      fieldErrors.streamType =
+        variableData.type === "query_values" &&
+        !variableData.query_data.stream_type
+          ? "Stream type is required."
+          : "";
+      fieldErrors.stream =
+        variableData.type === "query_values" && !variableData.query_data.stream
+          ? "Stream / index is required."
+          : "";
+      fieldErrors.constantValue =
+        variableData.type === "constant" && !variableData.value?.trim()
+          ? "Constant value is required."
+          : "";
+
+      // Validate filter rows (name and operator required per row)
+      if (variableData.type === "query_values") {
+        filterNameErrors.value = (variableData.query_data.filter ?? []).map(
+          (f: any) => (f.name ? "" : "Field is required."),
         );
-        return;
+        filterOperatorErrors.value = (variableData.query_data.filter ?? []).map(
+          (f: any) => (f.operator ? "" : "Operator is required."),
+        );
+      } else {
+        filterNameErrors.value = [];
+        filterOperatorErrors.value = [];
       }
-      if (variableData.type === "constant" && !variableData.value?.trim()) {
-        showErrorNotification("Constant value is required.");
+      // Validate custom option labels
+      if (variableData.type === "custom") {
+        optionLabelErrors.value = (variableData.options ?? []).map(
+          (o: any) => (o.label?.trim() ? "" : "Label is required."),
+        );
+      } else {
+        optionLabelErrors.value = [];
+      }
+
+      const hasFilterErrors =
+        filterNameErrors.value.some(Boolean) ||
+        filterOperatorErrors.value.some(Boolean);
+      const hasOptionErrors = optionLabelErrors.value.some(Boolean);
+
+      if (
+        fieldErrors.name ||
+        fieldErrors.tabs ||
+        fieldErrors.panels ||
+        fieldErrors.streamType ||
+        fieldErrors.stream ||
+        fieldErrors.constantValue ||
+        hasFilterErrors ||
+        hasOptionErrors
+      ) {
         return;
       }
       // first, validate form values
@@ -1532,6 +1621,10 @@ export default defineComponent({
 
     return {
       variableData,
+      fieldErrors,
+      filterNameErrors,
+      filterOperatorErrors,
+      optionLabelErrors,
       store,
       t,
       data,

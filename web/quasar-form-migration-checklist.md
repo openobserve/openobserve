@@ -242,6 +242,100 @@ Replace `style="width: 100%; display: flex; gap: 16px"` wrappers with Tailwind u
 
 ---
 
+### 10. Validation — Never Remove `:rules`, Always Migrate Inline
+
+**Rule:** Any Quasar `:rules` prop on a `q-input`, `q-select`, `q-file`, etc. **must** be preserved after migration. OInput/OSelect do not accept Quasar's `:rules` prop, so validations must be moved explicitly.
+
+**Do NOT** move field-level validation into toast notifications. The error must appear **below the field** exactly as Quasar's `:rules` did.
+
+#### Option A — Use OFormInput / OFormSelect (inside an OForm)
+
+When the field is wrapped in `<OForm>`, use `OFormInput` / `OFormSelect` with a `:validators` prop. The error renders inline automatically.
+
+```vue
+<!-- Before -->
+<q-form ref="formRef" @submit.stop="onSubmit">
+  <q-input
+    v-model="name"
+    :rules="[(val) => !!val.trim() || 'Name is required']"
+  />
+</q-form>
+
+<!-- After -->
+<OForm ref="formRef" :default-values="{ name: '' }" @submit="onSubmit">
+  <OFormInput
+    name="name"
+    label="Name *"
+    :validators="[(val) => !val?.toString().trim() ? 'Name is required' : undefined]"
+  />
+</OForm>
+```
+
+#### Option B — Use `:error-message` + `:error` props (standalone OInput / OSelect)
+
+When there is no OForm wrapper, bind reactive error state directly to the field. Clear the error when the user changes the value.
+
+```vue
+<!-- Before -->
+<q-input v-model="streamType" :rules="[(val) => !!val || 'Required']" />
+
+<!-- After (script) -->
+const streamTypeError = ref('');
+
+const onSubmit = () => {
+  streamTypeError.value = !streamType.value ? 'Required' : '';
+  if (streamTypeError.value) return;
+  // ... proceed
+};
+
+<!-- After (template) -->
+<OSelect
+  v-model="streamType"
+  :error-message="streamTypeError"
+  :error="!!streamTypeError"
+  @update:model-value="streamTypeError = ''"
+/>
+```
+
+#### Per-item errors in `v-for` lists
+
+For lists (e.g., filter rows, custom options), use a `ref<string[]>([])` array indexed by the loop index. Cast `index` to `number` in the template.
+
+```vue
+<!-- script -->
+const filterNameErrors = ref<string[]>([]);
+
+const onSubmit = () => {
+  filterNameErrors.value = filters.value.map(
+    (f) => (f.name ? '' : 'Field is required.')
+  );
+  if (filterNameErrors.value.some(Boolean)) return;
+};
+
+<!-- template -->
+<div v-for="(filter, index) in filters" :key="index">
+  <OSelect
+    v-model="filter.name"
+    :error-message="filterNameErrors[index as number]"
+    :error="!!filterNameErrors[index as number]"
+    @update:model-value="filterNameErrors[index as number] = ''"
+  />
+</div>
+```
+
+#### What counts as a removed validation
+
+| Was in the original | Must still exist after migration |
+|---|---|
+| `:rules="[(val) => !!val.trim() \|\| 'Required']"` | OFormInput `:validators`, or `:error-message` + `:error` |
+| `:rules="[(val) => val > 0 \|\| 'Must be positive']"` | Same, OR `min="1"` on OInput `type="number"` |
+| `:rules="[(val) => /regex/.test(val) \|\| 'Invalid']"` | Same |
+| Form-level `formRef.validate()` guard | OForm `.validate()`, or manual check before proceeding |
+
+**Never** replace inline field validation with `showErrorNotification(...)` — that is a different UX and does not tell the user which field is wrong.
+
+---
+
 ### 11. q-tooltip → OTooltip
 
 `OTooltip` is a drop-in replacement for `q-tooltip`. It supports the same **child mode** (placed inside the trigger element, no default slot) and a **wrapper mode** (trigger provided via default slot).

@@ -41,6 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.panelHeight') + ' *'"
           type="number"
           style="min-width: 220px"
+          :error-message="heightError"
+          :error="!!heightError"
+          @update:model-value="heightError = ''"
           data-test="panel-layout-settings-height-input"
         />
 
@@ -90,15 +93,21 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
-    const panelFormRef = ref(null);
     const updatedLayout = ref({ ...props.layout });
+    const heightError = ref("");
 
     const savePanelLayout = () => {
       emit("save:layout", { ...updatedLayout.value });
     };
 
     const submitForm = () => {
-      if (!updatedLayout.value.h || updatedLayout.value.h <= 0) return;
+      if (!updatedLayout.value.h || updatedLayout.value.h <= 0) {
+        heightError.value = !updatedLayout.value.h
+          ? t("common.required")
+          : t("common.valueMustBeGreaterThanZero");
+        return;
+      }
+      heightError.value = "";
       savePanelLayout();
     };
 
@@ -122,7 +131,7 @@ export default defineComponent({
       submitForm,
       getRowCount,
       updatedLayout,
-      panelFormRef,
+      heightError,
     };
   },
 });

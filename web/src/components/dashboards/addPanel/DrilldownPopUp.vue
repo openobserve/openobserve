@@ -33,6 +33,9 @@
     <OInput
       v-model="drilldownData.name"
       :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
+      :error-message="nameError"
+      :error="!!nameError"
+      @update:model-value="nameError = ''"
       data-test="dashboard-config-panel-drilldown-name"
     />
     <div
@@ -355,6 +358,8 @@ export default defineComponent({
         ],
       },
     });
+    const nameError = ref("");
+
     const drilldownData = ref(
       props?.isEditMode
         ? JSON.parse(
@@ -569,6 +574,11 @@ export default defineComponent({
     });
 
     const saveDrilldown = () => {
+      if (!drilldownData.value.name.trim()) {
+        nameError.value = t("common.required");
+        return;
+      }
+      nameError.value = "";
       // if editmode then made changes
       // else add new drilldown
       if (props?.isEditMode) {
@@ -775,6 +785,7 @@ export default defineComponent({
       outlinedDashboard,
       dashboardPanelData,
       drilldownData,
+      nameError,
       outlinedDelete,
       store,
       folderList,
