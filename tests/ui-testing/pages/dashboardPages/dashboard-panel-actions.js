@@ -141,7 +141,7 @@ export default class DashboardactionPage {
 
   /**
    * Verify that actual data is plotted on the chart canvas.
-   * Checks two things:
+   * Waits for the full data pipeline to settle, then asserts:
    *   1. No "no-data" placeholder is visible
    *   2. At least one canvas has colored (non-background, non-transparent) pixels
    *
@@ -149,6 +149,16 @@ export default class DashboardactionPage {
    * @param {Function} expect - Playwright expect function
    */
   async verifyChartHasData(expect) {
+    // Wait for full data pipeline: query loading + panelData conversion.
+    // The Apply button switches data-test to "dashboard-cancel" while loading.
+    // After the query completes, the panelData conversion runs async —
+    // poll until loading is done AND the no-data element clears.
+    await this.page.waitForFunction(() => {
+      if (document.querySelector('[data-test="dashboard-cancel"]')) return false;
+      const noData = document.querySelector('[data-test="no-data"]');
+      return !noData || noData.textContent.trim() !== 'No Data';
+    }, { timeout: 30000 });
+
     // 1. No "no data" placeholder
     const noDataVisible = await this.noDataElement.isVisible().catch(() => false);
     expect(noDataVisible).toBe(false);
