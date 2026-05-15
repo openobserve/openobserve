@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <SchemaIndex v-model="schemaData" />
     </ODrawer>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
