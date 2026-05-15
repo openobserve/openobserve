@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
           <div class="tw:text-center">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
             <div
               v-else-if="correlationError"
               class="tw:text-base tw:text-red-500"
