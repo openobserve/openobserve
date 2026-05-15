@@ -223,8 +223,8 @@ describe("AlertsDestinationList", () => {
               setPagination: vi.fn(),
             },
           },
-          QPage: {
-            template: '<div class="q-page-mock"><slot /></div>',
+          OPage: {
+            template: '<div data-o2-page><slot /></div>',
           },
           QInput: {
             template: '<div class="q-input-mock"><slot /></div>',

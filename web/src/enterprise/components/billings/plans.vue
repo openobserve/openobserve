@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-px-lg q-pt-md" style="min-height: inherit; overflow: auto">
+  <OPage class="q-px-lg q-pt-md" style="min-height: inherit; overflow: auto">
     <div class="row justify-between items-center">
       <div>
         <span class="o2-page-title">{{ t("billing.title") }}</span
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pricingError="pricingError"
       ></enterprise-plan>
     </div>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

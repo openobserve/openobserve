@@ -116,7 +116,7 @@ describe("SearchSchedulersList Component", () => {
           store,
         },
         stubs: {
-          'q-page': true,
+          'OPage': true,
           'q-table': true,
           'q-tr': true,
           'q-td': true,

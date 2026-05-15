@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
+  <OPage
     class="q-pa-none"
     style="height: calc(100vh - 88px); min-height: inherit"
   >
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </OPage>
 </template>
 <script lang="ts">
 import {

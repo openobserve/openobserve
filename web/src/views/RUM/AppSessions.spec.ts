@@ -200,8 +200,8 @@ describe("AppSessions.vue", () => {
       global: {
         plugins: [store, router, i18n, Quasar],
         stubs: {
-          QPage: {
-            template: '<div class="q-page" v-bind="$attrs"><slot /></div>',
+          OPage: {
+            template: '<div data-o2-page v-bind="$attrs"><slot /></div>',
           },
           QBtn: {
             template:
@@ -798,7 +798,7 @@ describe("AppSessions.vue", () => {
         global: {
           plugins: [store, router, i18n, Quasar],
           stubs: {
-            QPage: { template: "<div><slot /></div>" },
+            OPage: { template: "<div><slot /></div>" },
             QBtn: { template: "<button><slot /></button>" },
             QSeparator: { template: "<hr />" },
             QSplitter: {

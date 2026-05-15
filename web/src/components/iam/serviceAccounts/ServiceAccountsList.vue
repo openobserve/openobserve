@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <OPage class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
       <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
       </div>
     </ODialog>
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">
