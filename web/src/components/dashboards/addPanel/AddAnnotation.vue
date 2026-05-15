@@ -1,31 +1,14 @@
 <template>
-  <q-dialog v-model="isOpen" persistent>
-    <q-card style="min-width: 700px">
-      <q-card-section class="q-pa-md">
-        <div class="text-h6">{{ isEditMode ? "Edit" : "Add" }} Annotation</div>
-      </q-card-section>
-      <q-card-section class="q-pa-md">
-        <q-input
+  <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
+    <div class="tw:flex tw:flex-col">
+        <OInput
           v-model="annotationData.title"
           label="Title *"
-          stack-label
-          class="q-py-md showLabelOnTop"
-          dense
-          borderless
-          hide-bottom-space
-          style="margin-bottom: 10px"
-          :rules="[(val) => !!val || 'Title is required.']"
         />
-        <q-input
+        <OTextarea
           v-model="annotationData.text"
           label="Description"
-          stack-label
-          class="q-py-md showLabelOnTop"
-          dense
-          type="textarea"
           :rows="3"
-          borderless
-          hide-bottom-space
         />
 
         <div class="q-mt-md">
@@ -137,7 +120,9 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
-
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 const props = defineProps({
   dashboardId: { type: String, required: true },
   annotation: { type: Object, default: null, required: false },

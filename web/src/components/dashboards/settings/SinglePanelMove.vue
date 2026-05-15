@@ -17,45 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-dialog>
-    <q-card style="width: 300px" data-test="dialog-box">
-      <q-card-section class="confirmBody">
-        <div class="head" data-test="dashboard-tab-move-title">{{ title }}</div>
-        <div class="para" data-test="dashboard-tab-move-message">
-          {{ message }}
-        </div>
-      </q-card-section>
-
-      <div
-        style="
-          display: flex;
-          flex-direction: row;
-          width: 100%;
-          height: 40px;
-          padding-left: 10px;
-          padding-right: 10px;
-          padding-top: 5px;
-        "
-      >
-        <q-select
-          dense
+  <ODialog data-test="single-panel-move-dialog" v-model:open="open" size="sm" :title="title"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    primary-button-label="Move"
+    :primary-button-disabled="selectedMoveTabId === null"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
+    <div>
+      <p class="text-body2">{{ message }}</p>
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OSelect
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="select-container o2-custom-select-dashboard"
+          class="tw:flex-1"
           data-test="dashboard-tab-move-select"
-          borderless
-          hide-bottom-space
-        >
-          <!-- template when on options -->
-          <template v-slot:no-option>
-            <q-item data-test="dashboard-tab-move-select-no-option">
-              <q-item-section class="text-italic text-grey">
-                No Other Tabs Available
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
 
         <OButton
           variant="outline"
@@ -123,10 +101,11 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton },
+  components: { AddTab, OButton, OSelect },
   emits: ["update:ok", "update:cancel", "refresh"],
   props: ["title", "message"],
   setup(props, { emit }) {
@@ -134,7 +113,7 @@ export default defineComponent({
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");
-    const selectedMoveTabId: any = ref(null);
+    const selectedMoveTabId = ref<string | null>(null);
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit = ref(null);
@@ -177,7 +156,7 @@ export default defineComponent({
       await getTabOptions();
 
       // set selectedMoveTabId to newly created tab
-      selectedMoveTabId.value = { label: tabData.name, value: tabData.tabId };
+      selectedMoveTabId.value = tabData.tabId;
 
       // close add tab dialog
       showAddTabDialog.value = false;
@@ -195,7 +174,7 @@ export default defineComponent({
     };
 
     const onConfirm = () => {
-      emit("update:ok", selectedMoveTabId.value.value);
+      emit("update:ok", selectedMoveTabId.value);
     };
     return {
       t,

@@ -86,52 +86,34 @@
                 </CommonAutoComplete>
               </div>
 
-              <!-- Color Picker -->
-              <div class="color-section tw:flex-1">
-                <div
-                  v-if="series.color !== null"
-                  class="tw:items-center tw:flex"
-                >
-                  <q-input
-                    v-model="series.color"
-                    style="width: 90%"
-                    class="input-spacing"
-                    dense
-                    borderless
-                    hide-bottom-space
-                  >
-                    <template v-slot:append>
-                      <q-icon
-                        name="colorize"
-                        class="cursor-pointer"
-                        :ref="`colorize-icon-${index}`"
-                        @click="openColorPicker(index)"
-                      >
-                        <q-popup-proxy cover transition-show="scale">
-                          <q-color v-model="series.color" />
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
-                  <q-icon
-                    :name="outlinedCancel"
-                    style="width: 10%"
-                    class="cursor-pointer tw:align-middle"
-                    size="xs"
-                    title="Remove color"
-                    @click="removeColorByIndex(index)"
-                  />
-                </div>
-                <div v-else class="tw:w-full">
-                  <OButton
-                    variant="ghost-primary"
-                    size="sm"
-                    class="tw:w-full"
-                    @click="setColorByIndex(index)"
-                    >Set color</OButton
-                  >
-                </div>
+            <!-- Color Picker -->
+            <div class="color-section tw:shrink-0 tw:w-40">
+              <div
+                v-if="series.color !== null"
+                class="tw:items-center tw:flex tw:gap-1"
+              >
+                <OColor
+                  v-model="series.color"
+                  class="tw:flex-1"
+                />
+                <q-icon
+                  :name="outlinedCancel"
+                  class="cursor-pointer tw:align-middle"
+                  size="xs"
+                  title="Remove color"
+                  @click="removeColorByIndex(index)"
+                />
               </div>
+              <div v-else class="tw:w-full">
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  class="tw:w-full"
+                  @click="setColorByIndex(index)"
+                  >Set color</OButton
+                >
+              </div>
+            </div>
 
               <!-- Delete series -->
               <OButton
@@ -177,6 +159,8 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
@@ -184,6 +168,8 @@ export default defineComponent({
     draggable: VueDraggableNext as any,
     CommonAutoComplete,
     OButton,
+    ODialog,
+    OColor,
   },
   props: {
     colorBySeries: {

@@ -68,10 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dashboard List -->
         <div v-else class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden">
-          <q-input
+          <OInput
             v-model="searchQuery"
             placeholder="Search dashboards..."
-            dense
             clearable
             class="tw:mb-4"
             data-test="add-dashboard-github-search"
@@ -79,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #prepend>
               <q-icon name="search" />
             </template>
-          </q-input>
+          </OInput>
 
           <div class="tw:text-xs tw:text-gray-500 tw:mb-2 tw:px-1">
             {{ filteredDashboards.length }} dashboard(s) available
@@ -106,11 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-dashboard-github-item"
             >
               <q-item-section side class="tw:pr-2">
-                <q-checkbox
+                <OCheckbox
                   :model-value="isSelected(dashboard)"
                   @update:model-value="toggleDashboard(dashboard)"
-                  color="primary"
-                  dense
                 />
               </q-item-section>
               <q-item-section>
@@ -154,60 +151,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card>
 
     <!-- Folder Selection Dialog -->
-    <q-dialog v-model="showFolderSelection" persistent>
-      <q-card style="min-width: 500px; max-width: 600px" class="tw:rounded-xl">
-        <q-card-section class="q-py-md">
-          <div class="text-h6 tw:font-bold">Select Destination Folder</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-select
-              v-model="selectedFolderObj"
-              :options="folderOptions"
-              label="Folder"
-              outlined
-              dense
-              class="tw:grow o2-custom-select-dashboard"
-              data-test="add-dashboard-github-folder-select"
-            >
-              <template v-slot:selected>
-                <span v-if="selectedFolderObj">{{
-                  selectedFolderObj.label
-                }}</span>
-              </template>
-            </q-select>
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="showAddFolderDialog = true"
-              data-test="add-dashboard-github-add-folder"
-              title="Add New Folder"
-            >
-              <template #icon-left><q-icon name="add" /></template>
-            </OButton>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="q-px-md q-pb-md tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="showFolderSelection = false"
-            >Back</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!selectedFolderObj"
-            :loading="importing"
-            @click="confirmAdd"
-            data-test="add-dashboard-github-confirm"
-            >Add Dashboard</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="add-dashboard-from-github-folder-selection-dialog"
+      v-model:open="showFolderSelection"
+      persistent
+      size="sm"
+      title="Select Destination Folder"
+      secondary-button-label="Back"
+      primary-button-label="Add Dashboard"
+      :primary-button-disabled="!selectedFolderObj"
+      :primary-button-loading="importing"
+      @click:secondary="showFolderSelection = false"
+      @click:primary="confirmAdd"
+    >
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OSelect
+          v-model="selectedFolderObj"
+          :options="folderOptions"
+          label="Folder"
+          class="tw:grow"
+          data-test="add-dashboard-github-folder-select"
+        />
+        <OButton
+          variant="ghost"
+          size="icon"
+          @click="showAddFolderDialog = true"
+          data-test="add-dashboard-github-add-folder"
+          title="Add New Folder"
+        >
+          <template #icon-left><q-icon name="add" /></template>
+        </OButton>
+      </div>
+    </ODialog>
 
     <!-- Add Folder Dialog -->
     <q-dialog
@@ -231,6 +205,11 @@ import { useQuasar } from "quasar";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface GitHubDashboard {
   name: string;
@@ -242,7 +221,7 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton },
+  components: { AddFolder, OButton, ODialog, ODrawer, OInput, OSelect, OCheckbox },
   props: {
     modelValue: {
       type: Boolean,
@@ -265,9 +244,7 @@ export default defineComponent({
     const searchQuery = ref("");
     const selectedDashboards = ref<GitHubDashboard[]>([]);
     const showFolderSelection = ref(false);
-    const selectedFolderObj = ref<{ label: string; value: string } | null>(
-      null,
-    );
+    const selectedFolderObj = ref<string | null>(null);
     const folderOptions = ref<{ label: string; value: string }[]>([]);
     const importing = ref(false);
     const showAddFolderDialog = ref(false);
@@ -438,10 +415,7 @@ export default defineComponent({
         // Refresh folder list
         await loadFolders();
         // Auto-select the newly created folder
-        selectedFolderObj.value = {
-          label: newFolder.data.name,
-          value: newFolder.data.folderId,
-        };
+        selectedFolderObj.value = newFolder.data.folderId;
       }
     };
 
@@ -452,7 +426,7 @@ export default defineComponent({
       importing.value = true;
       try {
         const orgId = store.state.selectedOrganization.identifier;
-        const folderId = selectedFolderObj.value.value;
+        const folderId = selectedFolderObj.value;
         let successCount = 0;
         let failCount = 0;
         const errors: string[] = [];

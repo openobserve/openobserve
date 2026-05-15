@@ -17,25 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-end tw:gap-2">
     <!-- select new dashboard -->
-    <q-select
+    <OSelect
       v-model="selectedDashboard"
       :label="t('dashboard.selectDashboardLabel')"
       :options="dashboardList"
       data-test="dashboard-dropdown-dashboard-selection"
-      input-debounce="0"
-      behavior="menu"
-      borderless
-      dense
-      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard tw:flex-1"
-      :loading="getDashboardList.isLoading.value"
-      hide-bottom-space
-    >
-      <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
-      </template>
-    </q-select>
+      labelKey="label"
+      class="tw:flex-1"
+    />
 
     <OButton
       data-test="dashboard-dashboard-new-add"
@@ -73,13 +62,15 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { getAllDashboardsByFolderId } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard, OButton },
+  components: { AddDashboard, OButton, ODrawer, OSelect },
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {
@@ -94,21 +85,15 @@ export default defineComponent({
     const showAddDashboardDialog: any = ref(false);
     const dashboardList: any = ref([]);
 
-    //dropdown selected dashboard
-    const selectedDashboard: any = ref(null);
+    //dropdown selected dashboard id (primitive string for OSelect)
+    const selectedDashboard = ref<string | null>(null);
     const { t } = useI18n();
 
     // on add dashboard, select added dashboard
     const updateDashboardList = async (dashboardId: any, folderId: any) => {
       showAddDashboardDialog.value = false;
       await getDashboardList.execute();
-
-      const dashboardData = await getDashboard(store, dashboardId, folderId);
-
-      selectedDashboard.value = {
-        label: dashboardData?.title,
-        value: dashboardData?.dashboardId,
-      };
+      selectedDashboard.value = dashboardId ?? null;
     };
 
     // get all dashboards based on selected folderId
@@ -129,10 +114,7 @@ export default defineComponent({
 
       // select first dashboard
       if (dashboardList.value.length > 0) {
-        selectedDashboard.value = {
-          label: dashboardList?.value[0]?.label,
-          value: dashboardList?.value[0]?.value,
-        };
+        selectedDashboard.value = dashboardList?.value[0]?.value ?? null;
       } else {
         selectedDashboard.value = null;
       }
@@ -158,8 +140,12 @@ export default defineComponent({
 
     watch(
       () => selectedDashboard.value,
-      () => {
-        emit("dashboard-selected", selectedDashboard.value);
+      (dashboardId) => {
+        const dashboard = dashboardList.value.find(
+          (d: any) => d.value === dashboardId,
+        );
+        // emit {label, value} for backward compatibility with parents
+        emit("dashboard-selected", dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null));
       },
     );
 

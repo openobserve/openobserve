@@ -100,21 +100,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
-        <q-toggle
+        <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
-          :icon="'img:' + getImageURL('images/common/function.svg')"
           :title="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
-          :disable="promqlMode"
-          class="float-left tw:h-[36px] o2-toggle-button-xs tw:mt-2"
-          size="xs"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
-        />
+          :disabled="promqlMode"
+          size="sm"
+        >
+          <template #label>
+            <img :src="'img:' + getImageURL('images/common/function.svg')" style="width: 16px; height: 16px" />
+          </template>
+        </OSwitch>
         <QueryTypeSelector></QueryTypeSelector>
       </div>
     </div>
@@ -206,34 +203,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div style="height: 40px; width: 100%">
                   <div style="display: flex; height: 40px">
-                    <q-select
+                    <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
                       :options="functionOptions"
                       data-test="dashboard-use-saved-vrl-function"
-                      input-debounce="0"
-                      behavior="menu"
-                      use-input
-                      borderless
-                      dense
-                      hide-selected
-                      menu-anchor="top left"
-                      fill-input
-                      @filter="filterFunctionOptions"
-                      option-label="name"
-                      option-value="function"
-                      @update:modelValue="onFunctionSelect"
-                      style="width: 100%"
-                      hide-bottom-space
-                    >
-                      <template #no-option>
-                        <q-item>
-                          <q-item-section>
-                            {{ t("search.noResult") }}</q-item-section
-                          >
-                        </q-item>
-                      </template>
-                    </q-select>
+                      searchable
+                      labelKey="name"
+                      valueKey="function"
+                      @search="onFunctionSearch"
+                      @update:model-value="onFunctionSelect"
+                      class="tw:flex-1"
+                    />
                     <OButton
                       variant="ghost"
                       size="icon"
@@ -294,6 +275,8 @@ import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -304,6 +287,8 @@ export default defineComponent({
     QueryTypeSelector,
     UnifiedQueryEditor,
     OButton,
+    OSelect,
+    OSwitch,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -325,7 +310,7 @@ export default defineComponent({
     const { getAllFunctions } = useFunctions();
     const functionList = ref([]);
     const functionOptions = ref([]);
-    const selectedFunction = ref("");
+    const selectedFunction = ref<string | undefined>(undefined);
 
     const getFunctions = async () => {
       try {
@@ -369,15 +354,24 @@ export default defineComponent({
       });
     };
 
-    const onFunctionSelect = (val: any) => {
+    const onFunctionSearch = (val: string) => {
+      functionOptions.value = functionList.value.filter((fn: any) => {
+        return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+      });
+    };
+
+    const onFunctionSelect = (fnCode: string | null | undefined) => {
+      if (!fnCode) return;
       // assign selected vrl function
-      vrlFnEditorRef.value?.setValue(val.function);
+      vrlFnEditorRef.value?.setValue(fnCode);
+      // find function name for notification
+      const fn = functionList.value.find((f: any) => f.function === fnCode);
       // clear v-model
-      selectedFunction.value = "";
+      selectedFunction.value = undefined;
 
       // show success message
       showPositiveNotification(
-        t("dashboard.functionAppliedSuccess", { name: val.name }),
+        t("dashboard.functionAppliedSuccess", { name: fn?.name ?? fnCode }),
       );
     };
 
@@ -778,6 +772,7 @@ export default defineComponent({
       functionOptions,
       selectedFunction,
       filterFunctionOptions,
+      onFunctionSearch,
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,

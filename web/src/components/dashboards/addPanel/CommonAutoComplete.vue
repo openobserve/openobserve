@@ -1,21 +1,18 @@
 <template>
-  <div class="relative" style="margin-top: 5px">
-    <q-input
+  <div class="relative" style="margin-top: 5px" data-no-autofocus>
+    <OInput
       v-model="inputValue"
       @update:model-value="onModelValueChanged"
-      dense
-      borderless
       :label="label"
       @focus="onFocus"
       @blur="hideOptions"
       v-bind="$attrs"
-      style="width: 100%"
       data-test="common-auto-complete"
-     hide-bottom-space>
+    >
       <template v-if="hasSlot('label')" v-slot:label>
         <slot name="label"></slot>
       </template>
-    </q-input>
+    </OInput>
     <div
       class="options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
@@ -41,9 +38,11 @@ import { ref, toRef, defineComponent, watch } from "vue";
 import { useSearchInputUsingRegex } from "@/composables/useSearchInputUsingRegex";
 import { useStore } from "vuex";
 import { useSlots } from "vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "CommonAutoComplete",
+  components: { OInput },
   props: {
     modelValue: {
       type: String,

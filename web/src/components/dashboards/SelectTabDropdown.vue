@@ -17,25 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-end tw:gap-2">
     <!-- select new tab -->
-    <q-select
+    <OSelect
       v-model="selectedTab"
       :label="t('dashboard.selectTabLabel')"
       :options="tabList"
       data-test="dashboard-dropdown-tab-selection"
-      input-debounce="0"
-      behavior="menu"
-      borderless
-      dense
-      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard tw:flex-1"
-      :loading="getTabList.isLoading.value"
-      hide-bottom-space
-    >
-      <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
-      </template>
-    </q-select>
+      labelKey="label"
+      class="tw:flex-1"
+    />
 
     <OButton
       data-test="dashboard-tab-new-add"
@@ -74,6 +63,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
@@ -81,7 +71,7 @@ import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectTabDropdown",
-  components: { AddTab, OButton },
+  components: { AddTab, OButton, OSelect },
   emits: ["tab-selected", "tab-list-updated"],
   props: {
     folderId: {
@@ -103,18 +93,15 @@ export default defineComponent({
     const showAddTabDialog: any = ref(false);
     const tabList: any = ref([]);
 
-    //dropdown selected folder index
-    const selectedTab: any = ref(null);
+    //dropdown selected tab id (primitive string for OSelect)
+    const selectedTab = ref<string | null>(null);
     const { t } = useI18n();
 
     // on add tab, select added tab
     const updateTabList = async (newTab: any) => {
       showAddTabDialog.value = false;
       await getTabList.execute();
-      selectedTab.value = {
-        label: newTab.name,
-        value: newTab.tabId,
-      };
+      selectedTab.value = newTab.tabId ?? null;
     };
 
     // get all tabs based on selected dashboardId
@@ -134,10 +121,7 @@ export default defineComponent({
 
       // select first tab
       if (tabList?.value?.length > 0) {
-        selectedTab.value = {
-          label: tabList?.value[0]?.label,
-          value: tabList?.value[0]?.value,
-        };
+        selectedTab.value = tabList?.value[0]?.value ?? null;
       } else {
         selectedTab.value = null;
       }
@@ -163,8 +147,10 @@ export default defineComponent({
 
     watch(
       () => selectedTab.value,
-      () => {
-        emit("tab-selected", selectedTab?.value);
+      (tabId) => {
+        const tab = tabList.value?.find((t: any) => t.value === tabId);
+        // emit {label, value} for backward compatibility with parents
+        emit("tab-selected", tab ?? (tabId ? { label: tabId, value: tabId } : null));
       },
     );
 

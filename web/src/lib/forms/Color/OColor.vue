@@ -5,6 +5,7 @@ import type { ColorProps, ColorEmits, ColorSlots } from "./OColor.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
 import {
   PopoverRoot,
+  PopoverPortal,
   PopoverTrigger,
   PopoverContent,
   ColorAreaRoot,
@@ -161,10 +162,11 @@ const wrapperClasses = computed(() => [
           />
         </PopoverTrigger>
 
+        <PopoverPortal>
         <PopoverContent
           :side-offset="6"
           align="start"
-          class="tw:z-50 tw:rounded-lg tw:border tw:shadow-md tw:p-3 tw:flex tw:flex-col tw:gap-3 tw:bg-colorpicker-popup-bg tw:border-colorpicker-popup-border"
+          class="tw:z-[10001] tw:rounded-lg tw:border tw:shadow-md tw:p-3 tw:flex tw:flex-col tw:gap-3 tw:bg-colorpicker-popup-bg tw:border-colorpicker-popup-border"
           style="width: 220px"
         >
           <!-- Saturation / Brightness area -->
@@ -210,6 +212,7 @@ const wrapperClasses = computed(() => [
             @input="handleText"
           />
         </PopoverContent>
+        </PopoverPortal>
       </PopoverRoot>
 
       <!-- Hex text input (always visible) -->

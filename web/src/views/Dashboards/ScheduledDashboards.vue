@@ -15,10 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="scheduled-dashboards"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  <ODrawer data-test="scheduled-dashboards-drawer"
+    :open="open"
+    :width="60"
+    :title="t('dashboard.scheduledDashboards')"
+    @update:open="emit('update:open', $event)"
   >
+    <template #header-right>
+      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+        <div class="app-tabs-container tw:h-[36px]">
+          <AppTabs
+            class="tabs-selection-container"
+            :tabs="scheduledReportTypeTabs"
+            v-model:active-tab="scheduledActiveTab"
+          />
+        </div>
+
+        <OInput
+          data-test="alert-list-search-input"
+          v-model="scheduledFilterQuery"
+          :placeholder="t('reports.search')"
+        >
+          <template #prepend>
+            <q-icon name="search" class="cursor-pointer" />
+          </template>
+        </OInput>
+
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="alert-list-add-alert-btn"
+          @click="createScheduledReport"
+          >{{ t("dashboard.newReport") }}</OButton
+        >
+      </div>
+    </template>
+
+    <div
+      class="scheduled-dashboards"
+      :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+    >
     <q-table
       data-test="scheduled-dashboard-table"
       ref="scheduledDashboardTableRef"
@@ -129,6 +165,8 @@ import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { Database, CalendarClock } from "lucide-vue-next";
 
 const props = defineProps({
   reports: {

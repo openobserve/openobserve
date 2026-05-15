@@ -33,19 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-h6">Example of custom charts</span>
         </div>
         <q-space />
-        <q-input
+        <OInput
           v-model="searchQuery"
-          dense
-          borderless
           placeholder="Search charts..."
-          style="min-width: 250px; border-radius: 4px; padding: 2px 8px"
           clearable
           @clear="searchQuery = ''"
         >
-          <template v-slot:prepend>
+          <template #prepend>
             <q-icon name="search" />
           </template>
-        </q-input>
+        </OInput>
         <OButton
           variant="ghost"
           size="icon"
@@ -192,12 +189,14 @@ import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
     CustomChartConfirmDialog,
     OButton,
+    OInput,
   },
   emits: ["close", "select"],
   setup(props, { emit }) {

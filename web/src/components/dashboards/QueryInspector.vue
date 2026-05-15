@@ -1,52 +1,25 @@
 <template>
-  <q-card
-    class="tw:min-w-[850px] tw:max-w-[80vw] tw:max-h-[90vh] tw:flex tw:flex-col tw:rounded-xl tw:shadow-2xl tw:overflow-hidden tw:bg-[var(--o2-card-bg)] tw:text-[var(--o2-text-primary)]"
+  <ODialog data-test="query-inspector"
+    :open="open"
+    @update:open="$emit('update:open', $event)"
+    title="Query Inspector"
+    :sub-title="`Panel : ${dataTitle}  ·  Total Queries: ${totalQueries}`"
+    :width="50"
   >
-    <!-- Header -->
-    <div
-      class="tw:flex tw:items-center tw:justify-between tw:px-6 tw:py-4 tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-color)]"
-    >
-      <div class="tw:flex tw:flex-col">
-        <div
-          class="tw:text-xl tw:font-bold tw:m-0 tw:flex tw:items-center tw:gap-2"
+    <!-- search input: sits left of the close button via #header-right -->
+    <template #header-right>
+      <div class="tw:flex">
+        <OInput
+          v-model="searchQuery"
+          placeholder="Search keywords..."
+          data-test="query-inspector-search"
         >
-          Query Inspector
-        </div>
-        <div
-          class="tw:text-[var(--o2-text-secondary)] tw:text-sm tw:font-bold tw:mt-1 tw:flex tw:items-center tw:gap-3"
-        >
-          <span>Panel : {{ dataTitle }}</span>
-          <span
-            class="tw:w-1 tw:h-1 tw:bg-[var(--o2-text-secondary)] tw:rounded-full"
-          ></span>
-          <span>Total Queries: {{ totalQueries }}</span>
-        </div>
+          <template #prepend>
+            <q-icon name="search" size="xs" />
+          </template>
+        </OInput>
       </div>
-
-      <div class="tw:flex tw:items-center tw:gap-4">
-        <div class="tw:relative tw:w-50">
-          <q-input
-            v-model="searchQuery"
-            placeholder="Search keywords..."
-            dense
-            color="primary"
-            :dark="store.state.theme === 'dark'"
-          >
-            <template v-slot:prepend>
-              <q-icon name="search" size="xs" />
-            </template>
-          </q-input>
-        </div>
-        <OButton
-          variant="ghost"
-          size="icon"
-          v-close-popup="true"
-          data-test="query-inspector-close-btn"
-        >
-          <template #icon-left><q-icon name="close" /></template>
-        </OButton>
-      </div>
-    </div>
+    </template>
 
     <!-- Body -->
     <q-card-section class="tw:flex-1 tw:max-h-[60vh] tw:overflow-y-auto tw:p-6">
@@ -283,11 +256,14 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "QueryInspector",
-  components: { OButton },
+  emits: ["update:open"],
+  components: { OButton, ODialog, OInput },
   props: {
     metaData: {
       type: Object,

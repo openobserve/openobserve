@@ -123,21 +123,16 @@
           class="tw:flex tw:space-x-2 tw:items-center"
           v-if="isHavingFilterVisible()"
         >
-          <q-select
-            dense
-            filled
+          <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
-            borderless
-            style="width: 60px"
+            class="tw:w-[60px]"
             data-test="dynamic-function-popup-having-operator"
           />
 
-          <q-input
-            dense
-            filled
+          <OInput
             v-model.number="getHavingCondition().value"
-            style="width: 50%"
+            class="tw:w-1/2"
             type="number"
             placeholder="Value"
             data-test="dynamic-function-popup-having-value"
@@ -155,18 +150,16 @@
       </div>
       <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
         <div>
-          <q-checkbox
+          <OCheckbox
             v-model="fields.treatAsNonTimestamp"
-            :label="'Mark this field as non-timestamp'"
-            dense
+            label="Mark this field as non-timestamp"
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
         </div>
         <div class="q-mt-xs">
-          <q-checkbox
+          <OCheckbox
             v-model="fields.showFieldAsJson"
-            :label="'Render Data as JSON / Array'"
-            dense
+            label="Render Data as JSON / Array"
             data-test="dynamic-function-popup-show-field-as-json"
           />
         </div>
@@ -187,6 +180,9 @@ import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 export default {
   name: "DynamicFunctionPopUp",
   components: {
@@ -198,6 +194,9 @@ export default {
     OTabPanels,
     OTabPanel,
     OButton,
+    OSelect,
+    OInput,
+    OCheckbox,
   },
   props: {
     modelValue: {

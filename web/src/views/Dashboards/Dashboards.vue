@@ -30,60 +30,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
           <div class="flex q-ml-auto tw:ps-2">
-            <q-input
+            <OInput
               v-model="dynamicQueryModel"
-              dense
-              borderless
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
                   : t('dashboard.search')
               "
-              data-test="dashboard-search"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-              class="o2-search-input"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-dark'
-                  : 'o2-search-input-light'
-              "
-              hide-bottom-space
+              data-test="dashboard-search"
             >
               <template #prepend>
-                <q-icon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search"
-                />
+                <q-icon name="search" />
               </template>
-            </q-input>
+            </OInput>
           </div>
           <div class="tw:mb-2">
-            <q-toggle
+            <OSwitch
               data-test="dashboard-search-across-folders-toggle"
               v-model="searchAcrossFolders"
               label="All Folders"
               size="lg"
-              class="q-ml-sm tw:h-[36px] o2-toggle-button-lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
             >
-            </q-toggle>
-            <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-              {{
-                searchAcrossFolders
-                  ? t("dashboard.searchSelf")
-                  : t("dashboard.searchAll")
-              }}
-            </q-tooltip>
+              <template #tooltip>
+                <q-tooltip>
+                  {{
+                    searchAcrossFolders
+                      ? t("dashboard.searchSelf")
+                      : t("dashboard.searchAll")
+                  }}
+                </q-tooltip>
+              </template>
+            </OSwitch>
           </div>
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
@@ -182,34 +161,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ></q-separator>
                   <!-- Search Input -->
                   <div style="width: 100%" class="flex folder-item q-py-xs">
-                    <q-input
+                    <OInput
                       v-model="folderSearchQuery"
-                      dense
-                      borderless
                       data-test="folder-search"
                       placeholder="Search Folder"
                       style="width: 100%"
                       clearable
-                      class="tw:mx-2 q-px-xs"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-search-input-dark'
-                          : 'o2-search-input-light'
-                      "
-                      hide-bottom-space
+                      class="tw:mx-2"
                     >
                       <template #prepend>
-                        <q-icon
-                          class="o2-search-input-icon"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'o2-search-input-icon-dark'
-                              : 'o2-search-input-icon-light'
-                          "
-                          name="search"
-                        />
+                        <q-icon name="search" />
                       </template>
-                    </q-input>
+                    </OInput>
                     <div></div>
                   </div>
                 </div>
@@ -591,6 +554,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 // @ts-nocheck
 import {
   computed,
@@ -656,6 +621,8 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    OInput,
+    OSwitch,
     AddDashboard,
     AddDashboardFromGitHub,
     QTablePagination,
