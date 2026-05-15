@@ -65,7 +65,7 @@ fn create_destinations_table_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// Statement to create index on on destinations_id.
+/// Statement to create index on destinations_id.
 fn create_destinations_template_id_destination_id_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()

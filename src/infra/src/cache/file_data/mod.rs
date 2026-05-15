@@ -287,7 +287,7 @@ async fn download_from_storage(
             } else {
                 // the entry in db does not match what there is actually in the blob store
                 // so we check if the footer is valid. If it is, then the db entry is invalid
-                // and we reset it. If footer is invalid, the the store has a corrupted file
+                // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
