@@ -1,0 +1,81 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
+<script setup lang="ts">
+import type { Cell, Row } from "@tanstack/vue-table";
+import { computed } from "vue";
+import { FlexRender } from "@tanstack/vue-table";
+
+const props = defineProps<{
+  cell: Cell<any, any>;
+  row: Row<any>;
+  highlightText?: string;
+  shouldHighlight?: boolean;
+  wrap?: boolean;
+  dense?: boolean;
+  bordered?: boolean;
+}>();
+
+const emit = defineEmits<{
+  "cell-click": [
+    params: { columnId: string; row: any; value: any },
+  ];
+}>();
+
+const meta = computed(() => props.cell.column.columnDef.meta as any);
+const align = computed(() => meta.value?.align ?? "left");
+
+const alignClass = computed(() => {
+  if (align.value === "center") return "tw:text-center";
+  if (align.value === "right") return "tw:text-right";
+  return "tw:text-left";
+});
+
+const isAction = computed(() => meta.value?.isAction ?? false);
+
+function handleClick() {
+  emit("cell-click", {
+    columnId: props.cell.column.id,
+    row: props.row.original,
+    value: props.cell.getValue(),
+  });
+}
+
+/**
+ * Renders highlighted text by splitting on highlight keywords.
+ * Simple client-side highlighting for non-virtual-scroll tables.
+ */
+function renderHighlightedText(value: unknown): string {
+  return String(value ?? "");
+}
+</script>
+
+<template>
+  <td
+    :data-test="`o2-table-cell-${cell.column.id}`"
+    :class="[
+      'tw:px-2',
+      dense ? 'tw:py-1' : 'tw:py-2',
+      alignClass,
+      bordered ? 'tw:border-r tw:border-border-default' : '',
+      isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
+      wrap ? '' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
+      meta?.cellClass ?? '',
+    ]"
+    :style="{
+      width: `calc(var(--header-${cell.column.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+    }"
+    @click="handleClick"
+  >
+    <slot v-if="isAction" />
+    <!-- Custom cell render via TanStack FlexRender -->
+    <FlexRender
+      v-else-if="cell.column.columnDef.cell"
+      :render="cell.column.columnDef.cell"
+      :props="cell.getContext()"
+    />
+    <!-- Default: plain text -->
+    <span v-else class="tw:text-text-primary tw:text-sm">
+      {{ renderHighlightedText(cell.getValue()) }}
+    </span>
+  </td>
+</template>
