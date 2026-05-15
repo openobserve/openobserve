@@ -115,9 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       key="applyBeforeFlattening"
                       :props="props"
                     >
-                      <q-toggle
+                      <OSwitch
                         data-test="stream-association-applyBeforeFlattening-toggle"
-                        class="q-mt-sm"
                         v-model="props.row.applyBeforeFlattening"
                         @update:model-value="
                           updateAssociatedFunctions(props.row)
@@ -142,22 +141,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr v-if="addFunctionInProgress">
                     <q-td></q-td>
                     <q-td data-test="stream-association-functions-select-input">
-                      <q-select
+                      <OSelect
                         v-model="selectedFunction"
-                        option-value="name"
-                        option-label="name"
+                        labelKey="name"
+                        valueKey="name"
                         :label="t('function.selectFunction')"
                         :options="filterFunctions"
                         :loading="addFunctionInProgressLoading"
-                        :disable="addFunctionInProgressLoading"
-                        filled
-                        borderless
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        @filter="filterFn"
-                      ></q-select>
+                        :disabled="addFunctionInProgressLoading"
+                        searchable
+                        @search="filterFn"
+                      />
                     </q-td>
                     <q-td></q-td>
                     <q-td> </q-td>
@@ -216,18 +210,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("logStream.header") }}
         </div>
         <div class="q-ml-auto" data-test="stream-association-search-input">
-          <q-input
+          <OInput
             v-model="filterQuery"
-            borderless
-            filled
-            dense
             class="q-mb-xs no-border"
             :placeholder="t('logStream.search')"
           >
             <template #prepend>
               <q-icon name="search" />
             </template>
-          </q-input>
+          </OInput>
         </div>
         <OButton
           data-test="log-stream-refresh-stats-btn"
@@ -299,10 +290,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw, OInnerLoading },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw, OInnerLoading, OSwitch, OSelect, OInput },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -487,16 +481,14 @@ export default defineComponent({
       });
     };
 
-    const filterFn = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        filterFunctions.value = allFunctionsList.value
-          .filter(
-            (item: any) =>
-              !functionsList.value.some((obj: any) => obj.name === item.name)
-          ) // filter existing applied functions
-          .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
-      });
+    const filterFn = (val: string) => {
+      const needle = val.toLowerCase();
+      filterFunctions.value = allFunctionsList.value
+        .filter(
+          (item: any) =>
+            !functionsList.value.some((obj: any) => obj.name === item.name)
+        ) // filter existing applied functions
+        .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
     };
 
     getLogStream();

@@ -782,7 +782,7 @@ Legend: `[ ]` = not done · `✅` = done
 - ✅ src/components/actionScripts/ActionScripts.vue
 - [ ] src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertsDestinationList.vue
-- [ ] src/components/alerts/ImportAlert.vue
+- ✅ src/components/alerts/ImportAlert.vue
 - [ ] src/components/alerts/ImportSemanticGroups.vue
 - [ ] src/components/alerts/ImportSemanticGroupsDrawer.vue
 - ✅ src/components/alerts/OrganizationDeduplicationSettings.vue
@@ -814,7 +814,7 @@ Legend: `[ ]` = not done · `✅` = done
 - ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
 - [ ] src/components/ingestion/recommended/AzureConfig.vue
 - [ ] src/components/login/GetStarted.vue
-- [ ] src/components/logstream/AssociatedRegexPatterns.vue
+- ✅ src/components/logstream/AssociatedRegexPatterns.vue
 - [ ] src/components/logstream/schema.vue
 - ✅ src/components/pipeline/PipelinesList.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
@@ -865,7 +865,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/alerts/DeduplicationConfig.vue
 - ✅ src/components/alerts/FieldsInput.vue
 - [ ] src/components/alerts/FilterCondition.vue
-- [ ] src/components/alerts/ImportAlert.vue
+- ✅ src/components/alerts/ImportAlert.vue
 - ✅ src/components/alerts/ImportDestination.vue
 - ✅ src/components/alerts/ImportTemplate.vue
 - ✅ src/components/alerts/IncidentList.vue
@@ -902,7 +902,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/dashboards/addPanel/ColorBySeriesPopUp.vue
 - ✅ src/components/dashboards/addPanel/CommonAutoComplete.vue
 - ✅ src/components/dashboards/addPanel/ConfigPanel.vue *(mixed — normal + autogrow fields)*
-- [ ] src/components/dashboards/addPanel/ConfigPanelSearch.vue
+- ✅ src/components/dashboards/addPanel/ConfigPanelSearch.vue
 - ✅ src/components/dashboards/addPanel/FieldList.vue
 - ✅ src/components/dashboards/addPanel/PromQLChartConfig.vue
 - ✅ src/components/dashboards/addPanel/ValueMappingPopUp.vue
@@ -913,13 +913,13 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
 - ✅ src/components/dashboards/settings/VariableAdHocValueSelector.vue
 - ✅ src/components/dashboards/tabs/AddTab.vue
-- [ ] src/components/functions/AddEnrichmentTable.vue
-- [ ] src/components/functions/AssociatedStreamFunction.vue
-- [ ] src/components/functions/EnrichmentSchema.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AssociatedStreamFunction.vue
+- ✅ src/components/functions/EnrichmentSchema.vue
 - ✅ src/components/functions/EnrichmentTableList.vue
 - ✅ src/components/functions/FunctionList.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/functions/StreamRouting.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/functions/StreamRouting.vue
 - [ ] src/components/iam/groups/AddGroup.vue
 - [ ] src/components/iam/groups/AppGroups.vue
 - [ ] src/components/iam/groups/GroupRoles.vue
@@ -955,7 +955,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/login/Login.vue
 - [ ] src/components/login/SsoLogin.vue
 - [ ] src/components/logstream/AddStream.vue
-- [T] src/components/logstream/AssociatedRegexPatterns.vue *(mixed — normal + autogrow fields)*
+- [T] src/components/logstream/AssociatedRegexPatterns.vue *(mixed — normal + autogrow fields)* ✅
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - [ ] src/components/logstream/StreamFieldInputs.vue
 - [ ] src/components/logstream/schema.vue
@@ -1038,8 +1038,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 - [ ] src/components/ResumePipelineDialog.vue
 - ✅ src/components/dashboards/settings/TabsDeletePopUp.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/logstream/AssociatedRegexPatterns.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/logstream/AssociatedRegexPatterns.vue
 - [ ] src/components/settings/DomainManagement.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
 
@@ -1104,9 +1104,9 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/VariableAdHocValueSelector.vue
 - ✅ src/components/dashboards/settings/VariableCustomValueSelector.vue
 - ✅ src/components/dashboards/settings/VariableQueryValueSelector.vue
-- [ ] src/components/functions/AssociatedStreamFunction.vue
-- [ ] src/components/functions/StreamRouting.vue
-- [ ] src/components/functions/TestFunction.vue
+- ✅ src/components/functions/AssociatedStreamFunction.vue
+- ✅ src/components/functions/StreamRouting.vue
+- ✅ src/components/functions/TestFunction.vue
 - [ ] src/components/iam/groups/GroupUsers.vue
 - [ ] src/components/iam/quota/Quota.vue
 - [ ] src/components/iam/roles/EditRole.vue
@@ -1190,7 +1190,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/addPanel/PromQLChartConfig.vue
 - ✅ src/components/dashboards/settings/AddSettingVariable.vue
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
-- [ ] src/components/functions/AssociatedStreamFunction.vue
+- ✅ src/components/functions/AssociatedStreamFunction.vue
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - [ ] src/components/logstream/schema.vue
@@ -1239,10 +1239,10 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/AddSettingVariable.vue
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
 - ✅ src/components/dashboards/tabs/AddTab.vue
-- [ ] src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
 - [ ] src/components/functions/AddFunction.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/functions/TestFunction.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/functions/TestFunction.vue
 - [ ] src/components/iam/organizations/AddUpdateOrganization.vue
 - [ ] src/components/iam/serviceAccounts/AddServiceAccount.vue
 - [ ] src/components/iam/users/AddUser.vue
@@ -1273,11 +1273,11 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 ### q-file → OFile / OFormFile
 
 - [ ] src/components/actionScripts/EditScript.vue
-- [ ] src/components/alerts/ImportAlert.vue
+- ✅ src/components/alerts/ImportAlert.vue
 - [ ] src/components/alerts/ImportSemanticGroups.vue
 - [ ] src/components/alerts/ImportSemanticGroupsDrawer.vue
 - [ ] src/components/common/BaseImport.vue
-- [ ] src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
 - [ ] src/components/settings/General.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
 
@@ -1326,7 +1326,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 ### q-option-group → OOptionGroup / OFormOptionGroup
 
-- [ ] src/components/functions/AddEnrichmentTable.vue
+- ✅ src/components/functions/AddEnrichmentTable.vue
 
 ---
 
@@ -1412,8 +1412,8 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/dashboards/viewPanel/ViewPanel.vue
 - ✅ src/components/functions/EnrichmentTableList.vue
 - ✅ src/components/functions/FunctionList.vue
-- [ ] src/components/functions/FunctionsToolbar.vue
-- [ ] src/components/functions/TestFunction.vue
+- ✅ src/components/functions/FunctionsToolbar.vue
+- ✅ src/components/functions/TestFunction.vue
 - [ ] src/components/iam/groups/GroupUsers.vue
 - ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
 - [ ] src/components/ingestion/recommended/AWSIntegrationTile.vue
