@@ -1353,9 +1353,10 @@ export default defineComponent({
       const hasRawData = data.value?.length && data.value[0]?.length;
 
       // During data buffer reset (executor clears state.data before reload),
-      // suppress "No Data" if a chart was already rendered to avoid flicker.
+      // suppress "No Data" only while still loading to avoid flicker.
+      // Once loading completes with empty data, show "No Data".
       if (!hasRawData) {
-        return panelData.value?.chartType ? "" : "No Data";
+        return loading.value && panelData.value?.chartType ? "" : "No Data";
       }
 
       // Raw data exists but conversion hasn't produced output yet — wait.
