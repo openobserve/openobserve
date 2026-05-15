@@ -89,8 +89,8 @@ async deleteJobSearch(trace_id) {
       await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
       await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
 
-      // Confirm the deletion
-      await this.page.locator('[data-test="cancel-button"]').click();
+      // Cancel the deletion (tests the cancel flow)
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
 
 
       // Click the delete button for the specified job row
@@ -98,7 +98,7 @@ async deleteJobSearch(trace_id) {
       await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
 
       // Confirm the deletion
-      await this.page.locator('[data-test="confirm-button"]').click();
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
       // Verify the success message
       await expect(this.page.locator('#q-notify')).toContainText('Search Job has been deleted successfully');
@@ -136,7 +136,7 @@ async cancelJobSearch(trace_id) {
     await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-cancel-btn"]`).click();
 
     // Confirm the cancellation
-    await this.page.locator('[data-test="confirm-button"]').click();
+    await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
     // Verify the success message
     await expect(this.page.locator('#q-notify')).toContainText('Search Job has been cancelled successfully');   
