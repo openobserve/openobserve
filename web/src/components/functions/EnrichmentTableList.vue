@@ -34,19 +34,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:active-tab="updateActiveTab"
               />
 
-              <q-input
+              <OInput
                 data-test="enrichment-tables-search-input"
                 v-model="filterQuery"
-                borderless
-                dense
-                flat
                 class="no-border o2-search-input"
                 :placeholder="t('function.searchEnrichmentTable')"
               >
                 <template #prepend>
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
-              </q-input>
+              </OInput>
               <OButton
                 class="q-ml-sm"
                 variant="primary"
@@ -79,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <NoData />
               </template>
               <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
               </template>
               <template v-slot:body-cell-type="props">
                 <q-td :props="props">
@@ -100,14 +97,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="positive"
                         size="18px"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: All Completed</strong><br/>
-                            {{ props.row.urlJobs.length }} URL job(s) completed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" to see details</em>
-                          </div>
-                        </q-tooltip>
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: All Completed</strong><br/>
+                              {{ props.row.urlJobs.length }} URL job(s) completed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" to see details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
                       </q-icon>
                       <q-icon
                         v-else-if="props.row.aggregateStatus === 'processing'"
@@ -116,14 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="18px"
                         class="rotate-animation"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Processing</strong><br/>
-                            One or more jobs are currently processing<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
-                          </div>
-                        </q-tooltip>
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Processing</strong><br/>
+                              One or more jobs are currently processing<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
                       </q-icon>
                       <q-icon
                         v-else-if="props.row.aggregateStatus === 'failed'"
@@ -133,14 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="cursor-pointer"
                         @click="showUrlJobsDialog(props.row)"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 350px;">
-                            <strong>Status: Failed</strong><br/>
-                            One or more jobs have failed<br/>
-                            <br/>
-                            Click to see details and retry failed jobs
-                          </div>
-                        </q-tooltip>
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 350px;">
+                              <strong>Status: Failed</strong><br/>
+                              One or more jobs have failed<br/>
+                              <br/>
+                              Click to see details and retry failed jobs
+                            </div>
+                          </template>
+                        </OTooltip>
                       </q-icon>
                       <q-icon
                         v-else-if="props.row.aggregateStatus === 'pending'"
@@ -148,14 +151,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color="grey-7"
                         size="18px"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Pending</strong><br/>
-                            Job(s) waiting to be processed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" for details</em>
-                          </div>
-                        </q-tooltip>
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Pending</strong><br/>
+                              Job(s) waiting to be processed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
                       </q-icon>
                     </template>
                   </div>
@@ -210,9 +215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template v-slot:body-cell-function="props">
                 <q-td :props="props">
-                  <q-tooltip>
-                    <pre>{{ props.row.function }}</pre>
-                  </q-tooltip>
+                  <OTooltip>
+                    <template #content><pre>{{ props.row.function }}</pre></template>
+                  </OTooltip>
                   <pre style="white-space: break-spaces">{{
                     props.row.function
                   }}</pre>
@@ -250,9 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
-                        size="sm"
                         :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                         class="o2-table-checkbox"
                       />
@@ -369,6 +373,9 @@ import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
@@ -382,6 +389,9 @@ export default defineComponent({
     AppTabs,
     OButton,
     ODrawer,
+    OInput,
+    OTooltip,
+    OCheckbox,
     Search,
     List,
     Pencil,

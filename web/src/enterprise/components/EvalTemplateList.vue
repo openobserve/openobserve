@@ -33,18 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex q-ml-auto tw:ps-2 items-center">
           <!-- Search input -->
-          <q-input
+          <OInput
             data-test="eval-template-list-search-input"
             v-model="filterQuery"
-            borderless
-            dense
             class="no-border o2-search-input"
             :placeholder="t('evalTemplate.search')"
           >
             <template #prepend>
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
-          </q-input>
+          </OInput>
 
           <!-- Refresh button -->
           <OButton
@@ -96,9 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:header="props">
             <q-tr :props="props">
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-table-checkbox-dark'
@@ -121,9 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Row selection checkbox -->
           <template v-slot:body-selection="scope">
-            <q-checkbox
+            <OCheckbox
               v-model="scope.selected"
-              size="sm"
               class="o2-table-checkbox"
             />
           </template>
@@ -247,6 +243,8 @@ import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { Pencil, Trash2 } from 'lucide-vue-next';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 interface Template {
   id: string;

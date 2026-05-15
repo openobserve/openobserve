@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("function.header") }}
               </div>
               <div class="q-ml-auto" data-test="functions-list-search-input">
-                <q-input
+                <OInput
                   v-model="filterQuery"
-                  borderless
-                  dense
                   class="q-ml-auto no-border o2-search-input"
                   :placeholder="t('function.search')"
                 >
                   <template #prepend>
                     <q-icon class="o2-search-input-icon" name="search" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <OButton
                 class="q-ml-sm"
@@ -102,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template v-slot:body-cell-function="props">
                 <q-td :props="props">
-                  <q-tooltip>
-                    <pre>{{ props.row.function }}</pre>
-                  </q-tooltip>
+                  <OTooltip>
+                    <template #content><pre>{{ props.row.function }}</pre></template>
+                  </OTooltip>
                   <pre style="white-space: break-spaces">{{
                     props.row.function
                   }}</pre>
@@ -112,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
               </template>
 
               <template #bottom="scope">
@@ -148,9 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
-                        size="sm"
                         :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                         class="o2-table-checkbox"
                       />
@@ -257,6 +254,9 @@ import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
@@ -268,6 +268,9 @@ export default defineComponent({
     ConfirmDialog,
     OButton,
     ODialog,
+    OInput,
+    OTooltip,
+    OCheckbox,
     Pencil,
     Trash2,
   },

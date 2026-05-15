@@ -96,12 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="service.flag"
                 class="col-6 col-sm-4 col-md-3"
               >
-                <q-checkbox
+                <OCheckbox
                   v-model="enabledServices"
-                  :val="service.flag"
+                  :value="service.flag"
                   :label="service.label"
-                  dense
-                  color="primary"
                 />
               </div>
             </div>
@@ -112,15 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="tw:mb-6">
         <div class="step-label tw:mb-3">Deployment region</div>
-        <q-select
+        <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
-          option-value="value"
-          option-label="label"
-          emit-value
-          map-options
-          outlined
-          dense
+          valueKey="value"
+          labelKey="label"
           style="max-width: 320px"
           data-test="aws-region-select"
         />
@@ -135,15 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >(where the StackSet is managed)</span
             >
           </div>
-          <q-select
+          <OSelect
             v-model="selectedRegion"
             :options="AWS_REGIONS"
-            option-value="value"
-            option-label="label"
-            emit-value
-            map-options
-            outlined
-            dense
+            valueKey="value"
+            labelKey="label"
             style="max-width: 320px"
             data-test="aws-admin-region-select"
           />
@@ -198,12 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :key="region.value"
                   class="col-12 col-sm-6 col-md-4"
                 >
-                  <q-checkbox
+                  <OCheckbox
                     v-model="targetRegions"
-                    :val="region.value"
+                    :value="region.value"
                     :label="`${region.label} (${region.value})`"
-                    dense
-                    color="primary"
                   />
                 </div>
               </div>
@@ -325,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="copyParam(param.value)"
                   >
                     <q-icon name="content_copy" />
-                    <q-tooltip>Copy</q-tooltip>
+                    <OTooltip content="Copy" />
                   </OButton>
                 </div>
               </div>
@@ -366,6 +354,9 @@ import {
   QUICK_SETUP_SERVICES,
 } from "@/utils/awsIntegrations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import segment from "@/services/segment_analytics";
 
 const COMPLETE_TEMPLATE_URL =
@@ -373,7 +364,7 @@ const COMPLETE_TEMPLATE_URL =
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem, OButton },
+  components: { OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox },
   setup() {
     const store = useStore();
     const q = useQuasar();
