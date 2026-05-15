@@ -21,11 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pb-lg flex items-center justify-center text-center full-width tw:h-[calc(100vh-12.5rem)]"
     >
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="2.5rem"
-          class="tw:mx-auto tw:block"
-        />
+        <OSpinner size="md" class="tw:mx-auto tw:block" />
         <div class="text-center full-width">
           {{ t("rum.loadingSessions") }}
         </div>
@@ -163,6 +159,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   events: {

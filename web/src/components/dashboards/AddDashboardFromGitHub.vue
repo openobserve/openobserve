@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="loading"
           class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
         >
-          <q-spinner color="primary" size="3em" />
+          <OSpinner size="lg" />
         </div>
 
         <!-- Error State -->
@@ -189,6 +189,7 @@ import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface GitHubDashboard {
   name: string;
@@ -200,7 +201,7 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton, ODialog, ODrawer },
+  components: { AddFolder, OButton, ODialog, ODrawer, OSpinner },
   props: {
     modelValue: {
       type: Boolean,

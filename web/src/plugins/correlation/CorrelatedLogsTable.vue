@@ -132,15 +132,9 @@ class="tw:mr-1" />
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
       </div>
 
       <!-- Results Summary Row -->
@@ -155,11 +149,9 @@ height="32px" />
               })
             }}
           </template>
-          <q-skeleton
+          <OSkeleton
             v-else-if="isLoading"
-            type="text"
-            width="200px"
-            height="14px"
+            class="tw:w-[200px] tw:h-[14px]"
           />
         </div>
       </div> -->
@@ -211,7 +203,7 @@ height="32px" />
           <div
             class="tw:flex tw:items-center tw:justify-center tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
             </span>
@@ -266,6 +258,8 @@ import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -1068,11 +1062,6 @@ watch(
   :deep(.q-field__append) {
     padding-left: 0.25rem;
   }
-}
-
-// Skeleton loading styles
-:deep(.q-skeleton) {
-  opacity: 0.7;
 }
 
 // Table skeleton container

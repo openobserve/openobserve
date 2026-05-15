@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
-        <q-spinner-dots size="60px" color="primary" />
+        <OSpinner variant="dots" size="xl" />
         <h5 class="q-mt-md">Setting up your subscription...</h5>
         <p class="text-grey-7">Please wait while we configure your account.</p>
       </div>
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'pending_activation'" class="text-center">
         <h5 class="q-mb-lg">Waiting for AWS Confirmation</h5>
         <div class="flex justify-center">
-          <q-spinner-gears size="80px" color="primary" />
+          <OSpinner size="xl" />
         </div>
         <p class="text-grey-7 q-mt-lg">
           Please wait while we confirm activation with AWS and set up your account.
@@ -188,6 +188,7 @@ import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type SetupState =
   | "select_org"
@@ -200,7 +201,7 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton },
+  components: { OButton, OSpinner },
   setup() {
     const store = useStore();
     const router = useRouter();

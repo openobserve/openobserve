@@ -41,11 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
     >
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="2.5rem"
-          class="tw:mx-auto tw:block"
-        />
+        <OSpinner size="md" class="tw:mx-auto tw:block" />
         <div class="text-center full-width">Loading Dashboard</div>
       </div>
     </div>
@@ -72,11 +68,13 @@ import searchService from "@/services/search";
 import apiDashboard from "@/utils/rum/api.json";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "ApiDashboard",
   components: {
     RenderDashboardCharts,
+    OSpinner,
   },
   props: {
     dateTime: {

@@ -23,11 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-12.5rem)]"
       >
         <div>
-          <q-spinner-hourglass
-            color="primary"
-            size="2.5rem"
-            class="tw:mx-auto tw:block"
-          />
+          <OSpinner size="md" class="tw:mx-auto tw:block" />
           <div class="text-center full-width">
             {{ t("rum.loadingErrorDetails") }}
           </div>
@@ -65,6 +61,7 @@ import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { t } = useI18n();
 
