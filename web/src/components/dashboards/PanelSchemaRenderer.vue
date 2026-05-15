@@ -1344,8 +1344,11 @@ export default defineComponent({
         (it: any) => it.alias || [],
       );
 
-      const firstRow = data.value[0]?.[0];
+      const rows = data.value[0];
 
+      // Check if at least one row has all required non-null field values
+      // for the given chart type. Uses .some() to short-circuit on the
+      // first valid row found.
       switch (panelType) {
         case "area":
         case "area-stacked":
@@ -1356,40 +1359,37 @@ export default defineComponent({
         case "line":
         case "scatter":
         case "gauge": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
-              yAlias.every((y: any) => getDataValue(firstRow, y) != null))
+          return rows.some(
+            (row: any) =>
+              xAlias.every((x: any) => getDataValue(row, x) != null) &&
+              yAlias.every((y: any) => getDataValue(row, y) != null),
           );
         }
         case "table": {
-          // For tables, simply check if there's any data in the array
-          return (
-            data.value[0]?.length > 1 ||
-            (data.value[0]?.length == 1 &&
-              (xAlias.some((x: any) => getDataValue(firstRow, x) != null) ||
-                yAlias.some((y: any) => getDataValue(firstRow, y) != null)))
+          // For tables, check that at least one row has any non-null field
+          return rows.some(
+            (row: any) =>
+              xAlias.some((x: any) => getDataValue(row, x) != null) ||
+              yAlias.some((y: any) => getDataValue(row, y) != null),
           );
         }
         case "metric": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
+          return rows.some((row: any) =>
+            yAlias.every((y: any) => getDataValue(row, y) != null),
           );
         }
         case "heatmap": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => getDataValue(firstRow, x) != null) &&
-              yAlias.every((y: any) => getDataValue(firstRow, y) != null) &&
-              zAlias.every((z: any) => getDataValue(firstRow, z) != null))
+          return rows.some(
+            (row: any) =>
+              xAlias.every((x: any) => getDataValue(row, x) != null) &&
+              yAlias.every((y: any) => getDataValue(row, y) != null) &&
+              zAlias.every((z: any) => getDataValue(row, z) != null),
           );
         }
         case "pie":
         case "donut": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => getDataValue(firstRow, y) != null)
+          return rows.some((row: any) =>
+            yAlias.every((y: any) => getDataValue(row, y) != null),
           );
         }
         case "maps":
@@ -1400,11 +1400,11 @@ export default defineComponent({
           const source = panelSchema.value.queries[0].fields.source.alias;
           const target = panelSchema.value.queries[0].fields.target.alias;
           const value = panelSchema.value.queries[0].fields.value.alias;
-          return (
-            data.value[0]?.length > 1 ||
-            source.every((s: any) => getDataValue(firstRow, s) != null) ||
-            target.every((t: any) => getDataValue(firstRow, t) != null) ||
-            value.every((v: any) => getDataValue(firstRow, v) != null)
+          return rows.some(
+            (row: any) =>
+              source.every((s: any) => getDataValue(row, s) != null) &&
+              target.every((t: any) => getDataValue(row, t) != null) &&
+              value.every((v: any) => getDataValue(row, v) != null),
           );
         }
         default:
