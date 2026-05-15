@@ -7,6 +7,29 @@ Tracks the full replacement of `<q-icon>` with `<OIcon>` across the application.
 
 ---
 
+## O2 Component Library Status (as of 2026-05-15)
+
+> Components in `web/src/lib/`. This determines which "blocked" migration items can proceed.
+
+| Component | Category | Status | Unblocks |
+|---|---|---|---|
+| **OButton** / OButtonGroup | core | ✅ Built | Phase 1 (done) |
+| **OIcon** | core | ✅ Built | Phase 2a (done) |
+| **OSeparator** | core | ✅ Built | — |
+| **ORefreshButton** | core | ✅ Built | — |
+| **OToggleGroup** / OToggleGroupItem | core | ✅ Built | AlertList toggle-group icon slots |
+| **OTabs** / OTab / OTabPanels / OTabPanel / ORouteTab | navigation | ✅ Built | q-tab `:icon` items (billing, reports, scripts) |
+| **ODialog** | overlay | ✅ Built | — |
+| **ODrawer** | overlay | ✅ Built | — |
+| **ODropdown** / ODropdownItem / ODropdownGroup | overlay | ✅ Built | ODropdownItem icon-left slots (logs, dashboards) |
+| **OInput** | form | ❌ Not built | Phase 4 — q-input prepend icons (~10 files) |
+| **OSelect** | form | ❌ Not built | q-select prepend icons |
+| **OTooltip** | overlay | ❌ Not built | Phase 5 — q-icon wrapping q-tooltip (~5 files) |
+| **ODatePicker** | form | ❌ Not built | Phase 6 — DateTime picker icons (~3 files) |
+| **OList** / OListItem | navigation | ❌ Not built | MenuLink nav icons |
+
+---
+
 ## Quick Legend
 
 | Symbol | Meaning |
@@ -42,6 +65,35 @@ These icon names appear in the codebase but were **not yet in `OIcon.icons.ts`**
 | `schema` | `schema` | 🔲 Phase 2b |
 
 > **Note on `outlinedXxx` imports**: All `@quasar/extras/material-icons-outlined` constants (e.g. `outlinedDelete`, `outlinedEdit`, `outlinedWarning`, `outlinedDriveFileMove`) resolve to the same icon as the base name (`delete`, `edit`, `warning`, `drive-file-move`). Material Symbols Light is already the outlined/light style — no suffix needed.
+
+## Pre-work Phase 2: Additional Registry Entries Needed 🔲
+
+Discovered during full-project audit. These icon names appear in the codebase but are **not yet in `OIcon.icons.ts`**.
+
+| Icon name (snake_case) | OIcon registry key | Used in | Status |
+|---|---|---|---|
+| `home` | `home` | `layouts/MainLayout.vue` | 🔲 |
+| `devices` | `devices` | `layouts/MainLayout.vue` | 🔲 |
+| `report_problem` | `report-problem` | `layouts/MainLayout.vue`, `components/dashboards/PanelContainer.vue` | 🔲 |
+| `filter_alt` | `filter-alt` | `layouts/MainLayout.vue` | 🔲 |
+| `manage_accounts` | `manage-accounts` | `layouts/MainLayout.vue` | 🔲 |
+| `notifications_active` | `notifications-active` | `layouts/MainLayout.vue` | 🔲 |
+| `table_view` | `table-view` | `plugins/logs/IndexList.vue` | 🔲 |
+| `arrow_forward_ios` | `arrow-forward-ios` | `plugins/traces/fields-sidebar/BasicValuesFilter.vue` | 🔲 |
+| `arrow_back_ios` | `arrow-back-ios` | `plugins/traces/fields-sidebar/BasicValuesFilter.vue` | 🔲 |
+| `dashboard_customize` | `dashboard-customize` | `components/dashboards/PanelContainer.vue` | 🔲 |
+| `file_download` | `file-download` | `components/dashboards/PanelContainer.vue`, `components/iam/quota/Quota.vue` | 🔲 |
+| `running_with_errors` | `running-with-errors` | `components/dashboards/PanelContainer.vue`, `components/dashboards/PanelErrorButtons.vue` | 🔲 |
+| `lightbulb` | `lightbulb` | `components/settings/AddRegexPattern.vue`, `components/logstream/AssociatedRegexPatterns.vue`, `components/functions/TestFunction.vue` | 🔲 |
+| `thumb_up_off_alt` | `thumb-up-off-alt` | `components/O2AIChat.vue` | 🔲 |
+| `thumb_down_off_alt` | `thumb-down-off-alt` | `components/O2AIChat.vue` | 🔲 |
+| `save` | `save` | `plugins/logs/TransformSelector.vue`, `plugins/logs/FunctionSelector.vue` | 🔲 |
+| `data_usage` | `data-usage` | `plugins/traces/ThreadView.vue` | 🔲 |
+| `payments` | `payments` | `plugins/traces/ThreadView.vue` | 🔲 |
+| `settings_ethernet` | `settings-ethernet` | `components/pipeline/NodeForm/CreateDestinationForm.vue` | 🔲 (blocked by q-stepper) |
+| `sentiment_very_dissatisfied` | `sentiment-very-dissatisfied` | `views/RUM/SessionViewer.vue` | 🔲 |
+| `help` | `help` | Lucide `HelpCircle` replacement | 🔲 |
+| `security` | `security` | Lucide `Shield` replacement — ⚠️ registry has `shield` which maps to `shield-outline`, not `security` | 🔲 verify mapping |
 
 ---
 
@@ -98,8 +150,8 @@ iconRight?: IconName;  // renders OIcon right of label; slot takes precedence
 | `components/dashboards/PanelContainer.vue:67` | `#icon-left` `fullscreen` | `icon-left="fullscreen"` | ✅ |
 | `components/dashboards/PanelContainer.vue:105` | `#icon-left` `refresh` | `icon-left="refresh"` | ✅ |
 | `components/dashboards/PanelContainer.vue:123` | `#icon-left` `close` | `icon-left="close"` | ✅ |
-| `components/dashboards/PanelContainer.vue:228` | `#icon-left` `search` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
-| `components/dashboards/PanelContainer.vue:236` | `#icon-left` `cached` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `components/dashboards/PanelContainer.vue:228` | `#icon-left` `search` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="search"` | 🔲 migrate |
+| `components/dashboards/PanelContainer.vue:236` | `#icon-left` `cached` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="cached"` | 🔲 migrate |
 | `components/dashboards/SelectTabDropdown.vue:51` | `#icon-left` `add` | `icon-left="add"` | ✅ |
 | `components/dashboards/SelectFolderDropdown.vue:52` | `#icon-left` `add` | `icon-left="add"` | ✅ |
 | `components/dashboards/settings/common/DashboardHeader.vue:27` | `#icon-left` `arrow_back_ios_new` | `icon-left="arrow-back-ios-new"` | ✅ |
@@ -134,9 +186,9 @@ iconRight?: IconName;  // renders OIcon right of label; slot takes precedence
 | `components/alerts/AlertInsights.vue:188` | `#icon-left` `settings` | `icon-left="settings"` | ✅ |
 | `components/alerts/AlertInsights.vue:199` | `#icon-left` `edit` | `icon-left="edit"` | ✅ |
 | `components/alerts/AlertInsights.vue:210` | `#icon-left` `history` | `icon-left="history"` | ✅ |
-| `components/alerts/AlertList.vue:49` | `#icon-left` `schedule` (OToggleGroupItem) | keep slot — Phase 2 OToggleGroup | — |
-| `components/alerts/AlertList.vue:53` | `#icon-left` `bolt` (OToggleGroupItem) | keep slot — Phase 2 OToggleGroup | — |
-| `components/alerts/AlertList.vue:57` | `#icon-left` `query_stats` (OToggleGroupItem) | keep slot — Phase 2 OToggleGroup | — |
+| `components/alerts/AlertList.vue:49` | `#icon-left` `schedule` (OToggleGroupItem) | **UNBLOCKED** — OToggleGroup now built | 🔲 migrate |
+| `components/alerts/AlertList.vue:53` | `#icon-left` `bolt` (OToggleGroupItem) | **UNBLOCKED** — OToggleGroup now built | 🔲 migrate |
+| `components/alerts/AlertList.vue:57` | `#icon-left` `query_stats` (OToggleGroupItem) | **UNBLOCKED** — OToggleGroup now built | 🔲 migrate |
 | `components/alerts/AlertList.vue:139` | `#icon-left` `file_upload` | `icon-left="file-upload"` | ✅ |
 | `components/alerts/AddDestination.vue:541` | `#icon-left` `preview` | `icon-left="preview"` | ✅ |
 | `components/alerts/AddDestination.vue:551` | `#icon-left` `send` | `icon-left="send"` | ✅ |
@@ -169,11 +221,11 @@ iconRight?: IconName;  // renders OIcon right of label; slot takes precedence
 
 | File | Before | After | Status |
 |---|---|---|---|
-| `plugins/logs/JsonPreview.vue:178` | `#icon-left` `visibility` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
-| `plugins/logs/JsonPreview.vue:190` | `#icon-left` `open_in_new` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
-| `plugins/logs/DetailTable.vue:213` | `#icon-left` `visibility` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
-| `plugins/logs/DetailTable.vue:221` | `#icon-left` `visibility_off` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
-| `plugins/logs/DetailTable.vue:233` | `#icon-left` `open_in_new` (ODropdownItem) | keep slot — Phase 2 ODropdown | — |
+| `plugins/logs/JsonPreview.vue:178` | `#icon-left` `visibility` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="visibility"` | 🔲 migrate |
+| `plugins/logs/JsonPreview.vue:190` | `#icon-left` `open_in_new` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="open-in-new"` | 🔲 migrate |
+| `plugins/logs/DetailTable.vue:213` | `#icon-left` `visibility` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="visibility"` | 🔲 migrate |
+| `plugins/logs/DetailTable.vue:221` | `#icon-left` `visibility_off` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="visibility-off"` | 🔲 migrate |
+| `plugins/logs/DetailTable.vue:233` | `#icon-left` `open_in_new` (ODropdownItem) | **UNBLOCKED** — ODropdown now built; use `icon-left="open-in-new"` | 🔲 migrate |
 | `plugins/logs/SearchSchedulersList.vue:194` | `#icon-left` `search` | `icon-left="search"` | ✅ |
 | `plugins/logs/patterns/PatternDetailsDialog.vue:279` | `#icon-left` `navigate_before` | `icon-left="navigate-before"` | ✅ |
 | `plugins/logs/patterns/PatternDetailsDialog.vue:297` | `#icon-right` `navigate_next` | `icon-right="navigate-next"` | ✅ |
@@ -236,6 +288,32 @@ These are `q-icon` used as standalone elements (not inside OButton slots), in ap
 | `enterprise/components/EvalTemplateList.vue` | 45 | `search` | `search` | inside q-input prepend | 🔴 blocked |
 | `enterprise/components/EvalTemplateEditor.vue` | 47–134 | `info` | `info` | `q-icon` wrapping `q-tooltip` | 🔴 blocked |
 
+### 2a-extra — Discovered static `q-icon` usages NOT in original audit
+
+| File | Line | Icon | Registry key | Notes | Status |
+|---|---|---|---|---|---|
+| `plugins/logs/data-table/CellActions.vue` | 15 | `content_copy` | `content-copy` | standalone | 🔲 |
+| `plugins/logs/TransformSelector.vue` | 57 | `arrow_drop_down` | `arrow-drop-down` | inside q-menu context | 🔴 blocked |
+| `plugins/logs/TransformSelector.vue` | 99 | `search` | `search` | inside q-input context | 🔴 blocked |
+| `plugins/logs/TransformSelector.vue` | 144 | `save` | `save` ⚠️ | standalone — add to registry | 🔲 |
+| `plugins/logs/FunctionSelector.vue` | 47 | `arrow_drop_down` | `arrow-drop-down` | inside q-menu context | 🔴 blocked |
+| `plugins/logs/FunctionSelector.vue` | 67 | `search` | `search` | inside q-input context | 🔴 blocked |
+| `plugins/logs/FunctionSelector.vue` | 102 | `save` | `save` ⚠️ | standalone — add to registry | 🔲 |
+| `plugins/traces/ThreadView.vue` | 283 | `schedule` | `schedule` | standalone | 🔲 |
+| `plugins/traces/ThreadView.vue` | 287 | `bolt` | `bolt` | standalone | 🔲 |
+| `plugins/traces/ThreadView.vue` | 291 | `timer` | `timer` | standalone | 🔲 |
+| `plugins/traces/ThreadView.vue` | 295 | `data_usage` | `data-usage` ⚠️ | add to registry | 🔲 |
+| `plugins/traces/ThreadView.vue` | 299 | `payments` | `payments` ⚠️ | add to registry | 🔲 |
+| `plugins/traces/ThreadView.vue` | 306 | `error_outline` | `error-outline` | standalone | 🔲 |
+| `plugins/traces/ThreadView.vue` | 314 | `arrow_forward` | `arrow-forward` | standalone | 🔲 |
+| `enterprise/components/billings/plans.vue` | 73 | `warning` | `warning` | standalone | 🔲 |
+| `enterprise/components/billings/proPlan.vue` | 45 | `warning` | `warning` | standalone | 🔲 |
+| `enterprise/components/billings/enterprisePlan.vue` | 44 | `warning` | `warning` | standalone | 🔲 |
+| `components/pipeline/NodeForm/CreateDestinationForm.vue` | 37 | `category` | `category` | q-step `icon` prop | 🔴 blocked (q-stepper) |
+| `components/pipeline/NodeForm/CreateDestinationForm.vue` | 74 | `check_circle` | `check-circle` | standalone | 🔲 |
+| `components/pipeline/NodeForm/CreateDestinationForm.vue` | 84 | `settings_ethernet` | `settings-ethernet` ⚠️ | q-step `icon` prop — add to registry | 🔴 blocked (q-stepper) |
+| `components/reports/CreateReport.vue` | 168 | `:icon="outlinedDashboard"` | `dashboard` | q-tab `:icon` prop | 🔴 blocked (q-tabs) |
+
 ### 2b — Dynamic bindings (`:name="variable"`) — `🔁` requires mapping
 
 These use `:name` bound to a runtime string (Quasar extras constants or data-driven). Each one needs the variable resolved to an `IconName` registry key.
@@ -271,6 +349,114 @@ These use `:name` bound to a runtime string (Quasar extras constants or data-dri
 | `components/AppTable.vue` | 130 | `col.icon` | data-driven | 🔁 requires a `string → IconName` map in the component or column def update |
 | `components/MenuLink.vue` | 45,59 | `icon` prop (string) or `iconComponent` | nav icon system | 🔁 nav menu icons need a dedicated mapping — coordinate with nav migration |
 
+### 2b-extra — Discovered `outlined*` usages NOT in original audit
+
+> These files import and use `outlined*` constants from `@quasar/extras/material-icons-outlined` but were missing from the Phase 2b list above.
+
+#### Layouts / Navigation
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `layouts/MainLayout.vue` | 394 | `outlinedHome` | `"home"` ⚠️ | Add to registry |
+| `layouts/MainLayout.vue` | 401 | `outlinedSearch` | `"search"` | Replace variable |
+| `layouts/MainLayout.vue` | 407 | `outlinedBarChart` | `"bar-chart"` | Replace variable |
+| `layouts/MainLayout.vue` | 413 | `outlinedAccountTree` | `"account-tree"` | Replace variable |
+| `layouts/MainLayout.vue` | 419 | `outlinedDevices` | `"devices"` ⚠️ | Add to registry |
+| `layouts/MainLayout.vue` | 425 | `outlinedDashboard` | `"dashboard"` | Replace variable |
+| `layouts/MainLayout.vue` | 431 | `outlinedWindow` | `"window"` | Replace variable |
+| `layouts/MainLayout.vue` | 437 | `outlinedReportProblem` | `"report-problem"` ⚠️ | Add to registry |
+| `layouts/MainLayout.vue` | 443 | `outlinedFilterAlt` | `"filter-alt"` ⚠️ | Add to registry |
+| `layouts/MainLayout.vue` | 449 | `outlinedManageAccounts` | `"manage-accounts"` ⚠️ | Add to registry |
+| `layouts/MainLayout.vue` | 584 | `outlinedNotificationsActive` | `"notifications-active"` ⚠️ | Add to registry |
+| `layouts/MainLayout.vue` | 605 | `outlinedCode` | `"code"` | Replace variable |
+| `layouts/MainLayout.vue` | 644 | `outlinedDescription` | `"description"` | Replace variable |
+| `layouts/MainLayout.vue` | 1189 | `outlinedSettings` | `"settings"` | Replace variable |
+| `layouts/MainLayout.vue` | 191–199 | `outlinedPerson`, `outlinedFormatListBulleted` | `"person"`, `"format-list-bulleted"` | Replace variables |
+
+> **Note**: `MainLayout.vue` nav icons flow through `MenuLink.vue` `:icon` prop → Phase 3 data-driven mapping. These are the source values for the nav icon system.
+
+#### Logs / Traces Field Sidebars
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `plugins/logs/IndexList.vue` | 413–426 | `outlinedSearch`, `outlinedAccountTree`, `outlinedBarChart`, `outlinedTableView` | `"search"`, `"account-tree"`, `"bar-chart"`, `"table-view"` ⚠️ | `table-view` needs registry |
+| `plugins/logs/IndexList.vue` | 1916–1918 | `outlinedAdd`, `outlinedVisibilityOff`, `outlinedVisibility` | `"add"`, `"visibility-off"`, `"visibility"` | Replace variables |
+| `plugins/logs/components/FieldRow.vue` | 68,74,83 | `outlinedAdd`, `outlinedVisibility`, `outlinedVisibilityOff` | `"add"`, `"visibility"`, `"visibility-off"` | Replace variables |
+| `plugins/logs/components/FieldExpansion.vue` | 74,80,89 | `outlinedAdd`, `outlinedVisibility`, `outlinedVisibilityOff` | `"add"`, `"visibility"`, `"visibility-off"` | Replace variables |
+| `plugins/traces/fields-sidebar/BasicValuesFilter.vue` | 39,44,53 | `outlinedAdd`, `outlinedVisibility`, `outlinedVisibilityOff` | `"add"`, `"visibility"`, `"visibility-off"` | Replace variables |
+| `plugins/traces/fields-sidebar/BasicValuesFilter.vue` | 97,110 | `outlinedArrowForwardIos`, `outlinedArrowBackIos` | `"arrow-forward-ios"`, `"arrow-back-ios"` ⚠️ | Add to registry |
+| `components/common/FieldRow.vue` | 62,72,82 | `outlinedAdd`, `outlinedVisibility`, `outlinedVisibilityOff` | `"add"`, `"visibility"`, `"visibility-off"` | Replace variables |
+| `components/common/sidebar/FieldList.vue` | 60,109 | `outlinedAdd` | `"add"` | Replace variable |
+
+#### Dashboards
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `views/Dashboards/ViewDashboard.vue` | 237 | `outlinedDescription` | `"description"` | Replace variable |
+| `components/dashboards/PanelContainer.vue` | 157 | `outlinedDashboardCustomize` | `"dashboard-customize"` ⚠️ | Add to registry |
+| `components/dashboards/PanelContainer.vue` | 202 | `outlinedFileDownload` | `"file-download"` ⚠️ | Add to registry |
+| `components/dashboards/PanelContainer.vue` | 257 | `outlinedReportProblem` | `"report-problem"` ⚠️ | Add to registry |
+| `components/dashboards/PanelContainer.vue` | — | `outlinedRunningWithErrors` | `"running-with-errors"` ⚠️ | Add to registry |
+| `components/dashboards/PanelErrorButtons.vue` | 62 | `outlinedRunningWithErrors` | `"running-with-errors"` ⚠️ | Add to registry |
+| `components/dashboards/viewPanel/ViewPanel.vue` | — | `outlinedWarning` | `"warning"` | Replace variable |
+| `components/dashboards/addPanel/DrilldownPopUp.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/dashboards/addPanel/ValueMappingPopUp.vue` | 147 | `outlinedCancel` | `"cancel"` | Replace variable |
+| `components/dashboards/addPanel/ColorBySeriesPopUp.vue` | 110 | `outlinedCancel` | `"cancel"` | Replace variable |
+
+#### Alerts
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `components/alerts/DeduplicationConfig.vue` | 40,91 | `outlinedInfo` | `"info"` | Replace variable |
+| `components/alerts/OrganizationDeduplicationSettings.vue` | 74,116 | `outlinedInfo` | `"info"` | Replace variable |
+| `components/alerts/FilterCondition.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+
+#### Reports / Pipelines
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `components/reports/CreateReport.vue` | 580 | `outlinedInfo` | `"info"` | Replace variable — q-icon standalone |
+| `components/reports/ReportList.vue` | 356–359 | `outlinedDelete`, `outlinedPause`, `outlinedPlayArrow`, `outlinedDriveFileMove` | `"delete"`, `"pause"`, `"play-arrow"`, `"drive-file-move"` | Replace variables |
+| `components/pipeline/NodeForm/ScheduledPipeline.vue` | 169–898 | `outlinedInfo` (×6), `outlinedWarning`, `outlinedDelete` | `"info"`, `"warning"`, `"delete"` | Replace variables |
+| `components/pipeline/NodeForm/Stream.vue` | — | `outlinedInfo` | `"info"` | Replace variable |
+| `components/pipeline/PipelinesList.vue` | — | `outlinedVisibility` | `"visibility"` | Replace variable |
+| `components/pipelines/BackfillJobsList.vue` | 385–388 | `outlinedDelete`, `outlinedPause`, `outlinedPlayArrow`, `outlinedVisibility` | `"delete"`, `"pause"`, `"play-arrow"`, `"visibility"` | Replace variables |
+
+#### Settings / Functions / IAM
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `components/settings/AddRegexPattern.vue` | 276 | `outlinedLightbulb` | `"lightbulb"` ⚠️ | Add to registry |
+| `components/settings/RegexPatternList.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/settings/CipherKeys.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/settings/AiToolsets.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/settings/index.vue` | — | `outlinedSettings` | `"settings"` | Replace variable |
+| `components/logstream/AssociatedRegexPatterns.vue` | 319 | `outlinedLightbulb` | `"lightbulb"` ⚠️ | Add to registry |
+| `components/logstream/StreamFieldInputs.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/functions/FunctionsToolbar.vue` | 48 | `outlinedInfo` | `"info"` | Replace variable |
+| `components/functions/EnrichmentTableList.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/functions/EnrichmentSchema.vue` | 166–168 | `outlinedSchema`, `outlinedPerson`, `outlinedDelete` | `"schema"`, `"person"`, `"delete"` | Replace variables |
+| `components/functions/AssociatedStreamFunction.vue` | — | `outlinedDelete` | `"delete"` | Replace variable |
+| `components/functions/TestFunction.vue` | 281 | `outlinedLightbulb` | `"lightbulb"` ⚠️ | Add to registry |
+| `components/iam/quota/Quota.vue` | 581–586 | `outlinedDelete`, `outlinedPause`, `outlinedPlayArrow`, `outlinedFileDownload`, `outlinedFileUpload`, `outlinedInsertDriveFile` | `"delete"`, `"pause"`, `"play-arrow"`, `"file-download"` ⚠️, `"file-upload"`, `"insert-drive-file"` | Add `file-download` to registry; `file-upload` ≈ `upload-file` |
+| `components/iam/serviceAccounts/ServiceAccountsList.vue` | — | `outlinedVisibility` | `"visibility"` | Replace variable |
+
+#### Queries / Actions / AI / RUM / Traces
+
+| File | Line | Current variable | Maps to | Action |
+|---|---|---|---|---|
+| `components/queries/RunningQueriesList.vue` | — | `outlinedCancel` | `"cancel"` | Replace variable |
+| `components/queries/RunningQueries.vue` | — | `outlinedCancel` | `"cancel"` | Replace variable |
+| `components/queries/SummaryList.vue` | — | `outlinedCancel` | `"cancel"` | Replace variable |
+| `components/actionScripts/ScriptToolbar.vue` | 53 | `outlinedInfo` | `"info"` | Replace variable — `q-icon` wrapping `q-tooltip` → blocked by OTooltip |
+| `components/actionScripts/EditScript.vue` | 138,383 | `outlinedDashboard` | `"dashboard"` | Replace variable — `:icon` on q-tab → 🔴 blocked |
+| `components/actionScripts/EditScript.vue` | 280,395 | `outlinedInfo` | `"info"` | Replace variable |
+| `components/O2AIChat.vue` | 1053,1073 | `outlinedThumbUpOffAlt`, `outlinedThumbDownOffAlt` | `"thumb-up-off-alt"`, `"thumb-down-off-alt"` ⚠️ | Add both to registry |
+| `components/rum/EventDetailDrawerContent.vue` | 77 | `outlinedCode` | `"code"` | Replace variable |
+| `components/rum/EventDetailDrawerContent.vue` | — | `outlinedAccountTree` | `"account-tree"` | Replace variable |
+| `plugins/traces/TraceDetails.vue` | 476 | `outlinedPlayCircle` | `"play-circle"` | Replace variable |
+| `plugins/traces/TraceDetails.vue` | — | `outlinedInfo` | `"info"` | Replace variable |
+
 ---
 
 ## Phase 3 — Blocked by Quasar Parent Components 🔴
@@ -300,12 +486,94 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 | `components/ScriptToolbar.vue` | 67 | closing `</q-icon>` — tooltip slot | OTooltip not yet built |
 | `components/functions/FunctionsToolbar.vue` | 61,94 | `q-icon` wrapping `q-tooltip` | OTooltip not yet built |
 
+### Phase 3 — Additional blocked entries discovered
+
+| File | Line | Context | Blocked by |
+|---|---|---|---|
+| `plugins/logs/TransformSelector.vue` | 57 | `q-icon` inside q-menu dropdown | q-menu → ODropdown |
+| `plugins/logs/TransformSelector.vue` | 99 | `q-icon` in search within q-menu | q-input inside q-menu |
+| `plugins/logs/FunctionSelector.vue` | 47 | `q-icon` inside q-menu dropdown | q-menu → ODropdown |
+| `plugins/logs/FunctionSelector.vue` | 67 | `q-icon` in search within q-menu | q-input inside q-menu |
+| `components/reports/CreateReport.vue` | 168 | `:icon="outlinedDashboard"` on `q-tab` | **UNBLOCKED** — OTabs now built; migrate to OTab `icon` prop |
+| `components/actionScripts/EditScript.vue` | 138,383 | `:icon="outlinedDashboard"` on `q-tab` | **UNBLOCKED** — OTabs now built; migrate to OTab `icon` prop |
+| `components/pipeline/NodeForm/CreateDestinationForm.vue` | 37,84 | `icon` on `q-step` elements | q-stepper (no O2 equivalent) |
+| `enterprise/components/billings/Billing.vue` | — | `img:` icon on `q-tab` elements | **UNBLOCKED** — OTabs now built; needs custom slot or `<img>` |
+| `components/alerts/AlertHistory.vue` | 77 | `search` in `q-select` prepend | q-select → OSelect (not yet built) |
+| `components/actionScripts/ScriptToolbar.vue` | 53 | `outlinedInfo` — `q-icon` wrapping `q-tooltip` | OTooltip not yet built |
+
+---
+
+## Phase 8 — Custom SVG Icon Components (`components/icons/`)
+
+> **26 hand-rolled SVG icon components** across `components/icons/` and `components/icons/dashboards/`.
+> These are NOT from any icon library — they are project-specific SVGs.
+> **Strategy**: Keep as-is where they represent truly unique shapes (joins, pipeline diagrams). For those that duplicate standard Material Symbols, consider adding an OIcon registry entry.
+
+### Root icons (`components/icons/`)
+
+| Component | Used in | Keep / Migrate | Notes |
+|---|---|---|---|
+| `EqualIcon.vue` | 10 files (filter conditions) | Keep — custom `=` glyph | slot child in q-icon/OButton |
+| `NotEqualIcon.vue` | 10 files (filter conditions) | Keep — custom `≠` glyph | slot child in q-icon/OButton |
+| `DynamicFilterIcon.vue` | `dashboards/settings/VariableAdHocValueSelector.vue` | Keep — custom filter shape | |
+| `FunctionIcon.vue` | **Not imported anywhere** | 🗑️ candidate for removal | unused |
+| `PipelineIcon.vue` | 2 files | Keep — pipeline diagram shape | |
+| `DeployedCode.vue` | 2 files | Keep — Material Symbols `deployed-code` shape | could register as OIcon |
+| `ServiceMapIcon.vue` | 1 file | Keep — service map diagram | |
+| `SlackIcon.vue` | 1 file | Keep — brand icon | |
+| `TraceTimelineIcon.vue` | 1 file | Keep — trace-specific | |
+| `SubTaskArrow.vue` | 1 file | Keep — visual connector | |
+| `ManagementIcon.vue` | 1 file | Keep | |
+| `AscSort.vue` | 1 file | Keep — custom sort indicator | |
+| `DescSort.vue` | 1 file | Keep — custom sort indicator | |
+| `InnerJoinTypeSvg.vue` | 2 files | Keep — join diagram | |
+| `LeftJoinTypeSvg.vue` | 2 files | Keep — join diagram | |
+| `RightJoinTypeSvg.vue` | 2 files | Keep — join diagram | |
+| `LeftJoinSvg.vue` | 1 file | Keep — join diagram | |
+| `RightJoinSvg.vue` | 1 file | Keep — join diagram | |
+| `LeftJoinLineSvg.vue` | 1 file | Keep — join diagram | |
+| `RightJoinLineSvg.vue` | 1 file | Keep — join diagram | |
+
+### Dashboard chart icons (`components/icons/dashboards/`)
+
+| Component | Used in | Notes |
+|---|---|---|
+| `LinearIcon.vue` | 1 file (chart interpolation selector) | line-style icon |
+| `Smooth.vue` | 1 file | smooth-curve icon |
+| `StepBefore.vue` | 1 file | step-before chart line |
+| `StepAfter.vue` | 1 file | step-after chart line |
+| `StepMiddle.vue` | 1 file | step-middle chart line |
+| `NoSymbol.vue` | 1 file | no-symbol marker |
+
+> These dashboard chart icons represent specific interpolation styles; no Material Symbols equivalents exist. **Keep as-is.**
+
+---
+
+## Phase 9 — `img:` Prefix SVG Icons (Quasar image-icon pattern)
+
+> Quasar's `img:` prefix loads SVG files as icons. These are scattered across q-tabs, q-btns, and pipeline nodes.
+> **Strategy**: Replace with `<img>` tags or custom OIcon slot content as the parent Quasar components are migrated.
+
+| File | Line | Image path | Context | Blocked by |
+|---|---|---|---|---|
+| `enterprise/components/billings/Billing.vue` | — | `images/common/plan_icon.svg` | `:icon` on q-tab | q-tabs → OTabs |
+| `enterprise/components/billings/Billing.vue` | — | `images/common/usage_icon.svg` | `:icon` on q-tab | q-tabs → OTabs |
+| `enterprise/components/billings/Billing.vue` | — | `images/common/invoice_icon.svg` | `:icon` on q-tab | q-tabs → OTabs |
+| `plugins/pipelines/CustomNode.vue` | — | function.svg, condition.svg, stream output, external output | pipeline node icons | pipeline visual system |
+| `plugins/logs/SearchBar.vue` | — | `images/common/function.svg`, `images/common/transform.svg` | computed icon URLs | q-btn `:icon` / q-menu context |
+| `plugins/logs/FunctionSelector.vue` | — | `images/common/function.svg` + variants | function selector button | q-menu context |
+| `plugins/logs/TransformSelector.vue` | — | `images/common/transform.svg` + variants | transform selector button | q-menu context |
+| `components/alerts/QueryEditorDialog.vue` | 121 | `images/common/function.svg` | `:icon` on q-btn | q-btn → OButton (if not migrated) |
+| `components/alerts/steps/QueryConfig.vue` | 716,776 | `images/common/function.svg` | `:icon` on q-btn | q-btn → OButton (if not migrated) |
+| `components/ingestion/logs/Index.vue` | — | `images/ingestion/filebeat.png`, `fluentbit_icon.png`, `fluentd_icon.svg`, `vector.png`, `otlp.svg`, `logstash.svg` | `:icon` on q-tab | q-tabs → OTabs (use OTab slot with `<img>`) |
+
 ---
 
 ## Phase 7 — `lucide-vue-next` Icons → `<OIcon>`
 
 > **Package**: `lucide-vue-next` v0.562.0 (see `web/package.json`)
-> **~90 unique icons across ~75 files.**
+> **Original scope**: ~90 unique icons across ~75 files.
+> **Current status**: **Only ~21 files still import from `lucide-vue-next`** — the majority have already been migrated.
 > **Strategy**: Map each Lucide component to the nearest `material-symbols-light` symbol, add to `OIcon.icons.ts`, then replace `<LucideComponent />` usages with `<OIcon name="..." />` and remove the `lucide-vue-next` import line.
 
 > **Custom SVG icons** (`EqualIcon`, `NotEqualIcon`, `DynamicFilterIcon` in `components/icons/`) are **not** from lucide — they are hand-rolled SVGs used as slot children inside `<q-icon>` and `<OButton>`. Tracked separately.
@@ -399,6 +667,13 @@ These `q-icon` usages are **inside Quasar component slots** (prepend/append of `
 | `Trash2` | `delete` | ✅ | many files — see 7b |
 | `TrendingUp` | `trending-up` | ⚠️ | `components/alerts/AlertList.vue`, `components/alerts/AddAlert.vue` |
 | `Type` (as `TypeIcon`) | `title` | ⚠️ | `components/alerts/steps/Advanced.vue` |
+| `Upload` | `upload` | ✅ | `components/settings/ImportRegexPattern.vue`, `components/common/BaseImport.vue`, `components/rum/errorTracking/view/PrettyStackTrace.vue`, `components/functions/EnrichmentTableList.vue` |
+| `UserCheck` | `verified-user` | ✅ | `components/logstream/schema.vue` |
+| `Users` | `group` | ✅ | `components/iam/groups/EditGroup.vue`, `components/iam/roles/EditRole.vue` |
+| `Webhook` | `webhook` | ✅ | `components/alerts/AddTemplate.vue`, `components/alerts/AddDestination.vue` |
+| `Wrench` | `build` | ✅ | `components/alerts/steps/QueryConfig.vue`, `components/dashboards/addPanel/QueryTypeSelector.vue`, `plugins/logs/SearchBar.vue` |
+| `X` | `close` | ✅ | many files — see 7b |
+| `Zap` | `bolt` | ✅ | `components/alerts/AlertList.vue`, `components/alerts/AddDestination.vue` |
 
 ---
 
@@ -411,42 +686,27 @@ These 3 icons have **no suitable equivalent** in `material-symbols-light` and ar
 | `BrainCircuit` | Stylized brain-with-circuit-board icon; no material symbols equivalent | `components/anomaly_detection/AnomalyDetectionList.vue` |
 | `Flame` | Flame/fire shape used for the Flame Graph tab; material symbols `local-fire-department` is a different semantic | `plugins/traces/TraceDetails.vue` |
 | `GitBranch` | Git branching diagram shape; material symbols has no git-specific fork icon | `components/alerts/FilterGroup.vue`, `components/rum/EventDetailDrawerContent.vue`, `components/rum/correlation/TraceCorrelationCard.vue`, `plugins/traces/SearchBar.vue` |
-| `Upload` | `upload` | ⚠️ | `components/settings/ImportRegexPattern.vue`, `components/common/BaseImport.vue`, `components/rum/errorTracking/view/PrettyStackTrace.vue`, `components/functions/EnrichmentTableList.vue` |
-| `UserCheck` | `verified-user` | ⚠️ | `components/logstream/schema.vue` |
-| `Users` | `group` | ⚠️ | `components/iam/groups/EditGroup.vue`, `components/iam/roles/EditRole.vue` |
-| `Webhook` | `webhook` | ⚠️ | `components/alerts/AddTemplate.vue`, `components/alerts/AddDestination.vue` |
-| `Wrench` | `build` | ⚠️ | `components/alerts/steps/QueryConfig.vue`, `components/dashboards/addPanel/QueryTypeSelector.vue`, `plugins/logs/SearchBar.vue` |
-| `X` | `close` | ✅ | many files — see 7b |
-| `Zap` | `bolt` | ✅ | `components/alerts/AlertList.vue`, `components/alerts/AddDestination.vue` |
 
 > **Icons with no material-symbols-light equivalent** (keep `lucide-vue-next` or replace with custom SVG): `BrainCircuit`, `Flame`, `GitBranch`.
 
 ---
 
-### 7b — Files by area
+### 7b — Files still importing from `lucide-vue-next` (verified 2026-05-15)
 
-| Area | Files with lucide imports |
-|---|---|
-| **Alerts** | `AlertList.vue`, `AddAlert.vue`, `AddTemplate.vue`, `AddDestination.vue`, `AlertHistoryDrawer.vue`, `FilterGroup.vue`, `steps/QueryConfig.vue`, `steps/Advanced.vue` |
-| **Settings** | `ServiceIdentitySetup.vue`, `RegexPatternList.vue`, `ModelPricingList.vue`, `ImportRegexPattern.vue`, `General.vue`, `DomainManagement.vue`, `DiscoveredServices.vue`, `CorrelationSettings.vue`, `CipherKeys.vue`, `AiToolsets.vue` |
-| **Logstream** | `StreamFieldInputs.vue`, `schema.vue`, `LlmEvaluationSettings.vue`, `explore/SearchBar.vue`, `AssociatedRegexPatterns.vue`, `AddStream.vue` |
-| **Functions** | `AssociatedStreamFunction.vue`, `EnrichmentSchema.vue`, `FunctionList.vue`, `EnrichmentTableList.vue`, `FunctionsToolbar.vue`, `TestFunction.vue` |
-| **Pipelines** | `pipeline/PipelinesList.vue`, `pipeline/PipelineEditor.vue`, `pipeline/NodeForm/CreateDestinationForm.vue`, `pipeline/NodeForm/LlmEvaluation.vue`, `pipeline/NodeForm/ScheduledPipeline.vue`, `pipelines/PipelineHistory.vue`, `pipelines/EditBackfillJobDialog.vue`, `pipelines/CreateBackfillJobDialog.vue`, `pipelines/BackfillJobsList.vue`, `pipelines/BackfillJobDetails.vue` |
-| **IAM** | `iam/groups/EditGroup.vue`, `iam/roles/EditRole.vue`, `iam/quota/Quota.vue` |
-| **RUM** | `rum/SearchBar.vue`, `rum/ResourceDetailDrawer.vue`, `rum/PlayerEventsSidebar.vue`, `rum/EventDetailDrawerContent.vue`, `rum/errorTracking/view/PrettyStackTrace.vue`, `rum/errorTracking/view/ErrorSessionReplay.vue`, `rum/correlation/TraceCorrelationCard.vue` |
-| **Queries** | `queries/SummaryList.vue`, `queries/RunningQueriesList.vue`, `queries/QueryList.vue` |
-| **Reports** | `reports/ReportList.vue` |
-| **Anomaly Detection** | `anomaly_detection/steps/AnomalyDetectionConfig.vue`, `anomaly_detection/steps/AnomalyAlerting.vue`, `anomaly_detection/AnomalySummary.vue`, `anomaly_detection/AnomalyDetectionList.vue` |
-| **Dashboards** | `dashboards/addPanel/QueryTypeSelector.vue`, `views/Dashboards/ScheduledDashboards.vue`, `views/Dashboards/ImportDashboard.vue` |
-| **Common** | `common/BaseImport.vue` |
-| **Cross-linking** | `cross-linking/CrossLinkUserGuide.vue`, `cross-linking/CrossLinkManager.vue`, `cross-linking/CrossLinkDialog.vue` |
-| **Logs plugin** | `plugins/logs/Index.vue`, `plugins/logs/SearchBar.vue`, `plugins/logs/SearchHistory.vue`, `plugins/logs/SearchJobInspector.vue`, `plugins/logs/SyntaxGuide.vue`, `plugins/logs/SearchSchedulersList.vue`, `plugins/logs/JsonPreview.vue` |
-| **Traces plugin** | `plugins/traces/Index.vue`, `plugins/traces/SearchBar.vue`, `plugins/traces/SyntaxGuide.vue`, `plugins/traces/TraceDetails.vue`, `plugins/traces/TraceDetailsSidebar.vue`, `plugins/traces/metrics/TracesAnalysisDashboard.vue` |
-| **Metrics plugin** | `plugins/metrics/SyntaxGuideMetrics.vue`, `plugins/metrics/MetricList.vue`, `plugins/metrics/AddToDashboard.vue` |
-| **Correlation plugin** | `plugins/correlation/TimeRangeEditor.vue`, `plugins/correlation/TelemetryCorrelationDashboard.vue`, `plugins/correlation/DimensionFilterEditor.vue` |
-| **Views** | `views/LogStream.vue` |
-| **Mixins** | `src/mixins/mainLayout.mixin.ts`, `src/enterprise/mixins/mainLayout.mixin.ts` |
-| **Enterprise** | `enterprise/components/EvalTemplateList.vue`, `enterprise/components/EvalTemplateEditor.vue`, `enterprise/components/billings/invoiceTable.vue`, `enterprise/components/billings/Billing.vue` |
+> **21 files remain.** The original ~75 files listed have been largely migrated. Below shows only files that **still have active lucide imports**.
+
+| Area | Files still importing lucide | Icons remaining |
+|---|---|---|
+| **Alerts** | `FilterGroup.vue` | `GitBranch` (permanently kept) |
+| **Logstream** | `AddStream.vue` | `X` → `close` ✅ in registry |
+| **Pipelines** | `pipeline/PipelinesList.vue`, `pipeline/PipelineEditor.vue`, `pipeline/NodeForm/CreateDestinationForm.vue`, `pipeline/NodeForm/LlmEvaluation.vue`, `pipeline/NodeForm/Query.vue`, `pipelines/BackfillJobsList.vue`, `pipelines/BackfillJobDetails.vue` | `Maximize2`/`Minimize2`, `Code2`, `Trash2`, `Plus`, `RefreshCw`, `X`, `LayoutList`, `CalendarClock`, `Zap`, `History`, `Upload` |
+| **Anomaly Detection** | `anomaly_detection/AnomalyDetectionList.vue` | `BrainCircuit` (permanently kept) |
+| **Dashboards** | `views/Dashboards/ScheduledDashboards.vue` | `Database`, `CalendarClock` |
+| **Cross-linking** | `cross-linking/CrossLinkUserGuide.vue`, `cross-linking/CrossLinkDialog.vue` | `HelpCircle`, `Plus` |
+| **RUM** | `rum/EventDetailDrawerContent.vue`, `rum/correlation/TraceCorrelationCard.vue` | `GitBranch` (permanently kept) |
+| **Logs plugin** | `plugins/logs/SearchJobInspector.vue`, `plugins/logs/SyntaxGuide.vue` | `Copy`/`Check`, `HelpCircle` |
+| **Traces plugin** | `plugins/traces/SearchBar.vue`, `plugins/traces/SyntaxGuide.vue`, `plugins/traces/TraceDetails.vue` | `GitBranch` (kept), `HelpCircle`, multiple trace icons |
+| **Metrics plugin** | `plugins/metrics/SyntaxGuideMetrics.vue` | `HelpCircle` |
 
 ---
 
@@ -454,12 +714,19 @@ These 3 icons have **no suitable equivalent** in `material-symbols-light` and ar
 
 | Phase | Scope | Approx. files | Prerequisite | Status |
 |---|---|---|---|---|
-| **Pre-work** | Add missing icons to registry | 1 file | None | ✅ Done |
+| **Pre-work 1** | Add Phase 1/2a icons to registry | 1 file | None | ✅ Done |
+| **Pre-work 2** | Add ~22 newly discovered icons to registry (see table above) | 1 file | None | 🔲 |
 | **Phase 1** | `icon-left`/`icon-right` props on OButton; migrate all OButton q-icon slots | ~50 files | Pre-work | ✅ Done |
+| **Phase 1 unblocked** | ODropdownItem `icon-left` slots (7 sites) + OToggleGroupItem slots (3 sites) | ~4 files | ODropdown/OToggleGroup built | 🔲 Ready now |
 | **Phase 2a** | Replace standalone static-name `q-icon` with `<OIcon>` | ~25 files | Pre-work | ✅ Done |
-| **Phase 2b** | Replace dynamic-bound `q-icon` (outlinedXxx constants and ternaries) | ~20 files | Pre-work | 🔲 Next |
+| **Phase 2a-extra** | Newly discovered static `q-icon` (ThreadView, CellActions, billing, etc.) | ~10 files | Pre-work 2 | 🔲 |
+| **Phase 2b** | Replace dynamic-bound `q-icon` (original audit — outlinedXxx constants) | ~20 files | Pre-work | 🔲 Next |
+| **Phase 2b-extra** | Newly discovered `outlined*` usages (~65 entries across ~45 files) | ~45 files | Pre-work 2 | 🔲 |
 | **Phase 3 (data-driven)** | Map `dialogConfig.badgeIcon`, `feature.icon`, `col.icon`, nav `icon` prop to `IconName` | ~4 files | Phase 2 | 🔲 |
-| **Phase 4 (blocked)** | Migrate q-input prepend icons | ~10 files | OInput component built | 🔴 |
-| **Phase 5 (blocked)** | Migrate q-icon-wrapping-tooltip | ~5 files | OTooltip component built | 🔴 |
-| **Phase 6 (blocked)** | Migrate DateTime picker internal icons | ~3 files | ODatePicker component built | 🔴 |
-| **Phase 7** | Replace `lucide-vue-next` component usages with `<OIcon>` | ~75 files / ~90 icons | Registry mappings for each Lucide icon | 🔲 |
+| **Phase 3 (unblocked by OTabs)** | Migrate q-tab `:icon` → OTab `icon` prop (reports, scripts, billing) | ~3 files | OTabs built ✅ | 🔲 Ready now |
+| **Phase 4 (blocked)** | Migrate q-input prepend icons | ~10 files | OInput component | 🔴 |
+| **Phase 5 (blocked)** | Migrate q-icon-wrapping-tooltip | ~5 files | OTooltip component | 🔴 |
+| **Phase 6 (blocked)** | Migrate DateTime picker internal icons | ~3 files | ODatePicker component | 🔴 |
+| **Phase 7** | Replace `lucide-vue-next` component usages with `<OIcon>` | **~21 files remain** (was ~75) | Registry mappings | 🔲 ~70% done |
+| **Phase 8** | Custom SVG icon components (`components/icons/`) — audit & clean up unused | ~26 components | None | 🔲 (mostly keep) |
+| **Phase 9** | `img:` prefix SVG icons (Quasar image-icon pattern) | ~9 files | Parent component migration | 🔴 mostly blocked |
