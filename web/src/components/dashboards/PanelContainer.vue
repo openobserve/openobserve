@@ -418,7 +418,6 @@ import {
   computed,
   defineAsyncComponent,
   watch,
-  onMounted,
   onBeforeUnmount,
 } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -894,49 +893,13 @@ export default defineComponent({
       isPartialData.value = isPartial;
     };
 
-    // Panel keyboard shortcuts (e=edit, v=view/fullscreen, r=refresh)
-    const handlePanelShortcut = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (
-        el?.tagName === "INPUT" ||
-        el?.tagName === "TEXTAREA" ||
-        el?.isContentEditable
-      )
-        return;
-      if (
-        !isCurrentlyHoveredPanel.value ||
-        props.viewOnly ||
-        props.simplifiedPanelView
-      )
-        return;
-      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-
-      switch (e.key.toLowerCase()) {
-        case "e":
-          e.preventDefault();
-          onEditPanel(props.data);
-          break;
-        case "v":
-          e.preventDefault();
-          emit("onViewPanel", props.data.id);
-          break;
-        case "r":
-          if (!isPanelLoading.value) {
-            e.preventDefault();
-            onRefreshPanel(false);
-          }
-          break;
-      }
-    };
-
-    onMounted(() => {
-      window.addEventListener("keydown", handlePanelShortcut);
-    });
-
     onBeforeUnmount(() => {
-      window.removeEventListener("keydown", handlePanelShortcut);
+      // Clear any pending timeouts or intervals
+      // Reset refs to help with garbage collection
       metaData.value = null;
       errorData.value = "";
+      
+      // Clear the PanelSchemaRenderer reference
       if (PanleSchemaRendererRef.value) {
         PanleSchemaRendererRef.value = null;
       }
