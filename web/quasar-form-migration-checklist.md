@@ -1222,18 +1222,18 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/dashboards/PanelSchemaRenderer.vue
 - [ ] src/components/dashboards/addPanel/ChartSelection.vue
 - [ ] src/components/dashboards/addPanel/ColumnOrderPopUp.vue
-- [ ] src/components/dashboards/addPanel/ConfigPanel.vue
+- ✅ src/components/dashboards/addPanel/ConfigPanel.vue
 - [ ] src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue
 - [ ] src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue
 - [ ] src/components/dashboards/addPanel/DashboardQueryBuilder.vue
-- [ ] src/components/dashboards/addPanel/DashboardQueryEditor.vue
+- ✅ src/components/dashboards/addPanel/DashboardQueryEditor.vue
 - [ ] src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue
 - [ ] src/components/dashboards/addPanel/DrilldownUserGuide.vue
-- [ ] src/components/dashboards/addPanel/PromQLChartConfig.vue
+- ✅ src/components/dashboards/addPanel/PromQLChartConfig.vue
 - [ ] src/components/dashboards/addPanel/ShowLegendsPopup.vue
-- [ ] src/components/dashboards/settings/AddSettingVariable.vue
-- [ ] src/components/dashboards/settings/SinglePanelMove.vue
-- [ ] src/components/dashboards/settings/VariableAdHocValueSelector.vue
+- ✅ src/components/dashboards/settings/AddSettingVariable.vue
+- ✅ src/components/dashboards/settings/SinglePanelMove.vue
+- ✅ src/components/dashboards/settings/VariableAdHocValueSelector.vue
 - [ ] src/components/dashboards/settings/VariableSettings.vue
 - [ ] src/components/dashboards/tabs/TabList.vue
 - [ ] src/components/dashboards/viewPanel/ViewPanel.vue
@@ -1285,19 +1285,19 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/plugins/correlation/DimensionFilterEditor.vue
 - [ ] src/plugins/correlation/DimensionFiltersBar.vue
 - [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
-- [ ] src/plugins/logs/FunctionSelector.vue
+- ✅ src/plugins/logs/FunctionSelector.vue
 - [ ] src/plugins/logs/IndexList.vue
 - [ ] src/plugins/logs/JsonPreview.vue
 - [ ] src/plugins/logs/SearchBar.vue
 - [ ] src/plugins/logs/SearchJobInspector.vue
 - [ ] src/plugins/logs/SearchResult.vue
 - [ ] src/plugins/logs/SyntaxGuide.vue
-- [ ] src/plugins/logs/TransformSelector.vue
+- ✅ src/plugins/logs/TransformSelector.vue
 - [ ] src/plugins/logs/components/FieldListPagination.vue
 - [ ] src/plugins/logs/patterns/PatternCard.vue
 - [ ] src/plugins/pipelines/CustomNode.vue
 - [ ] src/plugins/traces/LLMInsightsDashboard.vue
-- [ ] src/plugins/traces/SearchBar.vue
+- ✅ src/plugins/traces/SearchBar.vue
 - [ ] src/plugins/traces/SearchResult.vue
 - [ ] src/plugins/traces/ServiceGraph.vue
 - [ ] src/plugins/traces/ServiceGraphEdgeSidePanel.vue
@@ -1314,10 +1314,10 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 
 #### views/
 
-- [ ] src/views/Dashboards/Dashboards.vue
-- [ ] src/views/Dashboards/PanelLayoutSettings.vue
+- ✅ src/views/Dashboards/Dashboards.vue
+- ✅ src/views/Dashboards/PanelLayoutSettings.vue
 - [ ] src/views/Dashboards/ViewDashboard.vue
-- [ ] src/views/Dashboards/addPanel/AddJoinPopUp.vue
+- ✅ src/views/Dashboards/addPanel/AddJoinPopUp.vue
 - [ ] src/views/Dashboards/addPanel/AddPanel.vue
 - [ ] src/views/Dashboards/addPanel/DashboardJoinsOption.vue
 - [ ] src/views/Functions.vue
