@@ -3,7 +3,12 @@
 
 html, body {
   margin: 0 !important;
-padding: 0 !important;
+  padding: 0 !important;
+  height: 100%;
+}
+
+html {
+  overflow: hidden;
 }
 
 body {
@@ -12,6 +17,7 @@ body {
   background: linear-gradient(to bottom right, var(--o2-body-primary-bg), var(--o2-body-secondary-bg)); /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
   overflow: hidden;
   color: var(--o2-text-primary);
+  height: 100%;
 
   // background: -webkit-linear-gradient(
   //   to bottom right,
