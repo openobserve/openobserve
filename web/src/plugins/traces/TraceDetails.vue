@@ -979,6 +979,8 @@ import {
   MessageSquare,
 } from "lucide-vue-next";
 import pipelineService from "@/services/pipelines";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -2175,7 +2177,7 @@ export default defineComponent({
 
         const span = formattedSpanMap[spanList.value[i].span_id];
 
-        span.style.color = searchObj.meta.serviceColors[span.serviceName];
+        span.style.color = getOrSetServiceColor(span.resolvedIdentity);
 
         span.style.backgroundColor = adjustOpacity(span.style.color, 0.2);
 
@@ -2207,8 +2209,9 @@ export default defineComponent({
       traceTree.value[0].lowestStartTime =
         convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
-      traceTree.value[0].style.color =
-        searchObj.meta.serviceColors[traceTree.value[0].serviceName];
+      traceTree.value[0].style.color = getOrSetServiceColor(
+        traceTree.value[0].resolvedIdentity,
+      );
 
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
@@ -2225,6 +2228,7 @@ export default defineComponent({
       buildServiceTree();
       flatSpans.value = useTraceProcessing(
         treeForFlameGraph as any,
+        spanMap as any
       ).flatSpans.value;
 
       // After the tree is built, scroll the pre-selected span into view (e.g.
@@ -2310,7 +2314,7 @@ export default defineComponent({
             duration: span.durationMs,
             children: children,
             itemStyle: {
-              color: searchObj.meta.serviceColors[span.serviceName],
+              color: getOrSetServiceColor(span.resolvedIdentity),
             },
             emphasis: {
               disabled: true,
@@ -2406,6 +2410,7 @@ export default defineComponent({
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
         genAiCost: cost,
+        resolvedIdentity: resolveSpanIdentity(span),
       };
     };
 
