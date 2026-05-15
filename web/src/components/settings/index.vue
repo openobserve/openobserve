@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="tw:h-full">
+  <OPage class="tw:h-full">
     <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 q-py-sm o2-management-header">
       {{ t("settings.header") }}
     </div> -->
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-splitter>
 
-  </q-page>
+  </OPage>
 </template>
 
 <script lang="ts">

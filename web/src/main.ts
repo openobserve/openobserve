@@ -28,6 +28,7 @@ import "./styles/tailwind.css";
 import config from "./aws-exports";
 import configService from "./services/config";
 
+import OPage from "@/lib/core/Page/OPage.vue";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
@@ -39,6 +40,8 @@ import { buildVersionChecker } from "./utils/buildVersionChecker";
 
 const app = createApp(App);
 const router = createRouter(store);
+
+app.component("OPage", OPage);
 
 app
   .use(Quasar, {

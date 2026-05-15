@@ -119,9 +119,9 @@ describe("ApiDashboard", () => {
       },
       global: {
         stubs: {
-          "q-page": {
-            name: "q-page",
-            template: '<div class="q-page"><slot /></div>',
+          "OPage": {
+            name: "OPage",
+            template: '<div data-o2-page><slot /></div>',
             props: ["class", "key"],
           },
           "q-spinner-hourglass": {

@@ -401,10 +401,6 @@ body.desktop .q-hoverable:hover > .q-focus-helper{
   background: transparent !important;
 }
 
-.q-layout__section--marginal {
-  background: transparent;
-}
-
 .q-btn, .q-btn-dropdown, .q-btn-group {
   &::before {
     box-shadow: none;

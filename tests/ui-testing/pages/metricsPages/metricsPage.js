@@ -1385,7 +1385,7 @@ export class MetricsPage {
     }
 
     async getResultsPageText() {
-        return await this.page.locator('.q-page, main, .metrics-results').textContent().catch(() => '');
+        return await this.page.locator('[data-o2-page], main, .metrics-results').textContent().catch(() => '');
     }
 
     async getMetricValueText() {

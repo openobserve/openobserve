@@ -152,7 +152,7 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QPage: {
+        OPage: {
           template: "<div data-test-stub='q-page'><slot></slot></div>",
         },
         QTable: {
