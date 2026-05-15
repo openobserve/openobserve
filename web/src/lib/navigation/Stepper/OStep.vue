@@ -75,16 +75,18 @@ const indicatorClasses = computed<string>(() => {
     'tw:transition-colors tw:duration-150',
   ].join(' ')
 
+  const cursor = canClick.value ? 'tw:cursor-pointer' : 'tw:cursor-default'
+
   if (props.error) {
-    return `${base} tw:bg-stepper-indicator-error tw:text-stepper-indicator-fg`
+    return `${base} ${cursor} tw:bg-stepper-indicator-error tw:text-stepper-indicator-fg`
   }
   if (props.done) {
-    return `${base} tw:bg-stepper-indicator-done tw:text-stepper-indicator-fg`
+    return `${base} ${cursor} tw:bg-stepper-indicator-done tw:text-stepper-indicator-fg`
   }
   if (isActive.value) {
-    return `${base} tw:bg-stepper-indicator-active tw:text-stepper-indicator-fg`
+    return `${base} ${cursor} tw:bg-stepper-indicator-active tw:text-stepper-indicator-fg`
   }
-  return `${base} tw:bg-stepper-indicator-default tw:text-stepper-indicator-default-text`
+  return `${base} ${cursor} tw:bg-stepper-indicator-default tw:text-stepper-indicator-default-text`
 })
 
 const titleClasses = computed<string>(() => {
