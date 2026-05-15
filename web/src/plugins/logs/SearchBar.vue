@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
             <template #icon-left>
-              <OIcon name="manage-search" size="xs" class="tw:shrink-0" />
+              <OIcon name="search" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("common.search") }}
           </OToggleGroupItem>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <OIcon name="show-chart" size="xs" class="tw:shrink-0" />
+              <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.visualize") }}
             <q-tooltip v-if="isVisualizeDisabled">
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <OIcon name="build" size="xs" class="tw:shrink-0" />
+              <OIcon name="build" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.buildQuery") }}
           </OToggleGroupItem>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <OIcon name="layers" size="xs" class="tw:shrink-0" />
+              <OIcon name="layers" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.showPatternsLabel") }}
           </OToggleGroupItem>
