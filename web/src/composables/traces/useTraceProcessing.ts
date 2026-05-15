@@ -16,6 +16,7 @@ import {
   type ServiceBreakdown,
 } from "@/ts/interfaces/traces/trace.types";
 import { getServiceColor } from "@/utils/traces/traceColors";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 
 /**
  * Composable for trace data processing
@@ -114,6 +115,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
 
     // First pass: convert to enriched spans
     spanList.forEach((span) => {
+      const resolvedIdentity = resolveSpanIdentity(span);
       const enriched: EnrichedSpan = {
         ...span,
         depth: 0,
@@ -122,6 +124,8 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isExpanded: true,
         isSelected: false,
         isOnCriticalPath: false,
+        resolvedIdentity,
+        color: getServiceColor(resolvedIdentity),
         durationMs: span.duration / 1000, // Convert from microseconds to milliseconds
         durationPercent: 0,
         startOffsetMs: (span.start_time - traceStartTime) / 1000000, // Convert from nanoseconds to milliseconds
