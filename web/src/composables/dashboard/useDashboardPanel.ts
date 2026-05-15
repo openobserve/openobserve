@@ -1246,14 +1246,28 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     dashboardPanelData.meta.stream.customQueryFields = fields;
   };
 
-  // On tab switch, restore the incoming query's cached fields to shared meta
+  // On tab switch, restore the incoming query's cached fields to shared meta.
+  // If the incoming query is custom + has SQL but no cached fields yet (e.g. first
+  // load of a saved panel), trigger SQL parsing to populate the cache.
   watch(
     () => dashboardPanelData.layout.currentQueryIndex,
-    (newIdx) => {
+    async (newIdx) => {
       const qf = getQueryFields(newIdx);
       dashboardPanelData.meta.stream.customQueryFields = qf.customQueryFields;
       dashboardPanelData.meta.stream.vrlFunctionFieldList =
         qf.vrlFunctionFieldList;
+
+      // Parse SQL for custom queries that haven't been parsed yet
+      const incomingQuery = dashboardPanelData.data.queries[newIdx];
+      if (
+        incomingQuery?.customQuery &&
+        incomingQuery?.query &&
+        dashboardPanelData.data.queryType == "sql" &&
+        qf.customQueryFields.length === 0 &&
+        parser
+      ) {
+        await updateQueryValue(pageKey == "logs" ? true : false);
+      }
     },
   );
 
