@@ -364,7 +364,16 @@
                 "
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
+                <div
+                  v-if="
+                    message.role === 'assistant' &&
+                    (!message.contentBlocks ||
+                      message.contentBlocks.length === 0) &&
+                    (!message.content || message.content.trim() === '') &&
+                    isLoading
+                  "
+                  class="inline-loading"
+                >
                   <OSpinner variant="dots" size="xs" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
