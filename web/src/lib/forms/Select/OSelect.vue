@@ -46,6 +46,7 @@ type NormalizedOption = {
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
+  icon?: string;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -65,6 +66,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
+  iconKey: undefined,
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -145,6 +147,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawValue = option[props.valueKey];
   if (!isPrimitiveSelectValue(rawValue)) return null;
 
+  const rawIcon = props.iconKey ? option[props.iconKey] : undefined;
   return {
     label:
       rawLabel === undefined || rawLabel === null
@@ -153,6 +156,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
+    icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
   };
 }
 
@@ -1015,6 +1019,12 @@ const fieldWidthClass = computed(() => {
                         </span>
                       </template>
 
+                      <q-icon
+                        v-if="filteredOptions[vRow.index].icon"
+                        :name="filteredOptions[vRow.index].icon"
+                        size="xs"
+                        class="tw:shrink-0"
+                      />
                       <span class="tw:truncate">{{
                         filteredOptions[vRow.index].label
                       }}</span>

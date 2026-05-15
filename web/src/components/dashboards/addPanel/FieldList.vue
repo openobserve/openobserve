@@ -41,18 +41,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].fields.stream
         "
         :label="t('dashboard.selectIndex')"
-        :options="dashboardPanelData.meta.stream.streamResults"
+        :options="filteredStreamsWithIcons"
         data-test="index-dropdown-stream"
         :loading="streamDataLoading.isLoading.value"
-        valueKey="name"
         labelKey="name"
+        valueKey="name"
+        :iconKey="
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type === 'metrics'
+            ? '_icon'
+            : undefined
+        "
+        searchable
+        @search="onStreamSearch"
         :readonly="dashboardPanelDataPageKey === 'logs'"
         :title="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream
         "
-      />
+      >
+        <template
+          v-if="
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type == 'metrics' && selectedMetricTypeIcon
+          "
+          #icon-left
+        >
+          <q-icon
+            size="xs"
+            :name="metricsIconMapping[selectedMetricTypeIcon || '']"
+          />
+        </template>
+      </OSelect>
     </div>
     <div class="column col index-table q-mt-xs">
       <q-table
@@ -537,7 +560,7 @@ export default defineComponent({
       // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
     });
-    const filteredStreams = ref([]);
+    const filteredStreams = ref<any[]>([]);
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -631,6 +654,24 @@ export default defineComponent({
           return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
         });
     };
+
+    // Keep filteredStreams in sync with the full results list whenever it loads.
+    // The old q-select @filter callback fired with "" on open to seed the list;
+    // OSelect's @search only fires when the user types, so we sync here instead.
+    watch(
+      () => dashboardPanelData.meta.stream.streamResults,
+      (results) => {
+        filteredStreams.value = results ?? [];
+      },
+      { immediate: true },
+    );
+
+    const filteredStreamsWithIcons = computed(() =>
+      (filteredStreams.value as any[]).map((s) => ({
+        ...s,
+        _icon: s.metrics_meta ? metricsIconMapping[s.metrics_meta.metric_type] || undefined : undefined,
+      })),
+    );
 
     const getStreamFields = useLoading(
       async (fieldName: string, streamType: string) => {
@@ -1103,6 +1144,7 @@ export default defineComponent({
       streamTypeOptions,
       onStreamSearch,
       filteredStreams,
+      filteredStreamsWithIcons,
       isAddXAxisNotAllowed,
       isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
