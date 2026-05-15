@@ -243,18 +243,25 @@ pub async fn warm_up_terms(
         }
     }
 
-    if !warm_up_fields_futures.is_empty() {
-        try_join_all(warm_up_fields_futures).await?;
-    }
-    if !warm_up_fields_term_futures.is_empty() {
-        try_join_all(warm_up_fields_term_futures).await?;
-    }
-    if !warm_up_terms_futures.is_empty() {
-        try_join_all(warm_up_terms_futures).await?;
-    }
-    if !warm_up_fast_fields_futures.is_empty() {
-        try_join_all(warm_up_fast_fields_futures).await?;
-    }
+    // Run all warm-up categories in parallel
+    tokio::try_join!(
+        async {
+            try_join_all(warm_up_terms_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fields_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async {
+            try_join_all(warm_up_fields_term_futures)
+                .await
+                .map_err(anyhow::Error::from)
+        },
+        async { try_join_all(warm_up_fast_fields_futures).await },
+    )?;
     Ok(())
 }
 
