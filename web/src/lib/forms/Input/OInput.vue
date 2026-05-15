@@ -229,6 +229,14 @@ const wrapperClasses = computed(() => [
 
     <!-- Input row -->
     <div :class="wrapperClasses">
+      <!-- Prepend slot (inside border, left — icon use) -->
+      <span
+        v-if="$slots.prepend"
+        class="tw:flex tw:items-center tw:ps-2 tw:text-input-addon-text tw:shrink-0 tw:select-none"
+      >
+        <slot name="prepend" />
+      </span>
+
       <!-- Prefix slot (inside border) -->
       <span
         v-if="$slots.prefix || prefix"
@@ -257,7 +265,7 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed',
           'tw:py-2',
-          $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
+          $slots.prepend || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
           'tw:text-sm',
           autogrow ? 'tw:resize-none' : 'tw:resize-y',
@@ -289,7 +297,7 @@ const wrapperClasses = computed(() => [
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed',
           heightClasses[size ?? 'md'],
-          $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
+          $slots.prepend || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
         ]"
         @input="handleInput"

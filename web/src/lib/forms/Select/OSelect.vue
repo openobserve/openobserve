@@ -31,6 +31,7 @@ import {
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   provide,
   ref,
@@ -406,6 +407,80 @@ onBeforeUnmount(() => {
 // DOM nodes minimal even for 20 000+ option datasets.
 const listboxScrollEl = ref<HTMLElement | null>(null);
 
+// ── Keyboard navigation ────────────────────────────────────────────────────
+// Because items are virtualised (absolutely positioned inside a spacer div
+// rather than real DOM children of ListboxRoot), Reka's built-in roving-focus
+// never reaches them. We manage highlight state ourselves with an index.
+//
+// Strategy:
+//   - highlightedIndex tracks which filteredOptions entry is highlighted.
+//   - Up / Down move the index through selectable (non-header, non-disabled)
+//     items with wrap-around.
+//   - Enter commits the selection; Escape closes the dropdown.
+//   - The highlight class is applied reactively — no DOM focus juggling.
+//   - The search <input> retains browser focus the whole time the dropdown is
+//     open, so typing always goes straight to the filter.
+const highlightedIndex = ref(-1);
+
+// Indices into filteredOptions that are actual selectable items (no headers/disabled).
+const navigableIndices = computed(() =>
+  filteredOptions.value
+    .map((opt, i) => ({ opt, i }))
+    .filter(({ opt }) => !opt.header && !opt.disabled)
+    .map(({ i }) => i),
+);
+
+// Reset highlight whenever the dropdown opens or the filtered list changes.
+watch(popoverOpen, (open) => {
+  if (open) highlightedIndex.value = -1;
+});
+watch(filteredOptions, () => {
+  highlightedIndex.value = -1;
+});
+
+function scrollHighlightedIntoView() {
+  if (highlightedIndex.value < 0 || !listboxScrollEl.value) return;
+  const rows = listboxScrollEl.value.querySelectorAll<HTMLElement>('[data-vrow]');
+  for (const row of rows) {
+    if (Number(row.dataset.vrow) === highlightedIndex.value) {
+      row.scrollIntoView({ block: 'nearest' });
+      break;
+    }
+  }
+}
+
+function handleDropdownKeydown(e: KeyboardEvent) {
+  const nav = navigableIndices.value;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    popoverOpen.value = false;
+    return;
+  }
+
+  if (nav.length === 0) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    const cur = nav.indexOf(highlightedIndex.value);
+    highlightedIndex.value = cur < nav.length - 1 ? nav[cur + 1] : nav[0];
+    nextTick(scrollHighlightedIntoView);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    const cur = nav.indexOf(highlightedIndex.value);
+    highlightedIndex.value = cur > 0 ? nav[cur - 1] : nav[nav.length - 1];
+    nextTick(scrollHighlightedIntoView);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (highlightedIndex.value >= 0) {
+      const opt = filteredOptions.value[highlightedIndex.value];
+      if (opt) handleListboxUpdate(toRekaString(opt.value));
+    } else {
+      handleCreateFromInput();
+    }
+  }
+}
+
 const virtualizer = useVirtualizer(
   computed(() => ({
     count: filteredOptions.value.length,
@@ -608,7 +683,8 @@ const fieldWidthClass = computed(() => {
             :name="name"
             :disabled="disabled"
             :class="[
-              'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:ps-3',
+              'tw:flex tw:items-center tw:w-full tw:rounded-md tw:border',
+              $slots.prepend ? 'tw:ps-2' : 'tw:ps-3',
               'tw:bg-select-bg',
               hasError
                 ? 'tw:border-select-border-error'
@@ -622,6 +698,14 @@ const fieldWidthClass = computed(() => {
               heightClasses[size ?? 'md'],
             ]"
           >
+            <!-- Prepend slot (inside trigger, left) -->
+            <span
+              v-if="$slots.prepend"
+              class="tw:flex tw:items-center tw:me-1.5 tw:text-select-placeholder tw:shrink-0"
+            >
+              <slot name="prepend" />
+            </span>
+
             <slot name="trigger" :value="modelValue">
               <template v-if="multiple && selectedLabels.length > 0">
                 <div
@@ -733,9 +817,8 @@ const fieldWidthClass = computed(() => {
             :class="[
               'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
               'tw:max-h-72 tw:overflow-hidden',
-              'tw:rounded-md tw:border tw:shadow-md',
-              'tw:bg-select-content-bg tw:border-select-content-border',
-              'tw:p-1',
+              'tw:rounded-md tw:shadow-lg',
+              'tw:bg-select-content-bg',
             ]"
             :style="dropdownStyle"
           >
@@ -745,20 +828,26 @@ const fieldWidthClass = computed(() => {
               :disabled="disabled"
               @update:model-value="handleListboxUpdate"
             >
-              <ListboxFilter
-                v-if="inputEnabled"
-                v-model="searchTerm"
-                auto-focus
+              <!-- Single bordered container wrapping search + list -->
+              <div
                 :class="[
-                  'tw:w-full tw:px-3 tw:mb-1 tw:rounded-md tw:border',
-                  'tw:bg-input-bg tw:border-input-border tw:text-input-text',
-                  'tw:placeholder:text-input-placeholder tw:outline-none',
-                  'tw:focus:ring-2 tw:focus:ring-input-focus-ring',
-                  heightClasses[size ?? 'md'],
+                  'tw:rounded-md tw:border tw:border-input-border tw:overflow-hidden',
+                  'tw:bg-select-content-bg',
                 ]"
-                :placeholder="searchPlaceholder"
-                @keydown.enter="handleCreateFromInput"
-              />
+              >
+                <ListboxFilter
+                  v-if="inputEnabled"
+                  v-model="searchTerm"
+                  auto-focus
+                  :class="[
+                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text',
+                    'tw:placeholder:text-input-placeholder tw:outline-none',
+                    'tw:border-b tw:border-input-border',
+                    heightClasses[size ?? 'md'],
+                  ]"
+                  :placeholder="searchPlaceholder"
+                  @keydown="handleDropdownKeydown"
+                />
 
               <!--
                 Select-all master row. Indeterminate (dash) when only some
@@ -821,8 +910,12 @@ const fieldWidthClass = computed(() => {
                 <span class="tw:truncate tw:font-medium">Select all</span>
               </div>
 
-              <!-- Virtual scroll container -->
-              <div ref="listboxScrollEl" class="tw:max-h-60 tw:overflow-auto">
+              <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
+                   on the ListboxFilter input above. Items are index-highlighted reactively. -->
+              <div
+                ref="listboxScrollEl"
+                class="tw:max-h-60 tw:overflow-auto"
+              >
                 <div
                   v-if="filteredOptions.length === 0"
                   class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
@@ -841,6 +934,7 @@ const fieldWidthClass = computed(() => {
                   <div
                     v-for="vRow in virtualizer.getVirtualItems()"
                     :key="vRow.key"
+                    :data-vrow="vRow.index"
                     :style="{
                       position: 'absolute',
                       top: 0,
@@ -876,7 +970,12 @@ const fieldWidthClass = computed(() => {
                         'tw:text-select-item-text tw:rounded-sm',
                         'tw:cursor-pointer tw:select-none tw:outline-none',
                         'tw:transition-colors tw:duration-100',
-                        'tw:data-highlighted:bg-select-item-hover-bg',
+                        // highlightedIndex-based highlight — works with virtualised items.
+                        // Reka's data-highlighted only fires for direct DOM children of
+                        // ListboxRoot; virtual rows are not, so we track highlight ourselves.
+                        vRow.index === highlightedIndex
+                          ? 'tw:bg-select-item-hover-bg'
+                          : 'tw:hover:bg-select-item-hover-bg',
                         multiple
                           ? ''
                           : 'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
@@ -943,6 +1042,7 @@ const fieldWidthClass = computed(() => {
                   </div>
                 </div>
               </div>
+            </div><!-- end bordered container -->
             </ListboxRoot>
           </PopoverContent>
         </PopoverPortal>

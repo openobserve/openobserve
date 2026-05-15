@@ -1059,3 +1059,112 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 | q-color | 4 |
 | q-option-group | 1 |
 | q-select-stub | — (test stubs; no migration needed) |
+
+---
+
+## O2 Component Improvements (Post-Migration)
+
+### OSelect
+
+| Improvement | Status | Notes |
+|---|---|---|
+| `searchable: true` default | ✅ Done | All OSelect instances are searchable by default; add `:searchable="false"` to opt out |
+
+---
+
+## New Components — CommonAutoComplete Migration
+
+`CommonAutoComplete` is a legacy Options API component that renders an `OInput` with a custom absolute-positioned dropdown. It should be replaced with the new **`OCombobox`** lib component.
+
+### OCombobox
+
+**Location:** `web/src/lib/forms/Combobox/OCombobox.vue`
+**Types:** `web/src/lib/forms/Combobox/OCombobox.types.ts`
+
+A proper searchable text input with a Reka UI `ComboboxRoot`-powered dropdown.
+Full keyboard navigation (Up/Down, Enter, Escape) is built in.
+
+#### Props
+
+| Prop | Type | Default | Notes |
+|---|---|---|---|
+| `modelValue` | `string` | `""` | Bound input value |
+| `items` | `ComboboxOption[]` | `[]` | `{ label, value }` objects |
+| `searchRegex` | `string` | — | Regex to extract search needle (same as CommonAutoComplete) |
+| `valueReplaceFn` | `(opt) => string` | `opt.value` | Transform selected option before emitting |
+| `label` | `string` | — | Field label |
+| `placeholder` | `string` | — | Input placeholder |
+| `disabled` | `boolean` | `false` | |
+| `size` | `"sm" \| "md"` | `"md"` | |
+| `error` | `boolean` | `false` | |
+| `errorMessage` | `string` | — | |
+| `helpText` | `string` | — | |
+| `debounce` | `number` | `0` | Delay (ms) before emitting `update:modelValue` |
+
+#### Emits
+
+| Event | Payload | Notes |
+|---|---|---|
+| `update:modelValue` | `string` | Fires on every keystroke |
+| `select` | `string` | Fires when user picks an option from the dropdown |
+
+#### Slots
+
+| Slot | Notes |
+|---|---|
+| `#label` | Replaces the label text |
+| `#tooltip` | Shows an info icon with tooltip next to the label |
+
+#### Usage
+
+```vue
+<OCombobox
+  v-model="series.value"
+  :items="seriesDataItems"
+  search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
+  label="Select Series"
+  :value-replace-fn="selectColorBySeriesOption"
+  data-test="color-by-series-input"
+/>
+```
+
+#### Migration from CommonAutoComplete
+
+| CommonAutoComplete prop | OCombobox prop |
+|---|---|
+| `modelValue` | `modelValue` |
+| `label` | `label` |
+| `items` | `items` |
+| `searchRegex` | `searchRegex` |
+| `valueReplaceFn` | `valueReplaceFn` (camelCase, no dash) |
+| `debounce` | `debounce` (added) |
+| `placeholder` | `placeholder` |
+| `#label` slot | `#label` slot |
+| `color`, `bg-color`, `stack-label`, `borderless` | **Drop** — Quasar style props, not supported |
+| `style` on the component | Use `style` or `width` prop on `OCombobox` |
+
+**Notes for each file:**
+
+| File | Template usages | Complexity | Notes |
+|---|---|---|---|
+| `AddCondition.vue` | 1 | Easy | Simple: `v-model`, `:items`, `searchRegex` only |
+| `DrilldownPopUp.vue` | 2 | Easy | Two instances: `v-model`, `searchRegex`, `:items`, `placeholder`, inline styles |
+| `AddSettingVariable.vue` | 1 | Easy | Add `debounce="1000"`, `placeholder="Enter Value"`, drop inline styles |
+| `PromQLBuilderOptions.vue` | 1 | Medium | Drop Quasar style props; use `style="width:260px"` on OCombobox; `:value-replace-fn` |
+| `ConfigPanel.vue` | 1 | Medium | Has `#label` slot with q-icon tooltip — move tooltip into OCombobox `#tooltip` slot |
+| `ColorBySeriesPopUp.vue` | 1 | Medium | Has `#label` slot; drop inline style block |
+| `DashboardSankeyChartBuilder.vue` | **0** (dead import) | Trivial | Remove unused import + `components:{}` entry |
+| `DashboardQueryBuilder.vue` | **0** (dead import) | Trivial | Remove unused import + `components:{}` entry |
+| `DashboardMapsQueryBuilder.vue` | **0** (dead import) | Trivial | Remove unused import + `components:{}` entry |
+
+**Files to migrate — todo list:**
+- [ ] `src/views/Dashboards/addPanel/AddCondition.vue`
+- [ ] `src/components/dashboards/addPanel/DrilldownPopUp.vue`
+- [ ] `src/components/dashboards/settings/AddSettingVariable.vue`
+- [ ] `src/components/promql/components/PromQLBuilderOptions.vue`
+- [ ] `src/components/dashboards/addPanel/ConfigPanel.vue`
+- [ ] `src/components/dashboards/addPanel/ColorBySeriesPopUp.vue`
+- [ ] `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` — remove dead import only
+- [ ] `src/components/dashboards/addPanel/DashboardQueryBuilder.vue` — remove dead import only
+- [ ] `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue` — remove dead import only
+
