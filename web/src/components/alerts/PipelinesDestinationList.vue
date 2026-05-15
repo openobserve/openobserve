@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPage
-    class="q-pa-none"
+  <div class="tw:rounded-md q-pa-none"
     style="height: calc(100vh - 88px); min-height: inherit"
   >
     <div v-if="!showDestinationEditor">
@@ -188,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </OPage>
+  </div>
 </template>
 <script lang="ts">
 import {

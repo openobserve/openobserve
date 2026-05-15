@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPage class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <q-table
       data-test="log-stream-table"
       ref="qTable"
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <SchemaIndex v-model="schemaData" />
     </ODrawer>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">

@@ -89,8 +89,7 @@ describe('Functions.vue', () => {
           [Quasar, {}],
         ],
         stubs: {
-          'OPage': { template: '<div data-o2-page><slot /></div>' },
-          'q-btn': {
+                    'q-btn': {
             template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             emits: ['click'],
           },
@@ -152,7 +151,7 @@ describe('Functions.vue', () => {
     it('should render the component with default configuration', async () => {
       wrapper = await createWrapper();
 
-      expect(wrapper.find('[data-o2-page]').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
       expect(wrapper.find('.q-splitter').exists()).toBe(true);
       // The tabs now use 'card-container' class instead of 'functions-tabs'
       expect(wrapper.find('.card-container').exists()).toBe(true);

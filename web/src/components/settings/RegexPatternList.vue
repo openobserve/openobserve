@@ -1,5 +1,5 @@
 ﻿<template>
-    <OPage class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
@@ -189,7 +189,7 @@
           @update:list="getRegexPatterns"
           @close="closeAddRegexPatternDialog"
         />
-    </OPage>
+    </div>
   </template>
 
 <script lang="ts">

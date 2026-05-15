@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPage>
+  <div class="tw:rounded-md">
     <q-splitter
       v-model="splitterModel"
       :limits="[0, 250]"
@@ -689,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-table>
       </template>
     </q-splitter>
-  </OPage>
+  </div>
 </template>
 
 <script lang="ts">

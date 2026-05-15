@@ -61,7 +61,7 @@ describe("InvoiceHistory", () => {
     });
 
     it("should render the main container with proper class", () => {
-      const pageContainer = wrapper.find('[data-o2-page]');
+      const pageContainer = wrapper.find('.q-py-md');
       expect(pageContainer.exists()).toBe(true);
       expect(pageContainer.classes()).toContain("q-py-md");
     });
@@ -147,7 +147,7 @@ describe("InvoiceHistory", () => {
 
   describe("Template Structure and DOM Elements", () => {
     it("should have the correct template structure", () => {
-      const qPage = wrapper.find('[data-o2-page]');
+      const qPage = wrapper.find('.q-py-md');
       expect(qPage.exists()).toBe(true);
 
       const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
@@ -158,7 +158,7 @@ describe("InvoiceHistory", () => {
     });
 
     it("should contain exactly one q-page element", () => {
-      const qPages = wrapper.findAll('[data-o2-page]');
+      const qPages = wrapper.findAll('.q-py-md');
       expect(qPages).toHaveLength(1);
     });
 
@@ -173,7 +173,7 @@ describe("InvoiceHistory", () => {
     });
 
     it("should have proper nesting structure", () => {
-      const qPage = wrapper.find('[data-o2-page]');
+      const qPage = wrapper.find('.q-py-md');
       const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
 
@@ -263,8 +263,7 @@ describe("InvoiceHistory", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'OPage': true
-            }
+                          }
           }
         });
       }).not.toThrow();
@@ -334,7 +333,7 @@ describe("InvoiceHistory", () => {
 
   describe("Accessibility", () => {
     it("should have proper semantic structure", () => {
-      const qPage = wrapper.find('[data-o2-page]');
+      const qPage = wrapper.find('.q-py-md');
       expect(qPage.exists()).toBe(true);
     });
 
@@ -345,7 +344,7 @@ describe("InvoiceHistory", () => {
     });
 
     it("should maintain proper DOM hierarchy", () => {
-      const qPage = wrapper.find('[data-o2-page]');
+      const qPage = wrapper.find('.q-py-md');
       expect(qPage.exists()).toBe(true);
       const allDivs = wrapper.findAll("div");
       expect(allDivs.length).toBeGreaterThan(0);
