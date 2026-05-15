@@ -790,7 +790,8 @@
     "no_keep_current": "不，保持最新状态",
     "feature_correlation_management": "关联管理",
     "feature_log_patterns": "日志模式",
-    "environment_type": "环境类型"
+    "environment_type": "环境类型",
+    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地摄取数据。"
   },
   "login": {
     "userid": "账号",
