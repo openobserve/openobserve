@@ -47,7 +47,9 @@ test.describe("Alerts Import/Export", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   });
 
-  test.skip('Import/Export Alert Functionality', {
+  // Re-enabled from test.skip — API-first fixes (alertTemplatesPage/alertDestinationsPage) resolved
+  // the cascading "page context closed" errors that caused this test to fail previously
+  test('Import/Export Alert Functionality', {
     tag: ['@all', '@alerts', '@alertsImportExport'],
     timeout: FIVE_MINUTES_MS
   }, async ({ page }) => {
@@ -186,6 +188,7 @@ test.describe("Alerts Import/Export", () => {
     const webhookDestinationUrl = 'https://raw.githubusercontent.com/openobserve/alert_tests/refs/heads/main/Webhook_Destination_Import.json';
     const webhookDestinationName = 'auto_dest_name_' + sharedRandomValue;
     await pm.alertDestinationsPage.importDestinationFromUrl(webhookDestinationUrl, webhookTemplateName, webhookDestinationName);
+    await pm.alertDestinationsPage.navigateToDestinations();
     await pm.alertDestinationsPage.verifyDestinationExists(webhookDestinationName);
     await pm.alertDestinationsPage.deleteDestinationWithSearch(webhookDestinationName);
     testLogger.info('Webhook URL destination cycle complete');
@@ -193,6 +196,7 @@ test.describe("Alerts Import/Export", () => {
     // Test 2: Webhook destination from file
     await pm.alertDestinationsPage.importDestinationFromFile('utils/webhookDestinationImport.json', webhookTemplateName, webhookDestinationName);
     await pm.alertDestinationsPage.verifySuccessfulImportMessage();
+    await pm.alertDestinationsPage.navigateToDestinations();
     await pm.alertDestinationsPage.verifyDestinationExists(webhookDestinationName);
     await pm.alertDestinationsPage.deleteDestinationWithSearch(webhookDestinationName);
     testLogger.info('Webhook FILE destination cycle complete');
