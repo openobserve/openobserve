@@ -10,7 +10,7 @@ on:
     #   - "**.yaml"
   pull_request:
     branches:
-      - "*"
+      - "**"
     # paths-ignore:
     #   - "**.md"
     #   - "**.yml"
