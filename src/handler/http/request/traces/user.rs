@@ -288,7 +288,18 @@ pub async fn get_latest_users(
         .collect();
 
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
-    let trace_ids_sql = all_trace_ids.join("','");
+    // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
+    // Trace IDs originate from ingested data and could contain injected SQL if not validated.
+    let sanitized_ids: Vec<String> = all_trace_ids
+        .iter()
+        .map(|tid| {
+            tid.chars()
+                .filter(|c| c.is_ascii_hexdigit() || *c == '-')
+                .collect::<String>()
+        })
+        .filter(|tid| !tid.is_empty())
+        .collect();
+    let trace_ids_sql = sanitized_ids.join("','");
     let query_sql = format!(
         "SELECT trace_id, \
         min(start_time) as trace_start_time, \

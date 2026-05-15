@@ -397,14 +397,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span>Total</span>
                       <span class="tw:tabular-nums">{{ t.spanCount }}</span>
                     </div>
-                    <div class="stat-row">
-                      <span>LLM calls</span>
-                      <span class="tw:tabular-nums">{{ t.llmCallCount }}</span>
-                    </div>
-                    <div class="stat-row">
-                      <span>Tool calls</span>
-                      <span class="tw:tabular-nums">{{ t.toolCallCount }}</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -455,7 +447,7 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 
 // Toolbar filters (all client-side over the in-memory turn list).
 const searchText = ref("");
-const statusFilter = ref<"all" | "ok" | "warn" | "error">("all");
+const statusFilter = ref<"all" | "ok" | "error">("all");
 const modelFilter = ref<string>("all");
 
 const sessionId = computed(() =>
@@ -474,7 +466,6 @@ const endTime = computed(() =>
 const statusOptions = [
   { label: "All statuses", value: "all" },
   { label: "OK", value: "ok" },
-  { label: "Warn", value: "warn" },
   { label: "Error", value: "error" },
 ];
 
@@ -694,8 +685,6 @@ function statusBadgeClass(s: SessionTraceRow["status"]): string {
   switch (s) {
     case "error":
       return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] tw:text-[var(--o2-service-health-critical)]";
-    case "warn":
-      return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-warning)_12%,transparent)] tw:text-[var(--o2-service-health-warning)]";
     default:
       return "tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy,#16a34a)_12%,transparent)] tw:text-[var(--o2-service-health-healthy,#16a34a)]";
   }

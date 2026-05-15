@@ -707,6 +707,27 @@ pub async fn get_latest_traces(
         let resp_search = match search_res {
             Ok(res) => res,
             Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                        "",
+                        "",
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/traces/latest",
+                        "500",
+                        &org_id,
+                        stream_type.as_str(),
+                        "",
+                        "",
+                    ])
+                    .inc();
                 log::error!("get traces latest service-breakdown error: {err:?}");
                 return map_error_to_http_response(&err, Some(trace_id));
             }
