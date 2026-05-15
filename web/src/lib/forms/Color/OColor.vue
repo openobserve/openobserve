@@ -111,7 +111,8 @@ function handleClear() {
 }
 
 const wrapperClasses = computed(() => [
-  "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-colors tw:duration-150",
+  "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-datepicker-bg",
   hasError.value
     ? "tw:border-datepicker-error-border"
@@ -149,7 +150,7 @@ const wrapperClasses = computed(() => [
           type="button"
           :disabled="disabled || readonly"
           :aria-label="label ? `${label} — pick color` : 'Pick color'"
-          class="tw:flex tw:items-center tw:ps-2 tw:pe-1 tw:shrink-0 tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:rounded-s-md"
+          class="tw:flex tw:items-center tw:ps-2 tw:pe-1 tw:shrink-0 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150 tw:rounded-s-md"
           :class="disabled || readonly ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer'"
         >
           <span
@@ -183,7 +184,7 @@ const wrapperClasses = computed(() => [
           >
             <ColorAreaArea class="tw:w-full tw:h-full" :style="areaStyle" />
             <ColorAreaThumb
-              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150"
             />
           </ColorAreaRoot>
 
@@ -197,7 +198,7 @@ const wrapperClasses = computed(() => [
           >
             <ColorSliderTrack class="tw:w-full tw:h-3 tw:rounded tw:overflow-hidden" />
             <ColorSliderThumb
-              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150"
             />
           </ColorSliderRoot>
 

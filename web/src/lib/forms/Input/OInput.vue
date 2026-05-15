@@ -194,7 +194,8 @@ const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
 };
 
 const wrapperClasses = computed(() => [
-  "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-colors tw:duration-150",
+  "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-input-bg",
   hasError.value
     ? "tw:border-input-border-error"
