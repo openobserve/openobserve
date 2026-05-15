@@ -35,6 +35,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   enableColumnReorder: false,
   enableColumnPin: false,
   loading: false,
+  streaming: false,
   error: null,
   dense: false,
   bordered: true,
