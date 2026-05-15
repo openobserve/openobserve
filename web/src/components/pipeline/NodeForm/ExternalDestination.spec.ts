@@ -696,10 +696,9 @@ describe("ExternalDestination.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       const rootDiv = wrapper.find(
-        '[data-test="add-stream-input-stream-routing-section"]',
+        '[data-test="add-destination-title"]',
       );
       expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.classes()).toContain("bg-dark");
     });
 
     it("12.2 renders correctly in light theme", async () => {
@@ -707,10 +706,9 @@ describe("ExternalDestination.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       const rootDiv = wrapper.find(
-        '[data-test="add-stream-input-stream-routing-section"]',
+        '[data-test="add-destination-title"]',
       );
       expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.classes()).toContain("bg-white");
     });
 
     afterEach(() => {

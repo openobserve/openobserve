@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <q-spinner color="primary" size="sm" />
+                <OSpinner size="xs" />
                 <span>Loading operations...</span>
               </div>
 
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <q-spinner color="primary" size="sm" />
+                <OSpinner size="xs" />
                 <span>Loading {{ cfg.label.toLowerCase() }}...</span>
               </div>
               <template v-else>
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-loading"
               >
-                <q-spinner color="primary" size="sm" />
+                <OSpinner size="xs" />
                 <span>Loading metrics...</span>
               </div>
 
@@ -620,6 +620,7 @@ import {
 } from "@/utils/metrics/metricGrouping";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -723,6 +724,7 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
+    OSpinner,
   },
   props: {
     selectedNode: {

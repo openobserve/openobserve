@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:w-full service-identity-config q-mt-sm">
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-hourglass color="primary" size="30px" />
+      <OSpinner size="sm" />
     </div>
 
     <div v-else>
@@ -160,6 +160,7 @@ import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsCo
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const store = useStore();
 const $q = useQuasar();

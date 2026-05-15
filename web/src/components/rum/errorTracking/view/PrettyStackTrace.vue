@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Loading state -->
     <div v-if="isLoadingTranslation" class="loading-container q-pa-xl text-center">
-      <q-spinner-dots color="primary" size="3em" />
+      <OSpinner variant="dots" size="lg" />
       <div class="q-mt-md text-grey-7" style="font-size: 14px; font-weight: 500;">
         Translating stack trace with source maps...
       </div>
@@ -249,6 +249,7 @@ import {
   getCachedTranslation,
   setCachedTranslation,
 } from "@/utils/stackTraceCache";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const store = useStore();
 const router = useRouter();

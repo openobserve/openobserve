@@ -67,7 +67,7 @@
             v-if="durationPercentilesLoading"
             class="tw:flex tw:justify-center tw:py-[0.5rem]"
           >
-            <q-spinner size="1rem" color="primary" />
+            <OSpinner size="xs" />
           </div>
           <template v-else-if="hasPercentiles">
             <div
@@ -183,6 +183,7 @@ import {
   SPAN_KIND_MAP,
   parseSpanKindWhereClause,
 } from "@/utils/traces/constants";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   row: {

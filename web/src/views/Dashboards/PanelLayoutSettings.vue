@@ -107,6 +107,7 @@ export default defineComponent({
       savePanelLayout();
     };
 
+
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
       // 28.5 is the height of each row

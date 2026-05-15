@@ -146,13 +146,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="q-pl-md q-py-xs"
                             style="height: 60px"
                           >
-                            <q-inner-loading
-                              size="xs"
+                            <OInnerLoading
                               :showing="
                                 metricLabelValues[props.row.name]?.isLoading
                               "
                               label="Fetching values..."
-                              label-style="font-size: 1.1em"
+                              size="xs"
                             />
                           </div>
                           <div
@@ -293,11 +292,12 @@ import useStreams from "@/composables/useStreams";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import { Plus } from 'lucide-vue-next';
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton, Plus, OInput },
+  components: { EqualIcon, NotEqualIcon, OButton, Plus, OInput, OInnerLoading },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();

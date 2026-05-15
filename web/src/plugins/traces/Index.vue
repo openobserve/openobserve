@@ -1741,7 +1741,7 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
   // Apply each filter term independently so replace-or-append works per field
   // Skip search only when live mode is ON (datetime trigger will handle it)
   // Don't skip when live mode is OFF (datetime trigger won't fire)
-  const skipSearch = Boolean(searchObj.meta.liveMode);
+  const skipSearch = !!(searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled);
 
   if (searchBarRef.value?.applyFilters) {
     searchBarRef.value.applyFilters(allFilters, skipSearch);

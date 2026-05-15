@@ -102,11 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pl-md q-py-xs"
         style="height: 3.75rem"
       >
-        <q-inner-loading
-          size="xs"
+        <OInnerLoading
           :showing="fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
-          label-style="font-size: 1.1em"
+          size="xs"
         />
       </div>
 
@@ -183,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
-        <q-spinner-dots v-if="isLoadingMore" color="primary" size="1em" />
+        <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
         <span v-else>View more values</span>
       </OButton>
     </div>
@@ -197,6 +196,8 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 
 interface FieldValues {
   isLoading: boolean;
