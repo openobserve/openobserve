@@ -86,69 +86,81 @@ jobs:
 
           PR_DIFF=$(cat /tmp/pr_diff.txt)
           PR_COMMITS=$(cat /tmp/pr_commits.json)
-          DIFF_TRUNCATED=$(echo "$PR_DIFF" | head -n 4000)
+          DIFF_TRUNCATED=$(echo "$PR_DIFF" | head -n 6000)
 
           SYSTEM_PROMPT="You are a senior code reviewer. Review the following PR diff for bugs, security issues, and performance problems. Skip style suggestions, documentation, and trivial improvements. Be concise — 2 sentences max per issue. Max 10 issues. Prioritize by severity."
 
-          # Build the user prompt text
-          USER_PROMPT=$(printf '%s' "\
-          ## Code Review Request
+          # Build instruction template (no inline variable expansion — passed via jq --arg)
+          INSTRUCTIONS="## Code Review Request
 
           **Repository:** ${{ github.repository }}
-          **PR Number:** ${PR_NUMBER}
+          **PR Number:** \${PR_NUMBER}
 
           ### Commits
           \`\`\`json
-          ${PR_COMMITS}
+          \${PR_COMMITS}
           \`\`\`
 
-          ### PR Diff
+          ### PR Diff (truncated to 6000 lines)
           \`\`\`diff
-          ${DIFF_TRUNCATED}
+          \${DIFF_TRUNCATED}
           \`\`\`
 
           ### Existing Review Comment (if any)
-          ${EXISTING_BODY}
+          \${EXISTING_BODY}
 
-          ### Instructions
-          Review the diff above and produce exactly a table of issues in this format:
+          ### OUTPUT FORMAT — FAILURE TO FOLLOW MEANS YOU FAILED
+
+          You MUST output ONLY the comment exactly as shown. NO preamble, NO \"Here is the review\", NO markdown outside the table.
 
           \`\`\`
           <!-- deepseek-pr-review -->
           ## Code Review
 
-          **Status:** [X issues / LGTM ✅] | **Commit count:** [N]
+          | # | File | Severity | Issue |
+          |---|------|----------|-------|
+          | 1 | \`path/file:line\` | 🔴 High | Description. **Fix:** suggestion |
+          \`\`\`
 
-          | File | Issue | Severity |
-          |------|-------|----------|
-          | \`file:line\` | Brief description. Fix: suggestion | High/Med/Low |
+          If NO issues found:
+          \`\`\`
+          <!-- deepseek-pr-review -->
+          ## Code Review
 
-          ### Resolved
-          - ~~Previously fixed issues that are now resolved~~
+          **LGTM ✅** — No bugs, security, or performance issues found.
           \`\`\`
 
           STRICT RULES:
-          - ONE table only, no extra sections or summaries
-          - No praise or compliments
+          - Output the markdown table ONLY — no extra text, no summaries, no praise
+          - Each issue: file path with line, severity (🔴 High / 🟡 Medium / 🟢 Low), one-line description with fix suggestion
           - 2 sentences max per issue
-          - If no issues found, use \"Status: LGTM ✅\" with empty table
-          - Only flag bugs, security issues, and performance problems
-          - If existing review body shows issues that are now resolved, move them to \"Resolved\" section with strikethrough
-          - Output ONLY the comment content, nothing else")
+          - Max 10 issues, sorted by severity (high first)
+          - If existing review body shows resolved issues, append a \"### Resolved\" section with ~~strikethrough~~
+          - DO NOT number items outside the table column
+          - DO NOT use \"1.\", \"2.\" at the start of each issue — use the table's `#` column instead"
 
-          # Build JSON payload safely using jq --arg (prevents command injection)
+          # Build JSON payload entirely with jq --arg (all user content safely escaped)
           JSON_BODY=$(jq -n \
             --arg model "deepseek-chat" \
             --arg sys "$SYSTEM_PROMPT" \
-            --arg user "$USER_PROMPT" \
+            --arg instructions "$INSTRUCTIONS" \
+            --arg pr_number "$PR_NUMBER" \
+            --arg pr_commits "$PR_COMMITS" \
+            --arg diff_truncated "$DIFF_TRUNCATED" \
+            --arg existing_body "$EXISTING_BODY" \
             '{
               model: $model,
               messages: [
                 {role: "system", content: $sys},
-                {role: "user", content: $user}
+                {role: "user", content: ($instructions |
+                  gsub("\\${PR_NUMBER}"; $pr_number) |
+                  gsub("\\${PR_COMMITS}"; $pr_commits) |
+                  gsub("\\${DIFF_TRUNCATED}"; $diff_truncated) |
+                  gsub("\\${EXISTING_BODY}"; $existing_body)
+                )}
               ],
-              temperature: 0.3,
-              max_tokens: 4096
+              temperature: 0.0,
+              max_tokens: 8192
             }')
 
           RESPONSE=$(curl -s https://api.deepseek.com/v1/chat/completions \
@@ -164,22 +176,19 @@ jobs:
             exit 1
           fi
 
-          echo "$REVIEW_BODY" > /tmp/review_body.txt
+          printf '%s\n' "$REVIEW_BODY" > /tmp/review_body.txt
 
       - name: Post or Update Review Comment
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          REVIEW_BODY=$(cat /tmp/review_body.txt)
           EXISTING_COMMENT_ID="${{ steps.find_comment.outputs.comment_id }}"
 
           if [ -n "$EXISTING_COMMENT_ID" ]; then
-            # Update existing comment
             gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
-              -X PATCH -f body="$REVIEW_BODY"
+              -X PATCH --input /tmp/review_body.txt
             echo "Updated existing review comment: $EXISTING_COMMENT_ID"
           else
-            # Create new comment
-            gh pr comment "${{ steps.pr.outputs.pr_number }}" --body "$REVIEW_BODY"
+            gh pr comment "${{ steps.pr.outputs.pr_number }}" --body-file /tmp/review_body.txt
             echo "Created new review comment"
           fi
