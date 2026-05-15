@@ -153,6 +153,16 @@ export default defineComponent({
     overflow: hidden;
     min-width: 100px;
   }
+
+  // Mobile: tighter cells + touch-friendly horizontal scroll
+  @media (max-width: 599px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    .q-td {
+      min-width: 80px;
+    }
+  }
   .table-header {
     // text-transform: capitalize;
 

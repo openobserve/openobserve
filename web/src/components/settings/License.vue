@@ -401,7 +401,7 @@
 
     <!-- License Key Modal -->
     <q-dialog v-model="showLicenseKeyModal" persistent>
-      <q-card style="min-width: 500px">
+      <q-card style="min-width: min(500px, 95vw)">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">{{ t("about.license_key") }}</div>
           <q-space />

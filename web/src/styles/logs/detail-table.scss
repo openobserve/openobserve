@@ -2,6 +2,13 @@
   width: 85vw;
 }
 
+// Mobile: full-screen detail view
+@media (max-width: 599px) {
+  .searchdetaildialog {
+    width: 100vw !important;
+  }
+}
+
 .q-item__section {
   word-break: break-all;
 }

@@ -1,6 +1,6 @@
 <template>
   <q-dialog v-model="isOpen" persistent>
-    <q-card style="min-width: 700px">
+    <q-card style="min-width: min(700px, 95vw)">
       <q-card-section class="q-pa-md">
         <div class="text-h6">{{ isEditMode ? "Edit" : "Add" }} Annotation</div>
       </q-card-section>

@@ -63,6 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             hide-bottom-space
             dense
             borderless
+            inputmode="email"
+            autocomplete="email"
+            enterkeyhint="next"
             :rules="[
               (val: any, rules: any) =>
                 rules.email(val) || 'Please enter a valid email address',
@@ -81,6 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               hide-bottom-space
+              autocomplete="new-password"
+              enterkeyhint="next"
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -108,6 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             hide-bottom-space
             borderless
+            autocomplete="given-name"
+            enterkeyhint="next"
             data-test="user-first-name-field"
           />
 
@@ -120,6 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             hide-bottom-space
             borderless
+            autocomplete="family-name"
+            enterkeyhint="next"
             data-test="user-last-name-field"
           />
           <q-select
@@ -192,6 +201,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               borderless
               hide-bottom-space
+              :autocomplete="
+                store.state.userInfo.email === formData.email
+                  ? 'current-password'
+                  : 'off'
+              "
+              enterkeyhint="next"
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -219,6 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               hide-bottom-space
               borderless
+              autocomplete="new-password"
+              enterkeyhint="done"
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -249,6 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             borderless
             hide-bottom-space
+            autocomplete="off"
+            enterkeyhint="done"
             :rules="[
               (val: any) =>
                 /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||

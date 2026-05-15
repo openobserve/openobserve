@@ -1,0 +1,24 @@
+// Shared mixin for mobile list cards: positions a 3px colored stripe on the
+// left edge via ::before. Callers set `--$accent-var` per `[data-tone="…"]`
+// to colorize the stripe without redefining the pseudo-element.
+//
+// Usage:
+//   .my-mobile-card {
+//     @include mobile-card-accent("my-accent");
+//     &[data-tone="ok"] { --my-accent: #21ba45; }
+//   }
+@mixin mobile-card-accent($var-name) {
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--#{$var-name}, var(--o2-primary-btn-bg));
+    opacity: 0.85;
+  }
+}

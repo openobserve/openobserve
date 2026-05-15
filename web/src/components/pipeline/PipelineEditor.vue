@@ -31,6 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               hide-bottom-space
               class="tw:w-[300px]"
+              autocomplete="off"
+              enterkeyhint="done"
               :error="pipelineNameError"
               :error-message="pipelineNameErrorMessage"
             />
@@ -112,6 +114,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @keydown.stop
       tabindex="0"
     >
+      <div
+        v-if="isMobile"
+        class="pipeline-editor-mobile-header"
+      >
+        <q-btn
+          data-test="pipeline-editor-mobile-close-node"
+          icon="close"
+          flat
+          round
+          dense
+          aria-label="Close"
+          @click="resetDialog"
+        />
+      </div>
       <QueryForm
         v-if="pipelineObj.dialog.name === 'query'"
         :stream-name="pipeline.stream_name"
@@ -154,14 +170,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         maximized
         :persistent="true"
       >
-        <JsonEditor
-          :data="pipelineObj.currentSelectedPipeline"
-          :title="t('pipeline.editPipelineJSON')"
-          :type="'pipelines'"
-          :validation-errors="validationErrors"
-          @close="showJsonEditorDialog = false"
-          @saveJson="savePipelineJson"
-        />
+        <div class="pipeline-json-dialog-wrap">
+          <div
+            v-if="isMobile"
+            class="pipeline-editor-mobile-header"
+          >
+            <span class="pipeline-editor-mobile-header__title">
+              {{ t('pipeline.editPipelineJSON') }}
+            </span>
+            <q-btn
+              data-test="pipeline-editor-mobile-close-json"
+              icon="close"
+              flat
+              round
+              dense
+              aria-label="Close"
+              @click="showJsonEditorDialog = false"
+            />
+          </div>
+          <JsonEditor
+            :data="pipelineObj.currentSelectedPipeline"
+            :title="t('pipeline.editPipelineJSON')"
+            :type="'pipelines'"
+            :validation-errors="validationErrors"
+            @close="showJsonEditorDialog = false"
+            @saveJson="savePipelineJson"
+          />
+        </div>
       </q-dialog>
   <confirm-dialog
     :title="confirmDialogMeta.title"
@@ -228,6 +263,9 @@ import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
 import config from "@/aws-exports";
+import { useScreen } from "@/composables/useScreen";
+
+const { isMobile } = useScreen();
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
@@ -1264,18 +1302,55 @@ const cleanupPipelinesContextProvider = () => {
   transition: none !important;
   transform: none !important;
   animation: none !important;
-  
+
   * {
     transition: none !important;
-    transform: none !important; 
+    transform: none !important;
     animation: none !important;
   }
+}
+
+.pipeline-editor-mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--o2-card-bg);
+  border-bottom: 1px solid var(--o2-border-color);
+
+  &__title {
+    flex: 1;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--o2-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.pipeline-json-dialog-wrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
 }
 </style>
 
 <style lang="scss">
 .stream-routing-dialog-container {
   min-width: 540px !important;
+}
+
+@media (max-width: 599px) {
+  .stream-routing-dialog-container {
+    min-width: 0 !important;
+    width: 100%;
+  }
 }
 
 .o2vf_node {

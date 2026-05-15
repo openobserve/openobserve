@@ -1418,5 +1418,32 @@
   border-radius: 0.325rem;
 }
 
+// Mobile: SearchBar toolbar stacking
+@media (max-width: 599px) {
+  .search-bar-mobile {
+    flex-direction: column !important;
+
+    > .col {
+      flex-wrap: wrap !important;
+      width: 100%;
+    }
+
+    .date-time-button {
+      flex: 1;
+      min-width: 0 !important;
+    }
+  }
+
+  .query-editor-container {
+    min-height: 80px !important;
+  }
+
+  // Hide desktop-only field splitter toggle on mobile — mobile uses FAB + slide-over
+  .logs-splitter-icon-collapse,
+  .logs-splitter-icon-expand {
+    display: none !important;
+  }
+}
+
 
 /************************* JSONPreview.vue *************************/

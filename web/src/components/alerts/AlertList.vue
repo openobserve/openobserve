@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
+          class="alert-list-toolbar flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <div
@@ -123,6 +123,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-tooltip>
             </div>
           </div>
+          <!-- Mobile: folder trigger -->
+          <q-btn
+            v-if="isMobile"
+            class="q-ml-sm o2-secondary-button tw:h-[36px]"
+            no-caps
+            flat
+            icon="folder"
+            :label="activeFolderName"
+            @click="openMobileFolders"
+            data-test="alert-list-mobile-folders-btn"
+            aria-label="Open folders"
+          />
           <!-- Import button -->
           <OButton
             :class="[
@@ -174,14 +186,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Alerts View (with folders) -->
       <q-splitter
-        v-model="splitterModel"
+        v-model="effectiveSplitterModel"
         unit="px"
-        :limits="[200, 500]"
+        :limits="isMobile ? [0, 0] : [200, 500]"
+        :class="{ 'alert-list-splitter-mobile': isMobile }"
         style="height: calc(100vh - 118px)"
         data-test="alert-list-splitter"
       >
         <template #before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+          <div
+            v-if="!isMobile"
+            class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]"
+          >
             <div class="tw:h-full">
               <FolderList
                 type="alerts"
@@ -193,8 +209,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-              <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
+              <!-- Mobile: card list (replaces multi-column table on <600px) -->
+              <PullToRefreshWrapper
+                v-if="isMobile"
+                class="mobile-alert-list"
+                data-test="alert-list-mobile"
+                @refresh="onMobileRefresh"
+              >
+                <MobileCardSkeleton
+                  v-if="isInitialLoading && !filteredResults?.length"
+                  :count="5"
+                  data-test="alert-list-mobile-skeleton"
+                />
+                <div
+                  v-else-if="!filteredResults?.length"
+                  class="mobile-alert-list__empty"
+                >
+                  <NoData />
+                </div>
+                <MobileAlertCard
+                  v-for="row in filteredResults"
+                  :key="row.alert_id || row.name"
+                  :row="row"
+                  @click="editAlert"
+                  @edit="editAlert"
+                  @toggle="toggleAlertState"
+                  @clone="duplicateAlert"
+                  @move="moveAlertToAnotherFolder"
+                  @trigger="triggerAlert"
+                  @delete="(row) => showDeleteDialogFn({ row })"
+                />
+              </PullToRefreshWrapper>
+              <!-- Desktop: multi-column Alert List Table -->
               <q-table
+                v-else
                 v-model:selected="selectedAlerts"
                 :selected-rows-label="getSelectedString"
                 selection="multiple"
@@ -721,6 +769,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
+    <!-- Mobile: folders side-sheet -->
+    <q-dialog
+      v-if="isMobile"
+      v-model="showMobileFolders"
+      v-bind="folderSheetDialogProps"
+      aria-label="Folders"
+    >
+      <q-card
+        class="mobile-folder-sheet"
+        style="width: 85vw; max-width: 360px; height: 100%"
+      >
+        <div class="mobile-folder-sheet__body tw:h-full tw:p-[0.625rem]">
+          <FolderList
+            type="alerts"
+            @update:activeFolderId="onMobileFolderSelect"
+          />
+        </div>
+      </q-card>
+    </q-dialog>
+
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete this alert?"
@@ -910,6 +978,11 @@ import {
   outlinedMoreVert,
 } from "@quasar/extras/material-icons-outlined";
 import FolderList from "../common/sidebar/FolderList.vue";
+import MobileAlertCard from "./MobileAlertCard.vue";
+import PullToRefreshWrapper from "@/components/shared/PullToRefreshWrapper.vue";
+import MobileCardSkeleton from "@/components/shared/MobileCardSkeleton.vue";
+import { useScreen } from "@/composables/useScreen";
+import { useResponsiveDialog } from "@/composables/useResponsiveDialog";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { toRaw } from "vue";
@@ -938,6 +1011,9 @@ export default defineComponent({
     ImportAlert,
     DedupSummaryCards,
     FolderList,
+    MobileAlertCard,
+    PullToRefreshWrapper,
+    MobileCardSkeleton,
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
@@ -978,12 +1054,43 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(200);
+    const { isMobile } = useScreen();
+    const { dialogProps: folderSheetDialogProps } = useResponsiveDialog({
+      mobileMode: "slide-left",
+    });
+    const showMobileFolders = ref(false);
+    const effectiveSplitterModel = computed({
+      get: () => (isMobile.value ? 0 : splitterModel.value),
+      set: (v: number) => {
+        if (!isMobile.value) splitterModel.value = v;
+      },
+    });
+    const openMobileFolders = () => {
+      showMobileFolders.value = true;
+    };
+    const onMobileFolderSelect = (folderId: string) => {
+      // FolderList emits update:activeFolderId on mount, which would
+      // immediately close the dialog right after it opened. Only close on a
+      // real user-driven selection (folderId changed from the current value).
+      const changed = folderId !== activeFolderId.value;
+      updateActiveFolderId(folderId);
+      if (changed) showMobileFolders.value = false;
+    };
+    const activeFolderName = computed(() => {
+      const folders =
+        store.state.organizationData?.foldersByType?.["alerts"] || [];
+      const match = folders.find(
+        (f: any) => f.folderId === activeFolderId.value,
+      );
+      return match?.name || activeFolderId.value || "";
+    });
     const showForm = ref(false);
     const indexOptions = ref([]);
     const schemaList = ref([]);
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
+    const isInitialLoading = ref(true);
 
     // Compact toolbar: icon-only buttons when AI sidebar is open at narrow widths
     const windowWidth = ref(window.innerWidth);
@@ -1594,6 +1701,8 @@ export default defineComponent({
           message: "Error while pulling alerts.",
           timeout: 2000,
         });
+      } finally {
+        isInitialLoading.value = false;
       }
     };
     const getAlertById = async (id: string) => {
@@ -2053,6 +2162,13 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Navigation failed:", error);
+      }
+    };
+    const onMobileRefresh = async (ack: () => void) => {
+      try {
+        await refreshList();
+      } finally {
+        ack();
       }
     };
     const refreshList = async (folderId?: string) => {
@@ -2911,6 +3027,7 @@ export default defineComponent({
       pagination,
       resultTotal,
       refreshList,
+      onMobileRefresh,
       perPageOptions,
       selectedPerPage,
       addAlert,
@@ -2936,6 +3053,7 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       isSubmitting,
+      isInitialLoading,
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery,
@@ -2955,6 +3073,13 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
+      isMobile,
+      showMobileFolders,
+      effectiveSplitterModel,
+      openMobileFolders,
+      onMobileFolderSelect,
+      activeFolderName,
+      folderSheetDialogProps,
       outlinedPause,
       outlinedPlayArrow,
       toggleAlertState,
@@ -3180,6 +3305,62 @@ export default defineComponent({
   }
   :deep(.q-toggle__label) {
     margin-top: 2px !important;
+  }
+}
+
+// Mobile: collapse the folders splitter pane and hide its separator.
+// Folders are accessed via the mobile header trigger + side-sheet dialog.
+// The mobile list fills its parent (splitter after-slot, height already
+// bounded by .alert-list-table). Using 100% here avoids a magic viewport
+// subtraction that would break when the header toolbar wraps to 2+ rows.
+.mobile-alert-list {
+  height: 100%;
+  padding: 8px 8px 80px 8px;
+  overflow-y: auto;
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+  }
+}
+
+.alert-list-splitter-mobile {
+  :deep(.q-splitter__before) {
+    display: none !important;
+  }
+  :deep(.q-splitter__separator) {
+    display: none !important;
+  }
+  :deep(.q-splitter__after) {
+    width: 100% !important;
+  }
+}
+
+// Mobile: let the header toolbar grow instead of clipping to its
+// fixed desktop height. The toolbar wraps to two rows on small
+// screens; without this override the second row renders under the
+// table's sticky header.
+@media (max-width: 599px) {
+  [data-test="alert-list-page"] {
+    .alert-list-toolbar {
+      height: auto !important;
+      min-height: 52px;
+      padding-top: 0.5rem !important;
+      padding-bottom: 0.5rem !important;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .alert-list-table {
+      height: auto !important;
+      min-height: calc(100vh - 200px);
+    }
+    // Alerts page inner chrome is noisy on mobile — tighten paddings.
+    .card-container {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
   }
 }
 </style>

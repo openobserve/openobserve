@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toolbar>
+  <q-toolbar :class="{ 'tw:px-2': isMobile }">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
@@ -154,8 +154,9 @@ size="xs" class="warning" />{{
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu">
-      <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
+      <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users (hidden on mobile) -->
       <OButton
+        v-if="!isMobile"
         variant="primary"
         size="xs"
         class="q-mx-xs"
@@ -209,8 +210,9 @@ size="xs" class="warning" />{{
         <OButton
           variant="ghost"
           size="sm"
-          style="max-width: 250px"
+          :style="isMobile ? 'max-width: 140px' : 'max-width: 250px'"
           class="tw:text-ellipsis tw:overflow-hidden"
+          @click="isMobile ? (showOrgDialog = true) : undefined"
         >
           <div class="row items-center no-wrap full-width">
             <div class="col tw:truncate">
@@ -219,8 +221,9 @@ size="xs" class="warning" />{{
             <q-icon name="arrow_drop_down" class="q-ml-xs" />
           </div>
 
-          <!-- Organization selection menu -->
+          <!-- Desktop: Organization selection menu -->
           <q-menu
+            v-if="!isMobile"
             anchor="bottom middle"
             self="top middle"
             class="organization-menu-o2"
@@ -326,13 +329,109 @@ size="xs" class="warning" />{{
             </q-list>
           </q-menu>
         </OButton>
+
+        <!-- Mobile: Full-screen bottom dialog for org selection -->
+        <q-dialog
+          v-if="isMobile"
+          v-model="showOrgDialog"
+          position="bottom"
+          full-width
+          transition-show="slide-up"
+          transition-hide="slide-down"
+          aria-label="Select organization"
+        >
+          <q-card style="max-height: 80vh; border-radius: 12px 12px 0 0">
+            <q-card-section class="row items-center q-pb-none">
+              <div class="text-subtitle1 text-weight-medium">
+                {{ t("organization.selectOrganization") }}
+              </div>
+              <q-space />
+              <q-btn
+                icon="close"
+                flat
+                round
+                dense
+                v-close-popup
+              />
+            </q-card-section>
+            <q-card-section style="padding: 8px">
+              <q-table
+                :rows="filteredOrganizations"
+                :row-key="(row) => 'org_' + row.identifier"
+                :columns="[
+                  {
+                    name: 'label',
+                    label: 'Organization',
+                    field: 'label',
+                    align: 'left',
+                  },
+                ]"
+                :visible-columns="['label']"
+                hide-header
+                :pagination="{ rowsPerPage }"
+                :rows-per-page-options="[]"
+                class="org-table"
+                style="width: 100%; max-height: 60vh"
+              >
+                <template #top>
+                  <div class="full-width">
+                    <q-input
+                      :model-value="searchQuery"
+                      @update:model-value="
+                        (val) => $emit('update:searchQuery', val)
+                      "
+                      borderless
+                      dense
+                      clearable
+                      debounce="1"
+                      autofocus
+                      :placeholder="'Search Organization'"
+                    >
+                      <template #prepend>
+                        <q-icon name="search" />
+                      </template>
+                    </q-input>
+                  </div>
+                </template>
+                <template v-slot:body-cell-label="props">
+                  <q-td
+                    :props="props"
+                    class="org-list-item-cell"
+                    @click="
+                      handleOrgSelection(props.row);
+                      showOrgDialog = false;
+                    "
+                  >
+                    <div
+                      class="org-menu-item"
+                      :class="{
+                        'org-menu-item--active':
+                          props.row.identifier === userClickedOrg?.identifier,
+                      }"
+                    >
+                      {{ props.row.label + " | " + props.row.identifier }}
+                    </div>
+                  </q-td>
+                </template>
+                <template v-slot:no-data>
+                  <div
+                    class="text-center q-pa-sm tw:w-full tw:flex tw:justify-center"
+                  >
+                    No organizations found
+                  </div>
+                </template>
+              </q-table>
+            </q-card-section>
+          </q-card>
+        </q-dialog>
       </div>
 
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
-      <!-- SLACK COMMUNITY LINK -->
+      <!-- SLACK COMMUNITY LINK (hidden on mobile) -->
       <OButton
+        v-if="!isMobile"
         variant="ghost"
         size="icon-circle-sm"
         data-test="menu-link-slack-item"
@@ -344,8 +443,13 @@ size="xs" class="warning" />{{
         </q-tooltip>
       </OButton>
 
-      <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
+      <!-- HELP MENU: Contains links to docs, API, and about page (hidden on mobile) -->
+      <OButton
+        v-if="!isMobile"
+        variant="ghost"
+        size="icon-circle-sm"
+        data-test="menu-link-help-item"
+      >
         <q-icon name="help_outline" size="20px" class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.help") }}
@@ -405,8 +509,9 @@ size="xs" class="warning" />{{
         </q-menu>
       </OButton>
 
-      <!-- SETTINGS BUTTON -->
+      <!-- SETTINGS BUTTON (hidden on mobile) -->
       <OButton
+        v-if="!isMobile"
         variant="ghost"
         size="icon-circle-sm"
         data-test="menu-link-settings-item"
@@ -589,6 +694,7 @@ import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
+import { useScreen } from "@/composables/useScreen";
 
 export default defineComponent({
   name: "HeaderComponent",
@@ -691,9 +797,13 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
+    const { isMobile } = useScreen();
 
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
+
+    // Mobile org selector dialog state
+    const showOrgDialog = ref(false);
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -789,6 +899,8 @@ export default defineComponent({
       t,
       outlinedSettings,
       getImageURL,
+      isMobile,
+      showOrgDialog,
       enterpriseButtonText,
       ingestionQuotaPercentage,
       ingestionQuotaColor,

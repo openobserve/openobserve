@@ -2158,3 +2158,89 @@ body {
 .height-stretch{
   height: stretch;
 }
+
+// ============================================
+// MOBILE RESPONSIVE UTILITIES
+// ============================================
+
+// Mobile breakpoint (< 600px — aligns with Quasar xs)
+@media (max-width: 599px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .mobile-full-width {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  .mobile-scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+// Tablet breakpoint (600px – 1023px — aligns with Quasar sm)
+@media (min-width: 600px) and (max-width: 1023px) {
+  .hide-on-tablet {
+    display: none !important;
+  }
+}
+
+// Desktop breakpoint (>= 1024px — aligns with Quasar md+)
+@media (min-width: 1024px) {
+  .hide-on-desktop {
+    display: none !important;
+  }
+}
+
+// Touch-safe interactive elements
+.touch-target {
+  min-height: var(--o2-touch-target-min);
+  min-width: var(--o2-touch-target-min);
+}
+
+// Forces a 44px hit surface on visually-dense controls (q-btn dense size="sm",
+// etc.) so mis-taps don't fall through to the parent card. Visual density is
+// preserved — only the interactive surface grows.
+.mobile-tap-target {
+  min-height: var(--o2-touch-target-min) !important;
+  min-width: var(--o2-touch-target-min) !important;
+}
+
+// Safe area inset support (iOS notch, home indicator)
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  // Folder side-sheet on mobile: keep the last row of the scrollable body
+  // clear of the iPhone home indicator. Paired with the sheet's inner flex
+  // column so content still fills available height.
+  .mobile-folder-sheet__body {
+    padding-bottom: calc(0.625rem + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+// Content area padding to clear mobile bottom nav
+.mobile-content-clearance {
+  @media (max-width: 599px) {
+    padding-bottom: calc(var(--o2-mobile-nav-height) + 0.5rem) !important;
+  }
+}
+
+// Mobile focus-visible styling for keyboard navigation
+@media (max-width: 599px) {
+  :focus-visible {
+    outline: 2px solid var(--o2-primary-btn-bg);
+    outline-offset: 2px;
+  }
+}

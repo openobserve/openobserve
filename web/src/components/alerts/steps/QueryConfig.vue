@@ -142,6 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-input"
                       style="min-width: 60px; max-width: 80px;"
                       min="1"
+                      inputmode="numeric"
+                      enterkeyhint="next"
                       :rules="[(val: any) => !!val || 'Required']"
                       @update:model-value="onTriggerThresholdChange"
                     />
@@ -171,6 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
+                      inputmode="numeric"
+                      enterkeyhint="next"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       @update:model-value="onConditionValueChange"
                     />
@@ -254,6 +258,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
+                    inputmode="numeric"
+                    enterkeyhint="next"
                     @update:model-value="onTriggerThresholdChange"
                     @blur="restoreDefaultThreshold"
                   />
@@ -345,6 +351,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       no-error-icon
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
+                      inputmode="numeric"
+                      enterkeyhint="next"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       @update:model-value="onTriggerThresholdChange"
                     />
@@ -373,6 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
+                      inputmode="numeric"
+                      enterkeyhint="next"
                       :rules="[(val: any) => !!val || 'Field is required!']"
                       @update:model-value="onConditionValueChange"
                     />
@@ -456,6 +466,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
+                    inputmode="numeric"
+                    enterkeyhint="next"
                     @update:model-value="onTriggerThresholdChange"
                     @blur="restoreDefaultThreshold"
                   />
@@ -485,6 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
+                      inputmode="numeric"
+                      enterkeyhint="next"
                       :rules="[(val: any) => !!val || 'Required']"
                       @update:model-value="onCheckEveryChange"
                       @blur="restoreDefaultFrequency"
@@ -500,6 +514,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
+                      autocomplete="off"
+                      enterkeyhint="next"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
@@ -853,6 +869,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
+                      inputmode="numeric"
+                      enterkeyhint="next"
                       :rules="[(val: any) => !!val || 'Required']"
                       @update:model-value="onCheckEveryChange"
                       @blur="restoreDefaultFrequency"
@@ -865,6 +883,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
+                      autocomplete="off"
+                      enterkeyhint="next"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
@@ -924,6 +944,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-v3-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
+                  inputmode="numeric"
+                  enterkeyhint="next"
                   @update:model-value="onTriggerThresholdChange"
                   @blur="restoreDefaultThreshold"
                 />
@@ -953,6 +975,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     v-model.number="promqlCondition.value"
                     type="number"
+                    inputmode="numeric"
+                    enterkeyhint="next"
                     dense borderless hide-bottom-space
                     no-error-icon
                     class="alert-v3-input"
@@ -982,6 +1006,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-input
                     v-model="triggerThreshold"
                     type="number"
+                    inputmode="numeric"
+                    enterkeyhint="next"
                     dense borderless hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"

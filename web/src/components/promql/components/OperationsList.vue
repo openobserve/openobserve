@@ -150,7 +150,7 @@
 
     <!-- Operation Selector Dialog -->
     <q-dialog v-model="showOperationSelector">
-      <q-card style="min-width: 500px">
+      <q-card style="min-width: min(500px, 95vw)">
         <q-card-section class="tw:pt-[0.625rem]! tw:pb-[0.625rem]!">
           <div class="tw:text-[1.2rem]">Add Operation</div>
         </q-card-section>

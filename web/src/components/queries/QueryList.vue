@@ -1,7 +1,7 @@
 <template>
   <q-card
     class="column full-height no-wrap"
-    style="min-width: 480px; max-width: 800px"
+    style="min-width: min(480px, 95vw); max-width: min(800px, 95vw)"
   >
     <!-- Header -->
     <div class="q-px-sm q-py-md">

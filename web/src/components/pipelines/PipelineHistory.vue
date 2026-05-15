@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error Dialog -->
     <q-dialog v-model="errorDialog">
-      <q-card style="min-width: 500px">
+      <q-card style="min-width: min(500px, 95vw)">
         <q-card-section
           class="pipeline-error-header row items-center q-pb-none"
         >

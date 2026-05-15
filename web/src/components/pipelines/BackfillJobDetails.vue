@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     data-test="backfill-job-details-dialog"
   >
-    <q-card class="tw-w-full" style="width: 700px">
+    <q-card class="tw-w-full" style="width: 700px; max-width: 95vw">
       <q-card-section class="q-pa-md">
         <div class="flex items-center justify-between">
           <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>

@@ -464,6 +464,12 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-service-health-degraded: #faad14;
   --o2-service-health-warning: #fa8c16;
   --o2-service-health-critical: #f5222d;
+
+  // Mobile responsive tokens.
+  // 44px = iOS HIG / Material AAA minimum touch target.
+  // 56px = Material bottom-nav baseline height.
+  --o2-touch-target-min: 44px;
+  --o2-mobile-nav-height: 56px;
 }
 
 // Semantic Colors - Dark Mode

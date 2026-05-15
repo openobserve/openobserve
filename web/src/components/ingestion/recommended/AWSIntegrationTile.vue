@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Unified Integration Method Selection Dialog -->
     <q-dialog v-model="showTemplateDialog">
-      <q-card style="min-width: 400px">
+      <q-card style="min-width: min(400px, 95vw)">
         <q-card-section>
           <div class="text-h6">Choose Integration Method</div>
         </q-card-section>

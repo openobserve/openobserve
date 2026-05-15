@@ -96,8 +96,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Splitter: folder list left, table right -->
+    <!-- Mobile: card list with pull-to-refresh (folder splitter hidden) -->
+    <PullToRefreshWrapper
+      v-if="isMobile"
+      class="mobile-report-list"
+      data-test="report-list-mobile"
+      @refresh="onMobileRefresh"
+    >
+      <div v-if="!visibleRows.length" class="mobile-report-list__empty">
+        <NoData />
+      </div>
+      <MobileReportCard
+        v-for="row in visibleRows"
+        :key="row.report_id || row.name"
+        :row="row"
+        @click="editReport"
+        @edit="editReport"
+        @toggle="toggleReportState"
+        @delete="confirmDeleteReport"
+      />
+    </PullToRefreshWrapper>
+
+    <!-- Desktop splitter: folder list left, table right -->
     <div
+      v-else
       class="full-width report-list-table"
       style="height: calc(100vh - 118px)"
     >
@@ -375,6 +397,9 @@ import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep, debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
+import MobileReportCard from "./MobileReportCard.vue";
+import PullToRefreshWrapper from "@/components/shared/PullToRefreshWrapper.vue";
+import { useScreen } from "@/composables/useScreen";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -383,6 +408,8 @@ import { Pause, Play, Pencil, Trash2, FolderInput, CalendarClock, Database } fro
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
 );
+
+const { isMobile } = useScreen();
 
 const { t } = useI18n();
 const router = useRouter();
@@ -471,9 +498,9 @@ const columns = computed<QTableProps["columns"]>(() => {
 });
 
 // ── Load reports ──────────────────────────────────────────────────────────────
-const loadReports = async (folderId: string, nameQuery?: string) => {
+const loadReports = async (folderId: string, nameQuery?: string, silent = false) => {
   // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
-  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
+  if (!nameQuery && !silent && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
     const cached = store.state.organizationData.allReportsListByFolderId[folderId];
     staticReportsList.value = cached;
     cachedFolderReports.value = cached;
@@ -481,12 +508,15 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     return;
   }
 
+
   isLoadingReports.value = true;
-  const dismiss = q.notify({
-    spinner: true,
-    message: "Please wait while fetching reports...",
-    timeout: 2000,
-  });
+  const dismiss = silent
+    ? () => {}
+    : q.notify({
+        spinner: true,
+        message: "Please wait while fetching reports...",
+        timeout: 2000,
+      });
 
   try {
     const folder = searchAcrossFolders.value ? undefined : folderId;
@@ -543,6 +573,14 @@ const invalidateFolderCache = (folderId: string) => {
   const updated = { ...store.state.organizationData.allReportsListByFolderId };
   delete updated[folderId];
   store.dispatch("setAllReportsListByFolderId", updated);
+};
+
+const onMobileRefresh = async (ack: () => void) => {
+  try {
+    await loadReports(activeFolderId.value, undefined, true);
+  } finally {
+    ack();
+  }
 };
 
 const filterReports = () => {

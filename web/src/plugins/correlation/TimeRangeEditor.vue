@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @hide="handleClose"
     data-test="time-range-editor-dialog"
   >
-    <q-card style="min-width: 500px; max-width: 600px">
+    <q-card style="min-width: min(500px, 95vw); max-width: min(600px, 95vw)">
       <!-- Header -->
       <q-card-section class="row items-center q-pb-none">
         <div class="text-h6">{{ t('correlation.logs.timeRange.title') }}</div>

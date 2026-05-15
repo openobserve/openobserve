@@ -30,6 +30,8 @@
             stack-label
             borderless
             dense
+            autocomplete="off"
+            enterkeyhint="next"
             v-bind:readonly="disableName"
             v-bind:disable="disableName"
             :rules="[

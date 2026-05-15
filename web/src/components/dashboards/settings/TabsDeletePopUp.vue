@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <q-dialog>
-    <q-card style="width: 600px" data-test="dialog-box">
+    <q-card style="width: 600px; max-width: 95vw" data-test="dialog-box">
       <q-card-section class="confirmBody">
         <div class="head" data-test="dashboard-tab-delete-tab-head">
           Delete

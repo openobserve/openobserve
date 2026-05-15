@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'q-router-link--active':
         router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
       'q-link-function': title == 'Functions',
+      'menu-link--bottomsheet': variant === 'bottomsheet',
     }"
     :target="target"
     :aria-current="isActive ? 'page' : undefined"
@@ -72,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -123,6 +124,11 @@ export default defineComponent({
     badge: {
       type: Number,
       default: 0,
+    },
+
+    variant: {
+      type: String as PropType<"sidebar" | "bottomsheet">,
+      default: "sidebar",
     },
   },
   setup(props) {
@@ -364,6 +370,99 @@ body.body--light {
       //   // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
       //   box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
       // }
+    }
+  }
+}
+
+// Bottomsheet variant: horizontal layout for mobile "More" sheet
+.menu-link--bottomsheet {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  min-height: var(--o2-touch-target-min);
+  padding: 0 16px !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  border-bottom: 1px solid var(--o2-border-color) !important;
+  transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  &:first-child {
+    margin-top: 0 !important;
+  }
+
+  // Reset sidebar pseudo-element indicators
+  &.q-router-link--active::before {
+    display: none !important;
+  }
+
+  &.q-router-link--active::after {
+    display: none !important;
+  }
+
+  // Active: gradient left edge + tinted background — mirrors sidebar's
+  // gradient treatment but adapted for horizontal list context
+  &.q-router-link--active {
+    border-left: 3px solid transparent !important;
+    border-image: linear-gradient(
+        180deg,
+        var(--o2-menu-gradient-start) 0%,
+        var(--o2-menu-gradient-end) 100%
+      )
+      1 !important;
+    background: var(--o2-hover-accent) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+
+    .q-icon {
+      color: var(--o2-primary-btn-bg) !important;
+      filter: drop-shadow(0 0 3px var(--o2-menu-gradient-start)) !important;
+    }
+
+    .q-item-label {
+      font-weight: 600 !important;
+      color: var(--o2-primary-btn-bg) !important;
+    }
+  }
+
+  .q-item__section--avatar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    min-width: unset;
+    gap: 12px;
+    perspective: none;
+
+    .q-icon {
+      padding: 0;
+      border-radius: 0;
+      transform: none !important;
+      filter: none !important;
+      transition: color 200ms ease, filter 200ms ease;
+    }
+
+    .q-item-label {
+      font-size: 14px;
+      font-weight: 500;
+      padding-bottom: 0;
+      transform: none !important;
+      transition: color 200ms ease;
+    }
+  }
+
+  // Touch-optimized: no 3D transforms, just subtle bg feedback
+  &:hover:not(.q-router-link--active),
+  &:active:not(.q-router-link--active) {
+    transform: none !important;
+    background: var(--o2-hover-gray) !important;
+
+    .q-icon {
+      transform: none !important;
+      filter: none !important;
+    }
+
+    .q-item-label {
+      transform: none !important;
     }
   }
 }

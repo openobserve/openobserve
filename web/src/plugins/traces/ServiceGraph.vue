@@ -251,7 +251,7 @@
 
   <!-- Enhanced Settings Dialog -->
   <q-dialog v-model="showSettings">
-    <q-card style="min-width: 450px">
+    <q-card style="min-width: min(450px, 95vw)">
       <q-card-section>
         <div class="text-h6">Service Graph Settings</div>
       </q-card-section>

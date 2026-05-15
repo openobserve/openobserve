@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-page class="q-pa-none">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+      <div class="user-toolbar tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
       <div
           class="q-table__title tw:font-[600]"
@@ -61,7 +61,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
     </div>
     <div class="tw:w-full">
-      <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+      <div
+        v-if="isMobile"
+        class="card-container mobile-user-list-wrap"
+      >
+        <PullToRefreshWrapper
+          class="mobile-user-list-scroll"
+          @refresh="onMobileRefresh"
+        >
+          <MobileCardSkeleton
+            v-if="isInitialLoading && visibleRows.length === 0"
+            :count="5"
+            data-test="user-list-mobile-skeleton"
+          />
+          <div
+            v-else-if="visibleRows.length === 0"
+            class="mobile-user-list-empty"
+          >
+            <NoData />
+          </div>
+          <div v-else class="mobile-user-list">
+            <MobileUserCard
+              v-for="row in visibleRows"
+              :key="row.email"
+              :row="row"
+              @click="
+                row.enableEdit && row.status !== 'pending'
+                  ? addRoutePush({ row })
+                  : null
+              "
+              @edit="addRoutePush({ row: $event })"
+              @delete="confirmDeleteAction({ row: $event })"
+              @revoke="confirmRevokeAction({ row: $event })"
+            />
+          </div>
+        </PullToRefreshWrapper>
+      </div>
+      <div
+        v-else
+        class="card-container"
+        style="height: calc(100vh - var(--navbar-height) - 92px)"
+      >
         <q-table
           ref="qTable"
           :rows="visibleRows"
@@ -213,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
+      <q-card style="width: 240px; max-width: 95vw">
         <q-card-section class="confirmBody">
           <div class="head">{{ t("user.confirmDeleteHead") }}</div>
           <div class="para">{{ t("user.confirmDeleteMsg") }}</div>
@@ -236,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="confirmRevoke">
-      <q-card style="width: 400px">
+      <q-card style="width: 400px; max-width: 95vw">
         <q-card-section class="confirmBody">
           <div class="head">Revoke Invitation</div>
           <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
@@ -259,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-dialog>
 
     <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
+      <q-card style="width: 280px; max-width: 95vw">
         <q-card-section class="confirmBody">
           <div class="head">Delete Users</div>
           <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
@@ -300,6 +340,10 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
+import MobileUserCard from "@/components/iam/users/MobileUserCard.vue";
+import PullToRefreshWrapper from "@/components/shared/PullToRefreshWrapper.vue";
+import MobileCardSkeleton from "@/components/shared/MobileCardSkeleton.vue";
+import { useScreen } from "@/composables/useScreen";
 import {
   getImageURL,
   verifyOrganizationStatus,
@@ -320,6 +364,9 @@ export default defineComponent({
     NoData,
     AddUser,
     MemberInvitation,
+    MobileUserCard,
+    PullToRefreshWrapper,
+    MobileCardSkeleton,
     OButton,
   },
   emits: [
@@ -334,7 +381,9 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
+    const { isMobile } = useScreen();
     const resultTotal = ref<number>(0);
+    const isInitialLoading = ref(true);
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -544,11 +593,12 @@ export default defineComponent({
             });
 
             dismiss();
-
+            isInitialLoading.value = false;
             resolve(true);
           })
           .catch(() => {
             dismiss();
+            isInitialLoading.value = false;
             reject(false);
           });
       });
@@ -653,7 +703,7 @@ export default defineComponent({
             user.role?.toLowerCase() !== "root" &&
             (currentUserRole.value == "root" ||
               currentUserRole.value == "admin") &&
-              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
+              store.state.userInfo.email?.toLowerCase() !== user.email?.toLowerCase()
 
           );
         }
@@ -873,6 +923,15 @@ export default defineComponent({
     const confirmDeleteAction = (props: any) => {
       confirmDelete.value = true;
       deleteUserEmail = props.row.email;
+    };
+
+    const onMobileRefresh = async (ack: () => void) => {
+      try {
+        await getOrgMembers();
+        updateUserActions();
+      } finally {
+        ack();
+      }
     };
 
     const deleteUser = async () => {
@@ -1162,6 +1221,7 @@ export default defineComponent({
       shouldAllowChangeRole,
       shouldAllowDelete,
       fetchUserRoles,
+      isInitialLoading,
       visibleRows,
       hasVisibleRows,
       selectableRows,
@@ -1170,6 +1230,8 @@ export default defineComponent({
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteUsers,
+      isMobile,
+      onMobileRefresh,
       // showAddUserBtn,
     };
   },
@@ -1226,5 +1288,26 @@ export default defineComponent({
 .inputHint {
   font-size: 11px;
   color: $light-text;
+}
+
+// Mobile: allow the toolbar to wrap and let col-6 actions stack full-width
+@media (max-width: 599px) {
+  .q-page {
+    .user-toolbar {
+      height: auto !important;
+      min-height: 52px;
+      padding-top: 0.5rem !important;
+      padding-bottom: 0.5rem !important;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .col-6 {
+      flex: 0 0 100%;
+      max-width: 100%;
+      > .q-btn {
+        width: 100%;
+      }
+    }
+  }
 }
 </style>

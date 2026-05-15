@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
     data-test="create-backfill-job-dialog"
   >
-    <q-card class="tw-w-full tw:flex tw:flex-col" style="width: 600px; height: 100%;">
+    <q-card class="tw-w-full tw:flex tw:flex-col" style="width: 600px; max-width: 95vw; height: 100%;">
       <q-card-section class="q-pa-md tw:flex-shrink-0">
         <div class="flex items-center justify-between">
           <div class="tw:flex tw:items-center tw:gap-2" data-test="dialog-title">
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Confirmation Dialog for Delete Before Backfill -->
   <q-dialog v-model="showDeleteConfirmation" persistent>
-    <q-card style="min-width: 400px">
+    <q-card style="min-width: min(400px, 95vw)">
       <q-card-section class="tw:pb-2">
         <div class="text-h6">Confirm Data Deletion</div>
       </q-card-section>

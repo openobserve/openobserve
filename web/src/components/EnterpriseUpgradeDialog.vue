@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-dialog v-model="showDialog" @hide="onDialogHide">
-    <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
+    <q-card class="enterprise-dialog-v3" style="min-width: min(1200px, 95vw); max-width: min(1400px, 95vw)">
       <!-- Close Button -->
       <div class="close-btn-top-right">
         <OButton

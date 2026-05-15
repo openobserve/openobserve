@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" persistent>
-    <q-card style="min-width: 500px; max-width: 650px">
+    <q-card style="min-width: min(500px, 95vw); max-width: min(650px, 95vw)">
       <q-card-section class="row items-center q-pb-sm q-pt-md q-px-md">
         <div class="text-subtitle1 text-weight-medium">Index Fields Detected</div>
         <q-space />

@@ -61,6 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
               borderless
               dense
+              autocomplete="off"
+              enterkeyhint="next"
               v-bind:readonly="isUpdatingTemplate"
               v-bind:disable="isUpdatingTemplate"
               :rules="[
@@ -91,6 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               stack-label
               borderless
               dense
+              autocomplete="off"
+              enterkeyhint="next"
               :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
             />

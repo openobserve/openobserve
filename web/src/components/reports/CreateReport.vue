@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           ref="addAlertFormRef"
           class="q-px-lg q-my-md"
-          style="width: 1024px"
+          style="width: 100%; max-width: 1024px"
         >
           <q-form
             class="create-report-form"

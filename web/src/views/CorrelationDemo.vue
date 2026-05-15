@@ -118,7 +118,7 @@
 
     <!-- Query Preview Dialog -->
     <q-dialog v-model="showQueryDialog">
-      <q-card style="min-width: 600px">
+      <q-card style="min-width: min(600px, 95vw)">
         <q-card-section class="row items-center">
           <div class="text-h6">Generated Query</div>
           <q-space />
