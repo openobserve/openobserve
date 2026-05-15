@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <td
                 v-for="(cell, cellIndex) in row.getVisibleCells()"
                 :key="cell.id"
-                class="tw:py-1 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
+                class="tw:py-0 tw:px-2 tw:overflow-hidden tw:relative table-cell copy-cell-td"
                 :class="[
                   (cell.column.columnDef.meta as any)?.align === 'center'
                     ? 'tw:text-center!'
