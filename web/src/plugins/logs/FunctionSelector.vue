@@ -19,22 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="q-pa-none float-left q-mr-xs function-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
     <div class="tw:flex tw:items-center">
-      <q-toggle
+      <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
-        class="o2-toggle-button-xs"
-        size="xs"
-        flat
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-xs-dark'
-            : 'o2-toggle-button-xs-light'
-        "
+        size="sm"
       >
-        <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-          {{ t("search.toggleFunctionEditor") }}
-        </q-tooltip>
-      </q-toggle>
+        <template #tooltip>
+          <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
+            {{ t("search.toggleFunctionEditor") }}
+          </q-tooltip>
+        </template>
+      </OSwitch>
     </div>
     <ODropdown v-model:open="functionModel" side="bottom" align="start">
       <template #trigger>
@@ -53,20 +48,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
         <!-- Search Input -->
         <div>
-          <q-input
+          <OInput
             v-model="searchTerm"
-            dense
-            filled
-            borderless
             clearable
-            debounce="300"
+            :debounce="300"
             :placeholder="t('search.searchSavedFunction')"
             data-test="function-search-input"
           >
             <template #prepend>
               <q-icon name="search" />
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <div v-if="filteredFunctionOptions.length">
@@ -112,6 +104,8 @@ import { computed, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";

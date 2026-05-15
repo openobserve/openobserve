@@ -105,19 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
           >
-            <q-toggle
+            <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
-            >
-            </q-toggle>
+              size="sm"
+            />
             <img
               :src="metricsIcon"
               alt="Metrics"
@@ -142,20 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
           >
-            <q-toggle
+            <OSwitch
               data-test="traces-search-bar-error-only-toggle-btn"
               v-model="searchObj.meta.showErrorOnly"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
+              size="sm"
               @update:model-value="onErrorOnlyToggle"
-            >
-            </q-toggle>
+            />
             <q-icon
               name="error"
               size="1.1rem"
@@ -366,15 +352,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
-          <q-select
+          <OSelect
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
-            dense
-            borderless
             class="tw:w-[7.5rem] tw:min-h-[2rem]! tw:h-[2rem]!"
-            emit-value
-            map-options
-            :disable="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+            :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onServiceGraphLayoutChange"
           />
         </div>
@@ -472,6 +454,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
 import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
@@ -500,6 +484,8 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    OSwitch,
+    OSelect,
     Layers,
     Network,
     GitBranch,
