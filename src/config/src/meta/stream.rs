@@ -826,7 +826,7 @@ pub struct CrossLinkField {
     pub alias: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
 pub struct TimeRange {
     /// Start timestamp in microseconds
     pub start: i64,
@@ -1228,7 +1228,7 @@ impl MemorySize for StreamSettings {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct StreamPartition {
     pub field: String,
     #[serde(default)]
@@ -1295,7 +1295,7 @@ impl MemorySize for StreamPartition {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamPartitionType {
     #[default]
