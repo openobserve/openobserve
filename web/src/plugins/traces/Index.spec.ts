@@ -1050,6 +1050,8 @@ describe("Index.vue (Main Traces Page)", () => {
       mockRemoveFilterByField.mockReset();
       mockSearchObj.meta.showErrorOnly = false;
       mockSearchObj.meta.metricsRangeFilters.clear();
+      // Reset auto_query_enabled to undefined for each test
+      delete store.state.zoConfig.auto_query_enabled;
     });
 
     it("should call applyFilters with all filter terms when metrics filters are updated", async () => {
@@ -1123,6 +1125,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
     it("should skip search when live mode is ON", async () => {
       mockSearchObj.meta.liveMode = true;
+      store.state.zoConfig.auto_query_enabled = true;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
