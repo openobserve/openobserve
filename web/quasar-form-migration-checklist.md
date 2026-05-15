@@ -887,10 +887,10 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/common/BaseImport.vue
 - ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/FieldValuesPanel.vue
-- [ ] src/components/common/sidebar/AddFolder.vue
-- [ ] src/components/common/sidebar/FieldList.vue
-- [ ] src/components/common/sidebar/FolderList.vue
-- [ ] src/components/common/sidebar/MoveAcrossFolders.vue
+- ✅ src/components/common/sidebar/AddFolder.vue
+- ✅ src/components/common/sidebar/FieldList.vue
+- ✅ src/components/common/sidebar/FolderList.vue
+- ✅ src/components/common/sidebar/MoveAcrossFolders.vue
 - [ ] src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboard.vue
 - ✅ src/components/dashboards/AddFolder.vue
@@ -1059,7 +1059,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/alerts/AlertList.vue
 - ✅ src/components/alerts/DeduplicationConfig.vue
 - ✅ src/components/alerts/FieldsInput.vue
-- [ ] src/components/alerts/FilterCondition.vue
+- ✅ src/components/alerts/FilterCondition.vue
 - [ ] src/components/alerts/ImportAlert.vue
 - ✅ src/components/alerts/ImportDestination.vue
 - ✅ src/components/alerts/ImportTemplate.vue
@@ -1230,8 +1230,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddCipherKey.vue
 - [ ] src/components/common/BaseImport.vue
-- [ ] src/components/common/sidebar/AddFolder.vue
-- [ ] src/components/common/sidebar/MoveAcrossFolders.vue
+- ✅ src/components/common/sidebar/AddFolder.vue
+- ✅ src/components/common/sidebar/MoveAcrossFolders.vue
 - [ ] src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboard.vue
 - ✅ src/components/dashboards/AddFolder.vue
@@ -1362,7 +1362,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/alerts/AlertSummary.vue
 - ✅ src/components/alerts/DedupSummaryCards.vue
 - ✅ src/components/alerts/DeduplicationConfig.vue
-- [ ] src/components/alerts/FilterCondition.vue
+- ✅ src/components/alerts/FilterCondition.vue
 - ✅ src/components/alerts/FilterGroup.vue
 - [ ] src/components/alerts/IncidentAlertTriggersTable.vue
 - ✅ src/components/alerts/IncidentDetailDrawer.vue
@@ -1387,7 +1387,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/common/AppTabs.vue
 - ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/ShareButton.vue
-- [ ] src/components/common/sidebar/FieldList.vue
+- ✅ src/components/common/sidebar/FieldList.vue
 - [ ] src/components/cross-linking/CrossLinkUserGuide.vue
 - [ ] src/components/dashboards/ExportDashboard.vue
 - [ ] src/components/dashboards/PanelContainer.vue

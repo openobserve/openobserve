@@ -147,12 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top-right>
-          <q-input
+          <OInput
             data-test="log-search-index-list-field-search-input"
             v-model="filterFieldValue"
             data-cy="index-field-search-input"
-            borderless
-            dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
@@ -161,19 +159,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #prepend>
               <q-icon name="search" class="o2-search-input-icon" />
             </template>
-          </q-input>
+          </OInput>
         </template>
 
         <template #pagination="scope">
           <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
-            <q-tooltip
-              anchor="center left"
-              self="center right"
+            <OTooltip
+              side="left"
+              align="center"
               max-width="18.75rem"
-              class="text-body2"
-            >
-              Total Fields: {{ filteredFieldsCount }}
-            </q-tooltip>
+              :content="`Total Fields: ${filteredFieldsCount}`"
+            />
             <OButton
               variant="ghost-primary"
               size="icon-panel"
@@ -216,6 +212,8 @@ import { useRouter } from "vue-router";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   formatLargeNumber,
   getImageURL,
@@ -233,6 +231,8 @@ export default defineComponent({
   components: {
     FieldValuesPanel,
     OButton,
+    OInput,
+    OTooltip,
   },
   props: {
     fields: {
