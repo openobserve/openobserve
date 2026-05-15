@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
-          <div class="flex q-ml-auto tw:ps-2">
+          <div class="tw:flex tw:flex-row tw:gap-x-2 tw:justify-end tw:items-center">
             <OInput
               v-model="dynamicQueryModel"
               :placeholder="
@@ -45,13 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-icon name="search" />
               </template>
             </OInput>
-          </div>
-          <div class="tw:mb-2">
+
             <OSwitch
               data-test="dashboard-search-across-folders-toggle"
               v-model="searchAcrossFolders"
               label="All Folders"
               size="lg"
+              class="tw:whitespace-nowrap tw:shrink-0"
             >
               <template #tooltip>
                 <q-tooltip>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-tooltip>
               </template>
             </OSwitch>
-          </div>
+
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t(`dashboard.add`) }}
           </OButton>
+          </div>
         </div>
       </div>
     </div>
@@ -160,14 +161,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="2px"
                   ></q-separator>
                   <!-- Search Input -->
-                  <div style="width: 100%" class="flex folder-item q-py-xs">
+                  <div class="flex folder-item q-py-xs tw:w-full tw:px-2">
                     <OInput
                       v-model="folderSearchQuery"
                       data-test="folder-search"
                       placeholder="Search Folder"
-                      style="width: 100%"
                       clearable
-                      class="tw:mx-2"
+                      class="tw:w-full"
                     >
                       <template #icon-left>
                         <q-icon name="search" />

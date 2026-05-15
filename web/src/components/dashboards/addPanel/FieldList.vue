@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="1"
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
-            class="tw:mx-[0.625rem]"
+            class="tw:mx-[0.625rem] tw:mb-2"
           >
             <template #icon-left>
               <q-icon name="search" />

@@ -333,6 +333,16 @@ function resolveListboxValue(value: unknown): SelectModelValue {
 
 function handleListboxUpdate(value: unknown) {
   const resolved = resolveListboxValue(value);
+
+  // Single-select: prevent deselecting the already-selected option
+  if (!props.multiple) {
+    if (resolved === undefined || resolved === null) {
+      // Reka toggled off the current selection — ignore it
+      popoverOpen.value = false;
+      return;
+    }
+  }
+
   emit("update:modelValue", resolved);
 
   if (!props.multiple) {

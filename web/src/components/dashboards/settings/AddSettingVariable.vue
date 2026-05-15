@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               />
             </div>
-            <div class="text-body1 text-bold q-mt-sm">
+            <div class="text-body1 text-bold q-mt-md">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
             <div class="row">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="tw:flex tw:justify-between tw:w-full text-body1 text-bold q-mt-sm"
+              class="tw:flex tw:justify-between tw:w-full text-body1 text-bold q-mt-md"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OSelect>
               </div>
+              <div class="row">
               <OSelect
                 v-model="variableData.query_data.field"
                 :label="t('dashboard.selectField') + ' *'"
@@ -153,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="_displayLabel"
                 valueKey="name"
                 searchable
+                class="tw:flex-1"
                 data-test="dashboard-variable-field-select"
               >
                 <template #tooltip>
@@ -168,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </template>
               </OSelect>
+              </div>
               <div>
                 <OInput
                   type="number"

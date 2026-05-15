@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between"
+      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-x-3"
       :style="{
         backgroundColor:
           store.state.theme === 'dark'
@@ -99,17 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left><q-icon name="add" /></template>
         </OButton>
       </div>
-      <div class="tw:flex tw:items-center tw:gap-1 tw:shrink-0">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0 ">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
           :title="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disabled="promqlMode"
-          size="sm"
+          size="lg"
         >
           <template #label>
-            <img :src="'img:' + getImageURL('images/common/function.svg')" style="width: 16px; height: 16px" />
+            <img :src="getImageURL('images/common/function.svg')" style="width: 16px; height: 16px" />
           </template>
         </OSwitch>
         <QueryTypeSelector></QueryTypeSelector>

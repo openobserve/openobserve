@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
       >
         <div
-          class="flex items-center q-table__title"
+          class="flex items-center"
           :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
         >
-          <span>
+          <span class="q-table__title">
             {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
           </span>
           <div>
