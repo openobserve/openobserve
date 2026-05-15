@@ -10,7 +10,7 @@ import type {
   RelativeUnit,
   DateTimeMode,
 } from "./ODateTimeRange.types";
-import { computed, ref, watch } from "vue";
+import { computed, ref, useAttrs, watch } from "vue";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -52,6 +52,9 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
 
 const emit = defineEmits<DateTimeRangeEmits>();
 defineSlots<DateTimeRangeSlots>();
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // ── Popover ────────────────────────────────────────────────────
 const _popoverOpen = ref(false);
@@ -214,8 +217,9 @@ const rangeLabel = computed((): string | null => {
   const start = stagedRange.value.start as DateValue | undefined;
   const end = stagedRange.value.end as DateValue | undefined;
   if (!start && !end) return null;
-  if (start && !end) return start.toString();
-  return `${start?.toString()} — ${end?.toString()}`;
+  return start && end
+    ? `${start.toString()} — ${end.toString()}`
+    : (start ?? end)?.toString() ?? null;
 });
 
 function handleRangeChange(value: DateRange | undefined) {
