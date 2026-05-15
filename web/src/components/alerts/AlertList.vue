@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
+  <div data-test="alert-list-page" class="q-pa-none tw:flex tw:flex-col">
     <div
       class="tw:w-full tw:px-[0.625rem] q-pt-xs"
       v-if="!showAddAlertDialog && !showImportAlertDialog"
@@ -170,14 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       class="full-width alert-list-table"
-      style="height: calc(100vh - 118px)"
     >
       <!-- Alerts View (with folders) -->
       <q-splitter
         v-model="splitterModel"
         unit="px"
         :limits="[200, 500]"
-        style="height: calc(100vh - 118px)"
         data-test="alert-list-splitter"
       >
         <template #before>
