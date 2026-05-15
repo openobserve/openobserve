@@ -73,6 +73,7 @@ export default [
       "vue/no-use-v-if-with-v-for": "off",
       "vue/no-reserved-component-names": "off",
       "vue/valid-v-for": "off",
+      "vue/valid-v-else-if": "off",
       "vue/require-v-for-key": "off",
       "vue/return-in-computed-property": "off",
       "vue/require-toggle-inside-transition": "off",
