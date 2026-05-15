@@ -35,7 +35,6 @@ export function getManager(
     s.instance = new ShortcutManager(options);
     s.handler = (e) => _state().instance!.handleKeyDown(e);
     window.addEventListener("keydown", s.handler);
-    console.log("[shortcut-manager] created + listener added");
   }
   return s.instance;
 }
@@ -116,7 +115,6 @@ export class ShortcutManager {
       { ...shortcut, key, id },
     ]);
 
-    console.log(`[shortcut-manager] registered "${key}"`);
     this.notify();
     return id;
   }
@@ -197,10 +195,6 @@ export class ShortcutManager {
 
     if (!key || key === "") return;
 
-    if (!["ctrl", "shift", "alt", "meta"].includes(key)) {
-      console.log(`[shortcut-manager] keydown="${key}" registered=[${Array.from(this.shortcuts.keys())}]`);
-    }
-
     this.sequenceBuffer.push(key);
     if (this.sequenceTimeout) clearTimeout(this.sequenceTimeout);
 
@@ -263,7 +257,6 @@ export class ShortcutManager {
       if (!el || document.activeElement !== el) return;
     }
 
-    console.log(`[shortcut-manager] FIRING "${shortcut.key}" → ${shortcut.description}`);
     if (this.options.preventDefault) e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
     shortcut.handler();
