@@ -104,11 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroup>
               </div>
               <div data-test="edit-role-permissions-search-input">
-                <q-input
+                <OInput
                   v-model="filter.value"
-                  borderless
                   :debounce="500"
-                  dense
                   class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
@@ -117,26 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #prepend>
                     <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <div data-test="edit-role-permissions-resource-select-input">
-                <q-select
+                <OSelect
                   v-model="filter.resource"
-                  :options="filteredResources"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-mr-sm"
+                  :options="resourceOptions"
                   placeholder="Select Resource"
-                  map-options
-                  use-input
-                  emit-value
-                  fill-input
-                  hide-selected
-                  borderless
-                  dense
                   clearable
+                  searchable
                   style="width: 200px"
-                  @filter="filterResourceOptions"
                   @update:model-value="onResourceChange"
                 />
               </div>
@@ -274,6 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { cloneDeep } from "lodash-es";
 import { defineAsyncComponent, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18n } from "vue-i18n";

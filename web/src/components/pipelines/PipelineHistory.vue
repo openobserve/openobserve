@@ -37,11 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t(`pipeline.history`) }}
               <q-icon name="info" size="18px" color="grey-6">
-                <q-tooltip>
-                  History is only available for scheduled and manually triggered
-                  pipelines. Real-time pipelines do not generate history
-                  records.
-                </q-tooltip>
+                <OTooltip content="History is only available for scheduled and manually triggered pipelines. Real-time pipelines do not generate history records." side="top" />
               </q-icon>
             </div>
           </div>
@@ -60,47 +56,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @on:date-change="updateDateTime"
               />
             </div>
-            <q-select
+            <OSelect
               v-model="selectedPipeline"
-              dense
-              borderless
-              use-input
-              hide-selected
-              fill-input
-              input-debounce="0"
-              :options="filteredPipelineOptions"
-              option-label="label"
-              option-value="value"
-              @filter="filterPipelineOptions"
+              :options="allPipelines"
+              labelKey="label"
+              valueKey="value"
+              searchable
               @update:model-value="onPipelineSelected"
-              :placeholder="
-                t(`pipeline.searchHistory`) || 'Select or search pipeline...'
-              "
+              :placeholder="t(`pipeline.searchHistory`) || 'Select or search pipeline...'"
               data-test="pipeline-history-search-select"
               class="o2-search-input q-mr-sm"
               style="min-width: 250px"
               clearable
-              @clear="clearSearch"
             >
-              <template v-slot:prepend>
-                <q-icon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search"
-                />
+              <template #empty>
+                <span>No pipelines found</span>
               </template>
-              <template v-slot:no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    No pipelines found
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
+            </OSelect>
             <OButton
               variant="ghost"
               size="icon-xs-sq"
@@ -110,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="loading"
             >
               <template #icon-left><Search class="tw:size-3.5 tw:shrink-0" /></template>
-              <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
+              <OTooltip :content="t('common.search') || 'Search'" side="top" />
             </OButton>
             <OButton
               variant="ghost"
@@ -120,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
             >
               <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-              <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
+              <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
             </OButton>
           </div>
         </div>
@@ -227,13 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="props.row.is_partial ? 'warning' : 'positive'"
                 size="xs"
               >
-                <q-tooltip>
-                  {{
-                    props.row.is_partial
-                      ? "Partial Results"
-                      : "Complete Results"
-                  }}
-                </q-tooltip>
+                <OTooltip :content="props.row.is_partial ? 'Partial Results' : 'Complete Results'" side="top" />
               </q-icon>
               <span v-else>-</span>
             </q-td>
@@ -560,6 +526,8 @@ import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { ChevronLeft, Search, RefreshCw, X } from "lucide-vue-next";

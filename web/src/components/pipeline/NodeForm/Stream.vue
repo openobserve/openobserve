@@ -30,21 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <div class="stream-routing-container full-width q-py-md">
-      <q-toggle
+      <OSwitch
         v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm tw:mr-3 tw:h-[36px] o2-toggle-button-lg q-ml-md"
-        size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
       />
 
-      <q-form @submit="saveStream">
+      <div>
         <div v-if="!createNewStream" class="q-px-md">
           <div class="flex justify-start items-center" style="padding-top: 0px">
             <div
@@ -52,20 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="alert-stream-type o2-input q-mr-sm full-width"
               style="padding-top: 0"
             >
-              <q-select
+              <OSelect
                 v-model="stream_type"
                 :options="filteredStreamTypes"
                 :label="t('alerts.streamType') + ' *'"
-                :popup-content-style="{ textTransform: 'none' }"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm showLabelOnTop no-case full-width"
-                stack-label
-                outlined
-                filled
-                dense
                 @update:model-value="updateStreams()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
+                data-test="input-node-stream-type-select"
               />
             </div>
             <div
@@ -98,12 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @input-value="handleDynamicStreamName"
               />
 
-              <q-toggle
+              <OSwitch
                 v-if="
                   stream_type == 'enrichment_tables' &&
                   selectedNodeType == 'output'
                 "
-                class="col-12 q-py-md text-grey-8 text-bold"
                 v-model="appendData"
                 :label="t('function.appendData')"
               />
@@ -161,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :is-in-pipeline="true"
           />
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
   </ODrawer>
@@ -182,6 +166,8 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 

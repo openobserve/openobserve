@@ -832,7 +832,7 @@ Legend: `[ ]` = not done · `✅` = done
 - ✅ src/components/shared/filter/FilterCreatorPopup.vue
 - [ ] src/enterprise/components/EvalTemplateList.vue
 - [ ] src/plugins/correlation/CorrelatedLogsTable.vue
-- [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
+- ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/traces/ServiceGraphNodeSidePanel.vue
 - ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 - ✅ src/views/Dashboards/Dashboards.vue
@@ -855,7 +855,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/QueryEditor.vue
 - ✅ src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/actionScripts/EditScript.vue
-- [ ] src/components/actionScripts/ScriptToolbar.vue
+- ✅ src/components/actionScripts/ScriptToolbar.vue
 - [T] src/components/ai_toolsets/AddAiToolset.vue
 - ✅ src/components/alerts/AddAlert.vue
 - ✅ src/components/alerts/AddDestination.vue
@@ -880,18 +880,18 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/alerts/steps/AlertSettings.vue
 - ✅ src/components/alerts/steps/Deduplication.vue
 - ✅ src/components/alerts/steps/QueryConfig.vue
-- [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
+- ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddAkeylessType.vue *(also has autogrow — use OTextarea for those fields)*
 - [ ] src/components/cipherkeys/AddCipherKey.vue
 - [ ] src/components/cipherkeys/AddOpenobserveType.vue *(also has autogrow — use OTextarea for those fields)*
-- [ ] src/components/common/BaseImport.vue
+- ✅ src/components/common/BaseImport.vue
 - ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/FieldValuesPanel.vue
 - ✅ src/components/common/sidebar/AddFolder.vue
 - ✅ src/components/common/sidebar/FieldList.vue
 - ✅ src/components/common/sidebar/FolderList.vue
 - ✅ src/components/common/sidebar/MoveAcrossFolders.vue
-- [ ] src/components/cross-linking/CrossLinkDialog.vue
+- ✅ src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboard.vue
 - ✅ src/components/dashboards/AddFolder.vue
 - ✅ src/components/dashboards/MoveDashboardToAnotherFolder.vue
@@ -920,22 +920,22 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/functions/FunctionList.vue
 - ✅ src/components/functions/FunctionsToolbar.vue
 - ✅ src/components/functions/StreamRouting.vue
-- [ ] src/components/iam/groups/AddGroup.vue
-- [ ] src/components/iam/groups/AppGroups.vue
+- ✅ src/components/iam/groups/AddGroup.vue
+- ✅ src/components/iam/groups/AppGroups.vue
 - ✅ src/components/iam/groups/GroupRoles.vue
 - ✅ src/components/iam/groups/GroupServiceAccounts.vue
 - ✅ src/components/iam/groups/GroupUsers.vue
-- [ ] src/components/iam/organizations/AddUpdateOrganization.vue
-- [ ] src/components/iam/organizations/ListOrganizations.vue
+- ✅ src/components/iam/organizations/AddUpdateOrganization.vue
+- ✅ src/components/iam/organizations/ListOrganizations.vue
 - [ ] src/components/iam/quota/Quota.vue
-- [ ] src/components/iam/roles/AddRole.vue
-- [ ] src/components/iam/roles/AppRoles.vue
-- [ ] src/components/iam/roles/EditRole.vue
-- [ ] src/components/iam/serviceAccounts/AddServiceAccount.vue
+- ✅ src/components/iam/roles/AddRole.vue
+- ✅ src/components/iam/roles/AppRoles.vue
+- ✅ src/components/iam/roles/EditRole.vue
+- ✅ src/components/iam/serviceAccounts/AddServiceAccount.vue
 - ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/iam/users/MemberInvitation.vue
-- [ ] src/components/iam/users/UpdateRole.vue
+- ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/iam/users/User.vue
 - [ ] src/components/ingestion/AIIntegrations.vue
 - [ ] src/components/ingestion/Database.vue
@@ -952,8 +952,8 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/ingestion/recommended/AzureIndividualServices.vue
 - [ ] src/components/ingestion/recommended/KubernetesConfig.vue
 - ✅ src/components/login/GetStarted.vue
-- [ ] src/components/login/Login.vue
-- [ ] src/components/login/SsoLogin.vue
+- ✅ src/components/login/Login.vue
+- ✅ src/components/login/SsoLogin.vue
 - [ ] src/components/logstream/AddStream.vue
 - [T] src/components/logstream/AssociatedRegexPatterns.vue *(mixed — normal + autogrow fields)* ✅
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
@@ -961,14 +961,14 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/logstream/schema.vue
 - [ ] src/components/pipeline/ImportPipeline.vue
 - [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
-- [ ] src/components/pipeline/NodeForm/LlmEvaluation.vue
+- ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - [ ] src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
-- [ ] src/components/pipeline/StreamSelection.vue
+- ✅ src/components/pipeline/StreamSelection.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - ✅ src/components/pipelines/EditBackfillJobDialog.vue
-- [ ] src/components/promql/components/OperationsList.vue
+- ✅ src/components/promql/components/OperationsList.vue
 - [ ] src/components/promql/components/PromQLBuilderOptions.vue
 - [ ] src/components/queries/RunningQueries.vue
 - [T] src/components/reports/CreateReport.vue *(mixed — normal + autogrow fields)*
@@ -979,9 +979,9 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/settings/BuiltInModelPricingTab.vue
 - ✅ src/components/settings/BuiltInPatternsTab.vue
 - ✅ src/components/settings/CipherKeys.vue
-- [ ] src/components/settings/DiscoveredServices.vue
-- [ ] src/components/settings/DomainManagement.vue
-- [ ] src/components/settings/General.vue
+- ✅ src/components/settings/DiscoveredServices.vue
+- ✅ src/components/settings/DomainManagement.vue
+- ✅ src/components/settings/General.vue
 - [ ] src/components/settings/ImportModelPricing.vue
 - [ ] src/components/settings/ImportRegexPattern.vue
 - [T] src/components/settings/License.vue
@@ -996,8 +996,8 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/shared/grid/Table.vue
 - [T] src/enterprise/components/EvalTemplateEditor.vue *(mixed — normal + autogrow fields)*
 - [ ] src/enterprise/components/EvalTemplateList.vue
-- [ ] src/plugins/correlation/DimensionFilterEditor.vue
-- [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
+- ✅ src/plugins/correlation/DimensionFilterEditor.vue
+- ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
 - ✅ src/plugins/logs/JsonPreview.vue
@@ -1040,7 +1040,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/TabsDeletePopUp.vue
 - ✅ src/components/functions/FunctionsToolbar.vue
 - ✅ src/components/logstream/AssociatedRegexPatterns.vue
-- [ ] src/components/settings/DomainManagement.vue
+- ✅ src/components/settings/DomainManagement.vue
 - [ ] src/plugins/correlation/TimeRangeEditor.vue
 
 ---
@@ -1071,13 +1071,13 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/alerts/steps/Deduplication.vue
 - ✅ src/components/alerts/steps/QueryConfig.vue
 - ✅ src/components/anomaly_detection/steps/AnomalyAlerting.vue
-- [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
+- ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddAkeylessType.vue
 - [ ] src/components/cipherkeys/AddCipherKey.vue
 - [ ] src/components/cipherkeys/AddEncryptionMechanism.vue
 - [ ] src/components/common/sidebar/InlineSelectFolderDropdown.vue
 - [ ] src/components/common/sidebar/SelectFolderDropDown.vue
-- [ ] src/components/cross-linking/CrossLinkDialog.vue
+- ✅ src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboardFromGitHub.vue
 - ✅ src/components/dashboards/OverrideConfigPopup.vue
 - ✅ src/components/dashboards/SelectDashboardDropdown.vue
@@ -1109,44 +1109,44 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/functions/TestFunction.vue
 - ✅ src/components/iam/groups/GroupUsers.vue
 - [ ] src/components/iam/quota/Quota.vue
-- [ ] src/components/iam/roles/EditRole.vue
+- ✅ src/components/iam/roles/EditRole.vue
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/iam/users/MemberInvitation.vue
-- [ ] src/components/iam/users/UpdateRole.vue
+- ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
 - [ ] src/components/logstream/AddStream.vue
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - [ ] src/components/logstream/StreamFieldInputs.vue
 - ✅ src/components/logstream/schema.vue
 - [ ] src/components/pipeline/ImportPipeline.vue
-- [ ] src/components/pipeline/NodeForm/AssociateFunction.vue
+- ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
 - [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - [ ] src/components/pipeline/NodeForm/ExternalDestination.vue
-- [ ] src/components/pipeline/NodeForm/LlmEvaluation.vue
+- ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
-- [ ] src/components/pipeline/NodeForm/Stream.vue
-- [ ] src/components/pipeline/StreamSelection.vue
+- ✅ src/components/pipeline/NodeForm/Stream.vue
+- ✅ src/components/pipeline/StreamSelection.vue
 - [ ] src/components/pipelines/BackfillJobsList.vue
 - [ ] src/components/pipelines/PipelineHistory.vue
-- [ ] src/components/promql/components/LabelFilterEditor.vue
+- ✅ src/components/promql/components/LabelFilterEditor.vue
 - [ ] src/components/promql/components/MetricSelector.vue
-- [ ] src/components/promql/components/OperationsList.vue
+- ✅ src/components/promql/components/OperationsList.vue
 - [ ] src/components/promql/components/PromQLBuilderOptions.vue
 - [ ] src/components/queries/RunningQueries.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/rum/PlayerEventsSidebar.vue
 - [ ] src/components/rum/VideoPlayer.vue
 - ✅ src/components/settings/BuiltInPatternsTab.vue
-- [ ] src/components/settings/DiscoveredServices.vue
-- [ ] src/components/settings/DomainManagement.vue
+- ✅ src/components/settings/DiscoveredServices.vue
+- ✅ src/components/settings/DomainManagement.vue
 - [ ] src/components/settings/ModelPricingEditor.vue
 - [ ] src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/components/shared/filter/FilterCreatorPopup.vue
 - [ ] src/components/shared/grid/Pagination.vue
 - [ ] src/enterprise/components/EvalTemplateEditor.vue
 - [ ] src/enterprise/components/billings/Billing.vue
-- [ ] src/plugins/correlation/DimensionFiltersBar.vue
-- [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
+- ✅ src/plugins/correlation/DimensionFiltersBar.vue
+- ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/DetailTable.vue
 - ✅ src/plugins/logs/IndexList.vue
 - ✅ src/plugins/logs/JsonPreview.vue
@@ -1194,12 +1194,12 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/iam/users/AddUser.vue
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - ✅ src/components/logstream/schema.vue
-- [ ] src/components/pipeline/NodeForm/AssociateFunction.vue
+- ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
 - [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - [ ] src/components/pipeline/NodeForm/ExternalDestination.vue
-- [ ] src/components/pipeline/NodeForm/LlmEvaluation.vue
+- ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
-- [ ] src/components/pipeline/NodeForm/Stream.vue
+- ✅ src/components/pipeline/NodeForm/Stream.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
 - [ ] src/components/rum/VideoPlayer.vue
@@ -1221,18 +1221,18 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 - [ ] src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/actionScripts/EditScript.vue
-- [ ] src/components/actionScripts/ScriptToolbar.vue
+- ✅ src/components/actionScripts/ScriptToolbar.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
 - ✅ src/components/alerts/AddAlert.vue
 - ✅ src/components/alerts/AlertList.vue
 - ✅ src/components/alerts/steps/AlertSettings.vue
 - ✅ src/components/alerts/steps/QueryConfig.vue
-- [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
+- ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddCipherKey.vue
-- [ ] src/components/common/BaseImport.vue
+- ✅ src/components/common/BaseImport.vue
 - ✅ src/components/common/sidebar/AddFolder.vue
 - ✅ src/components/common/sidebar/MoveAcrossFolders.vue
-- [ ] src/components/cross-linking/CrossLinkDialog.vue
+- ✅ src/components/cross-linking/CrossLinkDialog.vue
 - ✅ src/components/dashboards/AddDashboard.vue
 - ✅ src/components/dashboards/AddFolder.vue
 - ✅ src/components/dashboards/MoveDashboardToAnotherFolder.vue
@@ -1243,26 +1243,26 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/functions/AddFunction.vue
 - ✅ src/components/functions/FunctionsToolbar.vue
 - ✅ src/components/functions/TestFunction.vue
-- [ ] src/components/iam/organizations/AddUpdateOrganization.vue
-- [ ] src/components/iam/serviceAccounts/AddServiceAccount.vue
+- ✅ src/components/iam/organizations/AddUpdateOrganization.vue
+- ✅ src/components/iam/serviceAccounts/AddServiceAccount.vue
 - [ ] src/components/iam/users/AddUser.vue
-- [ ] src/components/iam/users/UpdateRole.vue
-- [ ] src/components/login/Login.vue
-- [ ] src/components/login/SsoLogin.vue
+- ✅ src/components/iam/users/UpdateRole.vue
+- ✅ src/components/login/Login.vue
+- ✅ src/components/login/SsoLogin.vue
 - [ ] src/components/logstream/AddStream.vue
 - ✅ src/components/logstream/schema.vue
-- [ ] src/components/pipeline/NodeForm/AssociateFunction.vue
+- ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
 - [ ] src/components/pipeline/NodeForm/Condition.vue
 - [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
-- [ ] src/components/pipeline/NodeForm/LlmEvaluation.vue
+- ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 - [ ] src/components/pipeline/NodeForm/Query.vue
-- [ ] src/components/pipeline/NodeForm/Stream.vue
-- [ ] src/components/pipeline/StreamSelection.vue
+- ✅ src/components/pipeline/NodeForm/Stream.vue
+- ✅ src/components/pipeline/StreamSelection.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
-- [ ] src/components/pipelines/EditBackfillJobDialog.vue
+- ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/reports/CreateReport.vue
 - [ ] src/components/settings/AddRegexPattern.vue
-- [ ] src/components/settings/General.vue
+- ✅ src/components/settings/General.vue
 - ✅ src/plugins/metrics/AddToDashboard.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
 - ✅ src/views/Dashboards/PanelLayoutSettings.vue
@@ -1276,9 +1276,9 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/alerts/ImportAlert.vue
 - ✅ src/components/alerts/ImportSemanticGroups.vue
 - ✅ src/components/alerts/ImportSemanticGroupsDrawer.vue
-- [ ] src/components/common/BaseImport.vue
+- ✅ src/components/common/BaseImport.vue
 - ✅ src/components/functions/AddEnrichmentTable.vue
-- [ ] src/components/settings/General.vue
+- ✅ src/components/settings/General.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
 
 ---
@@ -1286,13 +1286,13 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 ### q-slider → OSlider / OFormSlider
 
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
-- [ ] src/components/pipeline/NodeForm/LlmEvaluation.vue
+- ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 
 ---
 
 ### q-range → ORange / OFormRange
 
-- [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
+- ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/settings/Nodes.vue
 
 ---
@@ -1320,7 +1320,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/PredefinedThemes.vue
 - ✅ src/components/dashboards/addPanel/ColorBySeriesPopUp.vue
 - ✅ src/components/dashboards/addPanel/ValueMappingPopUp.vue
-- [ ] src/components/settings/General.vue
+- ✅ src/components/settings/General.vue
 
 ---
 
@@ -1353,7 +1353,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/actionScripts/EditScript.vue
 - [ ] src/components/actionScripts/ScriptEditor.vue
-- [ ] src/components/actionScripts/ScriptToolbar.vue
+- ✅ src/components/actionScripts/ScriptToolbar.vue
 - ✅ src/components/alerts/AddAlert.vue
 - ✅ src/components/alerts/AlertHistory.vue
 - ✅ src/components/alerts/AlertHistoryDrawer.vue
@@ -1383,7 +1383,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/anomaly_detection/AnomalyDetectionList.vue
 - [ ] src/components/anomaly_detection/AnomalySummary.vue
 - ✅ src/components/anomaly_detection/steps/AnomalyAlerting.vue
-- [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
+- ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/common/AppTabs.vue
 - ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/ShareButton.vue
@@ -1430,8 +1430,8 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/pipelines/PipelineHistory.vue
-- [ ] src/components/promql/components/LabelFilterEditor.vue
-- [ ] src/components/promql/components/OperationsList.vue
+- ✅ src/components/promql/components/LabelFilterEditor.vue
+- ✅ src/components/promql/components/OperationsList.vue
 - [ ] src/components/promql/components/PromQLBuilderOptions.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
@@ -1439,9 +1439,9 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/rum/FrustrationEventBadge.vue
 - [ ] src/components/rum/correlation/TraceCorrelationCard.vue
 - ✅ src/components/settings/BuiltInPatternsTab.vue
-- [ ] src/components/settings/DiscoveredServices.vue
-- [ ] src/components/settings/DomainManagement.vue
-- [ ] src/components/settings/General.vue
+- ✅ src/components/settings/DiscoveredServices.vue
+- ✅ src/components/settings/DomainManagement.vue
+- ✅ src/components/settings/General.vue
 - [ ] src/components/settings/ModelPricingEditor.vue
 - ✅ src/components/settings/ModelPricingList.vue
 - ✅ src/components/settings/Nodes.vue
@@ -1455,9 +1455,9 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 
 #### plugins/
 
-- [ ] src/plugins/correlation/DimensionFilterEditor.vue
-- [ ] src/plugins/correlation/DimensionFiltersBar.vue
-- [ ] src/plugins/correlation/TelemetryCorrelationDashboard.vue
+- ✅ src/plugins/correlation/DimensionFilterEditor.vue
+- ✅ src/plugins/correlation/DimensionFiltersBar.vue
+- ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
 - ✅ src/plugins/logs/IndexList.vue
 - ✅ src/plugins/logs/JsonPreview.vue

@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
           <div class="full-width tw:flex tw:justify-end tw:gap-3">
 
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('organization.search')"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
           
             <OButton
               variant="primary"
@@ -139,6 +137,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";

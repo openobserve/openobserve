@@ -55,16 +55,11 @@
                   </q-select>
 
                   <!-- Operator Selection -->
-                  <q-select
+                  <OSelect
                     v-model="label.op"
                     :options="operatorOptions"
                     label="Operator"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
                     class="label-filter-operator-select showLabelOnTop q-mb-sm"
-                    input-class="tw:normal-case!"
                     data-test="promql-operator-select"
                   />
 
@@ -147,7 +142,7 @@
           data-test="promql-add-label-filter"
         >
           <q-icon name="add" size="14px" />
-          <q-tooltip>Add label filter</q-tooltip>
+          <OTooltip content="Add label filter" side="top" />
         </OButton>
       </div>
     </div>
@@ -158,6 +153,8 @@
 import { ref, watch, computed, inject } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";

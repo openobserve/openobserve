@@ -125,34 +125,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="o2-input login-inputs"
         >
-          <q-form ref="loginform"
-  class="q-gutter-md" @submit.prevent="">
-            <q-input
+          <div class="q-gutter-md">
+            <OInput
               v-model="name"
               data-cy="login-user-id"
               data-test="login-user-id"
-              outlined
               :label="`${t('login.userEmail')} *`"
               placeholder="Email"
-              class="showLabelOnTop no-case"
               type="email"
-              dense
-              stack-label
-              filled
             />
 
-            <q-input
+            <OInput
               v-model="password"
               data-cy="login-password"
               data-test="login-password"
-              outlined
               :label="`${t('login.password')} *`"
               placeholder="Password"
-              class="showLabelOnTop no-case"
               type="password"
-              dense
-              stack-label
-              filled
             />
 
             <div class="q-mt-lg q-mb-xl">
@@ -168,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t('login.login') }}
               </OButton>
             </div>
-          </q-form>
+          </div>
         </div>
       </div>
     </div>
@@ -196,6 +185,7 @@ import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import config from "@/aws-exports";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -411,7 +401,6 @@ export default defineComponent({
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;
-                loginform.value.resetValidation();
                 $q.notify({
                   color: "negative",
                   message: res.data.message,
@@ -421,7 +410,6 @@ export default defineComponent({
             .catch((e: Error) => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
-              loginform.value.resetValidation();
               $q.notify({
                 color: "negative",
                 message: "Invalid username or password",
@@ -431,7 +419,6 @@ export default defineComponent({
             });
         } catch (e) {
           submitting.value = false;
-          loginform.value.resetValidation();
           $q.notify({
             color: "negative",
             message: "Please fill all the fields and try again.",
@@ -447,7 +434,6 @@ export default defineComponent({
       password,
       confirmpassword,
       email,
-      loginform,
       submitting,
       onSignIn,
       tab: ref("signin"),

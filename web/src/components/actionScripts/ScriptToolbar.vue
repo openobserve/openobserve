@@ -22,30 +22,20 @@
       <div class="tw:text-lg tw:w-full add-script-title q-mr-md">
         Add Action
       </div>
-      <q-form ref="addScriptForm" class="o2-input">
+      <div class="o2-input">
         <div class="tw:flex tw:items-center">
-          <q-input
+          <OInput
             data-test="add-script-name-input"
             v-model.trim="actionName"
             :label="t('actions.name')"
-            color="input-border"
-            bg-color="input-bg"
             class="q-pa-none tw:w-full"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="disableName"
-            v-bind:disable="disableName"
-            :rules="[
-              (val: any) => !!val || 'Field is required!',
-              isValidMethodName,
-            ]"
-            no-error-icon
-            tabindex="0"
-            style="min-width: 300px"
+            :readonly="disableName"
+            :disabled="disableName"
+            :error="!!scriptNameError"
+            :error-message="scriptNameError"
             @update:model-value="onUpdate"
             @blur="onUpdate"
+            style="min-width: 300px"
           />
           <q-icon
             :key="actionName"
@@ -55,18 +45,10 @@
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              :offset="[2, 0]"
-              class="tw:text-[12px]"
-            >
-              {{ isValidMethodName() }}
-            </q-tooltip>
+            <OTooltip side="right" :content="String(isValidMethodName())" />
           </q-icon>
         </div>
-      </q-form>
+      </div>
     </div>
     <div class="add-script-actions tw:flex tw:items-center tw:gap-2">
       <OButton
@@ -105,6 +87,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const { t } = useI18n();
 
@@ -128,6 +112,13 @@ const props = defineProps({
 const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 
 const addScriptForm = ref(null);
+
+const scriptNameError = computed(() => {
+  if (!showInputError.value) return '';
+  if (!actionName.value) return 'Field is required!';
+  const result = isValidMethodName();
+  return result === true ? '' : result;
+});
 
 const showInputError = ref(false);
 

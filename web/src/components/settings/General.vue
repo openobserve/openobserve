@@ -35,20 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title">
               {{ t("settings.scrapintervalLabel") }}
             </span>
-            <q-input
+            <OInput
               v-model.number="scrapeIntereval"
               type="number"
               min="0"
-              class="showLabelOnTop q-ml-sm"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
+              class="q-ml-sm"
+              :error="!!scrapeIntervalError"
+              :error-message="scrapeIntervalError"
+              @update:model-value="scrapeIntervalError = ''"
               data-test="general-settings-scrape-interval"
-              :rules="[
-                (val: any) => !!val || t('settings.scrapeIntervalRequired'),
-              ]"
-              :lazy-rules="true"
               style="width: 120px"
             />
             <span class="individual-setting-description">
@@ -61,43 +56,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
-            <q-input
+            <OInput
               v-model.number="maxSeriesPerQuery"
               type="number"
               :min="1000"
               :max="1000000"
-              class="showLabelOnTop q-ml-sm"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
-              data-test="general-settings-max-series-per-query"
-              :rules="[
-                (val: any) => {
-                  // Allow empty/null (user wants default)
-                  if (val === null || val === undefined || val === '')
-                    return true;
-
-                  // Validate numeric range
-                  const numVal = Number(val);
-                  return (
-                    (numVal >= 1000 && numVal <= 1000000) ||
-                    t('settings.maxSeriesPerQueryValidation')
-                  );
-                },
-              ]"
-              :lazy-rules="true"
+              class="q-ml-sm"
+              :error="!!maxSeriesError"
+              :error-message="maxSeriesError"
+              @update:model-value="maxSeriesError = ''"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
+              data-test="general-settings-max-series-per-query"
               style="width: 180px"
             >
               <template v-slot:append>
                 <q-icon name="info" size="xs" class="cursor-pointer">
-                  <q-tooltip max-width="300px">
-                    {{ t("settings.maxSeriesPerQueryTooltip") }}
-                  </q-tooltip>
+                  <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
                 </q-icon>
               </template>
-            </q-input>
+            </OInput>
             <span class="individual-setting-description">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
@@ -161,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="reset-theme-colors-btn"
               >
                 <q-icon name="refresh" size="16px" />
-                <q-tooltip>{{ t("settings.resetToDefaultColors") }}</q-tooltip>
+                <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
             <span class="individual-setting-description tw:self-start">
@@ -177,13 +154,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="onSubmit.isLoading.value"
               variant="primary"
               size="sm-action"
-              type="submit"
+              @click="onSubmit.execute"
             >
               {{ t("dashboard.save") }}
             </OButton>
           </div>
-        </q-form>
-      </div>
+        </div>
     </div>
     <div
       id="enterpriseFeature"
@@ -208,11 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
             class="tw:flex tw:gap-3 tw:items-center"
           >
-            <q-input
-              class="showLabelOnTop tw:w-[250px] tw:mr-sm"
-              stack-label
-              borderless
-              dense
+            <OInput
+              class="tw:w-[250px] tw:mr-sm"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
@@ -472,6 +445,8 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -502,6 +477,8 @@ export default defineComponent({
     const q = useQuasar();
     const store = useStore();
     const router: any = useRouter();
+    const scrapeIntervalError = ref("");
+    const maxSeriesError = ref("");
     const scrapeIntereval = ref(
       store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
@@ -1010,7 +987,9 @@ export default defineComponent({
       config,
       router,
       scrapeIntereval,
+      scrapeIntervalError,
       maxSeriesPerQuery,
+      maxSeriesError,
       onSubmit,
       files,
       filesLight,

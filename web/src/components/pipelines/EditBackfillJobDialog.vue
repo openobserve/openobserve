@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-    <q-form @submit="onSubmit" id="edit-backfill-form" class="tw:mx-5 tw:my-3">
+    <div id="edit-backfill-form" class="tw:mx-5 tw:my-3">
           <!-- Time Range Section -->
           <div>
             <div class="text-subtitle2 q-mb-sm">
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-icon name="error" class="q-mr-sm" />
         {{ errorMessage }}
       </div>
-    </q-form>
+    </div>
   </ODrawer>
 </template>
 

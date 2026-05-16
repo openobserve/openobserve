@@ -27,35 +27,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="row q-gutter-md items-end">
         <div class="col-auto claim-parser-select">
-          <q-select
+          <OSelect
             v-model="claimParserFunction"
             :options="functionOptions"
             :label="t('settings.claimParserFunctionLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            dense
-            :loading="loadingFunctions"
-            @filter="filterFunctions"
-            use-input
-            fill-input
-            hide-selected
-            input-debounce="300"
+            searchable
             clearable
+            :loading="loadingFunctions"
           >
-            <template v-slot:hint>
-              {{ t("settings.claimParserFunctionHint") }}
+            <template #empty>
+              <span>{{ t('settings.noVrlFunctionsFound') }}</span>
             </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("settings.noVrlFunctionsFound") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          </OSelect>
         </div>
         <div class="col-auto">
           <OButton
@@ -73,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showVrlInfo = true"
           >
             <template #icon-left><q-icon name="help_outline" /></template>
-            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+            <OTooltip :content="t('settings.claimParserFunctionInfoTitle')" side="top" />
           </OButton>
         </div>
       </div>
@@ -129,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :loading="loadingErrors"
                       >
                         <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-                        <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+                        <OTooltip :content="t('common.refresh')" side="top" />
                       </OButton>
                     </div>
                   </div>
@@ -196,18 +179,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
       <div class="row q-gutter-md items-center q-mb-md">
         <div class="col-auto">
-          <q-input
+          <OInput
             v-model="newDomain"
-            :hint="t('settings.domainHint', { 'at_sign': '@' })"
             class="domain-input"
-            borderless
-            hide-bottom-space
-            dense
             @keydown.enter="addDomain"
             :placeholder="t('settings.domainPlaceholder')"
-            :rules="[
-              (val) => isValidDomain(val) || t('settings.invalidDomain')
-            ]"
+            :error="!!domainError"
+            :error-message="domainError"
+            @update:model-value="domainError = ''"
           />
         </div>
         <div class="col-auto q-my-none">
@@ -276,18 +255,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="!domain.allowAllUsers" class="specific-users-section">
             <div class="row q-gutter-md items-center q-mb-md">
               <div class="col">
-                <q-input
+                <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="email-input"
-                  outlined
-                  dense
                   @keydown.enter="addEmail(domain)"
-                  :rules="[
-                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
-                  ]"
                 />
               </div>
               <div class="col-auto q-my-none">
@@ -350,6 +322,9 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
@@ -372,6 +347,7 @@ const store = useStore();
 const router = useRouter();
 
 const newDomain = ref("");
+const domainError = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
 

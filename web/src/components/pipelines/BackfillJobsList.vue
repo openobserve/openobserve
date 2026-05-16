@@ -40,41 +40,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-2">
             <!-- Filters -->
             <div class="tw:flex tw:gap-2">
-              <q-select
+              <OSelect
                 v-model="filters.status"
-                :options="statusOptions"
-                color="input-border"
-                bg-color="input-bg"
+                :options="allStatusOptions"
                 placeholder="Status"
-                use-input
-                fill-input
-                hide-selected
-                borderless
-                dense
                 clearable
-                input-debounce="300"
-                @filter="filterStatuses"
+                searchable
                 style="width: 150px"
                 data-test="status-filter"
               />
-              <q-select
+              <OSelect
                 v-model="filters.pipelineId"
-                :options="pipelineOptions"
-                option-label="label"
-                option-value="value"
-                color="input-border"
-                bg-color="input-bg"
+                :options="allPipelineOptions"
+                labelKey="label"
+                valueKey="value"
                 placeholder="Pipeline"
-                map-options
-                use-input
-                emit-value
-                fill-input
-                hide-selected
-                borderless
-                dense
                 clearable
-                input-debounce="300"
-                @filter="filterPipelines"
+                searchable
                 style="width: 250px"
                 data-test="pipeline-filter"
               />
@@ -97,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <RefreshCw class="tw:size-3.5 tw:shrink-0" />
               </template>
-              <q-tooltip>Refresh</q-tooltip>
+              <OTooltip content="Refresh" side="top" />
             </OButton>
           </div>
         </div>
@@ -208,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <Pause class="tw:size-3.5 tw:shrink-0" />
                     </template>
-                    <q-tooltip>Pause Job</q-tooltip>
+                    <OTooltip content="Pause Job" side="top" />
                   </OButton>
                   <OButton
                     v-if="canResumeJob(props.row)"
@@ -220,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <Play class="tw:size-3.5 tw:shrink-0" />
                     </template>
-                    <q-tooltip>Resume Job</q-tooltip>
+                    <OTooltip content="Resume Job" side="top" />
                   </OButton>
                   <OButton
                     v-if="canEditJob(props.row.status)"
@@ -232,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <Pencil class="tw:size-3.5 tw:shrink-0" />
                     </template>
-                    <q-tooltip>Edit Job</q-tooltip>
+                    <OTooltip content="Edit Job" side="top" />
                   </OButton>
                   <OButton
                     variant="ghost"
@@ -243,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <Eye class="tw:size-3.5 tw:shrink-0" />
                     </template>
-                    <q-tooltip>View Details</q-tooltip>
+                    <OTooltip content="View Details" side="top" />
                   </OButton>
                   <OButton
                     v-if="canDeleteJob(props.row.status)"
@@ -255,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <Trash2 class="tw:size-3.5 tw:shrink-0" />
                     </template>
-                    <q-tooltip>Delete Job</q-tooltip>
+                    <OTooltip content="Delete Job" side="top" />
                   </OButton>
                   <OButton
                     v-if="props.row.error"
@@ -267,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <AlertCircle class="tw:size-3.5 tw:shrink-0" />
                     </template>
-                    <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
+                    <OTooltip :content="`Error: ${props.row.error}`" side="top" />
                   </OButton>
                 </div>
               </q-td>
@@ -374,6 +356,8 @@ import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import {
   ChevronLeft,

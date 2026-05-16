@@ -108,51 +108,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-md tw:text-grey-6">{{
               t("settings.correlation.filterBy")
             }}</span>
-            <q-select
+            <OSelect
               v-model="filterKey"
-              :options="filteredKeyOptions"
-              dense
-              borderless
+              :options="allKeys"
+              labelKey="label"
+              valueKey="value"
               clearable
-              use-input
-              fill-input
-              hide-selected
-              input-debounce="0"
-              emit-value
-              map-options
+              searchable
               :placeholder="t('settings.correlation.selectFieldPlaceholder')"
               data-test="service-filter-key"
               class="o2-search-input filter-select"
-              @filter="filterKeyFn"
               @update:model-value="filterValue = null"
             />
             <span>
-              <q-select
+              <OSelect
                 v-model="filterValue"
-                :options="filteredValueOptions"
-                dense
-                borderless
+                :options="allValues"
                 clearable
-                use-input
-                fill-input
-                hide-selected
-                input-debounce="0"
-                emit-value
-                map-options
-                :disable="!filterKey"
+                searchable
+                :disabled="!filterKey"
                 :placeholder="t('settings.correlation.selectValuePlaceholder')"
                 data-test="service-filter-value"
                 class="o2-search-input filter-select"
-                @filter="filterValueFn"
               />
-              <q-tooltip v-if="!filterKey">{{
-                t("settings.correlation.selectFieldFirst")
-              }}</q-tooltip>
+              <OTooltip v-if="!filterKey" :content="t('settings.correlation.selectFieldFirst')" side="top" />
             </span>
-            <q-input
+            <OInput
               v-model="searchQuery"
-              dense
-              borderless
               :placeholder="t('settings.correlation.searchServiceName')"
               data-test="service-search-input"
               clearable
@@ -161,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               data-test="reset-discovered-services-btn"
               variant="outline"
@@ -170,9 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="confirmResetServices"
             >
               {{ t("settings.correlation.resetServices") }}
-              <q-tooltip>{{
-                t("settings.correlation.resetServicesTooltip")
-              }}</q-tooltip>
+              <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
             </OButton>
             <OButton
               variant="outline"
@@ -323,9 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="instance.logs_streams.length > 0"
                         class="telemetry-badge telemetry-sm telemetry-logs"
                       >
-                        <q-tooltip class="tw:text-xs">{{
-                          instance.logs_streams.join(", ")
-                        }}</q-tooltip>
+                        <OTooltip side="top" :content="instance.logs_streams.join(', ')" />
                         {{
                           t("settings.correlation.logsWithCount", {
                             count: instance.logs_streams.length,
@@ -338,9 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="instance.traces_streams.length > 0"
                         class="telemetry-badge telemetry-sm telemetry-traces"
                       >
-                        <q-tooltip class="tw:text-xs">{{
-                          instance.traces_streams.join(", ")
-                        }}</q-tooltip>
+                        <OTooltip side="top" :content="instance.traces_streams.join(', ')" />
                         {{
                           t("settings.correlation.tracesWithCount", {
                             count: instance.traces_streams.length,
@@ -353,9 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="instance.metrics_streams.length > 0"
                         class="telemetry-badge telemetry-sm telemetry-metrics"
                       >
-                        <q-tooltip class="tw:text-xs">{{
-                          instance.metrics_streams.join(", ")
-                        }}</q-tooltip>
+                        <OTooltip side="top" :content="instance.metrics_streams.join(', ')" />
                         {{
                           t("settings.correlation.metricsWithCount", {
                             count: instance.metrics_streams.length,
@@ -595,6 +569,9 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { RefreshCw } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
