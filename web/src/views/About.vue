@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 package.json
               </a>
               <a href="https://npmjs.com" target="_blank" class="link-badge">
-                <OIcon name="javascript" size="sm" class="tw:mr-1" />
+                <OIcon name="javascript" size="md" class="tw:mr-1" />
                 npmjs.com
               </a>
               <a href="https://crates.io" target="_blank" class="link-badge">
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:mt-4 tw:p-3 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-blue-400' : 'tw:bg-blue-500'">
               <p class="tw:text-sm tw:mb-0">
-                <OIcon name="info" size="sm" class="tw:mr-1" />
+                <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
                 {{ t("about.license_info_note") }}
               </p>
             </div>

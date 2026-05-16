@@ -62,15 +62,15 @@ import HelpOutline from "~icons/material-symbols/help-outline";
 import History from "~icons/material-symbols/history";
 import Info from "~icons/material-symbols/info-outline";
 import InfoOutline from "~icons/material-symbols/info-outline";
-import AccountTree from "~icons/material-symbols/account-tree";
-import DarkMode from "~icons/material-symbols/dark-mode";
+import AccountTree from "~icons/material-symbols/account-tree-outline";
+import DarkMode from "~icons/material-symbols/dark-mode-outline";
 import Draft from "~icons/material-symbols/draft-outline";
-import DriveFileMove from "~icons/material-symbols/drive-file-move";
+import DriveFileMove from "~icons/material-symbols/drive-file-move-outline";
 import ExpandLess from "~icons/material-symbols/expand-less";
 import Inventory2 from "~icons/material-symbols/inventory-2-outline";
-import LightMode from "~icons/material-symbols/light-mode";
-import Schema from "~icons/material-symbols/schema";
-import Window from "~icons/material-symbols/window";
+import LightMode from "~icons/material-symbols/light-mode-outline";
+import Schema from "~icons/material-symbols/schema-outline";
+import Window from "~icons/material-symbols/window-outline";
 import Javascript from "~icons/material-symbols/javascript";
 import KeyboardArrowDown from "~icons/material-symbols/keyboard-arrow-down";
 import KeyboardDoubleArrowLeft from "~icons/material-symbols/keyboard-double-arrow-left";
@@ -81,7 +81,7 @@ import LocationOn from "~icons/material-symbols/location-on-outline";
 import MoreVert from "~icons/material-symbols/more-vert";
 import MenuIcon from "~icons/material-symbols/menu";
 import OpenInNew from "~icons/material-symbols/open-in-new";
-import Pause from "~icons/material-symbols/pause";
+import Pause from "~icons/material-symbols/pause-outline";
 import Person from "~icons/material-symbols/person-outline";
 import PlayArrow from "~icons/material-symbols/play-arrow-outline";
 import Preview from "~icons/material-symbols/preview-outline";
@@ -123,7 +123,7 @@ import CloseFullscreen from "~icons/material-symbols/close-fullscreen";
 import DataObject from "~icons/material-symbols/data-object";
 import Database from "~icons/material-symbols/database-outline";
 import Description from "~icons/material-symbols/description-outline";
-import Dns from "~icons/material-symbols/dns";
+import Dns from "~icons/material-symbols/dns-outline";
 import ForkRight from "~icons/material-symbols/fork-right";
 import FullscreenExit from "~icons/material-symbols/fullscreen-exit";
 import Group from "~icons/material-symbols/group-outline";
@@ -139,8 +139,8 @@ import Notifications from "~icons/material-symbols/notifications-outline";
 import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
-import Speed from "~icons/material-symbols/speed";
-import StopCircle from "~icons/material-symbols/stop-circle";
+import Speed from "~icons/material-symbols/speed-outline";
+import StopCircle from "~icons/material-symbols/stop-circle-outline";
 import Storage from "~icons/material-symbols/storage";
 import TableChart from "~icons/material-symbols/table-chart-outline";
 import TimerIcon from "~icons/material-symbols/timer-outline";
@@ -156,60 +156,60 @@ import MenuBook from "~icons/material-symbols/menu-book-outline";
 // Batch 2: Additional icons from full codebase audit (2026-05-16)
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
-import AnalyticsIcon from "~icons/material-symbols/analytics";
+import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
 import ArrowBackIosIcon from "~icons/material-symbols/arrow-back-ios";
 import ArrowForwardIosIcon from "~icons/material-symbols/arrow-forward-ios";
 import ArrowRightIcon from "~icons/material-symbols/arrow-right";
 import ArrowRightAltIcon from "~icons/material-symbols/arrow-right-alt";
-import AssessmentIcon from "~icons/material-symbols/analytics";
-import AssignmentIcon from "~icons/material-symbols/assignment";
+import AssessmentIcon from "~icons/material-symbols/analytics-outline";
+import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
 import AutorenewIcon from "~icons/material-symbols/autorenew";
 import CardGiftcardIcon from "~icons/material-symbols/redeem";
-import CircleIcon from "~icons/material-symbols/circle";
-import CloudDoneIcon from "~icons/material-symbols/cloud-done";
-import CloudUploadIcon from "~icons/material-symbols/cloud-upload";
+import CircleIcon from "~icons/material-symbols/circle-outline";
+import CloudDoneIcon from "~icons/material-symbols/cloud-done-outline";
+import CloudUploadIcon from "~icons/material-symbols/backup-outline";
 import CodeOffIcon from "~icons/material-symbols/code-off";
-import ColorLensIcon from "~icons/material-symbols/palette";
-import ColorizeIcon from "~icons/material-symbols/colorize";
+import ColorLensIcon from "~icons/material-symbols/palette-outline";
+import ColorizeIcon from "~icons/material-symbols/colorize-outline";
 import CompareIcon from "~icons/material-symbols/compare";
 import CorporateFareIcon from "~icons/material-symbols/corporate-fare";
-import DashboardCustomizeIcon from "~icons/material-symbols/dashboard-customize";
+import DashboardCustomizeIcon from "~icons/material-symbols/dashboard-customize-outline";
 import DataUsageIcon from "~icons/material-symbols/data-usage";
-import DeleteSweepIcon from "~icons/material-symbols/delete-sweep";
+import DeleteSweepIcon from "~icons/material-symbols/delete-sweep-outline";
 import DevicesIcon from "~icons/material-symbols/devices-outline";
 import DragIndicatorIcon from "~icons/material-symbols/drag-indicator";
-import EventNoteIcon from "~icons/material-symbols/event-note";
+import EventNoteIcon from "~icons/material-symbols/event-note-outline";
 import ExitToAppIcon from "~icons/material-symbols/exit-to-app";
 import ExpandAllIcon from "~icons/material-symbols/expand-all";
-import FastForwardIcon from "~icons/material-symbols/fast-forward";
-import FastRewindIcon from "~icons/material-symbols/fast-rewind";
-import FiberManualRecordIcon from "~icons/material-symbols/fiber-manual-record";
+import FastForwardIcon from "~icons/material-symbols/fast-forward-outline";
+import FastRewindIcon from "~icons/material-symbols/fast-rewind-outline";
+import FiberManualRecordIcon from "~icons/material-symbols/fiber-manual-record-outline";
 import FileDownloadIcon from "~icons/material-symbols/download";
-import FilterAltIcon from "~icons/material-symbols/filter-alt";
+import FilterAltIcon from "~icons/material-symbols/filter-alt-outline";
 import FilterListIcon from "~icons/material-symbols/filter-list";
 import FlagIcon from "~icons/material-symbols/flag-outline";
 import FormatListNumberedIcon from "~icons/material-symbols/format-list-numbered";
 import ForumIcon from "~icons/material-symbols/forum-outline";
 import FunctionsIcon from "~icons/material-symbols/functions";
-import GridOnIcon from "~icons/material-symbols/grid-on";
+import GridOnIcon from "~icons/material-symbols/grid-on-outline";
 import HelpIcon from "~icons/material-symbols/help-outline";
 import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
 import HomeIcon from "~icons/material-symbols/home-outline";
-import HubIcon from "~icons/material-symbols/hub";
+import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
 import InsightsIcon from "~icons/material-symbols/insights";
-import KeyboardArrowRightIcon from "~icons/material-symbols/keyboard-arrow-right";
+import KeyboardArrowRightIcon from "~icons/material-symbols/chevron-right";
 import KeyboardArrowUpIcon from "~icons/material-symbols/keyboard-arrow-up";
 import LightbulbIcon from "~icons/material-symbols/lightbulb-outline";
 import LockIcon from "~icons/material-symbols/lock-outline";
 import LoginIcon from "~icons/material-symbols/login";
 import LogoutIcon from "~icons/material-symbols/logout";
-import ManageAccountsIcon from "~icons/material-symbols/manage-accounts";
-import MemoryIcon from "~icons/material-symbols/memory";
+import ManageAccountsIcon from "~icons/material-symbols/manage-accounts-outline";
+import MemoryIcon from "~icons/material-symbols/memory-outline";
 import MonetizationOnIcon from "~icons/material-symbols/attach-money";
-import NoteAddIcon from "~icons/material-symbols/note-add";
+import NoteAddIcon from "~icons/material-symbols/note-add-outline";
 import NotificationsActiveIcon from "~icons/material-symbols/notifications-active-outline";
 import PaletteIcon from "~icons/material-symbols/palette-outline";
 import PaymentsIcon from "~icons/material-symbols/payments-outline";
@@ -219,35 +219,45 @@ import RadarIcon from "~icons/material-symbols/radar";
 import RemoveIcon from "~icons/material-symbols/remove";
 import ReportProblemIcon from "~icons/material-symbols/report-outline";
 import RestartAltIcon from "~icons/material-symbols/restart-alt";
-import RocketLaunchIcon from "~icons/material-symbols/rocket-launch";
+import RocketLaunchIcon from "~icons/material-symbols/rocket-launch-outline";
 import RuleIcon from "~icons/material-symbols/rule";
 import RunningWithErrorsIcon from "~icons/material-symbols/error-outline";
 import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
-import SecurityIcon from "~icons/material-symbols/security";
-import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad";
-import StopIcon from "~icons/material-symbols/stop";
+import SecurityIcon from "~icons/material-symbols/shield-outline";
+import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
+import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
-import SyncIcon from "~icons/material-symbols/sync";
-import SyncProblemIcon from "~icons/material-symbols/sync-problem";
-import TableViewIcon from "~icons/material-symbols/table-view";
+import SyncIcon from "~icons/material-symbols/sync-outline";
+import SyncProblemIcon from "~icons/material-symbols/sync-problem-outline";
+import TableViewIcon from "~icons/material-symbols/table-view-outline";
 import TagIcon from "~icons/material-symbols/tag";
 import TaskAltIcon from "~icons/material-symbols/task-alt";
 import TextFieldsIcon from "~icons/material-symbols/text-fields";
-import ThumbDownOffAltIcon from "~icons/material-symbols/thumb-down";
-import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up";
-import ToggleOffIcon from "~icons/material-symbols/toggle-off";
+import ThumbDownOffAltIcon from "~icons/material-symbols/thumb-down-outline";
+import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up-outline";
+import ToggleOffIcon from "~icons/material-symbols/toggle-off-outline";
 import TrendingDownIcon from "~icons/material-symbols/trending-down";
 import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
 import UpdateIcon from "~icons/material-symbols/update";
 import VerifiedIcon from "~icons/material-symbols/verified-outline";
 import ViewColumnIcon from "~icons/material-symbols/view-column-outline";
-import VolumeOffIcon from "~icons/material-symbols/volume-off";
-import VolumeUpIcon from "~icons/material-symbols/volume-up";
+import VolumeOffIcon from "~icons/material-symbols/volume-off-outline";
+import VolumeUpIcon from "~icons/material-symbols/volume-up-outline";
 import WarningAmberIcon from "~icons/material-symbols/warning-outline";
 import WrapTextIcon from "~icons/material-symbols/wrap-text";
+import Whatshot from "~icons/material-symbols/whatshot-outline";
+import Key from "~icons/material-symbols/key-outline";
+import AdminPanelSettings from "~icons/material-symbols/admin-panel-settings-outline";
+import FactCheck from "~icons/material-symbols/fact-check-outline";
+import AltRoute from "~icons/material-symbols/alt-route";
+import Emergency from "~icons/material-symbols/emergency-outline";
+import Compress from "~icons/material-symbols/compress";
+import Pattern from "~icons/material-symbols/pattern";
+import CallMerge from "~icons/material-symbols/call-merge";
+import AutoGraph from "~icons/material-symbols/auto-graph";
 
 import type { Component } from "vue";
 
@@ -361,6 +371,19 @@ export const iconRegistry = {
   "description": Description,
   "dns": Dns,
   "fork-right": ForkRight,
+  "git-branch": ForkRight,
+  "flame": Whatshot,
+  "whatshot": Whatshot,
+  "brain-circuit": PsychologyIcon,
+  "key": Key,
+  "admin-panel-settings": AdminPanelSettings,
+  "fact-check": FactCheck,
+  "alt-route": AltRoute,
+  "emergency": Emergency,
+  "compress": Compress,
+  "pattern": Pattern,
+  "call-merge": CallMerge,
+  "auto-graph": AutoGraph,
   "fullscreen-exit": FullscreenExit,
   "group": Group,
   "hourglass-empty": HourglassEmpty,

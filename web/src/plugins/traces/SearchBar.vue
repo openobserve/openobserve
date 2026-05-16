@@ -330,9 +330,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value="tree"
               size="sm"
             >
-              <template #icon-left
-                ><GitBranch class="tw:size-3.5 tw:shrink-0"
-              /></template>
+              <template #icon-left>
+                <OIcon name="git-branch" size="sm" />
+              </template>
               Tree View
             </OToggleGroupItem>
             <OToggleGroupItem
@@ -451,7 +451,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { GitBranch } from 'lucide-vue-next';
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -482,7 +481,6 @@ export default defineComponent({
     OSwitch,
     OSelect,
     OTooltip,
-    GitBranch,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

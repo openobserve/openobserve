@@ -247,9 +247,9 @@ size="xs"
                 /></template>
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left
-                  ><Flame class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="flame" size="sm" />
+                </template>
                 Flame Graph
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
@@ -261,9 +261,9 @@ size="xs"
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
 size="sm">
-                <template #icon-left
-                  ><GitBranch class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
                 DAG
               </OToggleGroupItem>
               <!--
@@ -857,10 +857,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import {
-  Flame,
-  GitBranch,
-} from "lucide-vue-next";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -967,8 +963,6 @@ export default defineComponent({
     OButton,
     ODrawer,
     OIcon,
-    Flame,
-    GitBranch,
     ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),

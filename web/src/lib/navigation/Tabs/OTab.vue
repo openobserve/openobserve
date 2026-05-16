@@ -96,10 +96,10 @@ const heightClasses = computed<string>(() => {
           aria-hidden="true"
           alt=""
         />
-        <!-- Regular Material icon name → render as icon font glyph -->
+        <!-- Regular Material icon name → render as outlined icon font glyph -->
         <span
           v-else-if="icon"
-          class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons"
+          class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons-outlined"
         >{{ icon }}</span>
       </slot>
       <span v-if="label" class="o-tab__label tw:truncate">{{ label }}</span>

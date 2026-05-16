@@ -439,7 +439,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.alerts.name"),
         note: t("about.enterprise_offer.core_features.alerts.note"),
-        icon: "notifications_active",
+        icon: "notifications-active",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.alerts,
       },
       {
@@ -463,19 +463,19 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.pipelines.name"),
         note: t("about.enterprise_offer.core_features.pipelines.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipelines,
       },
       {
         name: t("about.enterprise_offer.core_features.high_availability.name"),
         note: t("about.enterprise_offer.core_features.high_availability.note"),
-        icon: "cloud_done",
+        icon: "cloud-done",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.high_availability,
       },
       {
         name: t("about.enterprise_offer.core_features.multitenancy.name"),
         note: t("about.enterprise_offer.core_features.multitenancy.note"),
-        icon: "corporate_fare",
+        icon: "corporate-fare",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.multitenancy,
       },
       {
@@ -504,7 +504,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.rbac.name"),
         note: t("about.enterprise_offer.enterprise_features.rbac.note"),
-        icon: "admin_panel_settings",
+        icon: "admin-panel-settings",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rbac,
       },
@@ -532,7 +532,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
         note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
-        icon: "fact_check",
+        icon: "fact-check",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
       },
@@ -546,7 +546,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
         note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
-        icon: "alt_route",
+        icon: "alt-route",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipeline_remote_destinations,
       },
@@ -568,7 +568,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
-        icon: "smart_toy",
+        icon: "smart-toy",
         requiresHA: true,
         beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
@@ -584,7 +584,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
-        icon: "query_stats",
+        icon: "query-stats",
         requiresHA: false,
         beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
@@ -620,21 +620,21 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
         note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
-        icon: "call_merge",
+        icon: "call-merge",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.broadcast_join,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
         note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
-        icon: "auto_graph",
+        icon: "auto-graph",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces_correlation,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
         note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.service_maps,
       },

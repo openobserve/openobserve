@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
                 <OToggleGroupItem value="traces" size="sm">
                   <template #icon-left
-                    ><OIcon name="fork-right" size="xs" class="tw:shrink-0"
+                    ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
@@ -366,15 +366,6 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OSpinner,
-    ScrollText,
-    BarChart2,
-    GitFork,
-    Info,
-    Search,
-    FileText,
-    Trash2,
-    ChevronLeft,
-    ChevronRight,
     OInput,
     OCheckbox,
   },

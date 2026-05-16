@@ -1051,21 +1051,13 @@ size="sm" />
                   <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_up'" :class="{
                       'feedback-selected': message.feedback === 'thumbs_up',
                     }" data-test="o2-ai-chat-thumbs-up-btn" @click="likeCodeBlock(index)">
-                    <OIcon :name="
-                        message.feedback === 'thumbs_up'
-                          ? matThumbUpAlt
-                          : 'thumb-up-off-alt'
-                      " size="14px" />
+                    <OIcon name="thumb-up-off-alt" size="xs" />
                     <q-tooltip>Helpful</q-tooltip>
                   </OButton>
                   <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_down'" :class="{
                       'feedback-selected': message.feedback === 'thumbs_down',
                     }" data-test="o2-ai-chat-thumbs-down-btn" @click="dislikeCodeBlock(index)">
-                    <OIcon :name="
-                        message.feedback === 'thumbs_down'
-                          ? matThumbDownAlt
-                          : 'thumb-down-off-alt'
-                      " size="14px" />
+                    <OIcon name="thumb-down-off-alt" size="xs" />
                     <q-tooltip>Not helpful</q-tooltip>
                   </OButton>
                 </div>
@@ -1353,7 +1345,6 @@ import DOMPurify from "dompurify";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import useAiChat from "@/composables/useAiChat";
-import { matThumbUpAlt, matThumbDownAlt } from "@quasar/extras/material-icons";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import {
   ChatMessage,
@@ -1421,6 +1412,8 @@ export default defineComponent({
     RichTextInput,
     O2AIConfirmDialog,
     ODropdown,
+    ODrawer,
+    ODialog,
     OSpinner,
     OIcon,
 },
@@ -5565,10 +5558,6 @@ export default defineComponent({
       loadHistory,
       store,
       isMac,
-      outlinedThumbUpOffAlt: "thumb-up-off-alt",
-      outlinedThumbDownOffAlt: "thumb-down-off-alt",
-      matThumbUpAlt,
-      matThumbDownAlt,
       likeCodeBlock,
       dislikeCodeBlock,
       currentChatTimestamp,
@@ -6001,16 +5990,23 @@ export default defineComponent({
       align-items: center;
       gap: 2px;
       margin-top: 4px;
-      opacity: 0.5;
-      transition: opacity 0.2s;
 
-      &:hover,
-      &.feedback-active {
+      > * {
+        opacity: 0.5;
+        transition: opacity 0.2s;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+
+      &.feedback-active > * {
         opacity: 1;
       }
 
       .feedback-selected {
         color: var(--o2-primary-color);
+        opacity: 1;
       }
     }
 

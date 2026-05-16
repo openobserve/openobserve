@@ -291,7 +291,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw, OInnerLoading, OSwitch, OSelect, OInput,
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OInput,
     OIcon,
 },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],

@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="close-drawer-btn"
                 @click="emit('update:open', false)"
                 >
-                  <X class="tw:size-4" />
+                  <OIcon name="close" size="sm" />
                 </OButton>
               </div>
             </div>
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="view-trace-btn"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
-                      <GitBranch class="tw:size-3" />
+                      <OIcon name="git-branch" size="xs" />
                       <span v-if="item._oo_trace_id" class="tw:text-[10px] tw:pl-[0.2rem]">Trace</span>
                     </OButton>
                   </div>
@@ -544,7 +544,6 @@ import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import { GitBranch } from 'lucide-vue-next';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 

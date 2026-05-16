@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="retrainingId === props.row.anomaly_id"
             @click="confirmRetrain(props.row)"
           >
-            <BrainCircuit class="tw:size-4" />
+            <OIcon name="brain-circuit" size="sm" />
           </OButton>
           <!-- Delete -->
           <OButton
@@ -251,12 +251,12 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 import { date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import { BrainCircuit } from 'lucide-vue-next';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, BrainCircuit, OSpinner },
+  components: { OButton, ODialog, OIcon, OSpinner },
 
   props: {
     org_identifier: {

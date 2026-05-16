@@ -1072,8 +1072,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <OIcon name="info"
-size="md" />
+                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6

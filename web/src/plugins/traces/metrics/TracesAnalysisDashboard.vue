@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="percentile-refresh-button"
           icon-left="refresh"
         >
-          <RefreshCw class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="refresh" size="sm" />
           <OTooltip :content="t('latencyInsights.refreshTooltip')" />
         </OButton>
       </div>

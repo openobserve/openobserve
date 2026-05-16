@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-item-section>
     <q-item-section v-else-if="iconComponent" avatar>
       <div class="icon-wrapper">
-        <OIcon><component :is="iconComponent" /></OIcon>
+        <component :is="iconComponent" class="o-icon tw:size-4" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"

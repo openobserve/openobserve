@@ -39,7 +39,7 @@
             size="xs"
           >
             <template #icon-left>
-              <GitBranch v-if="tab.value === 'or'" class="tw:size-3 tw:shrink-0" />
+              <OIcon v-if="tab.value === 'or'" name="git-branch" size="xs" />
               <OIcon v-else name="merge" size="xs" />
             </template>
             {{ tab.label }}
@@ -151,7 +151,6 @@
     import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
     import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
     import OIcon from '@/lib/core/Icon/OIcon.vue';
-    import { GitBranch } from 'lucide-vue-next';
     import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';

@@ -100,7 +100,7 @@ watch(
       <template v-else>
         <span
           v-if="icon"
-          class="material-icons tw:text-icon-md tw:text-collapsible-icon tw:shrink-0"
+          class="material-icons-outlined tw:text-icon-md tw:text-collapsible-icon tw:shrink-0"
           aria-hidden="true"
         >{{ icon }}</span>
 
@@ -116,7 +116,7 @@ watch(
 
         <!-- Chevron ΓÇö rotates when open -->
         <span
-          class="material-icons tw:text-icon-md tw:text-collapsible-icon tw:shrink-0
+          class="material-icons-outlined tw:text-icon-md tw:text-collapsible-icon tw:shrink-0
                  tw:transition-transform tw:duration-200"
           :class="isOpen ? 'tw:rotate-180' : 'tw:rotate-0'"
           aria-hidden="true"

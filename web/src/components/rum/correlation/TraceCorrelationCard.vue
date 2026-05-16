@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!hasBackendTrace"
             @click="viewTraceDetails"
           >
-            <GitBranch class="tw:size-4 tw:mr-1" />
+            <OIcon name="git-branch" size="sm" class="tw:mr-1" />
             View Trace Details
             <q-tooltip v-if="!hasBackendTrace">
               Backend trace data not yet available. Trace data may take up to 30
@@ -202,7 +202,6 @@ import { useQuasar, copyToClipboard } from "quasar";
 import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { GitBranch } from 'lucide-vue-next';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 

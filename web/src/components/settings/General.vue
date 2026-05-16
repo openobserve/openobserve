@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 180px"
             >
               <template v-slot:append>
-                <OIcon name="info" size="xs" class="cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <q-tooltip max-width="300px">
                     {{ t("settings.maxSeriesPerQueryTooltip") }}
                   </q-tooltip>

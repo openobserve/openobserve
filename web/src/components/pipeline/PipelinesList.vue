@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         icon-left="visibility"
                       >
                         <template #icon-left>
-                          <Eye class="tw:size-3.5 tw:shrink-0" />
+                          <OIcon name="visibility" size="sm" />
                         </template>
                         <OTooltip>
                           <template #content><PipelineView :pipeline="props.row" /></template>

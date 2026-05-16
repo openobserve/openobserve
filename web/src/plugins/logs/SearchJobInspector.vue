@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
               data-test="inspector-close-button"
             >
-              <X :size="16" />
+              <OIcon name="close" size="sm" />
               <OTooltip content="Close" />
             </OButton>
           </div>

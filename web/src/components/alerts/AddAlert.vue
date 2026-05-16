@@ -500,10 +500,6 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
-    Shield,
-    SlidersHorizontal,
-    TrendingUp,
-    Bell,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
