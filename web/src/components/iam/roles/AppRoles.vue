@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
-    <div>
-      <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
+    <div class="card-container tw:flex tw:flex-col tw:h-[calc(100vh-var(--navbar-height)-1.5rem)]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[56px] tw:shrink-0"
         >
         <div
           data-test="iam-roles-section-title"
@@ -27,19 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.roles") }}
         </div>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-            <div data-test="iam-roles-search-input">
-              <q-input
-                v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-                :placeholder="t('iam.searchRole')"
-              >
-                <template #prepend>
-                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
-                </template>
-              </q-input>
-            </div>
+
 
             <OButton
               data-test="alert-list-add-alert-btn"
@@ -51,66 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
       </div>
-    </div>
-      <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-var(--navbar-height)-92px)]">
-    <app-table
+      <div class="tw:flex-1 tw:min-h-0">
+    <RoleTable
       data-test="iam-roles-table-section"
-      class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-      :tableStyle="hasVisibleRows ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' : ''"
-      :rows="visibleRows"
-      :columns="columns"
-      pagination
-      :rows-per-page="20"
-      :filter="{
-        value: filterQuery,
-        method: filterRoles,
-      }"
-      :bordered="false"
-      :title="t('iam.roles')"
-      :hideTopPagination="true"
-      :showBottomPaginationWithTitle="true"
-      selection="multiple"
-      row-key="role_name"
-      v-model:selected="selectedRoles"
-      :theme="store.state.theme"
-    >
-      <template v-slot:actions="slotProps: any">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
-          <OButton
-            :data-test="`iam-roles-edit-${slotProps.column.row.role_name}-role-icon`"
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="t('common.edit')"
-            @click="() => editRole(slotProps.column.row)"
-          >
-            <OIcon name="edit" size="sm" />
-          </OButton>
-          <OButton
-            :data-test="`iam-roles-delete-${slotProps.column.row.role_name}-role-icon`"
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="t('common.delete')"
-            @click="() => showConfirmDialog(slotProps.column.row)"
-          >
-            <OIcon name="delete" size="sm" />
-          </OButton>
-        </div>
-      </template>
-      <template v-slot:bottom-actions>
-        <OButton
-          v-if="selectedRoles.length > 0"
-          data-test="iam-roles-bulk-delete-btn"
-          variant="outline"
-          size="sm"
-          class="tw:mr-2"
-          @click="openBulkDeleteDialog"
-          icon-left="delete"
-        >
-          {{ t('common.delete') }}
-        </OButton>
-      </template>
-    </app-table>
+      :data="rows"
+      :selected-ids="selectedRoleNames"
+      @update:selected-ids="onSelectionChange"
+      @edit="editRole"
+      @delete="showConfirmDialog"
+      @bulk-delete="openBulkDeleteDialog"
+    />
   </div>
   </div>
   </div>
@@ -127,21 +64,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <ConfirmDialog
     title="Bulk Delete Roles"
-    :message="`Are you sure you want to delete ${selectedRoles.length} role(s)?`"
+    :message="`Are you sure you want to delete ${selectedRoleNames.length} role(s)?`"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
   />
-  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeMount, ref } from "vue";
+import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18n } from "vue-i18n";
-import AppTable from "@/components/AppTable.vue";
-import { cloneDeep } from "lodash-es";
+import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles } from "@/services/iam";
 import { useStore } from "vuex";
@@ -149,7 +84,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+
 
 const { t } = useI18n();
 
@@ -170,35 +106,11 @@ const deleteConformDialog = ref({
   data: null as any,
 });
 
-const selectedRoles: any = ref([]);
+const selectedRoleNames = ref<string[]>([]);
+const onSelectionChange = (ids: string[]) => { selectedRoleNames.value = ids; };
 const confirmBulkDelete = ref(false);
 
-const columns: any = [
-  {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
-    style: "width: 67px"
-  },
-  {
-    name: "role_name",
-    field: "role_name",
-    label: t("iam.roleName"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "actions",
-    field: "actions",
-    label: t("common.actions"),
-    align: "center",
-    sortable: false,
-    slot: true,
-    slotName: "actions",
-    classes: "actions-column",
-  },
-];
+
 
 const { rolesState } = usePermissions();
 
@@ -206,17 +118,12 @@ onBeforeMount(() => {
   setupRoles();
 });
 
-const filterQuery = ref("");
-
 const updateTable = () => {
    let counter = 1;
-  rows.value = cloneDeep(
-    rolesState.roles.map((role: { role_name: string }, index) => ({
+  rows.value = rolesState.roles.map((role: { role_name: string }, index: number) => ({
       ...role,
-      // "#": index + 1,
-       "#": counter <= 9 ? `0${counter++}` : counter++,
-    }))
-  );
+      "#": counter <= 9 ? `0${counter++}` : counter++,
+    }));
 };
 
 const addRole = () => {
@@ -250,17 +157,6 @@ const setupRoles = async () => {
     .catch((err) => {
       console.log(err);
     });
-};
-
-const filterRoles = (rows: any, terms: any) => {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i]["role_name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-    }
-  }
-  return filtered;
 };
 
 const hideForm = () => {
@@ -303,7 +199,7 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeleteUserRoles = async () => {
-  const roleNames = selectedRoles.value.map((role: any) => role.role_name);
+  const roleNames = selectedRoleNames.value;
 
   try {
     const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
@@ -337,7 +233,7 @@ const bulkDeleteUserRoles = async () => {
     }
 
     await setupRoles();
-    selectedRoles.value = [];
+    selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
@@ -351,29 +247,7 @@ const bulkDeleteUserRoles = async () => {
   }
 };
 
-const visibleRows = computed(() => {
-  if (!filterQuery.value) return rows.value || []
-  return filterRoles(rows.value || [], filterQuery.value)
-})
 
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
 </script>
 
 <style scoped></style>
-<style lang="scss">
-.iam-table {
-  .thead-sticky,
-  .tfoot-sticky {
-    position: sticky;
-    top: 0;
-    opacity: 1;
-    z-index: 1;
-    background: transparent !important;
-  }
-
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: transparent !important;
-  }
-}
-</style>

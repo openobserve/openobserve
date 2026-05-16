@@ -19,15 +19,16 @@ import { useTableKeyboard } from "./composables/useTableKeyboard";
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OTablePagination from "./sub-components/OTablePagination.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
-  pagination: "none",
+  pagination: "client",
   pageSize: 20,
   pageSizeOptions: () => [20, 50, 100, 250, 500],
-  sorting: "none",
+  sorting: "client",
   selection: "none",
   expansion: "none",
   virtualScroll: false,
@@ -38,13 +39,15 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   loading: false,
   streaming: false,
   error: null,
-  dense: false,
+  dense: true,
   bordered: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
   rowKey: "id",
   rowHeight: 24,
+  showGlobalFilter: true,
+  globalFilterPlaceholder: "Search...",
   filterMode: "client",
   defaultColumns: true,
 });
@@ -56,6 +59,23 @@ const slots = defineSlots<OTableSlots<TData>>();
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const columnIds = computed(() => props.columns.map((c) => c.id));
 
+// ── Internal global filter state (uncontrolled when no parent binds :global-filter) ──
+const globalFilterLocal = ref(props.globalFilter ?? "");
+watch(
+  () => props.globalFilter,
+  (val) => {
+    globalFilterLocal.value = val ?? "";
+  },
+);
+
+function handleGlobalFilterChange(value: string) {
+  globalFilterLocal.value = value;
+  emit("update:globalFilter", value);
+  if (props.filterMode === "server") {
+    emit("filter-change", { global: value });
+  }
+}
+
 // ── Core table instance ─────────────────────────────────────────
 const {
   table,
@@ -66,18 +86,18 @@ const {
   columnSizeVars,
 } = useTableCore<TData>(
   {
-    data: props.data,
-    columns: props.columns,
-    pageSize: props.pageSize,
+    get data() { return props.data; },
+    get columns() { return props.columns; },
+    get pageSize() { return props.pageSize; },
     sortBy: props.sortBy,
     sortOrder: props.sortOrder,
     sortFieldMap: props.sortFieldMap,
-    globalFilter: props.globalFilter,
+    get globalFilter() { return globalFilterLocal.value; },
     rowKey: props.rowKey,
     enableColumnResize: props.enableColumnResize,
     enableColumnReorder: props.enableColumnReorder,
     enableColumnPin: props.enableColumnPin,
-    columnVisibility: props.columnVisibility,
+    get columnVisibility() { return props.columnVisibility; },
     defaultColumns: props.defaultColumns,
     getSubRows: props.getSubRows,
     pagination: props.pagination,
@@ -95,7 +115,7 @@ const pagination = useTablePagination(table, {
   pageSizeOptions: props.pageSizeOptions,
   currentPage: props.currentPage,
   totalCount: props.totalCount,
-  data: props.data,
+  get data() { return props.data; },
 }, emit);
 
 // ── Sorting ─────────────────────────────────────────────────────
@@ -109,7 +129,7 @@ const sorting = useTableSorting(table, {
 // ── Selection ───────────────────────────────────────────────────
 const selection = useTableSelection(table, {
   selection: props.selection,
-  selectedIds: props.selectedIds,
+  get selectedIds() { return props.selectedIds; },
   rowKey: props.rowKey,
 }, emit);
 
@@ -127,7 +147,7 @@ const expansion = useTableExpansion<TData>(
 // ── Filtering ───────────────────────────────────────────────────
 const filtering = useTableFiltering<TData>(
   {
-    globalFilter: props.globalFilter,
+    get globalFilter() { return globalFilterLocal.value; },
     globalFilterPlaceholder: props.globalFilterPlaceholder,
     filterMode: props.filterMode,
   },
@@ -147,7 +167,7 @@ const columnMgmt = useTableColumnManagement(
   {
     enableColumnResize: props.enableColumnResize,
     enableColumnReorder: props.enableColumnReorder,
-    columnVisibility: props.columnVisibility,
+    get columnVisibility() { return props.columnVisibility; },
     columnOrder,
     columnIds,
     pinnedFirstColumn: undefined,
@@ -270,10 +290,42 @@ defineExpose({
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
 
+    <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
+    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)] tw:rounded">
+    <!-- ── Built-in global search ─────────────────────────── -->
+    <div
+      v-if="props.showGlobalFilter && !slots.top"
+      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      data-test="o2-table-global-filter"
+    >
+      <div class="tw:relative tw:max-w-xs">
+        <q-icon
+          name="search"
+          size="0.9rem"
+          class="tw:absolute tw:left-2 tw:top-1/2 tw:-translate-y-1/2 tw:text-text-secondary"
+        />
+        <input
+          :value="globalFilterLocal"
+          type="text"
+          :placeholder="props.globalFilterPlaceholder"
+          class="tw:pl-7 tw:pr-2 tw:py-1 tw:text-sm tw:bg-transparent tw:border-none tw:text-text-primary tw:placeholder-text-disabled tw:outline-none tw:w-full"
+          data-test="o2-table-global-filter-input"
+          @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
+        />
+      </div>
+    </div>
+
     <!-- ── Loading banner (shown when loading with existing data) ── -->
     <slot
-      v-if="props.loading && displayRows.length > 0"
+      v-if="props.loading && displayRows.length > 0 && slots['loading-banner']"
       name="loading-banner"
+    />
+    <OBanner
+      v-else-if="props.loading && displayRows.length > 0"
+      variant="info"
+      :content="'Loading...'"
+      dense
+      data-test="o2-table-loading-banner"
     />
 
     <!-- ── Top pagination ───────────────────────────────────── -->
@@ -340,6 +392,7 @@ defineExpose({
           :get-sort-icon="sorting.getSortIcon"
           :sticky-header="props.stickyHeader"
           :bordered="props.bordered"
+          :dense="props.dense"
           :pivot-header-levels="props.pivotHeaderLevels"
           :pivot-row-columns="props.pivotRowColumns"
           :sticky-col-totals="props.stickyColTotals"
@@ -408,11 +461,12 @@ defineExpose({
         <tfoot
           v-if="table.getFooterGroups().length"
           data-test="o2-table-footer"
+          class="tw:sticky tw:bottom-0 tw:z-10"
         >
           <tr
             v-for="footerGroup in table.getFooterGroups()"
             :key="footerGroup.id"
-            class="tw:sticky tw:bottom-0 tw:z-10 tw:bg-[var(--color-table-header-bg)]"
+            class="tw:bg-[var(--color-table-header-bg)]"
           >
             <!-- Expand placeholder -->
             <th
@@ -430,13 +484,13 @@ defineExpose({
               :colspan="header.colSpan"
               :data-test="`o2-table-footer-cell-${header.id}`"
               :class="[
-                'tw:px-2 tw:py-2 tw:text-left tw:font-medium tw:text-text-primary tw:text-sm',
-                props.bordered ? 'tw:border-r tw:border-t tw:border-border-default' : 'tw:border-t tw:border-border-default',
+                'tw:px-2 tw:py-1 tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs',
+                'tw:border-t tw:border-[var(--color-table-header-border)]',
                 (header.column.columnDef.meta as any)?.align === 'center' ? 'tw:text-center' : '',
                 (header.column.columnDef.meta as any)?.align === 'right' ? 'tw:text-right' : '',
               ]"
               :style="{
-                width: `calc(var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+                width: `var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size)`,
                 ...(header.column.getIsPinned?.() === 'right'
                   ? {
                       position: 'sticky',
@@ -470,7 +524,10 @@ defineExpose({
       <!-- ── Loading State ──────────────────────────────────── -->
       <OTableLoading
         v-if="showLoadingOverlay"
-        :overlay="displayRows.length > 0"
+        variant="skeleton"
+        :skeleton-rows="props.pageSize ?? 5"
+        :skeleton-cols="props.columns.length"
+        :overlay="false"
       >
         <template v-if="slots.loading" #default>
           <slot name="loading" />
@@ -504,24 +561,9 @@ defineExpose({
         aria-label="Data streaming in progress"
       />
     </div>
+    </div> <!-- /bordered wrapper -->
 
-    <!-- ── Bottom slot (custom actions) ─────────────────────── -->
-    <slot
-      name="bottom"
-      :current-page="pagination.currentPage.value"
-      :page-size="pagination.pageSize.value"
-      :total-pages="pagination.totalPages.value"
-      :total-rows="pagination.totalCount.value"
-      :is-first-page="pagination.isFirstPage.value"
-      :is-last-page="pagination.isLastPage.value"
-      :set-page-size="pagination.setPageSize"
-      :first-page="pagination.firstPage"
-      :prev-page="pagination.prevPage"
-      :next-page="pagination.nextPage"
-      :last-page="pagination.lastPage"
-    />
-
-    <!-- ── Bottom Pagination ────────────────────────────────── -->
+    <!-- ── Bottom Pagination (with optional bulk actions slot) ── -->
     <OTablePagination
       v-if="pagination.isEnabled.value"
       position="bottom"
@@ -539,6 +581,23 @@ defineExpose({
       @prev-page="pagination.prevPage"
       @next-page="pagination.nextPage"
       @last-page="pagination.lastPage"
-    />
+    >
+      <template v-if="slots.bottom" #actions>
+        <slot
+          name="bottom"
+          :current-page="pagination.currentPage.value"
+          :page-size="pagination.pageSize.value"
+          :total-pages="pagination.totalPages.value"
+          :total-rows="pagination.totalCount.value"
+          :is-first-page="pagination.isFirstPage.value"
+          :is-last-page="pagination.isLastPage.value"
+          :set-page-size="pagination.setPageSize"
+          :first-page="pagination.firstPage"
+          :prev-page="pagination.prevPage"
+          :next-page="pagination.nextPage"
+          :last-page="pagination.lastPage"
+        />
+      </template>
+    </OTablePagination>
   </div>
 </template>

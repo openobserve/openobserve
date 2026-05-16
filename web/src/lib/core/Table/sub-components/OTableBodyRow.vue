@@ -89,16 +89,17 @@ function onDblclick(event: MouseEvent) {
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
     :class="[
-      'tw:transition-colors',
-      isStriped
+      'tw:transition-colors tw:duration-150',
+      'tw:hover:bg-[var(--color-table-row-hover-bg)]',
+      isRowSelected
+        ? 'tw:bg-[var(--color-table-row-selected-bg)]'
+        : '',
+      !isRowSelected && isStriped
         ? 'tw:bg-[var(--color-table-row-striped-bg)]'
         : '',
       rowClass,
     ]"
-    :style="{
-      ...rowStyle,
-      borderLeft: rowStyle?.borderLeft,
-    }"
+    :style="rowStyle"
     @click="onClick"
     @dblclick="onDblclick"
   >
@@ -113,7 +114,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      class="tw:w-0 tw:px-0"
+      :class="['tw:w-0 tw:px-0 tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
@@ -126,7 +127,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Selection checkbox cell -->
     <td
       v-if="selectionEnabled"
-      class="tw:w-0"
+      :class="['tw:w-0 tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
       data-test="o2-table-select-cell"
     >
       <OTableSelectCheckbox
@@ -169,7 +170,10 @@ function onDblclick(event: MouseEvent) {
     :data-test="`o2-table-expanded-row-${row.index}`"
     class="tw:bg-[var(--color-table-row-expanded-bg)]"
   >
-    <td :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)">
+    <td
+      :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
+      :class="bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : ''"
+    >
       <slot name="expansion" :row="row.original" />
     </td>
   </tr>
