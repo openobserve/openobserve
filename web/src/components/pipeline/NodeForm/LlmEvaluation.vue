@@ -15,22 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="llm-evaluation-node-section"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    style="width: 100%; height: 100%"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.llmEvaluation')"
+    :width="30"
+    :show-close="true"
+    @keydown.stop
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="llm-evaluation-node-section"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
-      {{ t("pipeline.llmEvaluation") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
+
 
     <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
       <q-form @submit="saveLlmEvaluationNode">
@@ -117,9 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
             class="q-mt-md"
-          >
-            <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+            icon-left="refresh"
+          />
         </div>
 
         <!-- Enable Sampling Toggle -->
@@ -178,7 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -189,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -197,17 +194,32 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { RefreshCw } from "lucide-vue-next";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog, OButton },
+  components: { ConfirmDialog, OButton, ODrawer },
+  props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
+  },
   emits: ["cancel:hideform"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const q = useQuasar();
     const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+
+    const internalOpen = ref(!!props.open);
+    watch(() => props.open, (v: boolean) => { internalOpen.value = !!v; });
+    function handleDrawerClose(v: boolean) {
+      internalOpen.value = v;
+      if (!v) {
+        setTimeout(() => emit("cancel:hideform"), 300);
+      }
+    }
     const { getStream } = useStreams();
 
     const nodeName = ref("");
@@ -437,6 +449,8 @@ export default defineComponent({
       deleteNode,
       dialog,
       pipelineObj,
+      internalOpen,
+      handleDrawerClose,
     };
   },
 });

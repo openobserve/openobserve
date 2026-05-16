@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none">
+  <div class="tw:rounded-md q-pa-none">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -29,17 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.basicUsers") }}
         </div>
         <div class="full-width tw:flex tw:justify-end tw:gap-3">
-          <q-input
+          <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('user.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           <div class="col-6" v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
@@ -79,11 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-slot:body-selection="scope">
             <q-td auto-width>
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 class="o2-table-checkbox"
-                :disable="!scope.row.enableDelete"
+                :disabled="!scope.row.enableDelete"
               />
             </q-td>
           </template>
@@ -92,11 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Adding this block to render the select-all checkbox -->
                <q-th v-if="columns.length > 0" auto-width>
                 
-                <q-checkbox
+                <OCheckbox
                   v-model="headerCheckboxValue"
-                  size="sm"
                   toggle-indeterminate
-                  :disable="selectableRows.length === 0"
+                  :disabled="selectableRows.length === 0"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-table-checkbox-dark'
@@ -124,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="confirmDeleteAction(props)"
                 :data-test="`delete-basic-user-${props.row.email}`"
               >
-                <q-icon :name="outlinedDelete" />
+                <OIcon name="delete" size="sm" />
               </OButton>
               <OButton
                 v-if="props.row.status == 'pending' && props.row.token"
@@ -134,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="confirmRevokeAction(props)"
                 :data-test="`revoke-invite-${props.row.email}`"
               >
-                <q-icon name="cancel" />
+                <OIcon name="cancel" size="sm" />
               </OButton>
               <OButton
                 v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
@@ -144,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="addRoutePush(props)"
                 :data-test="`edit-basic-user-${props.row.email}`"
               >
-                <q-icon name="edit" />
+                <OIcon name="edit" size="sm" />
               </OButton>
             </q-td>
           </template>
@@ -165,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 class="tw:mr-2"
                 @click="openBulkDeleteDialog"
+                icon-left="delete"
               >
-                <template #icon-left><q-icon name="delete" /></template>
                 Delete
               </OButton>
               <QTablePagination
@@ -184,109 +180,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
 
-    <q-dialog
+    <update-user-role
       v-if="config.isCloud == 'false'"
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
+      v-model:open="showUpdateUserDialog"
+      v-model="selectedUser"
+      @updated="updateMember"
+    />
+
+    <add-user
+      v-model:open="showAddUserDialog"
+      v-if="config.isCloud == 'false'"
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      :userRole="currentUserRole"
+      :roles="options"
+      :customRoles="customRoles"
+      @updated="addMember"
+    />
+
+    <ODialog data-test="user-delete-dialog"
+      v-model:open="confirmDelete"
+      size="xs"
+      :title="t('user.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
     >
-      <update-user-role v-model="selectedUser" @updated="updateMember" />
-    </q-dialog>
+      <p>{{ t('user.confirmDeleteMsg') }}</p>
+    </ODialog>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
+    <ODialog data-test="user-revoke-dialog"
+      v-model:open="confirmRevoke"
+      size="xs"
+      title="Revoke Invitation"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRevoke = false"
+      @click:primary="revokeInvite"
     >
-      <add-user
-        v-if="config.isCloud == 'false'"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        :userRole="currentUserRole"
-        :roles="options"
-        :customRoles="customRoles"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </q-dialog>
+      <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
+    </ODialog>
 
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("user.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("user.confirmDeleteMsg") }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="deleteUser"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmRevoke">
-      <q-card style="width: 400px">
-        <q-card-section class="confirmBody">
-          <div class="head">Revoke Invitation</div>
-          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="revokeInvite"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Users</div>
-          <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="bulkDeleteUsers"
-          >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog data-test="user-bulk-delete-dialog"
+      v-model:open="confirmBulkDelete"
+      size="xs"
+      title="Delete Users"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteUsers"
+    >
+      <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -305,7 +261,7 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -321,6 +277,10 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    OIcon,
+    ODialog,
+    OInput,
+    OCheckbox,
   },
   emits: [
     "updated:fields",
@@ -394,6 +354,17 @@ export default defineComponent({
       // }
 
       updateUserActions();
+
+      // Handle deep-linked / refreshed URL
+      const query = router.currentRoute.value.query;
+      if (query.action === "add") {
+        addUser({}, false);
+      } else if (query.action === "update" && query.email) {
+        const match = usersState.users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
     });
 
     const columns: any = ref<QTableProps["columns"]>([
@@ -876,6 +847,7 @@ export default defineComponent({
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       usersService
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
@@ -905,6 +877,7 @@ export default defineComponent({
     };
 
     const revokeInvite = async () => {
+      confirmRevoke.value = false;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",
@@ -1138,7 +1111,6 @@ export default defineComponent({
       maxRecordToReturn,
       showUpdateUserDialog,
       changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       fetchUserGroups,
       toggleExpand,

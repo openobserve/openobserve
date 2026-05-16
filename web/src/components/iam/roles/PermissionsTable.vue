@@ -69,13 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        <q-circular-progress
-          indeterminate
-          rounded
-          size="20px"
-          color="primary"
-          class="q-my-sm q-mx-none q-mr-sm"
-        />
+        <OSpinner size="xs" class="q-my-sm q-mx-none q-mr-sm" />
         <div>Loading Resources...</div>
       </div>
       <div
@@ -100,10 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           parent ? parent.name : 'main'
         }-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        style="max-height: calc(100vh - 310px); overflow-x: hidden; overflow-y: auto;"
         :style="{
-          'max-height': level > 0 ? '400px' : 'calc(100vh - 310px)',
-          'height': 'auto',
+          'max-height': level > 0 ? '400px' : '100%',
+          'height': level > 0 ? 'auto' : '100%',
+          'overflow-x': 'hidden',
+          'overflow-y': 'auto',
         }"
         :items-size="getFilteredRows.length"
         :virtual-scroll-item-size="39"
@@ -140,9 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-if="col.field === 'permission'">
                   <div class="tw:flex tw:items-center tw:justify-center tw:gap-0.5">
-                    <q-checkbox
+                    <OCheckbox
                       :data-test="`edit-role-permissions-table-header-column-${col.name}-select-all`"
-                      size="xs"
                       :model-value="getHeaderCheckboxState(col.name)"
                       :indeterminate-value="'indeterminate'"
                       class="filter-check-box cursor-pointer"
@@ -193,23 +187,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <template v-if="col.name === 'expand' && row.has_entities">
-                <q-icon
+                <OIcon
                   :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-icon`"
                   :name="
-                    row.expand ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
-                  "
+                    row.expand ? 'keyboard-arrow-up' : 'keyboard-arrow-down'
+                  " size="sm"
                   class="cursor-pointer"
                   :title="t('common.expand')"
                   @click="() => expandPermission(row)"
                 />
               </template>
               <template v-else-if="col.field === 'permission'">
-                <q-checkbox
+                <OCheckbox
                   :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-checkbox`"
                   v-if="row.permission?.[col.name]?.show"
-                  size="xs"
                   v-model="row.permission[col.name].value"
-                  :val="col.name"
+                  :value="col.name"
                   class="filter-check-box cursor-pointer"
                   @update:model-value="handlePermissionChange(row, col.name)"
                 />
@@ -262,7 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   selectedPermissionsHash: {
     type: Set,

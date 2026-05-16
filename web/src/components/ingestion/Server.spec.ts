@@ -84,7 +84,7 @@ describe("Server Component", () => {
           'q-route-tab': true,
           'router-view': true,
           'q-input': true,
-          'q-icon': true
+          'OIcon': true
         }
       },
     });
@@ -147,7 +147,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -207,7 +207,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -233,7 +233,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -259,7 +259,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -285,7 +285,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -314,7 +314,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -347,7 +347,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -596,7 +596,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -617,7 +617,7 @@ describe("Server Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-input': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });

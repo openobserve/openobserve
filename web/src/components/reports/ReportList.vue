@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
 
@@ -216,58 +216,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="display: inline-block; width: 33.14px; height: auto"
                       class="flex justify-center items-center"
                     >
-                      <q-circular-progress
-                        indeterminate
-                        rounded
-                        size="16px"
-                        :value="1"
-                        color="secondary"
-                      />
+                      <OSpinner size="xs" />
                     </div>
                     <OButton
                       v-else
                       :data-test="`report-list-${props.row.name}-pause-start-report`"
                       :variant="props.row.enabled ? 'ghost-destructive' : 'ghost'"
                       size="icon-sm"
+                      :icon-left="props.row.enabled ? 'pause' : 'play-arrow'"
                       :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
                       @click="toggleReportState(props.row)"
-                    >
-                      <Pause v-if="props.row.enabled" class="tw:size-4" />
-                      <Play v-else class="tw:size-4" />
-                    </OButton>
+                    />
 
                     <!-- Edit -->
                     <OButton
                       :data-test="`report-list-${props.row.name}-edit-report`"
+                      icon-left="edit"
                       variant="ghost"
                       size="icon-sm"
                       :title="t('alerts.edit')"
                       @click="editReport(props.row)"
-                    >
-                      <Pencil class="tw:size-4" />
-                    </OButton>
+                    />
 
                     <!-- Move to folder -->
                     <OButton
                       :data-test="`report-list-${props.row.name}-move-report`"
+                      icon-left="drive-file-move"
                       variant="ghost"
                       size="icon-sm"
                       title="Move to Folder"
                       @click="openMoveDialog(props.row)"
-                    >
-                      <FolderInput class="tw:size-4" />
-                    </OButton>
+                    />
 
                     <!-- Delete -->
                     <OButton
                       :data-test="`report-list-${props.row.name}-delete-report`"
+                      icon-left="delete"
                       variant="ghost-destructive"
                       size="icon-sm"
                       :title="t('alerts.delete')"
                       @click="confirmDeleteReport(props.row)"
-                    >
-                      <Trash2 class="tw:size-4" />
-                    </OButton>
+                    />
                   </q-td>
                 </template>
 
@@ -282,21 +271,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         v-if="selectedReports.length > 0"
                         data-test="report-list-move-reports-btn"
+                        icon-left="drive-file-move"
                         variant="outline"
                         size="sm-action"
                         @click="moveMultipleReports"
                       >
-                        <FolderInput class="tw:size-4 tw:mr-1" />
                         Move
                       </OButton>
                       <OButton
                         v-if="selectedReports.length > 0"
                         data-test="report-list-delete-reports-btn"
+                        icon-left="delete"
                         variant="outline-destructive"
                         size="sm-action"
                         @click="openBulkDeleteDialog"
                       >
-                        <Trash2 class="tw:size-4 tw:mr-1" />
                         Delete
                       </OButton>
                     </div>
@@ -336,21 +325,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Move to folder dialog -->
-    <q-dialog
-      v-model="showMoveDialog"
-      position="right"
-      full-height
-      maximized
+    <MoveAcrossFolders
+      v-model:open="showMoveDialog"
+      :activeFolderId="activeFolderToMove"
+      :moduleId="reportIdsToMove"
+      type="reports"
+      @updated="onMoveUpdated"
       data-test="report-move-to-another-folder-dialog"
-    >
-      <MoveAcrossFolders
-        v-if="showMoveDialog"
-        :activeFolderId="activeFolderToMove"
-        :moduleId="reportIdsToMove"
-        type="reports"
-        @updated="onMoveUpdated"
-      />
-    </q-dialog>
+    />
   </div>
 </template>
 
@@ -364,12 +346,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedDriveFileMove,
-} from "@quasar/extras/material-icons-outlined";
 import { useQuasar, date, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
@@ -378,7 +354,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pause, Play, Pencil, Trash2, FolderInput, CalendarClock, Database } from 'lucide-vue-next';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -423,8 +400,8 @@ const reportListTableRef: Ref<any> = ref(null);
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const tabs = reactive([
-  { label: t("reports.scheduled"), value: "shared", icon: CalendarClock },
-  { label: t("reports.cached"),    value: "cached", icon: Database },
+  { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
+  { label: t("reports.cached"),    value: "cached", icon: "database" },
 ]);
 
 const perPageOptions: any = [

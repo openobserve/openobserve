@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('common.search')"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </q-input>
           <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-150px)]">
@@ -90,10 +90,13 @@ import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 import OTab from '@/lib/navigation/Tabs/OTab.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
-  components: { OTabs, OTab },
+  components: { OTabs, OTab,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

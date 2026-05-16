@@ -217,7 +217,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const icon = wrapper.find(".icon-wrapper .q-icon");
+    const icon = wrapper.find(".icon-wrapper .OIcon");
     expect(icon.exists()).toBe(true);
   });
 

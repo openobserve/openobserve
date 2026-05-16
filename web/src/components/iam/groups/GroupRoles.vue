@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="col q-pa-none" >
+  <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full q-pa-none" >
     <div
-      class="flex justify-start q-px-md q-py-sm card-container"
-      style="position: sticky; top: 0px; z-index: 2"
+      class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
       <div class="q-mr-md">
@@ -60,21 +59,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mr-md"
         style="width: 400px"
       >
-        <q-input
+        <OInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          borderless
-          dense
           class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
           placeholder="Search Roles"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
+            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" />
           </template>
-        </q-input>
+        </OInput>
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
+    <div data-test="iam-roles-selection-table" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto card-container">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -83,14 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :virtual-scroll="false"
           :title="t('iam.roles')"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+          :tableStyle="hasVisibleRows ? 'height: 100%; overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
         >
           <template v-slot:select="slotProps: any">
-            <q-checkbox
+            <OCheckbox
               :data-test="`iam-roles-selection-table-body-row-${slotProps.column.row.role_name}-checkbox`"
-              size="xs"
               v-model="slotProps.column.row.isInGroup"
               class="filter-check-box cursor-pointer"
               @click="toggleUserSelection(slotProps.column.row)"
@@ -113,6 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { watch, onBeforeMount, computed } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";

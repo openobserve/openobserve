@@ -19,35 +19,19 @@
 
 
     <template>
-        <q-card
-        style="width: 60vw"
-        class="column full-height no-wrap"
+        <ODrawer data-test="enrichment-schema-drawer"
+        :open="open"
+        size="lg"
+        :title="t('logStream.schemaHeader')"
+        @update:open="$emit('update:open', $event)"
     >
-        <q-card-section class="q-ma-none">
-        <div class="row items-center no-wrap">
-            <div class="col">
-            <div
-                class="text-body1 tw:font-semibold tw:text-xl"
-                data-test="schema-title-text"
-            >
-                {{ t("logStream.schemaHeader") }}
-            </div>
-            </div>
-            <div class="col-auto">
-            <OButton variant="ghost" size="icon-sm" v-close-popup="true">
-              <X :size="14" />
-            </OButton>
-            </div>
-        </div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-ma-none q-pa-none">
+        <div>
         <div
           v-if="loadingState"
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
@@ -93,20 +77,17 @@
             <div class="tw:text-sm display-total-fields">
                 All Fields ({{ schemaData.schema.length }})
             </div>
-                <q-input
+                <OInput
                   data-test="schema-field-search-input"
                   v-model="filterField"
                   data-cy="schema-index-field-search-input"
-                  filled
-                  borderless
-                  dense
                   debounce="1"
                   :placeholder="t('search.searchField')"
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <OIcon name="search" size="sm" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
           <div>
 
@@ -148,8 +129,8 @@
         </div>
 
       <br /><br /><br />
-    </q-card-section>
-    </q-card>
+        </div>
+    </ODrawer>
     </template>
 
     <script lang="ts">
@@ -157,7 +138,7 @@
     import {
     defineComponent,
     ref,
-    onMounted,
+    watch,
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
@@ -178,14 +159,12 @@
     import AppTabs from "@/components/common/AppTabs.vue";
 
     import QTablePagination from "@/components/shared/grid/Pagination.vue";
-    import {
-    outlinedSchema,
-    outlinedPerson,
-    outlinedDelete,
-    } from "@quasar/extras/material-icons-outlined";
-    import DateTime from "@/components/DateTime.vue";
+        import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
-    import { X } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+    import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+    import OInput from "@/lib/forms/Input/OInput.vue";
+        import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     const defaultStreamData = {
         name: '',
         schema: [],
@@ -200,6 +179,10 @@
     export default defineComponent({
     name: "SchemaEnrichment",
     props: {
+        open: {
+        type: Boolean,
+        default: false,
+        },
          
         selectedEnrichmentTable: {
         type: String,
@@ -211,10 +194,14 @@
         StreamFieldsInputs,
         AppTabs,
         QTablePagination,
+        ODrawer,
         OButton,
-        X,
-    },
-    setup({ selectedEnrichmentTable }) {
+        OInput,
+        OSpinner,
+        OIcon,
+},
+    emits: ['update:open'],
+    setup(props) {
         const { t } = useI18n();
         const store = useStore();
         const q = useQuasar();
@@ -252,19 +239,25 @@
             { label: "50", value: 50 },
         ];
 
-        onMounted(async () => {
-            await getSchemaData();
-        })
+        watch(
+            () => props.open,
+            async (isOpen) => {
+                if (isOpen) await getSchemaData();
+            },
+        );
 
         const getSchemaData = async () => {
             try {
                 loadingState.value = true;
-                const streamData = await getStream(selectedEnrichmentTable, 'enrichment_tables', true);
-                schemaData.value = streamData;
-                resultTotal.value = streamData.schema.length;
-                loadingState.value = false;
+                const streamData = await getStream(props.selectedEnrichmentTable, 'enrichment_tables', true);
+                if (streamData) {
+                    schemaData.value = streamData;
+                    resultTotal.value = streamData.schema.length;
+                }
             } catch (error) {
                 console.error(error);
+                schemaData.value = { ...defaultStreamData, stats: { ...defaultStreamData.stats } };
+            } finally {
                 loadingState.value = false;
             }
         }
@@ -292,7 +285,7 @@
         schemaRows,
         loadingState,
         schemaData,
-        selectedEnrichmentTable,
+        selectedEnrichmentTable: props.selectedEnrichmentTable,
         getStream,
         formatSizeFromMB,
         isCloud,

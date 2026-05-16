@@ -1,25 +1,21 @@
 <template>
   <!-- histogram interval for sql queries -->
-  <q-select
+  <OSelect
     v-model="histogramIntervalModel"
     label="Histogram interval"
     :options="histogramIntervalOptions"
-    behavior="menu"
-    borderless
     data-test="histogram-interval-dropdown"
-    dense
-    class="o2-custom-select-dashboard"
     @update:model-value="$emit('update:modelValue', $event)"
-    :display-value="`${histogramIntervalModel?.label ?? 'Auto'}`"
-  >
-  </q-select>
+  />
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "HistogramIntervalDropDown",
+  components: { OSelect },
   props: {
     modelValue: {
       type: String,
@@ -123,19 +119,15 @@ export default defineComponent({
       },
     ];
 
-    const histogramIntervalModel: any = ref(
-      histogramIntervalOptions.find(
-        (v: any) => v.value == (props.modelValue ?? null),
-      ) ?? { label: "Auto", value: null },
+    const histogramIntervalModel = ref<string | null>(
+      props.modelValue ?? null,
     );
 
     // on modelvalue change, update the model
     watch(
       () => props.modelValue,
       () => {
-        histogramIntervalModel.value = histogramIntervalOptions.find(
-          (v: any) => v.value == props.modelValue,
-        );
+        histogramIntervalModel.value = props.modelValue ?? null;
       },
     );
 

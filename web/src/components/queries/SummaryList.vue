@@ -33,14 +33,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </div>
         <div v-else class="text-center full-width full-height q-mt-lg">
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -50,9 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('queries.cancelQuery')"
             data-test="cancelQuery-btn"
             @click.stop="confirmDeleteAction(props)"
-          >
-            <X class="tw:size-4" />
-          </OButton>
+            icon-left="close"
+          />
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -100,15 +99,15 @@ import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X } from 'lucide-vue-next';
 import { durationFormatter } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QTablePagination, NoData, OButton, X },
+  components: { QTablePagination, NoData, OButton, X, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -236,7 +235,7 @@ export default defineComponent({
       perPageOptions,
       showListSchemaDialog,
       changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       loadingState,
       isMetaOrg,
       resultTotal,

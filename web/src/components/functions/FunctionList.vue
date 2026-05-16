@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("function.header") }}
               </div>
               <div class="q-ml-auto" data-test="functions-list-search-input">
-                <q-input
+                <OInput
                   v-model="filterQuery"
-                  borderless
-                  dense
                   class="q-ml-auto no-border o2-search-input"
                   :placeholder="t('function.search')"
                 >
                   <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
+                    <OIcon class="o2-search-input-icon" name="search" size="sm" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <OButton
                 class="q-ml-sm"
@@ -77,34 +75,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
                     @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    icon-left="edit"
+                  />
                   <OButton
                     variant="ghost-destructive"
                     size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
                     @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
+                    icon-left="delete"
+                  />
                   <OButton
                     variant="ghost"
                     size="icon-sm"
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines(props)"
                   >
-                    <q-icon :name="outlinedAccountTree" size="14px" />
+                    <OIcon name="account-tree" size="xs" />
                   </OButton>
                 </q-td>
               </template>
 
               <template v-slot:body-cell-function="props">
                 <q-td :props="props">
-                  <q-tooltip>
-                    <pre>{{ props.row.function }}</pre>
-                  </q-tooltip>
+                  <OTooltip>
+                    <template #content><pre>{{ props.row.function }}</pre></template>
+                  </OTooltip>
                   <pre style="white-space: break-spaces">{{
                     props.row.function
                   }}</pre>
@@ -112,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
               </template>
 
               <template #bottom="scope">
@@ -127,10 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     class="tw:mr-2"
                     @click="openBulkDeleteDialog"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     Delete
                   </OButton>
                   <QTablePagination
@@ -148,9 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
-                        size="sm"
                         :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                         class="o2-table-checkbox"
                       />
@@ -199,49 +192,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <q-dialog v-model="confirmForceDelete" persistent>
-      <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
-        <q-card-section
-          class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center"
-        >
-          <div>
-            Pipelines Associated with
-            <strong> {{ selectedDelete.name }}</strong>
-          </div>
-          <q-icon
-            name="close"
-            size="18px"
-            @click="closeDialog"
-            style="cursor: pointer"
-          />
-        </q-card-section>
-        <q-card-section>
-          <div
-            v-if="transformedPipelineList.length > 0"
-            class="pipeline-list-container"
+    <ODialog data-test="function-list-force-delete-dialog" v-model:open="confirmForceDelete" persistent size="md"
+      :title="`Pipelines Associated with ${selectedDelete?.name}`"
+    >
+      <div
+        v-if="transformedPipelineList.length > 0"
+        class="pipeline-list-container"
+      >
+        <q-list class="scrollable-list">
+          <q-item
+            v-for="(pipeline, index) in transformedPipelineList"
+            :key="pipeline.value"
+            clickable
+            @click="onPipelineSelect(pipeline)"
           >
-            <q-list class="scrollable-list">
-              <q-item
-                v-for="(pipeline, index) in transformedPipelineList"
-                :key="pipeline.value"
-                clickable
-                @click="onPipelineSelect(pipeline)"
-              >
-                <q-item-section>
-                  {{ index + 1 }}. {{ pipeline.label }}
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-          <div v-else>
-            <div class="text-h6 text-center">
-              No pipelines associated with this function
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+            <q-item-section>
+              {{ index + 1 }}. {{ pipeline.label }}
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </div>
+      <div v-else>
+        <div class="text-h6 text-center">
+          No pipelines associated with this function
+        </div>
+      </div>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
@@ -265,14 +242,14 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import {
-  outlinedDelete,
-  outlinedAccountTree,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "functionList",
@@ -282,9 +259,12 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
-    Pencil,
-    Trash2,
-  },
+    OIcon,
+    ODialog,
+    OInput,
+    OTooltip,
+    OCheckbox,
+    },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -757,8 +737,6 @@ export default defineComponent({
       maxRecordToReturn,
       showAddJSTransformDialog,
       changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedAccountTree,
       forceDeleteFn,
       confirmForceDelete,
       pipelineList,

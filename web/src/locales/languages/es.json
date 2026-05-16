@@ -396,7 +396,8 @@
     "traces": "Huellas",
     "switchToLogs": "haga clic para volver a Registros",
     "patternNoValuesAvailable": "No hay valores disponibles",
-    "selectLogStream": "Seleccione la secuencia de registros"
+    "selectLogStream": "Seleccione la secuencia de registros",
+    "noData": "No hay datos disponibles"
   },
   "menu": {
     "home": "Inicio",

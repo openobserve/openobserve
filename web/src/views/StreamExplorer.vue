@@ -1,5 +1,5 @@
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -12,11 +12,7 @@
       <template v-if="isLoading.length">
         <div class="full-height flex justify-center items-center">
           <div class="q-pb-lg">
-            <q-spinner-hourglass
-              color="primary"
-              size="40px"
-              style="margin: 0 auto; display: block"
-            />
+            <OSpinner size="md" class="tw:mx-auto tw:block" />
             <span class="text-center">
               Hold on tight, we're fetching your stream data.
             </span>
@@ -31,7 +27,7 @@
         />
       </template>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -49,12 +45,13 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { IDateTime } from "@/ts/interfaces";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type SearchBarInstance = InstanceType<typeof SearchBar>;
 
 export default defineComponent({
   name: "StreamExplorer",
-  components: { SearchBar, StreamDataTable },
+  components: { SearchBar, StreamDataTable, OSpinner },
   setup() {
     const store = useStore();
     const router = useRouter();

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <span class="text-bold">{{ t("rum.eventID") }}:</span>
         <span
@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="error.error_id"
           class="q-pl-xs cursor-pointer"
           >{{ error.error_id }}
-          <q-icon
-            size="12px"
-            name="content_copy"
+          <OIcon
+            size="xs"
+            name="content-copy"
             class="hover:tw:text-[var(--o2-primary-btn-bg)]"
             @click="copyErrorId(error.error_id)"
         /></span>
@@ -71,6 +71,7 @@ import { defineProps } from "vue";
 import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const router = useRouter();

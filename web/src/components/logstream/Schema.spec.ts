@@ -27,6 +27,70 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
+// Lightweight stub for ODrawer so tests can render the slots schema.vue
+// places inside the drawer (header badge, default content, footer) without
+// pulling in reka-ui portals. Exposes the migrated prop surface and emits
+// update:open + click:primary/secondary/neutral.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: {
+    open: { type: Boolean, default: false },
+    size: { type: String, default: undefined },
+    title: { type: String, default: undefined },
+    subTitle: { type: String, default: undefined },
+    persistent: { type: Boolean, default: false },
+    showClose: { type: Boolean, default: true },
+    width: { type: [String, Number], default: undefined },
+    primaryButtonLabel: { type: String, default: undefined },
+    secondaryButtonLabel: { type: String, default: undefined },
+    neutralButtonLabel: { type: String, default: undefined },
+    primaryButtonVariant: { type: String, default: undefined },
+    secondaryButtonVariant: { type: String, default: undefined },
+    neutralButtonVariant: { type: String, default: undefined },
+    primaryButtonDisabled: { type: Boolean, default: false },
+    secondaryButtonDisabled: { type: Boolean, default: false },
+    neutralButtonDisabled: { type: Boolean, default: false },
+    primaryButtonLoading: { type: Boolean, default: false },
+    secondaryButtonLoading: { type: Boolean, default: false },
+    neutralButtonLoading: { type: Boolean, default: false },
+  },
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-drawer-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-width="width"
+      :data-persistent="String(!!persistent)"
+      :data-show-close="String(!!showClose)"
+    >
+      <slot name="header" />
+      <slot name="header-left" />
+      <slot name="header-right" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-drawer-stub-primary"
+        @click="$emit('click:primary')"
+      >primary</button>
+      <button
+        data-test="o-drawer-stub-secondary"
+        @click="$emit('click:secondary')"
+      >secondary</button>
+      <button
+        data-test="o-drawer-stub-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+    </div>
+  `,
+};
+
+const globalMountOptions = (storeOverride: any = store) => ({
+  provide: { store: storeOverride },
+  plugins: [i18n],
+  stubs: { ODrawer: ODrawerStub },
+});
+
 describe("Schema Component Tests", async () => {
   let wrapper: any;
 
@@ -79,6 +143,7 @@ describe("Schema Component Tests", async () => {
             store: store,
           },
           plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
         },
       });
       await flushPromises();
@@ -180,9 +245,10 @@ describe("Schema Component Tests", async () => {
         global: {
           provide: { store: store },
           plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
         },
       });
-      
+
       await flushPromises();
       expect(enrichmentWrapper.vm.showDataRetention).toBe(false);
       enrichmentWrapper.unmount();
@@ -550,9 +616,10 @@ describe("Schema Component Tests", async () => {
         global: {
           provide: { store: store },
           plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
         },
       });
-      
+
       await flushPromises();
       expect(tracesWrapper.vm.showStoreOriginalDataToggle).toBe(false);
       tracesWrapper.unmount();
@@ -723,6 +790,7 @@ describe("Schema Component Tests", async () => {
             },
           },
           plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
         },
       });
       await flushPromises();
@@ -979,6 +1047,7 @@ describe("Schema Component Tests", async () => {
         global: {
           provide: { store },
           plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
         },
       });
       await flushPromises();
@@ -1048,6 +1117,7 @@ describe("Schema Component Tests", async () => {
         global: {
           provide: { store },
           plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
         },
       });
       await flushPromises();
@@ -1093,7 +1163,7 @@ describe("Schema Component Tests", async () => {
             settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [], pattern_associations: [] },
           },
         },
-        global: { provide: { store }, plugins: [i18n] },
+        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
       });
       await flushPromises();
       expect(w.find('[data-test="stream-llm-evaluation-tab"]').exists()).toBe(false);
@@ -1119,7 +1189,7 @@ describe("Schema Component Tests", async () => {
             settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [], pattern_associations: [] },
           },
         },
-        global: { provide: { store }, plugins: [i18n] },
+        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
       });
       await flushPromises();
       // Tab visibility depends on config.isEnterprise which comes from aws-exports mock
@@ -1147,7 +1217,7 @@ describe("Schema Component Tests", async () => {
             settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [], pattern_associations: [] },
           },
         },
-        global: { provide: { store }, plugins: [i18n] },
+        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
       });
       await flushPromises();
       // When enable_cross_linking is false, the tab should not exist
@@ -1162,6 +1232,157 @@ describe("Schema Component Tests", async () => {
     it("should expose orgCrossLinks computed", async () => {
       expect(wrapper.vm.orgCrossLinks).toBeDefined();
       expect(Array.isArray(wrapper.vm.orgCrossLinks)).toBe(true);
+    });
+  });
+
+  // Coverage for the q-dialog/q-drawer → ODrawer migration.
+  describe("ODrawer Migration", () => {
+    const buildProps = (open = true) => ({
+      open,
+      modelValue: {
+        name: "test-stream",
+        storage_type: "s3",
+        stream_type: "logs",
+        stats: {
+          doc_time_min: 1678448628630259,
+          doc_time_max: 1678448628652947,
+          doc_num: 400,
+          file_num: 1,
+          storage_size: 0.74,
+          compressed_size: 0.03,
+        },
+        schema: [{ name: "_timestamp", type: "Int64" }],
+        settings: {
+          partition_time_level: "hourly",
+          partition_keys: {},
+          full_text_search_keys: [],
+          index_fields: [],
+          bloom_filter_fields: [],
+          data_retention: 30,
+          max_query_range: 0,
+          store_original_data: false,
+          approx_partition: false,
+          defined_schema_fields: [],
+          extended_retention_days: [],
+          pattern_associations: [],
+        },
+      },
+    });
+
+    let w: any;
+
+    beforeEach(async () => {
+      w = mount(LogStream, {
+        props: buildProps(true),
+        global: {
+          provide: { store },
+          plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
+        },
+      });
+      await flushPromises();
+    });
+
+    afterEach(() => {
+      w?.unmount();
+      vi.clearAllMocks();
+    });
+
+    it("should render both ODrawer instances (schema drawer + pattern association drawer)", () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers.length).toBe(2);
+    });
+
+    it("should forward the open prop to the schema ODrawer", () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[0].props("open")).toBe(true);
+    });
+
+    it("should mount the schema ODrawer with width=60", () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[0].props("width")).toBe(60);
+    });
+
+    it("should mount the pattern association ODrawer with width=60 and showClose=false", () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[1].props("width")).toBe(60);
+      expect(drawers[1].props("showClose")).toBe(false);
+    });
+
+    it("should keep the pattern association ODrawer closed by default", () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[1].props("open")).toBe(false);
+    });
+
+    it("should emit update:open=false when the schema ODrawer emits update:open=false", async () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      await drawers[0].vm.$emit("update:open", false);
+      const emitted = w.emitted("update:open");
+      expect(emitted).toBeTruthy();
+      expect(emitted[emitted.length - 1]).toEqual([false]);
+    });
+
+    it("should emit update:open=false when the ODrawer close button is clicked", async () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      await drawers[0].find('[data-test="o-drawer-stub-close"]').trigger("click");
+      await flushPromises();
+      const emitted = w.emitted("update:open");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1]).toEqual([false]);
+    });
+
+    it("should render the header slot content (stream name badge) inside the ODrawer", () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[0].find('[data-test="schema-title-text"]').exists()).toBe(true);
+      expect(drawers[0].find('[data-test="schema-title-text"]').text()).toContain("test-stream");
+    });
+
+    it("should open the pattern association ODrawer when openPatternAssociationDialog is invoked", async () => {
+      w.vm.patternAssociations = {
+        field1: [{ field: "field1", pattern_name: "p1", pattern_id: "id1" }],
+      };
+      w.vm.openPatternAssociationDialog("field1");
+      await flushPromises();
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[1].props("open")).toBe(true);
+    });
+
+    it("should close the pattern association ODrawer when it emits update:open=false", async () => {
+      w.vm.patternAssociationDialog.show = true;
+      await flushPromises();
+      const drawers = w.findAllComponents(ODrawerStub);
+      expect(drawers[1].props("open")).toBe(true);
+
+      await drawers[1].vm.$emit("update:open", false);
+      await flushPromises();
+      expect(w.vm.patternAssociationDialog.show).toBe(false);
+    });
+
+    it("should hide schema content and show loading placeholder when indexData.schema is falsy", async () => {
+      const lw = mount(LogStream, {
+        props: {
+          open: true,
+          modelValue: { name: "loading-stream", schema: null, stats: {}, settings: {} },
+        },
+        global: {
+          provide: { store },
+          plugins: [i18n],
+          stubs: { ODrawer: ODrawerStub },
+        },
+      });
+      await flushPromises();
+      const drawer = lw.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.text()).toContain("Wait while loading");
+      lw.unmount();
+    });
+
+    it("should not throw when ODrawer emits update:open with the same value", async () => {
+      const drawers = w.findAllComponents(ODrawerStub);
+      await drawers[0].vm.$emit("update:open", true);
+      const emitted = w.emitted("update:open");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1]).toEqual([true]);
     });
   });
 });

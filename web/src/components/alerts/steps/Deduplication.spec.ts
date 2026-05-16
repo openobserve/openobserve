@@ -475,7 +475,7 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render info icons", () => {
-      // q-icon components are rendered - check HTML contains info icon references
+      // OIcon components are rendered - check HTML contains info icon references
       const html = wrapper.html();
       expect(html).toContain("info");
     });

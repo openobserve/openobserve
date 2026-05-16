@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page :key="store.state.selectedOrganization.identifier" class="tw:h-full">
+  <div class="tw:rounded-md tw:h-full" :key="store.state.selectedOrganization.identifier">
     <div
       ref="fullscreenDiv"
       :class="{
@@ -54,23 +54,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-back-btn"
             >
               <template #icon-left
-                ><q-icon name="arrow_back_ios_new"
+                ><OIcon name="arrow-back-ios-new" size="sm"
               /></template>
             </OButton>
             <span
               class="q-table__title folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              data-test="dashboard-view-folder-breadcrumb"
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
-            <q-spinner-dots
+            <OSpinner
               v-if="!store.state.organizationData.folders.length"
-              color="primary"
-              size="2em"
+              variant="dots"
+              size="sm"
             />
-            <q-icon
+            <OIcon
               class="q-table__title tw:text-gray-400 tw:mt-1"
-              name="chevron_right"
-            ></q-icon>
+              name="chevron-right" size="sm"
+             />
             <span
               class="q-table__title q-mx-sm tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
@@ -86,8 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               @click="addPanelData"
               data-test="dashboard-panel-add"
+              icon-left="add"
             >
-              <template #icon-left><q-icon name="add" /></template>
               <q-tooltip>{{ t("panel.add") }}</q-tooltip>
             </OButton>
             <!-- <DateTimePicker 
@@ -139,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               @click="cancelQuery"
               data-test="dashboard-cancel-btn"
+              icon-left="cancel"
             >
-              <template #icon-left><q-icon name="cancel" /></template>
               <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
             </OButton>
             <OButton
@@ -152,8 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
               data-test="dashboard-refresh-btn"
+              icon-left="refresh"
             >
-              <template #icon-left><q-icon name="refresh" /></template>
               <q-tooltip>
                 {{
                   isVariablesChanged
@@ -183,8 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               data-test="dashboard-setting-btn"
               @click="openSettingsDialog"
+              icon-left="settings"
             >
-              <template #icon-left><q-icon name="settings" /></template>
               <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
             </OButton>
             <OButton
@@ -194,8 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-print-btn"
             >
               <template #icon-left
-                ><q-icon
-                  :name="store.state.printMode === true ? 'close' : 'print'"
+                ><OIcon
+                  :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
               <q-tooltip>{{
                 store.state.printMode === true
@@ -211,12 +212,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-fullscreen-btn"
             >
               <template #icon-left
-                ><q-icon
+                ><OIcon
                   :name="
                     quasar.fullscreen.isActive
-                      ? 'fullscreen_exit'
+                      ? 'fullscreen-exit'
                       : 'fullscreen'
-                  "
+                  " size="sm"
               /></template>
               <q-tooltip>{{
                 quasar.fullscreen.isActive
@@ -233,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="view-dashboard-scheduled-reports"
             >
               <template #icon-left
-                ><q-icon :name="outlinedDescription"
+                ><OIcon name="description" size="sm"
               /></template>
               <q-tooltip>{{ t("dashboard.scheduledDashboards") }}</q-tooltip>
             </OButton>
@@ -244,8 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs"
               data-test="dashboard-json-edit-btn"
               @click="openJsonEditor"
+              icon-left="code"
             >
-              <template #icon-left><q-icon name="code" /></template>
               <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
             </OButton>
           </div>
@@ -290,59 +291,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:runId="updateRunId"
       />
 
-      <q-dialog
-        v-model="showDashboardSettingsDialog"
-        position="right"
-        full-height
-        maximized
-        data-test="dashboard-settings-dialog"
-      >
-        <DashboardSettings @refresh="loadDashboard" />
-      </q-dialog>
+      <DashboardSettings
+        v-model:open="showDashboardSettingsDialog"
+        @refresh="loadDashboard"
+        @close="showDashboardSettingsDialog = false"
+      />
 
-      <q-dialog
-        v-model="selectedPanelConfig.show"
-        position="right"
-        full-height
-        maximized
-      >
-        <PanelLayoutSettings
-          :layout="selectedPanelConfig.data.layout"
-          @save:layout="savePanelLayout"
-        />
-      </q-dialog>
+      <PanelLayoutSettings
+        v-if="selectedPanelConfig.data"
+        v-model:open="selectedPanelConfig.show"
+        :layout="selectedPanelConfig.data.layout"
+        @save:layout="savePanelLayout"
+        @close="selectedPanelConfig.show = false"
+      />
 
-      <q-dialog
-        v-model="showScheduledReportsDialog"
-        position="right"
-        full-height
-        maximized
-      >
-        <ScheduledDashboards
-          :reports="scheduledReports"
-          :loading="isLoadingReports"
-          :folderId="folderId"
-          :dashboardId="dashboardId"
-          :tabId="tabId"
-          :tabs="currentDashboardData?.data?.tabs || []"
-        />
-      </q-dialog>
+      <ScheduledDashboards
+        v-model:open="showScheduledReportsDialog"
+        :reports="scheduledReports"
+        :loading="isLoadingReports"
+        :folderId="folderId"
+        :dashboardId="dashboardId"
+        :tabId="tabId"
+        :tabs="currentDashboardData?.data?.tabs || []"
+      />
 
-      <q-dialog
-        v-model="showJsonEditorDialog"
-        position="right"
-        full-height
-        maximized
-        :persistent="true"
-      >
-        <DashboardJsonEditor
-          :dashboard-data="currentDashboardData.data"
-          :save-json-dashboard="saveJsonDashboard"
-          @close="showJsonEditorDialog = false"
-        />
-      </q-dialog>
+      <DashboardJsonEditor
+        v-model:open="showJsonEditorDialog"
+        :dashboard-data="currentDashboardData.data"
+        :save-json-dashboard="saveJsonDashboard"
+      />
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -389,12 +368,13 @@ import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
-import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -434,7 +414,9 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
-  },
+    OSpinner,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const route = useRoute();
@@ -1907,7 +1889,7 @@ export default defineComponent({
       folderId,
       reportId,
       tabId,
-      outlinedDescription,
+      outlinedDescription: "description",
       searchRequestTraceIds,
       arePanelsLoading,
       cancelQuery,

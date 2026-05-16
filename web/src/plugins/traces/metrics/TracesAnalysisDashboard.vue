@@ -15,121 +15,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="isOpen"
-    position="right"
-    full-height
-    :maximized="true"
-    allow-focus-outside
-    transition-show="slide-left"
-    transition-hide="slide-right"
-    @hide="onClose"
+  <ODrawer data-test="traces-analysis-dashboard-drawer"
+    v-model:open="isOpen"
+    :width="80"
+    :title="drawerTitle"
+    @update:open="(v) => !v && onClose()"
   >
-    <q-card class="analysis-dashboard-card">
-      <!-- Header -->
-      <q-card-section
-        class="analysis-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-[0.675rem]"
+    <template #header-left>
+      <OIcon name="timeline" size="1.5rem" />
+      <!-- Time Range Display: Inline chips -->
+      <div
+        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-2"
       >
-        <div class="tw:flex tw:items-center tw:gap-1 tw:flex-wrap">
-          <q-icon name="timeline" size="1.5rem" color="primary" />
-          <span
-            class="tw:text-[var(--o2-text-4)]! tw:text-lg tw:font-semibold tw:whitespace-nowrap"
+        <!-- Baseline Chip -->
+        <div
+          class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          :style="{ '--chip-color': chipColors.baseline }"
+        >
+          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
+            >Baseline:</span
           >
-            <template v-if="props.analysisType === 'duration'">{{
-              t("latencyInsights.title")
-            }}</template>
-            <template v-else-if="props.analysisType === 'volume'">{{
-              t("volumeInsights.title")
-            }}</template>
-            <template v-else-if="props.analysisType === 'error'">{{
-              t("errorInsights.title")
-            }}</template>
-          </span>
-
-          <!-- Time Range Display: Inline chips -->
-          <div
-            class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-[1rem]"
-          >
-            <!-- Baseline Chip -->
-            <div
-              class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
-              :style="{ '--chip-color': chipColors.baseline }"
-            >
-              <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-                >Baseline:</span
-              >
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  baselineTimeRange.startTime,
-                  baselineTimeRange.endTime,
-                ).start
-              }}</span>
-              <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  baselineTimeRange.startTime,
-                  baselineTimeRange.endTime,
-                ).end
-              }}</span>
-            </div>
-
-            <!-- Selected Chip -->
-            <div
-              v-if="hasSelectedTimeRange"
-              class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
-              :style="{ '--chip-color': chipColors.selected }"
-            >
-              <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-                >Selected:</span
-              >
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  selectedTimeRangeDisplay.startTime,
-                  selectedTimeRangeDisplay.endTime,
-                ).start
-              }}</span>
-              <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
-              <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-                formatSmartTimestamp(
-                  selectedTimeRangeDisplay.startTime,
-                  selectedTimeRangeDisplay.endTime,
-                ).end
-              }}</span>
-            </div>
-
-            <!-- Additional filter info -->
-            <span
-              v-if="filterMetadata"
-              class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
-            >
-              {{ filterMetadata }}
-            </span>
-          </div>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              baselineTimeRange.startTime,
+              baselineTimeRange.endTime,
+            ).start
+          }}</span>
+          <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              baselineTimeRange.startTime,
+              baselineTimeRange.endTime,
+            ).end
+          }}</span>
         </div>
 
-        <div class="tw:flex tw:items-center tw:gap-3">
-          <!-- Refresh button (shown when percentile changes on duration tab) -->
-          <OButton
-            v-if="showRefreshButton"
-            variant="primary"
-            size="icon-xs-sq"
-            @click="refreshAfterPercentileChange"
-            data-test="percentile-refresh-button"
+        <!-- Selected Chip -->
+        <div
+          v-if="hasSelectedTimeRange"
+          class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          :style="{ '--chip-color': chipColors.selected }"
+        >
+          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
+            >Selected:</span
           >
-            <RefreshCw class="tw:size-3.5 tw:shrink-0" />
-            <q-tooltip>{{ t("latencyInsights.refreshTooltip") }}</q-tooltip>
-          </OButton>
-
-          <OButton
-            variant="ghost"
-            size="icon-xs-sq"
-            @click="isOpen = false"
-            data-test="analysis-dashboard-close"
-          >
-            <X class="tw:size-3.5 tw:shrink-0" />
-          </OButton>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              selectedTimeRangeDisplay.startTime,
+              selectedTimeRangeDisplay.endTime,
+            ).start
+          }}</span>
+          <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
+          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+            formatSmartTimestamp(
+              selectedTimeRangeDisplay.startTime,
+              selectedTimeRangeDisplay.endTime,
+            ).end
+          }}</span>
         </div>
-      </q-card-section>
+
+        <!-- Additional filter info -->
+        <span
+          v-if="filterMetadata"
+          class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
+        >
+          {{ filterMetadata }}
+        </span>
+
+        <!-- Refresh button (shown when percentile changes on duration tab) -->
+        <OButton
+          v-if="showRefreshButton"
+          variant="primary"
+          size="icon-xs-sq"
+          @click="refreshAfterPercentileChange"
+          data-test="percentile-refresh-button"
+          icon-left="refresh"
+        >
+          <OIcon name="refresh" size="sm" />
+          <OTooltip :content="t('latencyInsights.refreshTooltip')" />
+        </OButton>
+      </div>
+    </template>
 
       <!-- Tabs (only shown if multiple analysis types available) -->
       <OTabs
@@ -150,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <q-card-section class="analysis-content tw:flex-1 tw:p-0">
+      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden">
         <q-splitter
           v-model="splitterModel"
           :limits="splitterLimits"
@@ -170,22 +136,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
                   <!-- Search Input -->
-                  <q-input
+                  <OInput
                     v-model="dimensionSearchText"
-                    dense
-                    borderless
                     :placeholder="t('search.searchDimension')"
                     clearable
                     class="tw:w-full"
                     data-test="dimension-search-input"
                   >
                     <template #prepend>
-                      <q-icon
-                        name="search"
+                      <OIcon
+                        name="search" size="sm"
                         class="tw:text-[1.2rem]! tw:text-[var(--o2-text-3)]"
                       />
                     </template>
-                  </q-input>
+                  </OInput>
                 </div>
 
                 <!-- Dimension List -->
@@ -200,14 +164,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="dimension-list-item tw:border-none!"
                     >
                       <q-item-section side>
-                        <q-checkbox
+                        <OCheckbox
                           :model-value="
                             selectedDimensions.includes(dimension.value)
                           "
                           @update:model-value="toggleDimension(dimension.value)"
-                          color="primary"
                           size="xs"
-                          dense
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
                       </q-item-section>
@@ -216,15 +178,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
                         >
                           {{ dimension.label }}
-                          <q-tooltip
-                            anchor="top middle"
-                            self="bottom middle"
-                            :offset="[0, 8]"
+                          <OTooltip
+                            side="top"
+                            align="center"
+                            :side-offset="8"
                             :delay="500"
                             max-width="300px"
-                          >
-                            {{ dimension.label }}
-                          </q-tooltip>
+                            :content="dimension.label"
+                          />
                         </q-item-label>
                       </q-item-section>
                     </q-item>
@@ -256,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'Collapse Dimensions'
                   : 'Expand Dimensions'
               "
+              :icon-left="showDimensionSelector ? 'chevron-left' : 'chevron-right'"
               :class="
                 showDimensionSelector
                   ? 'splitter-icon-expand'
@@ -264,10 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="sidebar-button"
               size="sidebar-button"
               @click="toggleDimensionSelector"
-            >
-              <ChevronLeft v-if="showDimensionSelector" class="tw:size-3.5 tw:shrink-0" />
-              <ChevronRight v-else class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+            />
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -281,11 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="loading"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="3.75rem"
-                    class="tw:mb-4"
-                  />
+                  <OSpinner size="xl" class="tw:mb-4" />
                   <div class="tw:text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
@@ -303,10 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="error"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <q-icon
-                    name="error_outline"
+                  <OIcon
+                    name="error-outline"
                     size="3.75rem"
-                    color="negative"
                     class="tw:mb-4"
                   />
                   <div class="tw:text-base tw:mb-2">
@@ -342,16 +296,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-splitter>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      </div>
+  </ODrawer>
 </template>
 
 <script lang="ts" setup>
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from "@/lib/core/Button/OButton.vue";
-import { RefreshCw, X, ChevronLeft, ChevronRight } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -369,6 +323,10 @@ import {
   selectDimensionsFromData,
   selectTraceDimensions,
 } from "@/composables/useDimensionSelector";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -437,6 +395,14 @@ const { generateDashboard } = useLatencyInsightsDashboard();
 const variablesManager = ref(null);
 
 const isOpen = ref(true);
+
+// Computed title for the drawer header based on analysis type
+const drawerTitle = computed(() => {
+  if (props.analysisType === 'duration') return t('latencyInsights.title');
+  if (props.analysisType === 'volume') return t('volumeInsights.title');
+  if (props.analysisType === 'error') return t('errorInsights.title');
+  return '';
+});
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
 const showDimensionSelector = ref(true); // Changed to true - now controls sidebar visibility
@@ -489,7 +455,7 @@ const availableTabs = computed(() => {
         return {
           name: "volume",
           label: t("volumeInsights.tabLabel"),
-          icon: "trending_up",
+          icon: "trending-up",
         };
       case "duration":
         return {
@@ -501,7 +467,7 @@ const availableTabs = computed(() => {
         return {
           name: "error",
           label: t("errorInsights.tabLabel"),
-          icon: "error_outline",
+          icon: "error-outline",
         };
     }
   });
@@ -1141,6 +1107,21 @@ watch(
 );
 </script>
 
+<style lang="scss">
+// Non-scoped: ODrawer body for this drawer does not have flex:1 by default
+// (intentional for form drawers, but the Insights drawer needs a full-height
+// splitter layout). Override the body div — 4th child of the drawer panel after
+// the two sr-only elements (h2, p) and the header div.
+// Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
+// that ODialog provides by default but ODrawer omits.
+[data-test="traces-analysis-dashboard-drawer"] > div:nth-child(4) {
+  flex: 1 1 0 !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+}
+</style>
+
 <style lang="scss" scoped>
 .analysis-dashboard-card {
   display: flex;
@@ -1155,7 +1136,7 @@ watch(
   }
 
   .insights-dashboard-tabs {
-    :deep(.o-tabs__content .q-icon) {
+    :deep(.o-tabs__content .OIcon) {
       font-size: 1.2rem;
       display: flex;
       align-items: center;
@@ -1183,30 +1164,32 @@ watch(
     }
   }
 
-  // Time range chips styling - matching chart colors
-  .time-range-chip {
-    font-size: 0.7rem;
-    line-height: 1.2;
-    transition: all 0.2s ease;
-
-    &.baseline-chip,
-    &.selected-chip {
-      background: color-mix(in srgb, var(--chip-color) 20%, transparent);
-      border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-      color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
-      font-weight: 500;
-    }
-  }
-
-  .analysis-content {
-    flex: 1;
-    overflow: hidden; // Changed to hidden - q-splitter handles overflow
-    min-height: 0;
-    background: #f5f5f5 !important;
-  }
   .q-card__section--vert {
     padding: 8px !important;
   }
+}
+
+// Time range chips styling - matching chart colors
+// (lifted out: .analysis-dashboard-card wrapper no longer exists in template)
+.time-range-chip {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  transition: all 0.2s ease;
+
+  &.baseline-chip,
+  &.selected-chip {
+    background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+    border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
+    color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
+    font-weight: 500;
+  }
+}
+
+.analysis-content {
+  flex: 1;
+  overflow: hidden; // Changed to hidden - q-splitter handles overflow
+  min-height: 0;
+  background: #f5f5f5 !important;
 }
 
 // Dimension sidebar (in splitter)
@@ -1238,13 +1221,11 @@ watch(
 }
 
 // Splitter icon positioning (at top, like logs page)
-.analysis-splitter-icon-collapse {
-  min-height: 3em !important;
-  min-width: 0.3rem !important;
-  position: absolute !important;
-  top: 26px !important;
-  left: 15px !important;
+// Splitter separator bar — visible narrow divider with collapse button at top
+:deep(.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator) {
+  width: 10px !important;
 }
+
 
 // Dark mode support
 body.body--dark {
@@ -1255,9 +1236,10 @@ body.body--dark {
       background: #1e1e1e !important;
     }
 
-    .analysis-content {
-      background: #2a2a2a !important;
-    }
+  }
+
+  .analysis-content {
+    background: #2a2a2a !important;
   }
 
   .dimension-sidebar {

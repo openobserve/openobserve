@@ -45,8 +45,8 @@ vi.mock("@/components/icons/NotEqualIcon.vue", () => ({
 }));
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedArrowBackIos: "arrow_back_ios",
-  outlinedArrowForwardIos: "arrow_forward_ios",
+  "arrow-back-ios": "arrow_back_ios",
+  "arrow-forward-ios": "arrow_forward_ios",
 }));
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────

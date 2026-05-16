@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger="refreshData"
             />
             <OButton
+              icon-left="refresh"
               :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
               size="icon-toolbar"
               data-test="rum-performance-refresh"
               @click="refreshData"
             >
-              <q-icon name="refresh" size="16px" />
               <q-tooltip>
                 {{
                   isVariablesChanged

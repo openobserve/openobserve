@@ -28,21 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="hideOnPrintMode"
               @click="goBack"
               data-test="alert-history-back-btn"
-            >
-              <template #icon-left><ChevronLeft class="tw:size-3.5 tw:shrink-0" /></template>
-            </OButton>
+              icon-left="chevron-left"
+            />
             <div
               class="q-table__title tw:font-[600] q-ml-sm tw:flex tw:items-center tw:gap-2"
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
-              <q-icon name="info" size="18px" color="grey-6">
+              <OIcon name="info" size="sm">
                 <q-tooltip>
                   History is only available for scheduled and manually triggered
                   pipelines. Real-time pipelines do not generate history
                   records.
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
           <div class="flex q-ml-auto items-center">
@@ -83,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template v-slot:prepend>
-                <q-icon
+                <OIcon
                   class="o2-search-input-icon"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-search-input-icon-dark'
                       : 'o2-search-input-icon-light'
                   "
-                  name="search"
+                  name="search" size="sm"
                 />
               </template>
               <template v-slot:no-option>
@@ -108,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="manualSearch"
               data-test="pipeline-history-manual-search-btn"
               :disabled="loading"
+              icon-left="search"
             >
-              <template #icon-left><Search class="tw:size-3.5 tw:shrink-0" /></template>
               <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
             </OButton>
             <OButton
@@ -118,8 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshData"
               data-test="pipeline-history-refresh-btn"
               :loading="loading"
+              icon-left="refresh"
             >
-              <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
               <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
             </OButton>
           </div>
@@ -184,29 +183,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-is_realtime="props">
             <q-td :props="props">
-              <q-icon
-                :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
+              <OIcon
+                :name="props.row.is_realtime ? 'check-circle' : 'schedule'"
                 :color="props.row.is_realtime ? 'positive' : 'grey'"
                 size="xs"
               >
                 <q-tooltip>
                   {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </q-td>
           </template>
 
           <template #body-cell-is_silenced="props">
             <q-td :props="props">
-              <q-icon
-                :name="props.row.is_silenced ? 'volume_off' : 'volume_up'"
+              <OIcon
+                :name="props.row.is_silenced ? 'volume-off' : 'volume-up'"
                 :color="props.row.is_silenced ? 'grey' : 'positive'"
                 size="20px"
               >
                 <q-tooltip>
                   {{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </q-td>
           </template>
 
@@ -218,12 +217,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-is_partial="props">
             <q-td :props="props">
-              <q-icon
+              <OIcon
                 v-if="
                   props.row.is_partial !== null &&
                   props.row.is_partial !== undefined
                 "
-                :name="props.row.is_partial ? 'warning' : 'check_circle'"
+                :name="props.row.is_partial ? 'warning' : 'check-circle'"
                 :color="props.row.is_partial ? 'warning' : 'positive'"
                 size="xs"
               >
@@ -234,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : "Complete Results"
                   }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
               <span v-else>-</span>
             </q-td>
           </template>
@@ -295,27 +294,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <q-dialog v-model="detailsDialog" position="standard">
-      <q-card
-        style="width: 700px; max-width: 80vw; max-height: 90vh"
-        class="pipeline-details-dialog"
+    <ODialog data-test="pipeline-history-details-dialog" v-model:open="detailsDialog" size="lg" title="Pipeline Execution Details" primary-button-label="Close" @click:primary="detailsDialog = false">
+      <div
+        class="scroll"
+        style="max-height: 70vh"
+        v-if="selectedRow"
       >
-        <q-card-section class="row items-center q-pb-xs bg-primary text-white">
-          <div class="text-h6">Pipeline Execution Details</div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section
-          class="scroll"
-          style="max-height: 70vh"
-          v-if="selectedRow"
-        >
-          <div class="q-gutter-sm">
+        <div class="q-gutter-sm">
             <!-- Basic Information -->
             <div class="detail-section">
               <div class="row q-col-gutter-md">
@@ -374,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Type</div>
                   <div class="text-body2">
-                    <q-icon
+                    <OIcon
                       :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
                       class="q-mr-xs"
                       size="xs"
@@ -385,17 +370,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Silenced</div>
                   <div class="text-body2">
-                    <q-icon
+                    <OIcon
                       v-if="selectedRow.is_silenced"
-                      name="volume_off"
-                      color="warning"
+                      name="volume-off"
                       size="xs"
                       class="q-mr-xs"
                     />
-                    <q-icon
+                    <OIcon
                       v-else
-                      name="volume_up"
-                      color="positive"
+                      name="volume-up"
                       size="xs"
                       class="q-mr-xs"
                     />
@@ -456,9 +439,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Result Status
                     </div>
                     <div class="text-body2">
-                      <q-icon
+                      <OIcon
                         :name="
-                          selectedRow.is_partial ? 'warning' : 'check_circle'
+                          selectedRow.is_partial ? 'warning' : 'check-circle'
                         "
                         :color="selectedRow.is_partial ? 'warning' : 'positive'"
                         size="xs"
@@ -487,27 +470,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
+                  <OIcon
                     name="error"
-                    color="negative"
                     size="xs"
                     class="q-mr-xs"
                   />
                   Error Details
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-negative-1 q-mt-xs">
+                <div class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-negative/5">
                   <pre
                     class="text-body2"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
+                      font-family: 'Courier New', monospace;
                       font-size: 12px;
                     "
                     >{{ selectedRow.error }}</pre
                   >
-                </q-card>
+                </div>
               </div>
             </template>
 
@@ -516,95 +498,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
-                    name="check_circle"
-                    color="positive"
+                  <OIcon
+                    name="check-circle"
                     size="xs"
                     class="q-mr-xs"
                   />
                   Response
                 </div>
-                <q-card flat bordered class="q-pa-sm bg-positive-1 q-mt-xs">
+                <div class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-positive/5">
                   <pre
                     class="text-body2"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: &quot;Courier New&quot;, monospace;
+                      font-family: 'Courier New', monospace;
                       font-size: 12px;
                     "
                     >{{ selectedRow.success_response }}</pre
                   >
-                </q-card>
+                </div>
               </div>
             </template>
           </div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right" class="q-pa-md">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+    </ODialog>
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialog">
-      <q-card style="min-width: 500px">
-        <q-card-section
-          class="pipeline-error-header row items-center q-pb-none"
-        >
-          <div class="tw:flex-1">
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-1">
-              <q-icon name="error" size="24px" class="error-icon" />
-              <span class="pipeline-name">{{
-                errorMessage.pipeline_name
-              }}</span>
-            </div>
-            <div class="error-timestamp">
-              <span class="tw:ml-1">Last error:</span>
-              <q-icon name="schedule" size="14px" class="tw:mr-1" />
-              {{
-                errorMessage.last_error_timestamp &&
-                new Date(
-                  errorMessage.last_error_timestamp / 1000,
-                ).toLocaleString()
-              }}
-            </div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            @click="closeErrorDialog"
-            class="close-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section>
-          <div class="tw:mb-4">
-            <div class="section-label tw:mb-2">Error Summary</div>
-            <div class="error-summary-box">
-              {{ errorMessage.error }}
-            </div>
-          </div>
-        </q-card-section>
-        <q-card-actions class="pipeline-error-actions">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="closeErrorDialog"
-          >Close</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="pipeline-history-error-dialog"
+      v-model:open="errorDialog"
+      size="sm"
+      :title="errorMessage?.pipeline_name"
+      :sub-title="errorMessage?.last_error_timestamp ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}` : undefined"
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="closeErrorDialog"
+    >
+      <template #header-left>
+        <OIcon name="error" size="md" class="error-icon" />
+      </template>
+      <div class="tw:mb-4">
+        <div class="section-label tw:mb-2">Error Summary</div>
+        <div class="error-summary-box">
+          {{ errorMessage?.error }}
+        </div>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -616,8 +555,9 @@ import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import { ChevronLeft, Search, RefreshCw, X } from "lucide-vue-next";
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -672,7 +612,7 @@ const dateTimeValues = ref({
 const detailsDialog = ref(false);
 const errorDialog = ref(false);
 const selectedRow = ref<any>(null);
-const errorMessage = ref("");
+const errorMessage = ref<any>(null);
 
 // Table columns
 const columns = ref([
@@ -1007,7 +947,7 @@ const showDetailsDialog = (row: any) => {
   detailsDialog.value = true;
 };
 
-const showErrorDialog = (error: string) => {
+const showErrorDialog = (error: any) => {
   errorMessage.value = error;
   errorDialog.value = true;
 };

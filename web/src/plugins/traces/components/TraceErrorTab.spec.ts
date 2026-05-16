@@ -384,7 +384,7 @@ describe("TraceErrorTab", () => {
     it("should show an error icon in the generic banner", () => {
       wrapper = mountTraceErrorTab();
 
-      // The generic banner includes a q-icon with name="error"
+      // The generic banner includes a OIcon with name="error"
       const errorIcons = wrapper
         .findAllComponents({ name: "QIcon" })
         .filter((c) => c.props("name") === "error");

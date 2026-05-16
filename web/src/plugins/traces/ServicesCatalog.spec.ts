@@ -395,7 +395,7 @@ function mountServicesCatalog(
         },
         "q-input": false,
         "q-btn": false,
-        "q-icon": false,
+        "OIcon": false,
         "q-tooltip": false,
         "q-spinner-hourglass": false,
       },

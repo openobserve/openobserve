@@ -58,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!hasResults"
                 >
                   <template v-if="true">
-                    <q-icon name="view_column"
-size="16px"
+                    <OIcon name="view-column"
+size="sm"
 class="tw:mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
@@ -75,11 +75,10 @@ class="tw:mr-1" />
                   data-test="select-all-columns"
                 >
                   <q-item-section avatar>
-                    <q-checkbox
+                    <OCheckbox
                       :model-value="areAllColumnsSelected"
                       :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
                       @update:model-value="toggleSelectAll"
-                      dense
                     />
                   </q-item-section>
                   <q-item-section>
@@ -106,19 +105,18 @@ class="tw:mr-1" />
                   class="column-item"
                 >
                   <q-item-section avatar>
-                    <q-checkbox
+                    <OCheckbox
                       :model-value="visibleColumns.has(field)"
                       @update:model-value="toggleColumnVisibility(field)"
-                      :disable="field === '_timestamp'"
-                      dense
+                      :disabled="field === '_timestamp'"
                     />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ field }}</q-item-label>
                   </q-item-section>
                   <q-item-section side>
-                    <q-icon
-                      name="drag_indicator"
+                    <OIcon
+                      name="drag-indicator"
                       size="xs"
                       class="drag-handle tw:cursor-move"
                     />
@@ -132,15 +130,9 @@ class="tw:mr-1" />
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
       </div>
 
       <!-- Results Summary Row -->
@@ -155,11 +147,9 @@ height="32px" />
               })
             }}
           </template>
-          <q-skeleton
+          <OSkeleton
             v-else-if="isLoading"
-            type="text"
-            width="200px"
-            height="14px"
+            class="tw:w-[200px] tw:h-[14px]"
           />
         </div>
       </div> -->
@@ -211,7 +201,7 @@ height="32px" />
           <div
             class="tw:flex tw:items-center tw:justify-center tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
             </span>
@@ -255,6 +245,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
@@ -266,6 +257,9 @@ import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -1068,11 +1062,6 @@ watch(
   :deep(.q-field__append) {
     padding-left: 0.25rem;
   }
-}
-
-// Skeleton loading styles
-:deep(.q-skeleton) {
-  opacity: 0.7;
 }
 
 // Table skeleton container

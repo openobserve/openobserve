@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col">
+  <div class="tw:flex tw:flex-col tw:h-full">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start q-px-md q-py-sm card-container"
-      style="position: sticky; top: 0px; z-index: 2"
+      class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
     >
       <div data-test="iam-users-selection-show-toggle" class="q-mr-md">
         <div class="flex items-center">
@@ -60,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search User"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
+            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon"/>
           </template>
         </q-input>
       </div>
@@ -90,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" style="height: calc(100vh - 250px);" class="card-container">
+    <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto card-container">
       <template v-if="rows.length">
         <app-table
           :rows="visibleRows"
@@ -104,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :title="t('iam.users')"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
+          :tableStyle="hasVisibleRows ? 'height: 100%; overflow-y: auto;' : ''"
           :hideTopPagination="true"
           :showBottomPaginationWithTitle="true"
         >
@@ -120,11 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:email="slotProps: any">
             <div class="flex items-center">
               <span>{{ slotProps.column.row.email }}</span>
-              <q-icon
+              <OIcon
                 v-if="shouldShowWarning(slotProps.column.row)"
                 name="info"
-                color="warning"
-                size="16px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${slotProps.column.row.email}`"
               >
@@ -139,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
                   </div>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </template>
         </app-table>
@@ -166,6 +164,7 @@ import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({

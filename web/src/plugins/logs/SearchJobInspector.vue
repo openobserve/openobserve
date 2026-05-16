@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+<!-- right 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="search-job-inspector q-pa-none">
+  <div class="tw:rounded-md search-job-inspector q-pa-none">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
@@ -61,13 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:items-center">
             <OButton
+              icon-left="close"
               variant="ghost"
               size="icon-sm"
               @click="goBack"
               data-test="inspector-close-button"
             >
-              <X :size="16" />
-              <q-tooltip>Close</q-tooltip>
+              <OIcon name="close" size="sm" />
+              <OTooltip content="Close" />
             </OButton>
           </div>
         </div>
@@ -219,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="hasNoData ? (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500') : (store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600')"
                 >
                   {{ hasNoData ? 'NA' : traceId }}
-                  <q-tooltip v-if="!hasNoData" class="tw:text-xs">{{ traceId }}</q-tooltip>
+                  <OTooltip v-if="!hasNoData" :content="traceId" />
                 </div>
               </div>
             </div>
@@ -261,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="inspector-error-banner"
       >
         <template v-slot:avatar>
-          <q-icon name="error" />
+          <OIcon name="error" size="sm" />
         </template>
         {{ errorMessage }}
       </q-banner>
@@ -269,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading State -->
       <div v-if="loading" class="card-container tw:h-[calc(100vh-242px)]">
         <div class="flex flex-center tw:h-full">
-          <q-spinner-hourglass color="primary" size="50px" />
+          <OSpinner size="lg" />
         </div>
       </div>
 
@@ -307,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Always reserve space for expand icon to keep alignment consistent -->
                   <div class="tree-icon-wrapper">
-                    <q-icon
+                    <OIcon
                       v-if="props.row.children && props.row.children.length > 0"
                       :name="
                         props.row.expanded
@@ -358,64 +359,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <q-dialog v-model="showSqlDialog" position="right" full-height maximized>
-      <q-card style="width: 600px; max-width: 80vw;">
-        <q-card-section class="row items-center q-pb-none tw:justify-between tw:mb-2">
-          <div class="text-h6">SQL Query</div>
-          <div class="tw:flex tw:items-center tw:gap-1">
-            <OButton
-              v-if="profileData?.sql"
-              variant="ghost"
-              size="icon-sm"
-              :class="[
+    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" title="SQL Query">
+      <template #header-right>
+        <OButton
+          v-if="profileData?.sql"
+          variant="ghost"
+          size="icon-sm"
+          :class="[
                 'tw:border',
                 copiedSql ? 'tw:text-green-600 tw:border-green-400' : 'tw:border-gray-300'
               ]"
-              @click="copySql"
-              data-test="inspector-copy-sql-btn"
-            >
-              <Copy v-if="!copiedSql" :size="16" />
-              <Check v-else :size="16" />
-              <q-tooltip>{{ copiedSql ? 'Copied!' : 'Copy SQL' }}</q-tooltip>
-            </OButton>
-            <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
-          </div>
-        </q-card-section>
-
-        <q-separator />
-        <q-card-section>
-          <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
-            <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+          @click="copySql"
+          data-test="inspector-copy-sql-btn"
+        >
+          <OIcon name="content-copy" size="sm" v-if="!copiedSql" />
+              <OIcon name="check" size="sm" v-else />
+          <OTooltip :content="copiedSql ? 'Copied!' : 'SQL'" />
+        </OButton>
+      </template>
+      <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
+        <pre class="sql-query" data-test="inspector-sql-query-content">{{ profileData?.sql || 'No SQL query available' }}</pre>
+      </div>
+    </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <q-dialog v-model="showTraceIdDialog">
-      <q-card style="min-width: 500px;">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Full Trace ID</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="16" /></OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div class="tw:flex tw:items-center tw:gap-3">
-            <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
-                 :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
-              {{ traceId }}
-            </div>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="copyTraceId"
-            ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
+      <div class="tw:flex tw:items-center tw:gap-3">
+        <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
+             :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
+          {{ traceId }}
+        </div>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          @click="copyTraceId"
+        ><OIcon name="content-copy" size="sm"  class="tw:mr-1" /></OButton>
+      </div>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
@@ -426,7 +407,12 @@ import { useQuasar } from "quasar";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Copy, Check } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface ProfileEvent {
   timestamp: string;
@@ -466,10 +452,12 @@ export default defineComponent({
   components: {
     NoData,
     OButton,
-    X,
-    Copy,
-    Check,
-  },
+    ODrawer,
+    ODialog,
+    OSpinner,
+    OTooltip,
+    OIcon,
+},
   setup() {
     const router = useRouter();
     const route = useRoute();

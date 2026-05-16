@@ -80,6 +80,15 @@ function makePipelineObj(overrides = {}) {
   };
 }
 
+// ODrawer stub — renders slot content so inner elements are accessible in tests.
+// The real ODrawer is a portal/teleport; stubbing it keeps tests fast and isolated.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "width", "persistent"],
+  emits: ["update:open"],
+  template: '<div class="o-drawer-stub"><slot /></div>',
+};
+
 function createWrapper(pipelineObjOverrides = {}) {
   mockPipelineObj = makePipelineObj(pipelineObjOverrides);
 
@@ -96,6 +105,7 @@ function createWrapper(pipelineObjOverrides = {}) {
       stubs: {
         AddStream:     true,
         ConfirmDialog: true,
+        ODrawer:       ODrawerStub,
       },
     },
   });
@@ -847,6 +857,52 @@ describe("Stream Component", () => {
       expect(
         wrapper.find('[data-test="input-node-stream-delete-btn"]').exists()
       ).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Header close button", () => {
+    // The close button is now part of ODrawer's header (via showClose prop).
+    // We simulate it by emitting update:open=false on the ODrawer component.
+    function closeViaDrawer(wrapper) {
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      drawer.vm.$emit("update:open", false);
+    }
+
+    it("has NOT emitted cancel:hideform before the header close button is clicked", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.emitted("cancel:hideform")).toBeUndefined();
+    });
+
+    it("emits cancel:hideform exactly once when the header close button is clicked", async () => {
+      vi.useFakeTimers();
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.emitted("cancel:hideform")).toBeUndefined();
+
+      closeViaDrawer(wrapper);
+      vi.advanceTimersByTime(400);
+      await nextTick();
+
+      const emits = wrapper.emitted("cancel:hideform");
+      expect(emits).toBeTruthy();
+      expect(emits).toHaveLength(1);
+      expect(emits[0]).toEqual([]);
+      vi.useRealTimers();
+    });
+
+    it("does NOT trigger save/delete/cancel-dialog flows (no addNode / deletePipelineNode / dialog)", async () => {
+      const wrapper = createWrapper({ isEditNode: true });
+      await flushPromises();
+
+      closeViaDrawer(wrapper);
+      await nextTick();
+
+      expect(mockAddNode).not.toHaveBeenCalled();
+      expect(mockDeletePipelineNode).not.toHaveBeenCalled();
+      expect(wrapper.vm.dialog.show).toBe(false);
     });
   });
 });

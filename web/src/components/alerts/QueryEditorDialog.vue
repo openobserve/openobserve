@@ -16,77 +16,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Editor Dialog -->
-  <q-dialog
-    v-model="isOpen"
-    position="right"
-    full-height
-    maximized
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  <ODrawer data-test="query-editor-dialog"
+    v-model:open="isOpen"
+    size="full"
+    :show-close="false"
   >
-    <div class="tw:flex tw:h-full tw:overflow-hidden editor-dialog-card">
-      <div
-        class="tw:h-full tw:flex tw:overflow-hidden"
-        :style="{
-          width: isFullScreen ? '100vw' : store.state.isAiChatEnabled ? '75vw' : '100vw'
-        }"
-      >
-        <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
-          <!-- Header -->
-          <div class="dialog-topbar" :class="store.state.theme === 'dark' ? 'dialog-topbar--dark' : 'dialog-topbar--light'">
-            <!-- Left: back + title + stream info -->
-            <div class="tw:flex tw:items-center tw:gap-2.5">
-              <div
-                data-test="add-alert-back-btn"
-                class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity tw:flex-shrink-0"
-                style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
-                :title="t('common.goBack')"
-                @click="closeDialog"
-              >
-                <q-icon name="arrow_back_ios_new" size="9px" />
-              </div>
-              <span class="tw:text-sm tw:font-semibold tw:whitespace-nowrap">{{ t('alerts.addConditions') }}</span>
+    <template #header-left>
+        <!-- Left: back + title + stream info -->
+        <div class="tw:flex tw:items-center tw:gap-2.5">
+          <div
+            data-test="add-alert-back-btn"
+            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 hover:tw:opacity-100 tw:transition-opacity tw:flex-shrink-0"
+            style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
+            :title="t('common.goBack')"
+            @click="closeDialog"
+          >
+            <OIcon name="arrow-back-ios-new" size="9px" />
+          </div>
+          <span class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block">{{ t('alerts.addConditions') }}</span>
 
-              <!-- Separator -->
-              <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
+          <!-- Separator -->
+          <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
 
-              <!-- Stream Type + Stream Name -->
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <div v-if="streamType" class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
-                  <span class="topbar-info-chip__label">Stream Type</span>
-                  <span class="topbar-info-chip__sep">:</span>
-                  <span class="topbar-info-chip__value">{{ streamType }}</span>
-                </div>
-                <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
-                <div class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--name-dark' : 'topbar-info-chip--name-light'">
-                  <span class="topbar-info-chip__label">Stream Name</span>
-                  <span class="topbar-info-chip__sep">:</span>
-                  <span v-if="streamName" class="topbar-info-chip__value">{{ streamName }}</span>
-                  <span v-else class="topbar-info-chip__value tw:opacity-40 tw:italic">none</span>
-                </div>
-              </div>
+          <!-- Stream Type + Stream Name -->
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <div v-if="streamType" class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--type-dark' : 'topbar-info-chip--type-light'">
+              <span class="topbar-info-chip__label">Stream Type</span>
+              <span class="topbar-info-chip__sep">:</span>
+              <span class="topbar-info-chip__value">{{ streamType }}</span>
             </div>
-
-            <!-- Right: AI -->
-            <div class="tw:flex tw:items-center tw:gap-3">
-
-              <!-- AI button -->
-              <OButton
-                v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                :ripple="false"
-                @click="toggleAIChat"
-                data-test="menu-link-ai-item"
-                variant="ghost"
-                size="icon-circle-sm"
-                class="ai-hover-btn"
-                :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-                @mouseenter="isHovered = true"
-                @mouseleave="isHovered = false"
-              >
-                <img :src="getBtnLogo" style="width: 18px; height: 18px;" />
-              </OButton>
+            <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
+            <div class="topbar-info-chip" :class="store.state.theme === 'dark' ? 'topbar-info-chip--name-dark' : 'topbar-info-chip--name-light'">
+              <span class="topbar-info-chip__label">Stream Name</span>
+              <span class="topbar-info-chip__sep">:</span>
+              <span v-if="streamName" class="topbar-info-chip__value">{{ streamName }}</span>
+              <span v-else class="topbar-info-chip__value tw:opacity-40 tw:italic">none</span>
             </div>
           </div>
+        </div>
+      </template>
+      <template #header-right> 
+        <!-- Right: AI -->
+        <div class="tw:flex tw:items-center tw:gap-3">
 
+          <!-- AI button -->
+          <OButton
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            :ripple="false"
+            @click="toggleAIChat"
+            data-test="menu-link-ai-item"
+            variant="ghost"
+            size="icon-toolbar"
+            class="ai-hover-btn"
+            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+            @mouseenter="isHovered = true"
+            @mouseleave="isHovered = false"
+          >
+            <img :src="getBtnLogo" class="ai-icon" style="width: 18px; height: 18px;" />
+          </OButton>
+        </div>
+      </template>
+    <div class="tw:flex tw:h-screen tw:overflow-hidden editor-dialog-card">
+      <div
+        class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
+      >
+        <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
           <div class="tw:grid tw:flex-1 tw:min-h-0 tw:w-full tw:grid-cols-[20fr_45fr_35fr] tw:gap-x-2 tw:px-2 tw:pr-2 tw:py-2 tw:overflow-hidden">
 
@@ -121,17 +115,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="pane-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                       </div>
                       <div class="tw:flex tw:items-center tw:gap-2">
-                        <q-toggle
+                        <OSwitch
                           v-if="localTab !== 'promql'"
                           :model-value="!sqlEditorMaximized"
-                          :icon="'img:' + getImageURL('images/common/function.svg')"
-                          size="xs"
                           class="o2-toggle-button-xs"
                           :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                           @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
                         >
-                          <q-tooltip :delay="400" class="tw:text-[12px]">{{ sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor' }}</q-tooltip>
-                        </q-toggle>
+                          <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
+                        </OSwitch>
                         <OButton
                           data-test="alert-run-query-btn"
                           variant="primary"
@@ -173,35 +165,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="sql-status-bar" :class="[sqlStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']">
                     <div class="sql-status-bar__inner">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
-                        <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                        <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
                         <span class="sql-status-bar__msg">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
-                        <q-spinner size="10px" style="flex-shrink:0;" />
+                        <OSpinner size="xs" class="tw:shrink-0" />
                         <span>Fetching results...</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
-                        <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                        <OIcon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
                         <span>Write a query to get started</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
-                        <q-icon name="play_arrow" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                        <OIcon name="play-arrow" size="xs" style="flex-shrink:0;opacity:0.7;" />
                         <span>Press Run Query to see results</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
-                        <q-icon name="search_off" size="12px" style="flex-shrink:0;" />
+                        <OIcon name="search-off" size="xs" style="flex-shrink:0;" />
                         <span>Query ran successfully — no matching events</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
-                        <q-icon name="check_circle" size="12px" style="flex-shrink:0;" />
+                        <OIcon name="check-circle" size="xs" style="flex-shrink:0;" />
                         <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
                       </template>
                     </div>
-                    <q-tooltip
+                    <OTooltip
                       v-if="sqlStatusState === 'sql-status-bar--error'"
-                      anchor="top middle" self="bottom middle" max-width="520px"
+                      side="top" align="center"
+                      :max-width="'520px'"
                       style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
-                    >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</q-tooltip>
+                      :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
+                    />
                   </div>
                 </div>
 
@@ -226,20 +220,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div v-if="!sqlEditorMaximized" class="tw:flex tw:gap-2 tw:items-center">
                       <!-- Saved functions -->
-                      <q-select
+                      <OSelect
                         v-model="selectedFunction"
                         :options="functionOptions"
                         data-test="alert-saved-vrl-function-select"
-                        input-debounce="0"
-                        behavior="menu"
-                        use-input
-                        borderless
-                        dense
-                        hide-selected
-                        menu-anchor="bottom left"
-                        fill-input
-                        option-label="name"
-                        option-value="name"
+                        labelKey="name"
+                        valueKey="name"
                         @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
                         class="mini-select alert-v3-select"
@@ -248,12 +234,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 140px;"
                         :placeholder="t('alerts.placeholders.savedFunctions')"
                       >
-                        <template #no-option>
+                        <template #empty>
                           <q-item>
                             <q-item-section>{{ t("search.noResult") }}</q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                       <!-- Apply VRL -->
                       <OButton
                         data-test="alert-apply-vrl-btn"
@@ -329,20 +315,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle: not yet run -->
                   <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon name="table_chart" size="48px" class="empty-state-icon" />
+                      <OIcon name="table-chart" size="48px" class="empty-state-icon" />
                       <span class="empty-state-text">{{ t('alerts.runQueryForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results after run -->
                   <div v-else-if="outputEvents == '' && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
-                      <span class="empty-state-text">{{ runPromqlError ? runPromqlError : t('search.noResultsFound') }}</span>
+                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
                   <div v-else-if="runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
-                    <q-spinner-hourglass color="primary" size="36px" />
+                    <OSpinner size="md" />
                     <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
                   </div>
                   <!-- Results -->
@@ -385,20 +370,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle -->
                   <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon name="data_object" size="48px" class="empty-state-icon" />
+                      <OIcon name="data-object" size="48px" class="empty-state-icon" />
                       <span class="empty-state-text">{{ t('alerts.applyVRLForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results -->
                   <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
-                      <span class="empty-state-text">{{ t('search.noResultsFound') }}</span>
+                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
                   <div v-else-if="runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
-                    <q-spinner-hourglass color="primary" size="36px" />
+                    <OSpinner size="md" />
                     <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
                   </div>
                   <!-- Results -->
@@ -434,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </q-dialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -443,9 +427,10 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
@@ -460,6 +445,10 @@ import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 const props = defineProps({
   modelValue: {
@@ -1346,6 +1335,14 @@ const getBtnLogo = computed(() => {
   &:hover {
     background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%) !important;
     box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  }
+
+  .ai-icon {
+    transition: transform 0.6s ease;
+  }
+
+  &:hover .ai-icon {
+    transform: rotate(180deg);
   }
 }
 

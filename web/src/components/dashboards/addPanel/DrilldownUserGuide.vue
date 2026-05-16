@@ -5,30 +5,33 @@
       size="icon"
       @click="onUserGuideClick"
       data-test="dashboard-drilldown-help-btn"
+      icon-left="help-outline"
     >
-      <template #icon-left><q-icon name="help_outline" /></template>
       <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
         User Guide
       </q-tooltip>
     </OButton>
   </div>
+  <Teleport to="body">
   <div
-    class="user-guide scroll o2-input"
+    class="user-guide"
     v-show="showUserGuide"
     style="
-      position: absolute;
-      z-index: 1;
+      position: fixed;
+      z-index: 9999;
       width: 500px;
       max-height: 300px;
+      overflow-y: auto;
       border: 1px solid gray;
       border-radius: 5px;
+      pointer-events: auto;
     "
-    @mouseleave="showUserGuide = false"
     :class="
       store.state.theme == 'dark'
         ? 'theme-dark bg-dark'
         : 'theme-light bg-white'
     "
+    @mouseleave="showUserGuide = false"
     ref="userGuideDivRef"
   >
     <p>
@@ -143,6 +146,7 @@
       </ul>
     </ul>
   </div>
+  </Teleport>
 </template>
 
 <script lang="ts">
@@ -185,6 +189,21 @@ export default {
 <style scoped lang="scss">
 .user-guide {
   padding: 10px;
+  overflow-y: auto;
+
+  /* Override global transparent-by-default scrollbar so it is always visible */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.25) rgba(0, 0, 0, 0.05);
 }
 .header {
   font-weight: bold;

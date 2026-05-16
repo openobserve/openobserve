@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'feature-card--dark' : ''"
           >
             <div class="feature-card__icon-box" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark' : ''">
-              <q-icon :name="feature.icon" size="20px" class="feature-card__icon" />
+              <OIcon :name="feature.icon" size="20px" class="feature-card__icon" />
             </div>
             <div class="feature-card__content">
               <div class="feature-card__title">{{ feature.title }}</div>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- double-ring icon -->
       <div class="ent-empty__icon-outer">
         <div class="ent-empty__icon-inner" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark' : ''">
-          <q-icon name="cloud_upload" size="28px" class="ent-empty__icon" />
+          <OIcon name="cloud-upload" size="28px" class="ent-empty__icon" />
         </div>
       </div>
 
@@ -126,15 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- key fact chips -->
       <div class="ent-empty__chips">
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <q-icon name="corporate_fare" size="13px" />
+          <OIcon name="corporate-fare" size="13px" />
           {{ t("storage_settings.perOrgIsolation") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <q-icon name="bolt" size="13px" />
+          <OIcon name="bolt" size="13px" />
           {{ t("storage_settings.appliesImmediately") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <q-icon name="lock" size="13px" />
+          <OIcon name="lock" size="13px" />
           {{ t("storage_settings.usesOrgCredentials") }}
         </span>
       </div>
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="positive"
                 style="font-size: 11px; border-radius: 20px; padding: 2px 8px; margin-top: 4px;"
               >
-                <q-icon name="check_circle" size="11px" style="margin-right: 3px;" />
+                <OIcon name="check-circle" size="11px" style="margin-right: 3px;" />
                 {{ t("storage_settings.active") }}
               </q-badge>
             </div>
@@ -275,6 +275,7 @@ import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();

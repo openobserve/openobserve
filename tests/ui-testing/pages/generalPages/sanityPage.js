@@ -27,7 +27,7 @@ export class SanityPage {
         
         // Pagination and Results locators
         this.resultColumnSource = '[data-test="log-table-column-0-source"]';
-        this.closeDialog = '[data-test="close-dialog"]';
+        this.closeDialog = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         
         // Histogram locators
         this.histogramToggleButton = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
@@ -36,10 +36,16 @@ export class SanityPage {
         // Saved Search locators
         this.saveSearchButton = 'button';
         this.alertNameInput = '[data-test="add-alert-name-input"]';
-        this.savedViewDialogSave = '[data-test="saved-view-dialog-save-btn"]';
+        // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were migrated
+        // from q-dialog to ODialog. The legacy shared data-test "saved-view-dialog-save-btn" no longer exists;
+        // each dialog now exposes its own ODialog primary button. The dialogs are mutually exclusive at runtime.
+        this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewsButton = '[data-test="logs-search-saved-views-btn"]';
         this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input"]';
-        this.confirmButton = '[data-test="confirm-button"]';
+        // After ConfirmDialog migrated to ODialog, the OK button no longer
+        // carries a "confirm-button" data-test. The ODialog primary footer
+        // button surfaces as "o-dialog-primary-btn" inside the open dialog.
+        this.confirmButton = '[data-test="o-dialog-primary-btn"]';
         
         // Function locators
         this.functionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
@@ -63,15 +69,19 @@ export class SanityPage {
         this.dashboardSearch = '[data-test="dashboard-search"]';
         this.newFolderButton = '[data-test="dashboard-new-folder-btn"]';
         this.folderAddName = '[data-test="dashboard-folder-add-name"]';
-        this.folderAddSave = '[data-test="dashboard-folder-add-save"]';
+        // AddFolder.vue now uses ODrawer's primary footer button — there is
+        // no standalone "dashboard-folder-add-save" element after migration.
+        this.folderAddSave = '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]';
         this.dashboardMoreIcon = '[data-test="dashboard-more-icon"]';
         this.deleteFolderIcon = '[data-test="dashboard-delete-folder-icon"]';
-        
+
         // Stream locators
         this.addStreamButton = '[data-test="log-stream-add-stream-btn"]';
         this.streamNameInput = 'label:has-text("Name *") + input, input[aria-label="Name *"], [data-test="add-stream-name-input"]';
         this.streamTypeDropdown = '[data-test="add-stream-type-input"]';
-        this.saveStreamButton = '[data-test="save-stream-btn"]';
+        // AddStream.vue uses ODrawer's primary footer button as Save —
+        // legacy "save-stream-btn" was removed during the migration.
+        this.saveStreamButton = '[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]';
         this.searchStreamInput = '[placeholder="Search Stream"]';
         this.deleteButton = { role: 'button', name: 'Delete' };
         
@@ -446,7 +456,9 @@ export class SanityPage {
         await this.page.keyboard.type('.sanity=1');
         await this.page.waitForTimeout(500);
 
-        await this.page.getByRole(this.saveButton.role, { name: this.saveButton.name }).click();
+        // Use the specific data-test selector for the save button to avoid
+        // ambiguity with other "Save" labelled buttons on the page.
+        await this.page.locator('[data-test="add-function-save-btn"]').click();
 
         await this.page.getByPlaceholder("Search Function").click();
         await this.page.getByPlaceholder("Search Function").fill(uniqueFunctionName);

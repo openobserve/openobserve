@@ -30,23 +30,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
         data-test="dashboard-panel-bar"
       >
-        <q-icon
+        <OIcon
           v-if="!viewOnly && !simplifiedPanelView"
-          name="drag_indicator"
+          name="drag-indicator" size="sm"
           data-test="dashboard-panel-drag"
         />
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
         <q-space />
-        <q-icon
+        <OIcon
           v-if="
             !viewOnly &&
             !simplifiedPanelView &&
             isCurrentlyHoveredPanel &&
             props.data.description != ''
           "
-          name="info_outline"
+          name="info-outline" size="sm"
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ props.data.description }}
             </div>
           </q-tooltip>
-        </q-icon>
+        </OIcon>
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
           variant="ghost"
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onPanelModifyClick('ViewPanel')"
           :title="t('panel.fullScreen')"
           data-test="dashboard-panel-fullscreen-btn"
+          icon-left="fullscreen"
         >
-          <template #icon-left><q-icon name="fullscreen" /></template>
         </OButton>
         <OButton
           v-if="dependentAdHocVariable"
@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
+          icon-left="warning"
         >
-          <template #icon-left><q-icon :name="outlinedWarning" /></template>
           <q-tooltip anchor="bottom right" self="top right" max-width="220px">
             Some dynamic variables are not applied because the field is not
             present in the query's stream. Open Query Inspector to see all the
@@ -101,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
+          icon-left="refresh"
         >
-          <template #icon-left><q-icon name="refresh" /></template>
           <q-tooltip>
             {{
               variablesDataUpdated
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onPanelModifyClick('DeletePanel')"
           :title="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
 
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
-              <q-icon name="more_vert" size="16px" />
+              <OIcon name="more-vert" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditPanel')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedEdit" size="16px"
+              ><OIcon name="edit" size="sm"
             /></template>
             {{ t("panel.editPanel") }}
           </ODropdownItem>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedDashboardCustomize" size="16px"
+              ><OIcon name="dashboard-customize" size="16px"
             /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DuplicatePanel')"
           >
             <template #icon-left
-              ><q-icon name="content_copy" size="16px"
+              ><OIcon name="content-copy" size="sm"
             /></template>
             {{ t("panel.duplicate") }}
           </ODropdownItem>
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DeletePanel')"
           >
             <template #icon-left
-              ><q-icon name="delete_outline" size="16px"
+              ><OIcon name="delete-outline" size="sm"
             /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showViewPanel = true"
           >
             <template #icon-left
-              ><q-icon name="manage_search" size="16px"
+              ><OIcon name="manage-search" size="sm"
             /></template>
             {{ t("panel.queryInspector") }}
           </ODropdownItem>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><q-icon :name="outlinedFileDownload" size="16px"
+              ><OIcon name="file-download" size="16px"
             /></template>
             {{ t("panel.downloadAsCSV") }}
           </ODropdownItem>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><q-icon name="data_object" size="16px"
+              ><OIcon name="data-object" size="sm"
             /></template>
             {{ t("panel.downloadAsJSON") }}
           </ODropdownItem>
@@ -224,16 +224,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="props.data.queryType != 'sql'"
             data-test="dashboard-move-to-logs-module"
             @select="onLogPanel"
+            icon-left="search"
           >
-            <template #icon-left><q-icon name="search" size="16px" /></template>
             {{ t("panel.goToLogs") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
             data-test="dashboard-refresh-without-cache"
             @select="onPanelModifyClick('Refresh')"
+            icon-left="cached"
           >
-            <template #icon-left><q-icon name="cached" size="16px" /></template>
             Refresh Cache &amp; Reload
           </ODropdownItem>
           <ODropdownItem
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('MovePanel')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedDriveFileMove" size="16px"
+              ><OIcon name="drive-file-move" size="sm"
             /></template>
             {{ t("panel.moveToAnotherTab") }}
           </ODropdownItem>
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('CreateAlert')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedReportProblem" size="16px"
+              ><OIcon name="report-problem" size="16px"
             /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>
@@ -312,16 +312,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ></PanelSchemaRenderer>
     </div>
 
-    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
-    </q-dialog>
+    <QueryInspector v-model:open="showViewPanel" :metaData="metaData" :data="props.data" data-test="query-inspector-dialog" />
 
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+      data-test="panel-container-legends-dialog"
+    />
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
@@ -360,15 +357,7 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import {
-  outlinedWarning,
-  outlinedRunningWithErrors,
-  outlinedReportProblem,
-  outlinedDriveFileMove,
-  outlinedEdit,
-  outlinedDashboardCustomize,
-  outlinedFileDownload,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   symOutlinedClockLoader20,
   symOutlinedDataInfoAlert,
@@ -444,6 +433,7 @@ export default defineComponent({
     RelativeTime,
     PanelErrorButtons,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ShowLegendsPopup: defineAsyncComponent(() => {
@@ -892,24 +882,6 @@ export default defineComponent({
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
-      outlinedWarning,
-      outlinedReportProblem,
-      outlinedDriveFileMove,
-      outlinedEdit,
-      outlinedDashboardCustomize,
-      outlinedFileDownload,
-      symOutlinedClockLoader20,
-      symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
-      store,
-      metaDataValue,
-      handleResultMetadataUpdate,
-      handleLastTriggeredAtUpdate,
-      isCachedDataDifferWithCurrentTimeRange,
-      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
-      lastTriggeredAt,
-      maxQueryRangeWarning,
-      metaData,
       showViewPanel,
       dependentAdHocVariable,
       confirmDeletePanelDialog,
@@ -931,6 +903,21 @@ export default defineComponent({
       t,
       showLegendsDialog,
       currentPanelData,
+      outlinedRunningWithErrors: "running-with-errors",
+      outlinedReportProblem: "report-problem",
+      outlinedDashboardCustomize: "dashboard-customize",
+      outlinedFileDownload: "file-download",
+      symOutlinedClockLoader20,
+      symOutlinedDataInfoAlert,
+      store,
+      metaDataValue,
+      handleResultMetadataUpdate,
+      handleLastTriggeredAtUpdate,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
+      lastTriggeredAt,
+      maxQueryRangeWarning,
+      metaData,
     };
   },
   methods: {

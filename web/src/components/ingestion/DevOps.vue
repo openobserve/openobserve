@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('common.search')"
             >
               <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+                <OIcon name="search" size="sm" class="cursor-pointer" />
               </template>
             </q-input>
             <OTabs
@@ -86,10 +86,13 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "DevOpsPage",
-  components: { OTabs, ORouteTab },
+  components: { OTabs, ORouteTab,
+    OIcon,
+},
   props: {
     currOrgIdentifier: {
       type: String,

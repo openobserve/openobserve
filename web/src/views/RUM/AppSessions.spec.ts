@@ -200,10 +200,7 @@ describe("AppSessions.vue", () => {
       global: {
         plugins: [store, router, i18n, Quasar],
         stubs: {
-          QPage: {
-            template: '<div class="q-page" v-bind="$attrs"><slot /></div>',
-          },
-          QBtn: {
+                    QBtn: {
             template:
               '<button class="q-btn" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
           },
@@ -219,7 +216,7 @@ describe("AppSessions.vue", () => {
             template: '<div class="q-avatar" v-bind="$attrs"><slot /></div>',
           },
           QIcon: {
-            template: '<span class="q-icon" v-bind="$attrs"></span>',
+            template: '<span class="OIcon" v-bind="$attrs"></span>',
           },
           QSpinnerHourglass: {
             template: '<div class="q-spinner-hourglass" v-bind="$attrs"></div>',
@@ -798,8 +795,7 @@ describe("AppSessions.vue", () => {
         global: {
           plugins: [store, router, i18n, Quasar],
           stubs: {
-            QPage: { template: "<div><slot /></div>" },
-            QBtn: { template: "<button><slot /></button>" },
+                        QBtn: { template: "<button><slot /></button>" },
             QSeparator: { template: "<hr />" },
             QSplitter: {
               template:

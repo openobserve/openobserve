@@ -30,7 +30,7 @@
           </template>
 
           <template v-slot:prepend>
-            <q-icon name="search" />
+            <OIcon name="search" size="sm" />
           </template>
 
           <template v-slot:hint>
@@ -47,6 +47,7 @@ import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import streamService from "@/services/stream";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps<{
   metric: string;

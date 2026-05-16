@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <q-page
-    class="quota-page text-left card-container"
+  <div class="tw:rounded-md quota-page text-left card-container"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -76,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Edit Quota
                 <template #icon-right>
-                  <q-icon name="edit" style="font-weight: 200; opacity: 0.7" />
+                  <OIcon name="edit" size="sm" style="font-weight: 200; opacity: 0.7" />
                 </template>
               </OButton>
             </div>
@@ -102,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               >
                 <template #prepend>
-                  <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
               </q-input>
               <q-select
@@ -261,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
       <div
         class="card-container tw:pb-[0.625rem]"
@@ -334,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs"
                   @click="triggerExpand(props)"
                 >
-                  <q-icon :name="expandedRow != props.row.uuid ? 'chevron_right' : 'expand_more'" />
+                  <OIcon :name="expandedRow != props.row.uuid ? 'chevron-right' : 'expand-more'" size="sm" />
                 </OButton>
                 {{ props.row[col.name] }}
               </template>
@@ -419,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
             <q-td v-for="col in props.cols" :key="col.name">
               <div v-if="col.name == 'create'" class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center">
-              <q-spinner-hourglass color="primary" size="lg" />
+              <OSpinner size="md" />
             </div>
             </q-td>
           </q-tr>
@@ -427,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
       </div>
       <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
       <div
         class="card-container"
@@ -454,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         class="flex justify-center items-center"
       >
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
       <div
         v-else-if="
@@ -548,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
     />
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -565,10 +564,10 @@ import {
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Gauge, Shield, Timer, Clock, Hourglass, Table2, Braces } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
@@ -578,16 +577,9 @@ import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedFileDownload,
-  outlinedFileUpload,
-  outlinedInsertDriveFile,
-} from "@quasar/extras/material-icons-outlined";
 import AppTable from "@/components/AppTable.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -600,7 +592,9 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     NoData,
-  },
+    OSpinner,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
@@ -629,12 +623,12 @@ export default defineComponent({
       {
         label: "API Limits",
         value: "api-limits",
-        icon: Gauge,
+        icon: "speed",
       },
       {
         label: "Role Limits",
         value: "role-limits",
-        icon: Shield,
+        icon: "shield",
       },
     ]);
 
@@ -642,17 +636,17 @@ export default defineComponent({
       {
         label: "Per Second",
         value: "second",
-        icon: Timer,
+        icon: "timer",
       },
       {
         label: "Per Minute",
         value: "minute",
-        icon: Clock,
+        icon: "access-time",
       },
       {
         label: "Per Hour",
         value: "hour",
-        icon: Hourglass,
+        icon: "hourglass-empty",
       },
     ]);
 
@@ -660,12 +654,12 @@ export default defineComponent({
       {
         label: "Table",
         value: "table",
-        icon: Table2,
+        icon: "table-chart",
       },
       {
         label: "JSON",
         value: "json",
-        icon: Braces,
+        icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
@@ -1689,10 +1683,10 @@ export default defineComponent({
       generateColumns,
       loading,
       isBulkUpdate,
-      outlinedFileDownload,
-      outlinedFileUpload,
+      outlinedFileDownload: "file-download",
+      outlinedFileUpload: "file-upload",
       uploadedRules,
-      outlinedInsertDriveFile,
+      outlinedInsertDriveFile: "insert-drive-file",
       getImageURL,
       fileListToDisplay,
       downloadTemplate,

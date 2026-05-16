@@ -55,10 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="insights-button"
         >
           <template #icon-left>
-            <q-icon name="timeline" size="12px" />
+            <OIcon name="timeline" size="xs" />
           </template>
           {{ t("volumeInsights.insightsButtonLabel") }}
-          <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
+          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <ORefreshButton
           :last-run-at="searchObj.meta.lastRunAt"
@@ -71,13 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-space />
         <!-- Pagination -->
         <template v-if="searchObj.meta.resultGrid.showPagination">
-          <q-select
+          <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
             class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
             size="sm"
-            dense
-            borderless
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
@@ -182,17 +180,23 @@ import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
     OButton,
+    OTooltip,
+    OSelect,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
-  },
+    OIcon,
+},
   emits: [
     "update:scroll",
     "update:datetime",

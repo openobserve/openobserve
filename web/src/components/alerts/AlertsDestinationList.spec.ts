@@ -223,17 +223,14 @@ describe("AlertsDestinationList", () => {
               setPagination: vi.fn(),
             },
           },
-          QPage: {
-            template: '<div class="q-page-mock"><slot /></div>',
-          },
-          QInput: {
+                    QInput: {
             template: '<div class="q-input-mock"><slot /></div>',
           },
           QBtn: {
             template: '<div class="q-btn-mock"><slot /></div>',
           },
           QIcon: {
-            template: '<div class="q-icon-mock"></div>',
+            template: '<div class="OIcon-mock"></div>',
           },
         },
       },

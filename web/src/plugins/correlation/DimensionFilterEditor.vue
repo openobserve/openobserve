@@ -15,32 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    :model-value="modelValue"
-    @update:model-value="$emit('update:modelValue', $event)"
-    @hide="handleClose"
-    data-test="dimension-filter-editor-dialog"
+  <ODialog data-test="dimension-filter-editor-dialog"
+    :open="modelValue"
+    @update:open="(v) => { $emit('update:modelValue', v); if (!v) handleClose(); }"
+    size="md"
+    :title="t('correlation.logs.filters.title')"
+    :secondary-button-label="t('common.cancel')"
+    :neutral-button-label="t('common.reset')"
+    :primary-button-label="t('common.apply')"
+    :primary-button-disabled="!hasChanges"
+    @click:secondary="handleCancel"
+    @click:neutral="handleReset"
+    @click:primary="handleApply"
   >
-    <q-card style="min-width: 600px; max-width: 800px">
-      <!-- Header -->
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">{{ t('correlation.logs.filters.title') }}</div>
-        <q-space />
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          v-close-popup
-          :aria-label="t('common.close')"
-          data-test="close-dialog-btn"
-        >
-          <X :size="14" />
-        </OButton>
-      </q-card-section>
-
-      <q-separator class="q-mt-md" />
-
-      <!-- Content -->
-      <q-card-section class="q-pt-md">
         <!-- Description -->
         <div class="tw:mb-4 tw:text-sm tw:text-gray-600">
           {{ t('correlation.logs.filters.description') }}
@@ -52,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
               {{ t('correlation.logs.filters.matchedDimensions') }}
             </h3>
-            <q-icon name="info" size="sm" color="primary">
+            <OIcon name="info" size="sm">
               <q-tooltip max-width="300px">
                 {{ t('correlation.logs.filters.matchedDimensionsTooltip') }}
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
 
           <div class="tw:space-y-3">
@@ -67,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`matched-dimension-${key}`"
             >
               <div class="tw:flex-1 tw:flex tw:items-center tw:gap-3">
-                <q-icon name="lock" size="sm" color="primary" />
+                <OIcon name="lock" size="sm" />
                 <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
                 <q-input
                   v-model="pendingFilters[key]"
@@ -78,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`matched-dimension-input-${key}`"
                 />
               </div>
-              <q-icon name="check_circle" size="sm" color="positive">
+              <OIcon name="check-circle" size="sm">
                 <q-tooltip>
                   {{ t('correlation.logs.filters.stableDimension') }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
         </div>
@@ -93,11 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
               {{ t('correlation.logs.filters.additionalDimensions') }}
             </h3>
-            <q-icon name="info" size="sm" color="warning">
+            <OIcon name="info" size="sm">
               <q-tooltip max-width="300px">
                 {{ t('correlation.logs.filters.additionalDimensionsTooltip') }}
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
 
           <div class="tw:space-y-3">
@@ -109,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-2">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <q-icon name="warning" size="sm" color="warning" />
+                  <OIcon name="warning" size="sm" />
                   <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
                   <q-input
                     v-model="pendingFilters[key]"
@@ -122,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="tw:ml-8">
                   <OButton
+                    icon-left="all-inclusive"
                     variant="ghost"
                     size="sm-action"
                     :class="pendingFilters[key] === SELECT_ALL_VALUE ? 'tw:text-green-600' : ''"
                     @click="toggleWildcard(key)"
                     :data-test="`toggle-wildcard-${key}`"
                   >
-                    <Infinity :size="14" class="tw:mr-1" />
                     {{
                       pendingFilters[key] === SELECT_ALL_VALUE
                         ? t('correlation.logs.filters.showingAll')
@@ -140,11 +127,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <q-icon name="sync_problem" size="sm" color="warning">
+              <OIcon name="sync-problem" size="sm">
                 <q-tooltip>
                   {{ t('correlation.logs.filters.unstableDimension') }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
         </div>
@@ -156,41 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t('correlation.logs.filters.noAdditionalDimensions') }}
         </div>
-      </q-card-section>
 
-      <q-separator />
-
-      <!-- Actions -->
-      <q-card-actions align="right" class="q-pa-md">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="handleCancel"
-          data-test="cancel-btn"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          @click="handleReset"
-          data-test="reset-btn"
-        >
-          <RotateCcw :size="14" class="tw:mr-1" />
-          {{ t('common.reset') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="handleApply"
-          :disabled="!hasChanges"
-          data-test="apply-btn"
-        >
-          {{ t('common.apply') }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -198,7 +152,8 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X, Infinity, RotateCcw } from 'lucide-vue-next';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   modelValue: boolean;

@@ -32,16 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step indicator -->
         <div class="step-indicator-wrapper">
           <div class="step-indicator">
-            <q-icon
+            <OIcon
               v-if="completedSteps.includes(step.id) && currentStep !== step.id"
               name="check"
-              size="18px"
+              size="sm"
               class="step-icon-check"
             />
-            <q-icon
+            <OIcon
               v-else-if="step.hasError"
-              name="error_outline"
-              size="18px"
+              name="error-outline"
+              size="sm"
               class="step-icon-error"
             />
             <span v-else class="step-number">{{ index + 1 }}</span>
@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, type PropType } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface Step {
   id: number;

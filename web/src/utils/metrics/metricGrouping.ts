@@ -202,7 +202,7 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
   {
     id: "pods",
     label: "Pods",
-    icon: "view_in_ar",
+    icon: "view-in-ar",
     defaultMetrics: [
       { streamName: "k8s_pod_cpu_usage" },
       { streamName: "k8s_pod_memory_usage" },

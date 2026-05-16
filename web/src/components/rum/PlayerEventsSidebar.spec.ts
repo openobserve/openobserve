@@ -139,8 +139,8 @@ describe("PlayerEventsSidebar Component", () => {
           "q-separator": {
             template: '<hr data-test="separator" />',
           },
-          "q-icon": {
-            template: '<i data-test="q-icon" :class="name"></i>',
+          "OIcon": {
+            template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
           },
         },
@@ -218,28 +218,28 @@ describe("PlayerEventsSidebar Component", () => {
     it("should display user email with mail icon", () => {
       const emailSection = wrapper.find(".event-metadata");
       expect(emailSection.text()).toContain("test@example.com");
-      const mailIcon = emailSection.find('[data-test="q-icon"].mail');
+      const mailIcon = emailSection.find('[data-test="OIcon"].mail');
       expect(mailIcon.exists()).toBe(true);
     });
 
     it("should display date with schedule icon", () => {
       const dateSection = wrapper.find(".event-metadata");
       expect(dateSection.text()).toContain("2024-01-01 10:00:00");
-      const scheduleIcon = dateSection.find('[data-test="q-icon"].schedule');
+      const scheduleIcon = dateSection.find('[data-test="OIcon"].schedule');
       expect(scheduleIcon.exists()).toBe(true);
     });
 
     it("should display browser and OS with settings icon", () => {
       const browserSection = wrapper.find(".event-metadata");
       expect(browserSection.text()).toContain("Chrome 120, Windows 10");
-      const settingsIcon = browserSection.find('[data-test="q-icon"].settings');
+      const settingsIcon = browserSection.find('[data-test="OIcon"].settings');
       expect(settingsIcon.exists()).toBe(true);
     });
 
     it("should display IP with language icon", () => {
       const ipSection = wrapper.find(".event-metadata");
       expect(ipSection.text()).toContain("192.168.1.1");
-      const languageIcon = ipSection.find('[data-test="q-icon"].language');
+      const languageIcon = ipSection.find('[data-test="OIcon"].language');
       expect(languageIcon.exists()).toBe(true);
     });
 
@@ -247,7 +247,7 @@ describe("PlayerEventsSidebar Component", () => {
       const locationSection = wrapper.find(".event-metadata");
       expect(locationSection.text()).toContain("New York, USA");
       const locationIcon = locationSection.find(
-        '[data-test="q-icon"].location_on',
+        '[data-test="OIcon"].location_on',
       );
       expect(locationIcon.exists()).toBe(true);
     });

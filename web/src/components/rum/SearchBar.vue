@@ -30,12 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mr-sm float-left download-logs-btn"
           variant="ghost"
           size="icon-sm"
+          icon-left="download"
           :disabled="!searchObj.data.queryResults.hits.length"
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        >
-          <Download class="tw:size-4" />
-        </OButton>
+        />
         <div class="float-left">
           <date-time
             auto-apply
@@ -104,7 +103,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Download } from 'lucide-vue-next';
+
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -119,7 +118,6 @@ export default defineComponent({
     ),
     SyntaxGuide,
     OButton,
-    Download,
   },
   emits: ["searchdata", "date-change"],
   props: {
@@ -459,7 +457,7 @@ export default defineComponent({
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
-      .q-icon {
+      .OIcon {
         font-size: 0.9375rem;
         color: #ffffff;
       }

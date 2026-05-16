@@ -342,9 +342,9 @@ describe("SummaryList.vue", () => {
     expect(wrapper.vm.qTable).toEqual(mockTable);
   });
 
-  // Test 29: Test outlinedCancel icon
-  it("should have outlinedCancel icon available", () => {
-    expect(wrapper.vm.outlinedCancel).toBeDefined();
+  // Test 29: Test "cancel" icon
+  it("should have "cancel" icon available", () => {
+    expect(wrapper.vm."cancel").toBeDefined();
   });
 
   // Test 30: Test i18n translation function
@@ -371,7 +371,7 @@ describe("SummaryList.vue", () => {
   it("should return all required values from setup function", () => {
     const setupReturnKeys = [
       "t", "columns", "confirmDeleteAction", "deleteDialog", "perPageOptions",
-      "showListSchemaDialog", "changePagination", "outlinedCancel", "loadingState",
+      "showListSchemaDialog", "changePagination", ""cancel"", "loadingState",
       "isMetaOrg", "resultTotal", "selectedPerPage", "qTable", "selectedRow",
       "handleMultiQueryCancel", "pagination", "getAllUserQueries"
     ];

@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
+    ref="catalogContainerRef"
+    class="services-catalog tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem] tw:relative tw:overflow-hidden"
   >
     <!-- Toolbar: stream selector + filter + chips + legend -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
@@ -25,42 +26,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-stream-selector"
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
-        <q-select
+        <OSelect
           v-model="streamFilter"
-          :options="
-            availableStreams.length > 0
-              ? availableStreams.map((s) => ({ label: s, value: s }))
-              : []
-          "
-          dense
-          borderless
-          emit-value
-          map-options
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          labelKey="label"
+          valueKey="value"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
-          :disable="availableStreams.length === 0"
-        >
-          <q-tooltip v-if="availableStreams.length === 0">
-            {{ t("traces.servicesCatalog.noStreamsDetected") }}
-          </q-tooltip>
-        </q-select>
+        />
+        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.servicesCatalog.noStreamsDetected')" />
       </div>
 
       <!-- Search input -->
       <div data-test="services-catalog-filter-input">
-        <q-input
+        <OInput
           v-model="filterText"
           :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
-          borderless
-          dense
           clearable
-          debounce="300"
-          class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+          :debounce="300"
+          class="tw:w-[14rem]!"
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <OIcon class="o2-search-input-icon" size="1rem" name="search" />
           </template>
-        </q-input>
+        </OInput>
       </div>
 
       <template v-if="!isLoading && services.length > 0">
@@ -87,10 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span>{{ statusCounts.critical }}</span>
             <span>{{ t("traces.servicesCatalog.status.critical") }}</span>
-            <q-tooltip>
-              {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
-              {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
-            </q-tooltip>
+            <OTooltip>
+              <template #content>
+                {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
+                {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+              </template>
+            </OTooltip>
           </div>
         </template>
         <template v-if="statusCounts.warning > 0">
@@ -100,10 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span>{{ statusCounts.warning }}</span>
             <span>{{ t("traces.servicesCatalog.status.warning") }}</span>
-            <q-tooltip>
-              {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
-              {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
-            </q-tooltip>
+            <OTooltip>
+              <template #content>
+                {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
+                {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+              </template>
+            </OTooltip>
           </div>
         </template>
         <template v-if="statusCounts.degraded > 0">
@@ -113,10 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span>{{ statusCounts.degraded }}</span>
             <span>{{ t("traces.servicesCatalog.status.degraded") }}</span>
-            <q-tooltip>
-              {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
-              {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
-            </q-tooltip>
+            <OTooltip>
+              <template #content>
+                {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
+                {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+              </template>
+            </OTooltip>
           </div>
         </template>
       </template>
@@ -127,13 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
         data-test="services-catalog-pagination-bar"
       >
-        <q-select
+        <OSelect
           v-model="rowsPerPage"
           :options="rowsPerPageOptions"
           class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
           size="sm"
-          dense
-          borderless
           data-test="services-catalog-records-per-page"
           @update:model-value="changeRowsPerPage"
         />
@@ -231,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
       data-test="services-catalog-empty"
     >
-      <q-icon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
       <p class="tw:text-[0.9rem]">
         {{ t("traces.servicesCatalog.noServicesFound") }}
       </p>
@@ -294,14 +288,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-total_requests="{ item }">
           <span :data-test="`services-catalog-requests-${item.service_name}`">
             {{ formatLargeNumber(item.total_requests) }}
-            <q-tooltip>{{ item.total_requests.toLocaleString() }}</q-tooltip>
+            <OTooltip :content="item.total_requests.toLocaleString()" />
           </span>
         </template>
 
         <template #cell-error_count="{ item }">
           <span :data-test="`services-catalog-errors-${item.service_name}`">
             {{ formatLargeNumber(item.error_count) }}
-            <q-tooltip>{{ item.error_count.toLocaleString() }}</q-tooltip>
+            <OTooltip :content="item.error_count.toLocaleString()" />
           </span>
         </template>
 
@@ -309,14 +303,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-p50_latency_ns="{ item }">
           <span>
             {{ formatLat(item.p50_latency_ns) }}
-            <q-tooltip>{{ item.p50_latency_ns.toLocaleString() }} ns</q-tooltip>
+            <OTooltip :content="item.p50_latency_ns.toLocaleString() + ' ns'" />
           </span>
         </template>
 
         <template #cell-p95_latency_ns="{ item }">
           <span>
             {{ formatLat(item.p95_latency_ns) }}
-            <q-tooltip>{{ item.p95_latency_ns.toLocaleString() }} ns</q-tooltip>
+            <OTooltip :content="item.p95_latency_ns.toLocaleString() + ' ns'" />
           </span>
         </template>
 
@@ -327,25 +321,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             {{ formatLat(item.p99_latency_ns) }}
-            <q-tooltip>{{ item.p99_latency_ns.toLocaleString() }} ns</q-tooltip>
+            <OTooltip :content="item.p99_latency_ns.toLocaleString() + ' ns'" />
           </span>
         </template>
 
         <template #cell-avg_duration_ns="{ item }">
           <span>
             {{ formatLat(item.avg_duration_ns) }}
-            <q-tooltip
-              >{{ item.avg_duration_ns.toLocaleString() }} ns</q-tooltip
-            >
+            <OTooltip :content="item.avg_duration_ns.toLocaleString() + ' ns'" />
           </span>
         </template>
 
         <template #cell-max_duration_ns="{ item }">
           <span>
             {{ formatLat(item.max_duration_ns) }}
-            <q-tooltip
-              >{{ item.max_duration_ns.toLocaleString() }} ns</q-tooltip
-            >
+            <OTooltip :content="item.max_duration_ns.toLocaleString() + ' ns'" />
           </span>
         </template>
 
@@ -354,11 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="1.25rem"
-              class="tw:mx-[0.25rem]"
-            />
+            <OSpinner size="xs" class="tw:mx-[0.25rem]" />
             <span
               class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
             >
@@ -373,11 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="services-catalog-loading"
             class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="1.25rem"
-              class="tw:mr-[0.25rem]"
-            />
+            <OSpinner size="xs" class="tw:mr-[0.25rem]" />
             <span
               class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
             >
@@ -412,6 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :time-range="timeRange"
       :visible="showSidePanel"
       :stream-filter="streamFilter"
+      :container-el="catalogContainerRef"
       data-test="services-catalog-node-side-panel"
       @close="handleCloseSidePanel"
       @view-traces="viewTraces"
@@ -440,9 +423,15 @@ import {
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const store = useStore();
+const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
 const { getStreams } = useStreams();
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =

@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Left Column: Display Name only (ID is internal/read-only) -->
       <div class="left-column">
         <div class="input-wrapper">
-          <q-input
+          <OInput
             data-test="semantic-group-display-input"
             v-model="localGroup.display"
             :label="t('common.name') + ' *'"
-            :rules="[(val) => !!val || t('common.name') + ' is required']"
-            dense
-            borderless
-            stack-label
+            :error="!!displayError"
+            :error-message="displayError"
             class="showLabelOnTop"
             @update:model-value="handleDisplayChange"
             @blur="handleDisplayBlur"
@@ -37,16 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="localGroup.id" class="text-caption text-grey-6">
           {{ t("common.id") }}: {{ localGroup.id }}
         </div>
-        <q-toggle
+        <OSwitch
           v-model="localGroup.is_workload_type"
           :label="t('correlation.isWorkloadType')"
-          dense
-          size="sm"
           class="q-mt-xs"
           @update:model-value="emitUpdate"
         >
-          <q-tooltip>{{ t('correlation.isWorkloadTypeTooltip') }}</q-tooltip>
-        </q-toggle>
+          <OTooltip :content="t('correlation.isWorkloadTypeTooltip')" />
+        </OSwitch>
       </div>
 
       <!-- Right Column: Field Names spanning both rows -->
@@ -71,10 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isProtected"
             @click="!isProtected && emit('delete')"
           >
-            <q-icon name="delete" />
-            <q-tooltip>
-              {{ isProtected ? t("correlation.serviceGroupProtected") : t("correlation.removeSemanticGroup") }}
-            </q-tooltip>
+            <OIcon name="delete" size="sm" />
+            <OTooltip :content="isProtected ? t('correlation.serviceGroupProtected') : t('correlation.removeSemanticGroup')" />
           </OButton>
         </div>
       </div>
@@ -86,7 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TagInput from "./TagInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 
@@ -116,6 +114,7 @@ const normalizeGroup = (g: SemanticGroup): SemanticGroup => ({
 });
 
 const localGroup = ref<SemanticGroup>(normalizeGroup(props.group));
+const displayError = ref("");
 
 watch(
   () => props.group,
@@ -137,11 +136,15 @@ const generateIdFromDisplay = (display: string): string => {
 
 // Handle display name change (just emit, don't generate ID yet)
 const handleDisplayChange = () => {
+  displayError.value = "";
   emitUpdate();
 };
 
 // Handle display name blur - generate ID on focus out
 const handleDisplayBlur = () => {
+  if (!localGroup.value.display) {
+    displayError.value = t('common.name') + ' is required';
+  }
   // Generate ID from display name if display is not empty
   // If display is empty, keep the current ID (UUID or previous display-based ID)
   if (localGroup.value.display) {

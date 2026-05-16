@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="running-queries-search-input"
           >
             <template #prepend>
-              <q-icon name="search" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+              <OIcon name="search" size="sm" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
             </template>
           </q-input>
           <div v-else class=" o2-select-input o2-input ">
@@ -151,15 +151,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteQuery"
       @update:cancel="deleteDialog.show = false"
     />
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showListSchemaDialog"
+      size="xl"
+      :show-close="false"
       data-test="list-schema-dialog"
+      @close="showListSchemaDialog = false"
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
-    </q-dialog>
+    </ODrawer>
   </div>
 </template>
 
@@ -178,20 +178,23 @@ import {
 } from "vue";
 import { useQuasar, type QTableProps, QTable } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem },
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const schemaData = ref({});
@@ -803,7 +806,7 @@ export default defineComponent({
       showListSchemaDialog,
       filterQuery,
       changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       schemaData,
       loadingState,
       refreshData,

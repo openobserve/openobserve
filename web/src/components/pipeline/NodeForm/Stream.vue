@@ -15,26 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-stream-input-stream-routing-section"
-    class="full-height"
-    :style="{
-      width: selectedNodeType == 'output' ? '40vw' : '',
-    }"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.streamTitle')"
+    size="md"
+    :show-close="true"
+    @keydown.stop
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-stream-input-stream-routing-section"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
-      {{ t("pipeline.streamTitle") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
 
-    <q-separator />
 
     <div class="stream-routing-container full-width q-py-md">
       <q-toggle
@@ -121,17 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="note-message"
             >
               <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Select an existing stream
+                <OIcon name="info" size="sm" class="q-pr-xs" /> Select an existing stream
                 from the list or enter the name to create a new one</span
               >
               <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Enrichment_tables as
+                <OIcon name="info" size="sm" class="q-pr-xs" /> Enrichment_tables as
                 destination stream is only available for scheduled
                 pipelines</span
               >
 
               <span class="tw:flex">
-                <q-icon name="info" class="q-pr-xs q-pt-xs" /> Use curly braces
+                <OIcon name="info" size="sm" class="q-pr-xs q-pt-xs" /> Use curly braces
                 '{}' to configure stream name dynamically. e.g.
                 static_text_{fieldname}_postfix. Static text before/after {} is
                 optional</span
@@ -171,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
     </div>
   </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -187,6 +181,8 @@ import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
@@ -194,10 +190,20 @@ import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["cancel:hideform"]);
+
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 
 const $q = useQuasar();
 

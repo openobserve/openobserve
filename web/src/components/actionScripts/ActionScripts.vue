@@ -35,18 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:full-width tw:flex tw:items-center tw:justify-end tw:gap-3"
           >
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               data-test="action-list-add-btn"
               variant="primary"
@@ -80,9 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <NoData />
             </template>
             <template v-slot:body-selection="scope">
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 class="o2-table-checkbox"
               />
             </template>
@@ -95,13 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex justify-center items-center q-ml-xs"
                   :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
                 >
-                  <q-circular-progress
-                    indeterminate
-                    rounded
-                    size="16px"
-                    :value="1"
-                    color="secondary"
-                  />
+                  <OSpinner size="xs" />
                 </div>
                 <OButton
                   :data-test="`alert-list-${props.row.name}-update-alert`"
@@ -109,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-circle-sm"
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
-                  ><q-icon name="edit" size="16px"
+                  ><OIcon name="edit" size="sm"
                 /></OButton>
                 <OButton
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -117,16 +108,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-circle-sm"
                   :title="t('alerts.delete')"
                   @click="showDeleteDialogFn(props)"
-                  ><q-icon :name="outlinedDelete" size="16px"
+                  ><OIcon name="delete" size="sm"
                 /></OButton>
               </q-td>
             </template>
 
             <template v-slot:body-cell-function="props">
               <q-td :props="props">
-                <q-tooltip>
-                  <pre>{{ props.row.sql }}</pre>
-                </q-tooltip>
+                <OTooltip>
+                  <template #content>
+                    <pre>{{ props.row.sql }}</pre>
+                  </template>
+                </OTooltip>
                 <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
               </q-td>
             </template>
@@ -147,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="secondary"
                     size="sm"
                     @click="openBulkDeleteDialog"
-                    ><q-icon name="delete" size="16px" /><span class="tw:ml-1.5"
+                    ><OIcon name="delete" size="sm" /><span class="tw:ml-1.5"
                       >Delete</span
                     ></OButton
                   >
@@ -166,9 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tr :props="props">
                 <!-- Adding this block to render the select-all checkbox -->
                 <q-th v-if="columns.length > 0" auto-width>
-                  <q-checkbox
+                  <OCheckbox
                     v-model="props.selected"
-                    size="sm"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-table-checkbox-dark'
@@ -220,79 +212,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm" persistent>
-        <q-card class="clone-alert-popup">
-          <div class="row items-center no-wrap q-mx-md q-my-sm">
-            <div class="flex items-center">
-              <div
-                data-test="add-action-back-btn"
-                class="flex justify-center items-center q-mr-md cursor-pointer"
-                style="
-                  border: 1.5px solid;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                "
-                title="Go Back"
-                @click="showForm = false"
-              >
-                <q-icon name="arrow_back_ios_new" size="14px" />
-              </div>
-              <div class="text-h6" data-test="clone-alert-title">
-                {{ t("alerts.cloneTitle") }}
-              </div>
-            </div>
+      <ODialog data-test="action-scripts-form-dialog"
+        v-model:open="showForm"
+        persistent
+        size="md"
+        :show-close="false"
+        :title="t('alerts.cloneTitle')"
+        :secondary-button-label="t('alerts.cancel')"
+        :primary-button-label="t('alerts.save')"
+        :primary-button-disabled="isSubmitting"
+        @click:secondary="showForm = false"
+        @click:primary="submitForm"
+      >
+        <template #header-left>
+          <div
+            data-test="add-action-back-btn"
+            class="flex justify-center items-center cursor-pointer"
+            style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
+            title="Go Back"
+            @click="showForm = false"
+          >
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
-          <q-card-section>
-            <q-form @submit="submitForm">
-              <q-input
+        </template>
+            <q-form id="action-script-clone-form" @submit="submitForm">
+              <OInput
                 data-test="to-be-clone-action-name"
                 v-model="toBeCloneAlertName"
                 label="Alert Name"
               />
-              <q-select
+              <OSelect
                 data-test="to-be-clone-stream-type"
                 v-model="toBeClonestreamType"
                 label="Stream Type"
                 :options="streamTypes"
                 @update:model-value="updateStreams()"
               />
-              <q-select
+              <OSelect
                 data-test="to-be-clone-stream-name"
                 v-model="toBeClonestreamName"
                 :loading="isFetchingStreams"
-                :disable="!toBeClonestreamType"
+                :disabled="!toBeClonestreamType"
                 label="Stream Name"
                 :options="streamNames"
-                @change="updateStreamName"
-                @filter="filterStreams"
-                use-input
-                fill-input
-                hide-selected
-                :input-debounce="400"
+                @update:model-value="updateStreamName"
               />
-              <div class="tw:flex tw:gap-2 tw:justify-center q-mt-lg">
-                <OButton
-                  data-test="clone-action-cancel-btn"
-                  variant="outline"
-                  size="sm-action"
-                  @click="showForm = false"
-                  >{{ t("alerts.cancel") }}</OButton
-                >
-                <OButton
-                  data-test="clone-action-submit-btn"
-                  variant="primary"
-                  size="sm-action"
-                  type="submit"
-                  :disabled="isSubmitting"
-                  >{{ t("alerts.save") }}</OButton
-                >
-              </div>
             </q-form>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
-    </template>
+        </ODialog>
+      </template>
   </div>
 </template>
 
@@ -328,15 +295,17 @@ import {
   convertUnixToQuasarFormat,
 } from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 interface ActionScriptList {
   "#": string | number; // If this represents a serial number or row index
@@ -356,6 +325,7 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
+    OIcon,
     QTablePagination,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
@@ -363,6 +333,12 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    ODialog,
+    OSpinner,
+    OInput,
+    OCheckbox,
+    OTooltip,
+    OSelect,
   },
   emits: [
     "updated:fields",
@@ -925,7 +901,6 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       isSubmitting,
-      outlinedDelete,
       filterQuery,
       filterData,
       getImageURL,
@@ -934,8 +909,6 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
-      outlinedPause,
-      outlinedPlayArrow,
       actionsScriptRows,
       alertStateLoadingMap,
       templates,

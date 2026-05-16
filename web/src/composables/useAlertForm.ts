@@ -88,7 +88,6 @@ import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
@@ -2840,7 +2839,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     initializeFormData,
 
     // Constants/utils
-    outlinedInfo,
+    "info": "info",
     getTimezoneOffset,
     isValidResourceName,
     convertDateToTimestamp,

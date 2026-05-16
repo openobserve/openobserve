@@ -15,12 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-stream-input-stream-routing-section"
-    class="tw:h-[calc(100vh)] tw:overflow-auto tw:w-[40vw]"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    title="External Destination"
+    size="lg"
+    :show-close="true"
+    @keydown.stop
   >
-    <q-page>
+    <div class="tw:rounded-md">
       <div class="o2-input">
         <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
           <div class="flex items-center tw:w-full">
@@ -31,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 External Destination
                 <div>
                   <OButton variant="ghost" size="icon" v-close-popup>
-                    <q-icon name="cancel" size="14px" />
+                    <OIcon name="cancel" size="xs" />
                   </OButton>
                 </div>
               </div>
@@ -119,8 +122,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-page>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -137,11 +140,24 @@ import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
+
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();

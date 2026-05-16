@@ -108,7 +108,7 @@ describe("AppTable", () => {
           NoData: {
             template: '<div data-test="no-data">No Data Available</div>',
           },
-          "q-icon": {
+          "OIcon": {
             template: '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
             props: ["name", "size"],
           },
@@ -303,7 +303,7 @@ describe("AppTable", () => {
             NoData: {
               template: '<div data-test="no-data">No Data Available</div>',
             },
-            "q-icon": {
+            "OIcon": {
               template: '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
               props: ["name", "size"],
             },

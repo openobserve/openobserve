@@ -90,6 +90,21 @@ installQuasar({
   plugins: [Dialog, Notify],
 });
 
+// Stub for ODrawer: exposes slots and re-emits update:open so tests can drive
+// drawer open/close interactions without rendering the real overlay.
+const ODrawerStub = {
+  name: 'ODrawer',
+  props: ['open', 'width', 'showClose', 'persistent', 'size', 'title', 'subTitle'],
+  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+  template: `
+    <div data-test-stub="o-drawer" :data-open="open" :data-size="size" :data-title="title">
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+};
+
 describe('EnrichmentTableList Component', () => {
   let wrapper;
   let store;
@@ -180,6 +195,7 @@ describe('EnrichmentTableList Component', () => {
           AddEnrichmentTable: true,
           ConfirmDialog: true,
           EnrichmentSchema: true,
+          ODrawer: ODrawerStub,
         }
       },
     });
@@ -682,11 +698,68 @@ describe('EnrichmentTableList Component', () => {
   describe('Table Sorting', () => {
     it('handles compressed size sorting', () => {
       const column = wrapper.vm.columns.find(c => c.name === 'compressed_size');
-      const result = column.sort(null, null, 
-        { original_compressed_size: 1000 }, 
+      const result = column.sort(null, null,
+        { original_compressed_size: 1000 },
         { original_compressed_size: 500 }
       );
       expect(result).toBe(500);
     });
   });
-}); 
+
+  describe('URL Jobs ODrawer', () => {
+    it('renders the ODrawer wrapper for URL jobs', () => {
+      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
+    });
+
+    it('passes size "lg" to the URL Jobs ODrawer', () => {
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes('data-size')).toBe('lg');
+    });
+
+    it('is closed by default (data-open="false")', () => {
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes('data-open')).toBe('false');
+      expect(wrapper.vm.showUrlJobsDialogState).toBe(false);
+    });
+
+    it('opens the drawer and records the row when showUrlJobsDialog is called', async () => {
+      const row = { name: 'url-table', urlJobs: [{ id: 1, url: 'https://x', status: 'completed' }] };
+      wrapper.vm.showUrlJobsDialog(row);
+      await flushPromises();
+
+      expect(wrapper.vm.showUrlJobsDialogState).toBe(true);
+      expect(wrapper.vm.selectedTableForUrlJobs).toEqual(row);
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes('data-open')).toBe('true');
+    });
+
+    it('closes when ODrawer emits update:open=false', async () => {
+      wrapper.vm.showUrlJobsDialog({ name: 'url-table', urlJobs: [] });
+      await flushPromises();
+      expect(wrapper.vm.showUrlJobsDialogState).toBe(true);
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      drawer.vm.$emit('update:open', false);
+      await flushPromises();
+
+      expect(wrapper.vm.showUrlJobsDialogState).toBe(false);
+    });
+  });
+
+  describe('EnrichmentSchema v-model:open Integration', () => {
+    it('toggles showEnrichmentSchema via listSchema and exposes table name', async () => {
+      expect(wrapper.vm.showEnrichmentSchema).toBe(false);
+      await wrapper.vm.listSchema({ row: { name: 'schema-table' } });
+      expect(wrapper.vm.showEnrichmentSchema).toBe(true);
+      expect(wrapper.vm.selectedEnrichmentTable).toBe('schema-table');
+    });
+
+    it('can be closed by setting showEnrichmentSchema to false (mimicking update:open)', async () => {
+      wrapper.vm.showEnrichmentSchema = true;
+      await wrapper.vm.$nextTick();
+      wrapper.vm.showEnrichmentSchema = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showEnrichmentSchema).toBe(false);
+    });
+  });
+});

@@ -17,7 +17,7 @@
             title="Go Back"
             @click="closeSearchHistory"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
           <div class="text-h6 tw:font-[600]" data-test="add-alert-title">
             {{ t("search_history.title") }}
@@ -25,23 +25,17 @@
         </div>
         <div class="tw:flex tw:items-center q-pr-md">
           <div>
-            <q-toggle
+            <OSwitch
               v-model="wrapText"
               :label="t('search_history.wrapText')"
-              class="o2-toggle-button-xs q-mr-md"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
+              size="sm"
+              class="q-mr-md"
             />
           </div>
           <div
             class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md"
           >
-            <q-icon name="info" class="q-mr-xs" size="16px" />
+            <OIcon name="info" class="q-mr-xs" size="sm" />
             <div>
               {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>
@@ -99,12 +93,12 @@
               >
                 <q-td>
                   <OButton variant="ghost" size="icon">
-                    <q-icon
+                    <OIcon
                       :name="
                         expandedRow != props.row.uuid
-                          ? 'expand_more'
-                          : 'expand_less'
-                      "
+                          ? 'expand-more'
+                          : 'expand-less'
+                      " size="sm"
                     />
                   </OButton>
                 </q-td>
@@ -145,7 +139,7 @@
                                 copyToClipboard(props.row.sql, 'SQL Query')
                               "
                             >
-                              <q-icon name="content_copy" /> </OButton></span
+                              <OIcon name="content-copy" size="sm" /> </OButton></span
                         ></strong>
                         <OButton
                           variant="outline-destructive"
@@ -154,7 +148,7 @@
                           @click.stop="goToLogs(props.row)"
                         >
                           <template #icon-left
-                            ><q-icon name="search"
+                            ><OIcon name="search" size="sm"
                           /></template>
                           Logs
                         </OButton>
@@ -170,7 +164,7 @@
                           @click.stop="goToInspector(props.row)"
                         >
                           <template #icon-left
-                            ><q-icon name="analytics"
+                            ><OIcon name="analytics" size="sm"
                           /></template>
                           Inspect
                         </OButton>
@@ -202,7 +196,7 @@
                                 )
                               "
                             >
-                              <q-icon name="content_copy" /> </OButton></span
+                              <OIcon name="content-copy" size="sm" /> </OButton></span
                         ></strong>
                       </div>
 
@@ -268,7 +262,7 @@
             v-if="isLoading"
             class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
           >
-            <q-spinner-hourglass color="primary" size="lg" />
+            <OSpinner size="md" />
           </div>
         </div>
       </div>
@@ -299,11 +293,14 @@ import { date, QTable, useQuasar } from "quasar";
 import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Code2, Info } from "lucide-vue-next";
+
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -318,7 +315,10 @@ export default defineComponent({
     AppTabs,
     QueryEditor,
     OButton,
-  },
+    OSwitch,
+    OSpinner,
+    OIcon,
+},
   props: {
     isClicked: {
       type: Boolean,
@@ -361,12 +361,12 @@ export default defineComponent({
       {
         label: "Query / Function",
         value: "query",
-        icon: Code2,
+        icon: "code",
       },
       {
         label: "More Details",
         value: "more_details",
-        icon: Info,
+        icon: "info",
       },
     ]);
 

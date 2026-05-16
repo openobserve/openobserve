@@ -6,7 +6,7 @@ on:
       - "main"
   pull_request:
     branches:
-      - "*"
+      - "**"
   merge_group:
 
 concurrency:
@@ -145,6 +145,7 @@ jobs:
     #   image: mcr.microsoft.com/playwright:v1.50.0-jammy
     #   options: --user root 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - testfolder: "GeneralTests"

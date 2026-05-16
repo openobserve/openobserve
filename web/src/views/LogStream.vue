@@ -38,43 +38,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><ScrollText class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="description" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metrics" size="sm">
                   <template #icon-left
-                    ><BarChart2 class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="bar-chart" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelMetrics") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="traces" size="sm">
                   <template #icon-left
-                    ><GitFork class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem value="metadata" size="sm">
                   <template #icon-left
-                    ><Info class="tw:size-3.5 tw:shrink-0"
+                    ><OIcon name="info" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
             <div data-test="streams-search-stream-input">
-              <q-input
+              <OInput
                 v-model="filterQuery"
-                borderless
-                dense
                 class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('logStream.search')"
-                debounce="300"
+                :debounce="300"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
-              </q-input>
+              </OInput>
             </div>
             <OButton
               data-test="log-stream-refresh-stats-btn"
@@ -132,13 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
-                <q-spinner-hourglass color="primary" size="lg" />
+                <OSpinner size="md" />
               </div>
             </template>
             <template #body-selection="scope">
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 :class="
                   store.state.theme === 'dark'
                     ? 'o2-table-checkbox-dark'
@@ -150,31 +147,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #body-cell-actions="props">
               <q-td :props="props">
                 <OButton
+                  icon-left="search"
                   :title="t('logStream.explore')"
                   data-test="log-stream-explore-btn"
                   variant="ghost"
                   size="icon-sm"
                   @click="exploreStream(props)"
-                >
-                  <Search class="tw:size-4" />
-                </OButton>
+                />
                 <OButton
+                  icon-left="description"
                   :title="t('logStream.schemaHeader')"
                   data-test="log-stream-schema-btn"
                   variant="ghost"
                   size="icon-sm"
                   @click="listSchema(props)"
-                >
-                  <FileText class="tw:size-4" />
-                </OButton>
+                />
                 <OButton
+                  icon-left="delete"
                   :title="t('logStream.delete')"
                   variant="ghost-destructive"
                   size="icon-sm"
                   @click="confirmDeleteAction(props)"
-                >
-                  <Trash2 class="tw:size-4" />
-                </OButton>
+                />
               </q-td>
             </template>
             <template v-slot:pagination="scope">
@@ -183,21 +177,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="tw:flex tw:items-center q-ml-md">
                   <OButton
+                    icon-left="chevron-left"
                     variant="ghost"
                     size="icon-sm"
                     :disabled="scope.isFirstPage"
                     @click="scope.prevPage"
-                  >
-                    <ChevronLeft class="tw:size-4" />
-                  </OButton>
+                  />
                   <OButton
+                    icon-left="chevron-right"
                     variant="ghost"
                     size="icon-sm"
                     :disabled="scope.isLastPage"
                     @click="scope.nextPage"
-                  >
-                    <ChevronRight class="tw:size-4" />
-                  </OButton>
+                  />
                 </div>
               </div>
             </template>
@@ -205,9 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tr :props="props">
                 <!-- Adding this block to render the select-all checkbox -->
                 <q-th auto-width>
-                  <q-checkbox
+                  <OCheckbox
                     v-model="props.selected"
-                    size="sm"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-table-checkbox-dark'
@@ -241,15 +232,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ scope.pagination.rowsNumber }} Stream(s)
                   <OButton
                     v-if="selected.length > 0"
-                    variant="outline"
+                    icon-left="delete"
+                    variant="outline-destructive"
                     size="sm-action"
                     class="tw:ml-4"
                     :disabled="isDeleting"
                     @click="confirmBatchDeleteAction"
                   >
-                    <template #icon-left
-                      ><Trash2 class="tw:size-3.5 tw:shrink-0"
-                    /></template>
                     {{ isDeleting ? "Deleting..." : "Delete" }}
                   </OButton>
                 </div>
@@ -267,109 +256,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-dialog
-      v-model="showIndexSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <SchemaIndex v-if="showIndexSchemaDialog" v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />
+
+    <AddStream
+      v-model:open="addStreamDialog.show"
+      :is-in-pipeline="false"
+      @close="addStreamDialog.show = false"
+      @streamAdded="getLogStream"
+    />
+
+    <ODialog data-test="log-stream-delete-dialog"
+      v-model:open="confirmDelete"
+      size="sm"
+      :title="t('logStream.confirmDeleteHead')"
+      :secondary-button-label="t('logStream.cancel')"
+      :primary-button-label="t('logStream.ok')"
+      primary-button-variant="destructive"
+      @click:secondary="confirmDelete = false"
+      @click:primary="() => { deleteStream(); confirmDelete = false; }"
     >
-      <SchemaIndex v-model="schemaData" />
-    </q-dialog>
+      <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
+      <div
+        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
+      >
+        <OCheckbox
+          class="checkbox-delete-associated-alerts-pipelines"
+          v-model="deleteAssociatedAlertsPipelines"
+        />
+        <span class="delete-associated-alerts-pipelines-text">
+          Delete all pipelines and alerts associated with the stream
+        </span>
+      </div>
+    </ODialog>
 
-    <q-dialog
-      v-model="addStreamDialog.show"
-      position="right"
-      full-height
-      maximized
+    <ODialog data-test="log-stream-batch-delete-dialog"
+      v-model:open="confirmBatchDelete"
+      size="sm"
+      :title="t('logStream.confirmBatchDeleteHead')"
+      :secondary-button-label="t('logStream.cancel')"
+      :primary-button-label="t('logStream.ok')"
+      primary-button-variant="destructive"
+      @click:secondary="confirmBatchDelete = false"
+      @click:primary="() => { deleteBatchStream(); confirmBatchDelete = false; }"
     >
-      <AddStream
-        :is-in-pipeline="false"
-        @close="addStreamDialog.show = false"
-        @streamAdded="getLogStream"
-      />
-    </q-dialog>
-
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 420px">
-        <q-card-section class="confirmBodyLogStream">
-          <div class="head">{{ t("logStream.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("logStream.confirmDeleteMsg") }}</div>
-        </q-card-section>
-        <div
-          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
-        >
-          <q-checkbox
-            class="checkbox-delete-associated-alerts-pipelines"
-            v-model="deleteAssociatedAlertsPipelines"
-          />
-          <span class="delete-associated-alerts-pipelines-text">
-            Delete all pipelines and alerts associated with the stream
-          </span>
-        </div>
-        <q-card-actions class="confirmActionsLogStream tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="confirmDelete = false"
-          >
-            {{ t("logStream.cancel") }}
-          </OButton>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            @click="
-              () => {
-                deleteStream();
-                confirmDelete = false;
-              }
-            "
-          >
-            {{ t("logStream.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBatchDelete">
-      <q-card style="width: 420px">
-        <q-card-section class="confirmBodyLogStream">
-          <div class="head">{{ t("logStream.confirmBatchDeleteHead") }}</div>
-          <div class="para">{{ t("logStream.confirmBatchDeleteMsg") }}</div>
-        </q-card-section>
-        <div
-          class="tw:w-full tw:flex tw:justify-center tw:items-center tw:text-sm tw:text-gray-500"
-        >
-          <q-checkbox
-            class="checkbox-delete-associated-alerts-pipelines"
-            v-model="deleteAssociatedAlertsPipelines"
-          />
-          <span class="delete-associated-alerts-pipelines-text">
-            Delete all pipelines and alerts associated with the selected streams
-          </span>
-        </div>
-        <q-card-actions class="confirmActionsLogStream tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="confirmBatchDelete = false"
-          >
-            {{ t("logStream.cancel") }}
-          </OButton>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            @click="
-              () => {
-                deleteBatchStream();
-                confirmBatchDelete = false;
-              }
-            "
-          >
-            {{ t("logStream.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+      <div
+        class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
+      >
+        <OCheckbox
+          class="checkbox-delete-associated-alerts-pipelines"
+          v-model="deleteAssociatedAlertsPipelines"
+        />
+        <span class="delete-associated-alerts-pipelines-text">
+          Delete all pipelines and alerts associated with the selected streams
+        </span>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -403,17 +345,14 @@ import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  Search,
-  FileText,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-vue-next";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { ScrollText, BarChart2, GitFork, Info } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -422,17 +361,13 @@ export default defineComponent({
     NoData,
     AddStream,
     OButton,
+    ODialog,
+    OIcon,
     OToggleGroup,
     OToggleGroupItem,
-    ScrollText,
-    BarChart2,
-    GitFork,
-    Info,
-    Search,
-    FileText,
-    Trash2,
-    ChevronLeft,
-    ChevronRight,
+    OSpinner,
+    OInput,
+    OCheckbox,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {

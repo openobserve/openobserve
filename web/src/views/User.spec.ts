@@ -31,15 +31,20 @@ installQuasar({
 describe("User.vue Component", () => {
   let wrapper: any;
 
-  beforeEach(async () => {
-    wrapper = mount(User, {
-      global: {
-        provide: {
-          store: store,
-        },
-        plugins: [i18n, router],
+  const mountOptions = {
+    global: {
+      provide: {
+        store: store,
       },
-    });
+      plugins: [i18n, router],
+      stubs: {
+        Users: { template: '<div data-test="users-stub" />' },
+      },
+    },
+  };
+
+  beforeEach(async () => {
+    wrapper = mount(User, mountOptions);
     await flushPromises();
   });
 
@@ -180,26 +185,16 @@ describe("User.vue Component", () => {
     });
 
     it("should initialize componentName as empty string", async () => {
-      const newWrapper = mount(User, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-        },
-      });
-      
+      const newWrapper = mount(User, mountOptions);
+
       await nextTick();
       expect(newWrapper.vm.componentName).toBe("Users");
       newWrapper.unmount();
     });
 
     it("should initialize loadComponent as false initially", async () => {
-      const newWrapper = mount(User, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-        },
-      });
-      
+      const newWrapper = mount(User, mountOptions);
+
       await nextTick();
       expect(newWrapper.vm.loadComponent).toBe(true);
       newWrapper.unmount();
@@ -269,13 +264,8 @@ describe("User.vue Component", () => {
     });
 
     it("should handle mount sequence correctly", async () => {
-      const newWrapper = mount(User, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-        },
-      });
-      
+      const newWrapper = mount(User, mountOptions);
+
       await flushPromises();
       expect(newWrapper.vm.componentName).toBe("Users");
       expect(newWrapper.vm.loadComponent).toBe(true);
@@ -446,12 +436,7 @@ describe("User.vue Component", () => {
 
     it("should handle component without config errors", async () => {
       expect(() => {
-        mount(User, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-          },
-        });
+        mount(User, mountOptions);
       }).not.toThrow();
     });
   });
@@ -459,12 +444,7 @@ describe("User.vue Component", () => {
   describe("Performance and Memory Tests", () => {
     it("should not create memory leaks on mount/unmount", () => {
       for (let i = 0; i < 5; i++) {
-        const testWrapper = mount(User, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-          },
-        });
+        const testWrapper = mount(User, mountOptions);
         testWrapper.unmount();
       }
       expect(true).toBe(true);
@@ -473,12 +453,7 @@ describe("User.vue Component", () => {
     it("should handle multiple instances", () => {
       const wrappers = [];
       for (let i = 0; i < 3; i++) {
-        wrappers.push(mount(User, {
-          global: {
-            provide: { store: store },
-            plugins: [i18n, router],
-          },
-        }));
+        wrappers.push(mount(User, mountOptions));
       }
       
       expect(wrappers.length).toBe(3);

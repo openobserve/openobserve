@@ -396,7 +396,8 @@
     "traces": "İzleri",
     "switchToLogs": "Günlüklere geri dönmek için tıklayın",
     "patternNoValuesAvailable": "Mevcut değer yok",
-    "selectLogStream": "Günlükler akışını seçin"
+    "selectLogStream": "Günlükler akışını seçin",
+    "noData": "Veri yok"
   },
   "menu": {
     "home": "Ana Sayfa",

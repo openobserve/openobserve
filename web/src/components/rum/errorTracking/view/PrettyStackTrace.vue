@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Loading state -->
     <div v-if="isLoadingTranslation" class="loading-container q-pa-xl text-center">
-      <q-spinner-dots color="primary" size="3em" />
+      <OSpinner variant="dots" size="lg" />
       <div class="q-mt-md text-grey-7" style="font-size: 14px; font-weight: 500;">
         Translating stack trace with source maps...
       </div>
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- No source maps available message -->
     <div v-else-if="allSourceInfoNull" class="no-source-maps-container q-pa-md text-center">
-      <q-icon name="code_off" size="2em" color="grey-6" class="q-mb-sm" />
+      <OIcon name="code-off" size="2em" class="q-mb-sm" />
       <div class="text-subtitle1 text-grey-8 q-mb-xs" style="font-weight: 500;">
         Source Maps Not Available
       </div>
@@ -49,10 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
+        icon-left="upload"
         class="tw:my-2"
         @click="navigateToUpload"
       >
-        <Upload class="tw:size-4 tw:mr-1" />
         Upload Source Maps
       </OButton>
     </div>
@@ -92,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="toggleFrame(traceIndex, 0)"
           >
             <div class="frame-header-content">
-              <q-icon
-                :name="isFrameExpanded(traceIndex, 0) ? 'expand_more' : 'chevron_right'"
+              <OIcon
+                :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
                 class="q-mr-xs text-grey-7"
               />
@@ -154,8 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
-            <q-icon
-              name="expand_more"
+            <OIcon
+              name="expand-more"
               size="xs"
               class="q-mr-xs"
             />
@@ -179,8 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >
                 <div class="collapsed-frame-content">
-                  <q-icon
-                    :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand_more' : 'chevron_right'"
+                  <OIcon
+                    :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'"
                     size="xs"
                     class="q-mr-xs text-grey-5"
                   />
@@ -243,12 +243,14 @@ import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Upload } from 'lucide-vue-next';
+
 import {
   generateCacheKey,
   getCachedTranslation,
   setCachedTranslation,
 } from "@/utils/stackTraceCache";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const router = useRouter();

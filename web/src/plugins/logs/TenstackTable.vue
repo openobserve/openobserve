@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (header.column.columnDef.meta as any).showWrap
                 "
               >
-                <q-icon
+                <OIcon
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                   name="cancel"
@@ -132,10 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? 'text-white' : 'text-grey-7'
                   "
                   :title="t('common.close')"
-                  size="18px"
+                  size="sm"
                   @click="closeColumn(header.column.columnDef)"
-                >
-                </q-icon>
+                 />
               </div>
             </div>
           </th>
@@ -153,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
             >
-              <q-spinner-hourglass size="20px" />
+              <OSpinner size="xs" />
               {{ t("confirmDialog.loading") }}
             </div>
           </td>
@@ -165,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="opacity: 0.7"
           >
             <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs"
+              <OIcon size="xs"
 name="warning"
 class="q-mr-xs" />
               {{ errMsg }}
@@ -195,9 +194,9 @@ class="q-mr-xs" />
                 class="q-mr-xs log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-                ><q-icon :name="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'" size="14px" /></OButton
+                ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="14px" /></OButton
               ><b>
-                <q-icon name="warning" size="15px"></q-icon>
+                <OIcon name="warning" size="15px" />
                 {{ t("search.functionErrorLabel") }}</b
               >
             </div>
@@ -338,11 +337,11 @@ class="q-mr-xs" />
                   class="q-mr-xs log-row-expand-btn"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
-                  ><q-icon
+                  ><OIcon
                     :name="
                       expandedRowIndices.has(virtualRow.index)
-                        ? 'expand_more'
-                        : 'chevron_right'
+                        ? 'expand-more'
+                        : 'chevron-right'
                     "
                     size="14px"
                 /></OButton>
@@ -432,6 +431,8 @@ import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface StreamField {
   name: string;

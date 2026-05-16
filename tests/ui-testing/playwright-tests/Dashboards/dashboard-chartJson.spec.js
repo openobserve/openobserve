@@ -257,8 +257,16 @@ test.describe("dashboard custom query mode field options testcases", () => {
     await pm.chartTypeSelector.openFieldPropertyPopup("x_axis_1", "x");
     await pm.chartTypeSelector.toggleShowFieldAsJson();
 
-    // Close the popup and re-apply
+    // Close the popup before applying. The popup is a q-menu portaled outside the
+    // axis-item button, so Escape must dismiss it before clicking Apply — otherwise
+    // CI runs occasionally see Apply intercepted by the still-mounted menu.
+    // Wait for the JSON-toggle checkbox (which only renders inside the open popup)
+    // to detach before continuing, so the menu is guaranteed gone.
     await page.keyboard.press('Escape');
+    await page
+      .locator('[data-test="dynamic-function-popup-show-field-as-json"]')
+      .waitFor({ state: 'hidden', timeout: 5000 })
+      .catch(() => {});
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 

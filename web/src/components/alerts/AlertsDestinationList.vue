@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
+  <div class="tw:rounded-md q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
 
     <div v-if="!showDestinationEditor && !showImportDestination" >
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -24,18 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_destinations.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               data-test="destination-list-search-input"
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('alert_destinations.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           <OButton
             variant="outline"
             size="sm"
@@ -100,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Export Destination"
                 @click.stop="exportDestination(props.row)"
               >
-                <q-icon name="download" />
+                <OIcon name="download" size="sm" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${props.row.name}-update-destination`"
@@ -109,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-                <q-icon name="edit" />
+                <OIcon name="edit" size="sm" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
@@ -118,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-                <q-icon :name="outlinedDelete" />
+                <OIcon name="delete" size="sm" />
               </OButton>
             </div>
           </q-td>
@@ -135,10 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                   :label="getPrebuiltTypeName(props.row)"
                 />
-                <q-icon
-                  name="auto_awesome"
-                  size="16px"
-                  color="primary"
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
                   :title="'Prebuilt ' + getPrebuiltTypeName(props.row) + ' destination'"
                 />
               </template>
@@ -150,10 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                   :label="getCustomDestinationLabel(props.row)"
                 />
-                <q-icon
+                <OIcon
                   name="settings"
-                  size="16px"
-                  color="grey-6"
+                  size="sm"
                   :title="getCustomDestinationLabel(props.row)"
                 />
               </template>
@@ -162,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
         </template>
 
         <template #bottom="scope">
@@ -178,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
+              <OIcon name="delete" size="sm" />
               <span class="tw:ml-2">Delete</span>
             </OButton>
           <QTablePagination
@@ -194,9 +190,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                   class="o2-table-checkbox"
                 />
@@ -248,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts">
 
@@ -280,8 +275,10 @@ import type { Template } from "@/ts/interfaces/index";
 import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 interface ConformDelete {
   visible: boolean;
@@ -290,12 +287,15 @@ interface ConformDelete {
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    OIcon,
     AddDestination,
     NoData,
     ConfirmDialog,
     QTablePagination,
     ImportDestination,
     OButton,
+    OInput,
+    OCheckbox,
   },
   setup() {
     const qTable = ref();
@@ -782,7 +782,6 @@ export default defineComponent({
       selectedPerPage,
       visibleRows,
       hasVisibleRows,
-      outlinedDelete,
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,

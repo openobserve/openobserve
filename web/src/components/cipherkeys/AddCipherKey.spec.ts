@@ -78,11 +78,8 @@ describe('AddCipherKey.vue', () => {
           $q: mockQuasar
         },
         stubs: {
-          'q-page': {
-            template: '<div class="q-page-stub"><slot></slot></div>'
-          },
-          'q-icon': {
-            template: '<div class="q-icon-stub">{{ name }}</div>',
+                    'OIcon': {
+            template: '<div class="OIcon-stub">{{ name }}</div>',
             props: ['name', 'size']
           },
           'q-separator': {
@@ -627,7 +624,7 @@ describe('AddCipherKey.vue', () => {
     it('has correct main structure', () => {
       wrapper = createWrapper();
       
-      expect(wrapper.find('.q-page-stub').exists()).toBe(true);
+      expect(wrapper.find('.q-pa-none').exists()).toBe(true);
       expect(wrapper.find('.q-form-stub').exists()).toBe(true);
       expect(wrapper.find('.q-stepper-stub').exists()).toBe(true);
     });

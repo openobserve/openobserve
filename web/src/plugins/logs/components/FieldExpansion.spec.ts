@@ -22,9 +22,9 @@ vi.mock("vue-i18n", () => ({
 }));
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedAdd: "add",
-  outlinedVisibility: "visibility",
-  outlinedVisibilityOff: "visibility_off",
+  "add": "add",
+  "visibility": "visibility",
+  "visibility-off": "visibility_off",
 }));
 
 vi.mock("@/components/common/FieldValuesPanel.vue", () => ({
@@ -107,7 +107,7 @@ function createWrapper(props = {}) {
         QIcon: {
           name: "QIcon",
           template:
-            '<span class="q-icon-stub" :data-name="name" v-bind="$attrs" @click="$emit(\'click\', $event)"></span>',
+            '<span class="OIcon-stub" :data-name="name" v-bind="$attrs" @click="$emit(\'click\', $event)"></span>',
           props: ["name", "size"],
           emits: ["click"],
         },
@@ -159,7 +159,7 @@ describe("FieldExpansion", () => {
     it("renders expand icon when field has dataType and is not expanded", () => {
       const wrapper = createWrapper();
       // The chevron_right icon is shown when not expanded
-      const icons = wrapper.findAll(".q-icon-stub");
+      const icons = wrapper.findAll(".OIcon-stub");
       const expandIcon = icons.find(
         (i) => i.attributes("data-name") === "chevron_right"
       );
@@ -340,7 +340,7 @@ describe("FieldExpansion", () => {
       const wrapper = createWrapper();
       // The expansion item stub gets modelValue from isExpanded ref
       // We verify the chevron_right icon is shown (not expanded)
-      const icons = wrapper.findAll(".q-icon-stub");
+      const icons = wrapper.findAll(".OIcon-stub");
       const chevronIcon = icons.find(
         (i) => i.attributes("data-name") === "chevron_right"
       );

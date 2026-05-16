@@ -396,7 +396,8 @@
     "traces": "痕迹",
     "switchToLogs": "点击切换回日志",
     "patternNoValuesAvailable": "没有可用值",
-    "selectLogStream": "选择日志流"
+    "selectLogStream": "选择日志流",
+    "noData": "无可用数据"
   },
   "menu": {
     "home": "主页",

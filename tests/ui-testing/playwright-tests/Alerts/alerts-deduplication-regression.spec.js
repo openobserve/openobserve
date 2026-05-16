@@ -283,7 +283,7 @@ test.describe("Deduplication Regression Tests", {
             await updateBtn.click();
         } else {
             // Try finding the pencil/edit icon in the row by title/aria-label (more robust than positional index)
-            const pencilIcon = alertRow.locator('[title="Edit"], [aria-label="Edit"], [title*="edit" i], button:has(.q-icon[name*="edit"])').first();
+            const pencilIcon = alertRow.locator('[title="Edit"], [aria-label="Edit"], [title*="edit" i], button:has(.OIcon[name*="edit"])').first();
             if (await pencilIcon.isVisible({ timeout: 2000 }).catch(() => false)) {
                 testLogger.info('Clicking pencil icon in row');
                 await pencilIcon.click();

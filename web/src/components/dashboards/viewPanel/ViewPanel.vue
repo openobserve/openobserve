@@ -15,7 +15,7 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px)" data-test="view-panel-screen">
+  <div style="height: calc(100vh - 57px); margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-5))" data-test="view-panel-screen">
     <div class="flex justify-between items-center q-pa-md">
       <div class="flex items-center q-table__title q-mr-md">
         <span data-test="dashboard-viewpanel-title">
@@ -66,8 +66,8 @@
           size="icon-xs"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"
+          icon-left="cancel"
         >
-          <template #icon-left><q-icon name="cancel" /></template>
           <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
         </OButton>
         <OButton
@@ -77,8 +77,8 @@
           @click="refreshData"
           :disabled="disable"
           data-test="dashboard-viewpanel-refresh-data-btn"
+          icon-left="refresh"
         >
-          <template #icon-left><q-icon name="refresh" /></template>
           <q-tooltip>{{
             isVariablesChanged
               ? "Refresh"
@@ -90,8 +90,8 @@
           size="icon-xs"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </div>
@@ -179,12 +179,10 @@
         </div>
       </div>
     </div>
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+    />
   </div>
 </template>
 
@@ -226,12 +224,12 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -253,7 +251,8 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
-  },
+    OIcon,
+},
   props: {
     panelId: {
       type: String,
@@ -889,7 +888,7 @@ export default defineComponent({
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,
-      outlinedWarning,
+      "warning": "warning",
       symOutlinedDataInfoAlert,
       currentTabId,
       currentPanelId,

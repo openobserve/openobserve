@@ -62,7 +62,7 @@ describe('enterprisePlan.vue', () => {
           'q-card': true,
           'q-chip': true,
           'q-separator': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-btn': {
             template: '<button @click="$emit(\'click\')" v-bind="$attrs"><slot/></button>',
             emits: ['click']
