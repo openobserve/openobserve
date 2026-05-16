@@ -27,72 +27,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="tw:w-full tw:h-full">
       <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
-        <q-table
-          ref="qTable"
-          :rows="invitations"
+        <OTable
+          :data="invitations"
           :columns="columns"
           row-key="token"
-          :pagination="pagination"
-          style="width: 100%"
-          :style="invitations.length > 0
-              ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 92px);'
-              : 'width: 100%'"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+          pagination="client"
+          :page-size="25"
+          sorting="client"
+          :default-columns="false"
+          :show-global-filter="false"
         >
-      <template #no-data>
-        <NoData></NoData>
-      </template>
-      <template v-slot:header="props">
-        <q-tr :props="props">
-          <q-th
-            v-for="col in props.cols"
-            :class="col.classes"
-            :key="col.name"
-            :props="props"
-          >
-            <span>{{ col.label }}</span>
-          </q-th>
-        </q-tr>
-      </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <OButton
-            variant="primary"
-            size="sm"
-            class="tw:mr-2"
-            @click="acceptInvitation(props.row)"
-            :data-test="`accept-invitation-${props.row.token}`"
-          >
-            {{ t('invitation.accept') }}
-          </OButton>
-          <OButton
-            variant="secondary"
-            size="sm"
-            @click="rejectInvitation(props.row)"
-            :data-test="`reject-invitation-${props.row.token}`"
-          >
-            {{ t('invitation.reject') }}
-          </OButton>
-        </q-td>
-      </template>
-
-      <template #bottom="scope">
-      <div class="bottom-btn tw:h-[48px] tw:flex tw:w-full">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[250px] tw:mr-md">
-            {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
-          </div>
-        <QTablePagination
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
-        </div>
-        <!-- :maxRecordToReturn="maxRecordToReturn" -->
-        <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
-      </template>
-        </q-table>
+          <template #empty>
+            <NoData />
+          </template>
+          <template #cell-actions="{ row }">
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <OButton
+                variant="primary"
+                size="sm"
+                @click="acceptInvitation(row)"
+                :data-test="`accept-invitation-${row.token}`"
+              >
+                {{ t('invitation.accept') }}
+              </OButton>
+              <OButton
+                variant="secondary"
+                size="sm"
+                @click="rejectInvitation(row)"
+                :data-test="`reject-invitation-${row.token}`"
+              >
+                {{ t('invitation.reject') }}
+              </OButton>
+            </div>
+          </template>
+          <template #bottom>
+            <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+              {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
+            </span>
+          </template>
+        </OTable>
       </div>
     </div>
 
@@ -127,21 +100,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 
 export default defineComponent({
   name: "InvitationList",
   components: {
     NoData,
-    QTablePagination,
     OButton,
     ODialog,
+    OTable,
   },
   props: {
     userEmail: {
@@ -154,76 +128,61 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
-    const qTable: any = ref(null);
     const invitations = ref([]);
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
     const selectedInvitation = ref(null);
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px;",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 48,
+        minSize: 40,
+        maxSize: 64,
+        meta: { align: "center", compactPadding: true },
       },
       {
-        name: "org_name",
-        field: "org_name",
-        label: t("invitation.organizationName"),
-        align: "left",
+        id: "org_name",
+        header: t("invitation.organizationName"),
+        accessorKey: "org_name",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "role",
-        field: "role",
-        label: t("invitation.role"),
-        align: "left",
+        id: "role",
+        header: t("invitation.role"),
+        accessorKey: "role",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "inviter_id",
-        field: "inviter_id",
-        label: t("invitation.invitedBy"),
-        align: "left",
+        id: "inviter_id",
+        header: t("invitation.invitedBy"),
+        accessorKey: "inviter_id",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "expiry",
-        field: "expiry",
-        label: t("invitation.expiry"),
-        align: "left",
+        id: "expiry",
+        header: t("invitation.expiry"),
+        accessorKey: "expiry",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("invitation.actions"),
-        align: "left",
-        classes: "actions-column",
+        id: "actions",
+        header: t("invitation.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 180,
+        minSize: 140,
+        maxSize: 220,
+        meta: { align: "center" },
       },
-    ]);
-
-    const pagination: any = ref({
-      rowsPerPage: 25,
-    });
-
-    const perPageOptions = [
-      { label: "25", value: 25 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
     ];
     const resultTotal = ref<number>(0);
-    const selectedPerPage = ref<number>(25);
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -378,15 +337,10 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       store,
       invitations,
       columns,
-      pagination,
-      perPageOptions,
       resultTotal,
-      selectedPerPage,
-      changePagination,
       confirmAccept,
       confirmReject,
       selectedInvitation,
