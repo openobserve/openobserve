@@ -1,7 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, ref, toRef, useSlots } from "vue";
+import { computed, ref, toRef, useSlots, watch } from "vue";
+import { FlexRender } from "@tanstack/vue-table";
 import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
@@ -168,8 +169,8 @@ const {
 } = useTableVirtualization({
   rows: displayRows,
   parentRef: scrollContainerRef,
-  scrollEl: scrollContainerRef.value ?? undefined,
-  scrollMargin: 0,
+  scrollEl: props.scrollEl ?? scrollContainerRef.value ?? undefined,
+  scrollMargin: props.scrollMargin ?? 0,
   rowHeight: props.rowHeight ?? 24,
   overscan: 100,
 });
@@ -220,6 +221,24 @@ function handleScroll(event: Event) {
   }
 }
 
+// ── Debounced column size emission ─────────────────────────────
+let columnSizeTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  () => table.getState().columnSizing,
+  (newSizes) => {
+    if (!props.enableColumnResize) return;
+    if (columnSizeTimer) clearTimeout(columnSizeTimer);
+    columnSizeTimer = setTimeout(() => {
+      const idMap: Record<string, string> = {};
+      for (const col of props.columns) {
+        idMap[col.id] = col.id;
+      }
+      emit("update:columnSizes", newSizes as Record<string, number>, idMap);
+    }, 500);
+  },
+  { deep: true },
+);
+
 /**
  * Exposed API: parent can access the TanStack table instance
  * and imperative methods via template ref.
@@ -237,6 +256,9 @@ defineExpose({
       scrollContainerRef.value.scrollTop = 0;
     }
   },
+  getRows: () => {
+    return table.getRowModel().rows.map((r) => r.original);
+  },
 });
 </script>
 
@@ -247,6 +269,12 @@ defineExpose({
   >
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
+
+    <!-- ── Loading banner (shown when loading with existing data) ── -->
+    <slot
+      v-if="props.loading && displayRows.length > 0"
+      name="loading-banner"
+    />
 
     <!-- ── Top pagination ───────────────────────────────────── -->
     <OTablePagination
@@ -286,7 +314,7 @@ defineExpose({
         :class="[
           'tw:w-full',
           !props.defaultColumns ? 'tw:table-fixed' : 'tw:table-auto',
-          props.bordered ? '' : 'tw:border-separate tw:border-spacing-0',
+          (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'tw:border-separate tw:border-spacing-0',
         ]"
         :style="{
           ...columnSizeVars,
@@ -312,6 +340,9 @@ defineExpose({
           :get-sort-icon="sorting.getSortIcon"
           :sticky-header="props.stickyHeader"
           :bordered="props.bordered"
+          :pivot-header-levels="props.pivotHeaderLevels"
+          :pivot-row-columns="props.pivotRowColumns"
+          :sticky-col-totals="props.stickyColTotals"
           @toggle-all-rows="selection.toggleAllRows"
           @sort="sorting.handleSort"
           @column-close="columnMgmt.closeColumn"
@@ -342,6 +373,7 @@ defineExpose({
           :get-status-bar-color="props.getRowStatusColor"
           :enable-cell-copy="props.enableCellCopy"
           :loading="props.loading"
+          :get-cell-style="(props.getCellStyle as any)"
           :virtual-rows="isVirtual ? virtualRows : undefined"
           :total-size="isVirtual ? totalSize : undefined"
           :base-offset="isVirtual ? baseOffset : undefined"
@@ -371,6 +403,58 @@ defineExpose({
             <slot name="expansion" :row="expSlotProps.row" />
           </template>
         </OTableBody>
+
+        <!-- ── Footer (sticky totals row) ─────────────────────── -->
+        <tfoot
+          v-if="table.getFooterGroups().length"
+          data-test="o2-table-footer"
+        >
+          <tr
+            v-for="footerGroup in table.getFooterGroups()"
+            :key="footerGroup.id"
+            class="tw:sticky tw:bottom-0 tw:z-10 tw:bg-[var(--color-table-header-bg)]"
+          >
+            <!-- Expand placeholder -->
+            <th
+              v-if="expansion.isEnabled.value"
+              class="tw:w-0 tw:px-0"
+            />
+            <!-- Selection placeholder -->
+            <th
+              v-if="selection.isMultiple.value"
+              class="tw:w-0"
+            />
+            <th
+              v-for="header in footerGroup.headers"
+              :key="header.id"
+              :colspan="header.colSpan"
+              :data-test="`o2-table-footer-cell-${header.id}`"
+              :class="[
+                'tw:px-2 tw:py-2 tw:text-left tw:font-medium tw:text-text-primary tw:text-sm',
+                props.bordered ? 'tw:border-r tw:border-t tw:border-border-default' : 'tw:border-t tw:border-border-default',
+                (header.column.columnDef.meta as any)?.align === 'center' ? 'tw:text-center' : '',
+                (header.column.columnDef.meta as any)?.align === 'right' ? 'tw:text-right' : '',
+              ]"
+              :style="{
+                width: `calc(var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+                ...(header.column.getIsPinned?.() === 'right'
+                  ? {
+                      position: 'sticky',
+                      right: `${header.column.getAfter?.('right') ?? 0}px`,
+                      zIndex: 20,
+                      boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                    }
+                  : {}),
+              }"
+            >
+              <FlexRender
+                v-if="!header.isPlaceholder"
+                :render="header.column.columnDef.footer"
+                :props="header.getContext()"
+              />
+            </th>
+          </tr>
+        </tfoot>
       </table>
 
       <!-- ── Empty State ───────────────────────────────────── -->
@@ -422,7 +506,20 @@ defineExpose({
     </div>
 
     <!-- ── Bottom slot (custom actions) ─────────────────────── -->
-    <slot name="bottom" />
+    <slot
+      name="bottom"
+      :current-page="pagination.currentPage.value"
+      :page-size="pagination.pageSize.value"
+      :total-pages="pagination.totalPages.value"
+      :total-rows="pagination.totalCount.value"
+      :is-first-page="pagination.isFirstPage.value"
+      :is-last-page="pagination.isLastPage.value"
+      :set-page-size="pagination.setPageSize"
+      :first-page="pagination.firstPage"
+      :prev-page="pagination.prevPage"
+      :next-page="pagination.nextPage"
+      :last-page="pagination.lastPage"
+    />
 
     <!-- ── Bottom Pagination ────────────────────────────────── -->
     <OTablePagination

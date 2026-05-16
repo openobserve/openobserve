@@ -30,6 +30,12 @@ const props = defineProps<{
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
+  /** Per-cell inline style function */
+  getCellStyle?: (params: {
+    columnId: string;
+    row: any;
+    value: any;
+  }) => Record<string, any>;
 }>();
 
 const emit = defineEmits<{
@@ -143,6 +149,7 @@ function onDblclick(event: MouseEvent) {
       :dense="dense"
       :bordered="bordered"
       :enable-cell-copy="enableCellCopy"
+      :get-cell-style="getCellStyle"
       @cell-click="emit('cell-click', $event)"
     >
       <template v-if="slots[`cell-${cell.column.id}`]" #default>

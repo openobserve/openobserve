@@ -6,6 +6,7 @@ import { FlexRender } from "@tanstack/vue-table";
 import { computed, ref } from "vue";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
+import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const props = defineProps<{
   headerGroups: HeaderGroup<any>[];
@@ -25,6 +26,9 @@ const props = defineProps<{
   getSortIcon?: (columnId: string) => "asc" | "desc" | "none";
   stickyHeader?: boolean;
   bordered?: boolean;
+  pivotHeaderLevels?: any[];
+  pivotRowColumns?: any[];
+  stickyColTotals?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -61,10 +65,146 @@ function handleDragStart(event: any) {
 function handleDragEnd() {
   emit("drag-end");
 }
+
+// ── Pivot helpers ───────────────────────────────────────────────
+
+function getPivotRowColStyle(colId: string): Record<string, any> {
+  const col = props.table.getColumn(colId);
+  if (!col) return {};
+  const leftOffset = col.getStart("left");
+  return {
+    position: "sticky",
+    left: `${leftOffset}px`,
+    zIndex: 12,
+    boxShadow: leftOffset > 0 ? "2px 0 4px -2px var(--color-border-default)" : "none",
+    backgroundColor: "var(--color-table-header-bg)",
+  };
+}
+
+function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
+  if (!props.stickyColTotals || !cell._isTotalHeader) return {};
+  const rightOffset = (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  const width = cell.colspan
+    ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH
+    : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    top: 0,
+    zIndex: 11,
+    width: `${width}px`,
+    minWidth: `${width}px`,
+    maxWidth: `${width}px`,
+    backgroundColor: "var(--color-table-header-bg)",
+    boxShadow: "-4px 0 8px rgba(0, 0, 0, 0.15)",
+  };
+}
 </script>
 
 <template>
+  <!-- ── Pivot multi-level headers (dashboard only) ───────────── -->
   <thead
+    v-if="pivotHeaderLevels && pivotHeaderLevels.length > 0"
+    class="tw:sticky tw:top-0 tw:z-10"
+    data-test="o2-table-pivot-header"
+  >
+    <tr
+      v-for="(level, levelIdx) in pivotHeaderLevels"
+      :key="'pivot-hl-' + levelIdx"
+      class="tw:h-7"
+    >
+      <!-- Row-field column headers: first row only, rowspan all levels -->
+      <th
+        v-if="levelIdx === 0"
+        v-for="col in pivotRowColumns"
+        :key="'pivot-rh-' + col.id"
+        :rowspan="pivotHeaderLevels.length"
+        :data-test="`o2-table-pivot-th-${col.id}`"
+        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-medium tw:text-text-secondary tw:text-sm"
+        :style="getPivotRowColStyle(col.id)"
+        @click="handleSort(col.id)"
+      >
+        <div class="tw:flex tw:items-center tw:gap-1">
+          <FlexRender
+            v-if="col.header"
+            :render="col.header"
+            :props="{}"
+          />
+          <span v-else>{{ col.label ?? col.id }}</span>
+          <q-icon
+            v-if="getSortIcon?.(col.id) === 'asc'"
+            name="arrow_upward"
+            size="0.85rem"
+            class="tw:text-[var(--color-table-sort-icon-active)]"
+          />
+          <q-icon
+            v-else-if="getSortIcon?.(col.id) === 'desc'"
+            name="arrow_downward"
+            size="0.85rem"
+            class="tw:text-[var(--color-table-sort-icon-active)]"
+          />
+          <q-icon
+            v-else
+            name="unfold_more"
+            size="0.85rem"
+            class="tw:opacity-40"
+          />
+        </div>
+      </th>
+
+      <!-- Pivot group / value headers -->
+      <th
+        v-for="(cell, cellIdx) in level.cells"
+        :key="'pivot-c-' + levelIdx + '-' + cellIdx"
+        :colspan="cell.colspan"
+        :rowspan="cell.rowspan || 1"
+        :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
+        class="tw:px-2"
+        :class="[
+          level.isLeaf
+            ? 'pivot-value-header tw:text-text-secondary tw:text-sm'
+            : 'pivot-group-header tw:text-center tw:font-medium tw:text-text-secondary tw:text-sm',
+          {
+            'tw:border-l tw:border-border-default':
+              cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
+          },
+          {
+            'tw:cursor-pointer': cell._sortColumn,
+          },
+        ]"
+        :style="
+          stickyColTotals && cell._isTotalHeader
+            ? getPivotTotalHeaderStyle(cell)
+            : {}
+        "
+        @click="cell._sortColumn && handleSort(cell._sortColumn)"
+      >
+        {{ cell.label }}
+        <q-icon
+          v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
+          name="arrow_upward"
+          size="0.85rem"
+          class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
+        />
+        <q-icon
+          v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
+          name="arrow_downward"
+          size="0.85rem"
+          class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
+        />
+        <q-icon
+          v-else-if="level.isLeaf && cell._sortColumn"
+          name="unfold_more"
+          size="0.85rem"
+          class="tw:opacity-40 tw:ml-1"
+        />
+      </th>
+    </tr>
+  </thead>
+
+  <!-- ── Standard TanStack headers (non-pivot) ─────────────────── -->
+  <thead
+    v-else
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
@@ -116,6 +256,8 @@ function handleDragEnd() {
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
+        :colspan="header.colSpan"
+        :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
           'tw:px-2 tw:text-left tw:font-medium tw:text-text-secondary tw:text-sm tw:select-none tw:relative',
@@ -123,10 +265,27 @@ function handleDragEnd() {
           'table-head',
           'tw:h-9',
           'tw:group',
+          header.column.getIsPinned?.() ? 'tw:bg-[var(--o2-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
           width: `calc(var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+          ...(header.column.getIsPinned?.() === 'left'
+            ? {
+                position: 'sticky',
+                left: `${header.column.getStart?.('left') ?? 0}px`,
+                zIndex: 20,
+                boxShadow: '2px 0 4px -2px var(--color-border-default)',
+              }
+            : {}),
+          ...(header.column.getIsPinned?.() === 'right'
+            ? {
+                position: 'sticky',
+                right: `${header.column.getAfter?.('right') ?? 0}px`,
+                zIndex: 20,
+                boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+              }
+            : {}),
         }"
       >
         <div class="tw:flex tw:items-center tw:gap-1 tw:h-full">
@@ -231,10 +390,27 @@ function handleDragEnd() {
           'tw:px-2 tw:text-left tw:font-medium tw:text-text-secondary tw:text-sm tw:select-none tw:relative',
           bordered ? 'tw:border-r tw:border-border-default' : '',
           'tw:h-9 tw:group',
+          header.column.getIsPinned?.() ? 'tw:bg-[var(--o2-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
           width: `calc(var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+          ...(header.column.getIsPinned?.() === 'left'
+            ? {
+                position: 'sticky',
+                left: `${header.column.getStart?.('left') ?? 0}px`,
+                zIndex: 20,
+                boxShadow: '2px 0 4px -2px var(--color-border-default)',
+              }
+            : {}),
+          ...(header.column.getIsPinned?.() === 'right'
+            ? {
+                position: 'sticky',
+                right: `${header.column.getAfter?.('right') ?? 0}px`,
+                zIndex: 20,
+                boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+              }
+            : {}),
         }"
       >
         <div class="tw:flex tw:items-center tw:gap-1 tw:h-full">
