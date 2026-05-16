@@ -256,7 +256,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:w-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-9 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -387,7 +387,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       />
       <th
         v-if="selectionMultiple"
-        class="tw:w-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-9 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
