@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @blur="queryEditorPlaceholderFlag = true"
                   />
                 </div>
+              </div>
               <div
                 v-if="activeTab === 'import_json_file'"
                 class="editor-container-json card-container tw:py-1"
@@ -172,7 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @focus="queryEditorPlaceholderFlag = false"
                     @blur="queryEditorPlaceholderFlag = true"
                   />
-                </div> (e.g., built-in patterns) -->
+                </div>
+              </div>
+              <!-- Slot for custom tab (e.g., built-in patterns) -->
               <slot name="custom-tab" :activeTab="activeTab" />
             </div>
           </template>

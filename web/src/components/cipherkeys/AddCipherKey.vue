@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div
       class="create-cipher-form"
+    >
     <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">

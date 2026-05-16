@@ -33,7 +33,7 @@
             :error="!!fieldNameErrors[index]"
             :error-message="fieldNameErrors[index] || ''"
             @update:model-value="fieldNameErrors[index] = ''"
-            @blur="if (!field.name.trim()) fieldNameErrors[index] = t('logStream.fieldRequired')"
+            @blur="!field.name.trim() && (fieldNameErrors[index as number] = t('logStream.fieldRequired'))"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
