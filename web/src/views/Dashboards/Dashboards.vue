@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #body-cell-name="props">
                   <q-td :props="props">
-                    <div :title="props.value" class="text-truncate">
+                    <div class="text-truncate">
                       {{
                         props.value && props.value.length > 30
                           ? props.value.slice(0, 30) + "..."
