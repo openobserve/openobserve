@@ -30,9 +30,10 @@
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
             class="q-py-sm"
-            :error="fieldNameErrors[index] && !field.name.trim()"
-            :error-message="fieldNameErrors[index] && !field.name.trim() ? t('logStream.fieldRequired') : ''"
-            @update:model-value="fieldNameErrors[index] = true"
+            :error="!!fieldNameErrors[index]"
+            :error-message="fieldNameErrors[index] || ''"
+            @update:model-value="fieldNameErrors[index] = ''"
+            @blur="if (!field.name.trim()) fieldNameErrors[index] = t('logStream.fieldRequired')"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
@@ -161,7 +162,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { Plus, Trash2 } from "lucide-vue-next";
 
-defineProps({
+const props = defineProps({
   fields: {
     type: Array,
     default: () => [],
@@ -226,7 +227,7 @@ const dataTypes = [
 const store = useStore();
 
 const { t } = useI18n();
-const fieldNameErrors = ref<boolean[]>([]);
+const fieldNameErrors = ref<string[]>([]);
 
 const isFocused = ref(false);
 //repetitive need to refactor
@@ -297,8 +298,19 @@ const handleDataTypeBlur = () => {
   isDataTypeFocused.value = false;
 };
 
+const validate = () => {
+  const fields = props.fields as any[];
+  fields.forEach((field, index) => {
+    if (!field.name.trim()) {
+      fieldNameErrors.value[index] = t("logStream.fieldRequired");
+    }
+  });
+  return fields.every((field) => field.name.trim());
+};
+
 // Expose methods and data for testing
 defineExpose({
+  validate,
   deleteApiHeader,
   addApiHeader,
   disableOptions,

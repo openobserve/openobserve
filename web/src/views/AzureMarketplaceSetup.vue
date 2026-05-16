@@ -76,6 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="newOrgName"
                 label="Organization Name"
                 class="q-mb-md"
+                :error="!!orgNameError"
+                :error-message="orgNameError"
+                @update:model-value="orgNameError = ''"
               />
               <OButton
                 variant="primary"
@@ -176,8 +179,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 type SetupState =
   | "select_org"
@@ -235,10 +236,7 @@ export default defineComponent({
 
     const createNewOrgForAzure = async () => {
       if (!newOrgName.value) {
-        q.notify({
-          type: "negative",
-          message: "Please enter an organization name",
-        });
+        orgNameError.value = "Please enter an organization name";
         return;
       }
 
