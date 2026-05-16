@@ -33,27 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center justify-between full-width q-mb-sm">
             <div class="flex items-center">
-              <q-select
+              <OSelect
                 :loading="isOrgLoading"
                 v-model="selectedOrganization"
                 :options="organizationToDisplay"
-                @filter="filterOrganizations"
+                searchable
                 placeholder="Select Organization"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                color="input-border"
-                bg-color="input-bg"
                 class="q-py-sm no-case q-mr-md input-width org-select"
-                stack-label
-                outlined
-                filled
-                dense
-                use-input
-                hide-selected
-                fill-input
+                labelKey="label"
+                valueKey="value"
                 @update:model-value="updateOrganization()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-              >
-              </q-select>
+              />
               <div class="app-tabs-container tw:h-[36px] tw:w-fit">
                 <app-tabs
                   data-test="quota-tabs"
@@ -85,11 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedOrganization && activeType == 'table'"
               class="flex items-center"
             >
-              <q-input
+              <OInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
-                borderless
-                flat
                 class="no-border input-width o2-search-input"
                 :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                 :placeholder="
@@ -98,34 +86,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'role-limits': t('quota.role-search'),
                   }[activeTab]
                 "
-
               >
                 <template #prepend>
                   <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
-              </q-input>
-              <q-select
+              </OInput>
+              <OSelect
                 v-if="activeTab == 'role-limits'"
                 :loading="isApiCategoryLoading"
                 v-model="selectedApiCategory"
-                :options="filteredApiCategoryToDisplayOptions"
-                placeholder="Select API Category"
-                color="input-border"
-                style="padding: 0px"
-                bg-color="input-bg"
-                class="no-case q-mr-md input-width q-ml-md category-select"
-                stack-label
-                outlined
-                filled
-                dense
-                use-input
-                hide-selected
-                fill-input
+                :options="apiCategories"
+                searchable
                 clearable
-                @filter="filterApiCategoriesToDisplayOptions"
+                placeholder="Select API Category"
+                style="padding: 0px"
+                class="no-case q-mr-md input-width q-ml-md category-select"
+                labelKey="label"
+                valueKey="value"
                 @update:model-value="filterModulesBasedOnCategory()"
-              >
-              </q-select>
+              />
             </div>
             <div
               v-if="selectedOrganization"
@@ -564,6 +543,8 @@ import {
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -593,6 +574,8 @@ export default defineComponent({
   components: {
     NoOrganizationSelected,
     OButton,
+    OSelect,
+    OInput,
     AppTabs,
     QTablePagination,
     ConfirmDialog,
@@ -893,14 +876,14 @@ export default defineComponent({
 
     const organizationToDisplay = computed(() => {
       if (activeTab.value === "api-limits") {
-        const newArray = [...filteredOrganizations.value];
+        const newArray = [...organizations.value];
         newArray.unshift({
           label: "global rules",
           value: "global_rules",
         });
         return newArray;
       } else {
-        return filteredOrganizations.value;
+        return organizations.value;
       }
     });
     const updateOrganization = async () => {

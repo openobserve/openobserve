@@ -42,24 +42,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
           <div class=" o2-select-input o2-input">
-          <q-select
+          <OSelect
             v-model="selectedSearchField"
-            dense
-            map-options
-            emit-value
-            filled
             :options="searchFieldOptions"
+            labelKey="label"
+            valueKey="value"
             class="q-pa-none tw:w-[140px] q-mr-sm"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
-          ></q-select>
+          />
           </div>
  
-          <q-input
+          <OInput
             v-if="selectedSearchField == 'all'"
             v-model="filterQuery"
-            dense
-            borderless
             class="no-border search-input q-pa-none search-running-query o2-search-input tw:h-[36px]"
             :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             :placeholder="t('queries.search')"
@@ -68,22 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #prepend>
               <q-icon name="search" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
             </template>
-          </q-input>
+          </OInput>
           <div v-else class=" o2-select-input o2-input ">
-            <q-select
+            <OSelect
             v-model="filterQuery"
-            borderless
-            map-options
-            emit-value
-            filled
-            dense
-
             :label="filterQuery ? '' : 'Select option'"
             :options="otherFieldOptions"
+            labelKey="label"
+            valueKey="value"
             class="no-border search-input"
-            :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
-          ></q-select>
+          />
           </div>
           <OButton
             data-test="running-queries-refresh-btn"
@@ -182,6 +173,8 @@ import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
@@ -192,7 +185,7 @@ import { getDuration } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer },
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OInput },
   setup() {
     const store = useStore();
     const schemaData = ref({});

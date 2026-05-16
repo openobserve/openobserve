@@ -20,77 +20,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="filters-section q-pa-md">
       <div class="tw:flex tw:justify-between tw:items-center">
       <div class="tw:flex tw:gap-4 tw:items-center">
-        <!-- Version Filter -->
-          <q-select
+          <!-- Version Filter -->
+          <OSelect
             v-model="filters.version"
-            :options="filteredVersionOptions"
+            :options="versionOptions"
             label="Version"
-            borderless
-            dense
             clearable
-            use-input
-            input-debounce="0"
-            @filter="filterVersions"
-            @new-value="addNewVersion"
+            searchable
+            creatable
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  Type to add custom version
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
 
         <!-- Service Filter -->
-          <q-select
+          <OSelect
             v-model="filters.service"
-            :options="filteredServiceOptions"
+            :options="serviceOptions"
             label="Service"
-            borderless
-            dense
             clearable
-            use-input
-            input-debounce="0"
-            @filter="filterServices"
-            @new-value="addNewService"
+            searchable
+            creatable
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  Type to add custom service
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
 
         <!-- Environment Filter -->
-          <q-select
+          <OSelect
             v-model="filters.environment"
-            :options="filteredEnvironmentOptions"
+            :options="environmentOptions"
             label="Environment"
-            borderless
-            dense
             clearable
-            use-input
-            input-debounce="0"
-            @filter="filterEnvironments"
-            @new-value="addNewEnvironment"
+            searchable
+            creatable
             style="width: 200px;"
             class="o2-custom-select-dashboard"
-          >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  Type to add custom environment
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
 
         <!-- Apply Button -->
           <OButton
@@ -251,6 +215,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 const store = useStore();
 const router = useRouter();

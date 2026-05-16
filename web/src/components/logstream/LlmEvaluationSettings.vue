@@ -60,15 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               {{ t("pipeline.llmEvaluationEnableHelp") }}
             </small>
           </div>
-          <q-toggle
+          <OSwitch
             v-model="enabled"
-            size="lg"
-            class="o2-toggle-button-lg"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-lg-dark'
-                : 'o2-toggle-button-lg-light'
-            "
             data-test="stream-llm-eval-enable-toggle"
             @update:model-value="markDirty"
           />
@@ -88,33 +81,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             >
               {{ t("pipeline.llmSpanIdentifier") }}
             </label>
-            <q-select
+            <OSelect
               v-model="spanIdentifier"
-              :options="filteredFields"
-              dense
-              borderless
-              use-input
-              input-debounce="300"
-              emit-value
-              map-options
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-dark'
-                  : 'o2-search-input-light'
-              "
-              class="o2-search-input no-border llm-eval-settings__input"
+              :options="streamFields"
+              searchable
+              labelKey="label"
+              valueKey="value"
+              class="llm-eval-settings__input"
               data-test="stream-llm-eval-span-identifier"
-              @filter="filterFields"
               @update:model-value="markDirty"
-            >
-              <template #no-option>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    {{ t("pipeline.noFieldsFound") }}
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
+            />
             <small
               class="llm-eval-settings__hint"
               :class="
@@ -140,33 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               {{ t("pipeline.evaluationTemplate") }}
             </label>
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-select
+              <OSelect
                 v-model="selectedTemplate"
                 :options="availableTemplates"
-                option-value="id"
-                option-label="name"
-                dense
-                borderless
-                emit-value
-                map-options
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-search-input-dark'
-                    : 'o2-search-input-light'
-                "
-                class="o2-search-input no-border llm-eval-settings__input tw:flex-1"
+                labelKey="name"
+                valueKey="id"
+                class="llm-eval-settings__input tw:flex-1"
                 data-test="stream-llm-eval-template-select"
                 :loading="loadingTemplates"
                 @update:model-value="markDirty"
-              >
-                <template #no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">
-                      {{ t("pipeline.noTemplatesFound") }}
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              />
               <OButton
                 variant="ghost"
                 size="icon-sm"
@@ -209,15 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             >
               {{ t("pipeline.samplingLabel") }}
             </span>
-            <q-toggle
+            <OSwitch
               v-model="enableSampling"
-              size="lg"
-              class="o2-toggle-button-lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
               data-test="stream-llm-eval-sampling-toggle"
               @update:model-value="markDirty"
             />
@@ -279,16 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             >
               {{ t("pipeline.llmEvaluationOutputStreamName") }}
             </label>
-            <q-input
+            <OInput
               v-model="outputStream"
-              dense
-              borderless
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-dark'
-                  : 'o2-search-input-light'
-              "
-              class="o2-search-input no-border llm-eval-settings__input"
+              class="llm-eval-settings__input"
               data-test="stream-llm-eval-output-stream"
               @update:model-value="markDirty"
             />
@@ -329,12 +274,15 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import pipelineService from "@/services/pipelines";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { RefreshCw } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
-  components: { OButton, RefreshCw, OSpinner },
+  components: { OButton, RefreshCw, OSpinner, OSwitch, OSelect, OInput },
 
   props: {
     streamName: {
