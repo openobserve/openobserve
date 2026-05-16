@@ -2,7 +2,7 @@
   <div class="row items-center">
     <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
-      class="row no-wrap items-center q-mb-xs"
+      class="row no-wrap items-center q-mb-xs tw:gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -86,7 +86,7 @@ export default defineComponent({
       const adhocVariablesTemp = adhocVariables.value;
       adhocVariablesTemp.push({
         name: "",
-        operator: operatorOptions[0],
+        operator: operatorOptions[0].value,
         value: "",
         streams: [],
       });
