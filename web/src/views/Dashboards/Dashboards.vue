@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-search-across-folders-toggle"
               v-model="searchAcrossFolders"
               label="All Folders"
-              size="xl"
-              class="tw:whitespace-nowrap tw:shrink-0"
+              size="lg"
+              class="toolbar-toggle-container"
             >
               <template #tooltip>
                 <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import">
+              <OButton variant="outline" size="sm" data-test="dashboard-import">
                 {{ t(`dashboard.import`) }}
                 <template #icon-right>
                   <q-icon name="expand_more" size="xs" />
@@ -96,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdown>
           <!-- new dashboard button -->
           <OButton
-            class="q-ml-sm tw:h-9"
             variant="primary"
             size="sm"
             data-test="dashboard-new"
@@ -1552,6 +1551,27 @@ export default defineComponent({
     background-color: #1a1a1a;
   }
   border-radius: 0.625rem;
+}
+
+// Toolbar Icon and Toggle Styles
+.toolbar-toggle-container {
+  padding: 0.450rem 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--color-button-outline-border); // 1px
+  border-radius: 0.375rem; // 6px
+  transition: all 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+.dark-theme .toolbar-toggle-container {
+  border: 0.0625rem solid var(--color-button-outline-border);
 }
 
 .bottom-btn-dashboard-list {
