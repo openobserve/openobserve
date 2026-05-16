@@ -86,11 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
               >
                 <div>
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="2.5rem"
-                    class="tw:mx-auto tw:block"
-                  />
+                  <OSpinner size="md" class="tw:mx-auto tw:block" />
                   <div class="text-center full-width">
                     {{ t("rum.loadingApplicationErrors") }}
                   </div>
@@ -143,6 +139,7 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -544,7 +541,7 @@ function updateUrlQueryParams() {
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
-      .q-icon {
+      .OIcon {
         font-size: 0.9375rem;
         color: #ffffff;
       }

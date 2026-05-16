@@ -150,7 +150,7 @@ describe("ScheduledPipeline Component", () => {
           'q-select': true,
           'q-input': true,
           'q-btn': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-tooltip': true,
           'q-table': true,
           'DateTime': true,

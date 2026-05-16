@@ -292,7 +292,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.saveCondition();
 
     // Verify error message
-    await pageManager.pipelinesPage.verifyFieldRequiredError();
+    await pageManager.pipelinesPage.verifyConditionRequiredError();
 
     testLogger.info('Test completed: Condition validation error shown');
   });

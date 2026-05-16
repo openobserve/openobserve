@@ -17,14 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
+  <div
+    data-test="alert-list-page"
+    class="tw:flex tw:flex-col"
+    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+  >
     <div
-      class="tw:w-full tw:px-[0.625rem] q-pt-xs"
+      class="tw:shrink-0 tw:px-[0.625rem]"
       v-if="!showAddAlertDialog && !showImportAlertDialog"
     >
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px]"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <div
@@ -34,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.header") }}
             </div>
           </div>
-          <div class="flex q-ml-auto tw:ps-2 items-center">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <!-- Alert Tabs -->
             <OToggleGroup
               :model-value="activeTab"
@@ -42,19 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
             >
               <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><CalendarClock class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="schedule" size="sm" /></template>
                 {{ t("alerts.scheduled") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                <template #icon-left><Zap class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="bolt" size="sm" /></template>
                 {{ t("alerts.realTime") }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
-                <template #icon-left><q-icon name="query_stats" size="14px" /></template>
+                <template #icon-left><OIcon name="query-stats" size="sm" /></template>
                 {{ t("alerts.anomalyDetection") }}
               </OToggleGroupItem>
             </OToggleGroup>
@@ -77,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
               <template v-if="isCompactToolbar" #append>
                 <q-toggle
@@ -135,8 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="importAlert"
             data-test="alert-import"
+            icon-left="upload-file"
           >
-            <template #icon-left><q-icon name="file_upload" /></template>
             <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
             <q-tooltip v-if="isCompactToolbar">
               {{ t("dashboard.import") }}
@@ -169,30 +173,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="full-width alert-list-table"
-      style="height: calc(100vh - 118px)"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
-      <!-- Alerts View (with folders) -->
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        style="height: calc(100vh - 118px)"
-        data-test="alert-list-splitter"
-      >
-        <template #before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full">
-              <FolderList
-                type="alerts"
-                @update:activeFolderId="updateActiveFolderId"
-              />
-            </div>
-          </div>
-        </template>
-        <template #after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
+      <!-- Left: FolderList -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+        <div class="tw:h-full">
+          <FolderList
+            type="alerts"
+            @update:activeFolderId="updateActiveFolderId"
+          />
+        </div>
+      </div>
+      <!-- Right: Table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <q-table
                 v-model:selected="selectedAlerts"
@@ -204,12 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="columns"
                 row-key="alert_id"
                 :pagination="pagination"
-                style="width: 100%"
-                :style="
-                  filteredResults?.length
-                    ? 'width: 100%; height: calc(100vh  - var(--navbar-height) - 87px)'
-                    : 'width: 100%'
-                "
+                style="width: 100%; height: 100%"
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
                 <template v-slot:header="props">
@@ -267,19 +256,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 :props="props">
                       <template v-if="col.name === 'name'">
                         <div class="tw:flex tw:items-center tw:gap-1.5">
-                          <q-icon
+                          <OIcon
                             v-if="props.row.is_real_time === 'anomaly'"
-                            name="query_stats"
+                            name="query-stats"
                             size="15px"
                             class="tw:text-blue-600 tw:shrink-0"
                           />
-                          <q-icon
+                          <OIcon
                             v-else-if="props.row.is_real_time"
                             name="bolt"
                             size="15px"
                             class="tw:text-orange-500 tw:shrink-0"
                           />
-                          <q-icon
+                          <OIcon
                             v-else
                             name="schedule"
                             size="15px"
@@ -388,13 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="flex justify-center items-center q-ml-xs"
                             :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
                           >
-                            <q-circular-progress
-                              indeterminate
-                              rounded
-                              size="16px"
-                              :value="1"
-                              color="secondary"
-                            />
+                            <OSpinner size="xs" />
                           </div>
                           <OButton
                             v-else
@@ -409,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             @click.stop="toggleAlertState(props.row)"
                           >
-                            <q-icon :name="props.row.enabled ? outlinedPause : outlinedPlayArrow" />
+                            <OIcon :name="props.row.enabled ? 'pause' : 'play-arrow'" size="sm" />
                           </OButton>
                           <OButton
                             :data-test="`alert-list-${props.row.name}-update-alert`"
@@ -418,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.edit')"
                             @click.stop="editAlert(props.row)"
                           >
-                            <q-icon name="edit" />
+                            <OIcon name="edit" size="sm" />
                           </OButton>
                           <OButton
                             :title="t('alerts.clone')"
@@ -427,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="duplicateAlert(props.row)"
                             :data-test="`alert-list-${props.row.name}-clone-alert`"
                           >
-                            <q-icon name="content_copy" />
+                            <OIcon name="content-copy" size="sm" />
                           </OButton>
                           <span>
                             <OButton
@@ -436,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="openMenu($event, props.row)"
                               :data-test="`alert-list-${props.row.name}-more-options`"
                             >
-                              <q-icon :name="outlinedMoreVert" />
+                              <OIcon name="more-vert" size="sm" />
                               <q-menu>
                                 <q-list style="min-width: 100px">
                                 <q-item
@@ -446,10 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="moveAlertToAnotherFolder(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDriveFileMove"
-                                    />
+                                    <OIcon name="drive-file-move" size="sm" />
                                   </q-item-section>
                                   <q-item-section>Move</q-item-section>
                                 </q-item>
@@ -461,10 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="showDeleteDialogFn(props)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDelete"
-                                    />
+                                    <OIcon name="delete" size="sm" />
                                   </q-item-section>
                                   <q-item-section>{{
                                     t("alerts.delete")
@@ -478,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="exportAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon size="16px" name="download" />
+                                    <OIcon size="sm" name="download" />
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
@@ -493,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     @click="triggerAlert(props.row)"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon
+                                      <OIcon
                                         size="16px"
                                         :name="symOutlinedSoundSampler"
                                       />
@@ -510,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     @click="retrainAnomaly(props.row)"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon size="16px" name="replay" />
+                                      <OIcon size="sm" name="replay" />
                                     </q-item-section>
                                     <q-item-section>Re-train</q-item-section>
                                   </q-item>
@@ -525,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="triggerAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
+                                    <OIcon
                                       size="16px"
                                       :name="symOutlinedSoundSampler"
                                     />
@@ -631,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="moveMultipleAlerts"
                     >
-                      <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      <OIcon name="drive-file-move" size="sm" />
                       <span class="tw:ml-2">Move</span>
                     </OButton>
                     <OButton
@@ -642,7 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="multipleExportAlert"
                     >
-                      <q-icon name="download" size="16px" />
+                      <OIcon name="download" size="sm" />
                       <span class="tw:ml-2">Export</span>
                     </OButton>
                     <OButton
@@ -653,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <q-icon name="pause" size="16px" />
+                      <OIcon name="pause" size="sm" />
                       <span class="tw:ml-2">Pause</span>
                     </OButton>
                     <OButton
@@ -664,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <q-icon name="play_arrow" size="16px" />
+                      <OIcon name="play-arrow" size="sm" />
                       <span class="tw:ml-2">Resume</span>
                     </OButton>
                     <OButton
@@ -675,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="openBulkDeleteDialog"
                     >
-                      <q-icon name="delete" size="16px" />
+                      <OIcon name="delete" size="sm" />
                       <span class="tw:ml-2">Delete</span>
                     </OButton>
                     <QTablePagination
@@ -688,10 +665,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </q-table>
-            </div>
-          </div>
-        </template>
-      </q-splitter>
+        </div>
+      </div>
     </div>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
@@ -738,127 +713,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template>
-      <q-dialog class="q-pa-md" v-model="showForm"
-persistent>
-        <q-card class="clone-alert-popup tw:pt-2">
-          <div class="row items-center no-wrap q-mx-md q-my-sm">
-            <div class="flex items-center">
-              <div
-                data-test="add-alert-back-btn"
-                class="flex justify-center items-center q-mr-md cursor-pointer"
-                style="
-                  border: 1.5px solid;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                "
-                title="Go Back"
-                @click="showForm = false"
-              >
-                <q-icon name="arrow_back_ios_new" size="14px" />
-              </div>
-              <div class="text-h6" data-test="clone-alert-title">
-                {{ t("alerts.cloneTitle") }}
-              </div>
-            </div>
-          </div>
-          <q-card-section>
-            <q-form @submit="submitForm">
-              <q-input
-                data-test="to-be-clone-alert-name"
-                v-model="toBeCloneAlertName"
-                label="Alert Name"
-                class="showLabelOnTop"
-                stack-label
-                hide-bottom-space
-                borderless
-                dense
-              />
-              <q-select
-                data-test="to-be-clone-stream-type"
-                v-model="toBeClonestreamType"
-                label="Stream Type"
-                :options="streamTypes"
-                @update:model-value="updateStreams()"
-                borderless
-                dense
-                class="showLabelOnTop no-case tw:mt-[1px]"
-              />
-              <q-select
-                data-test="to-be-clone-stream-name"
-                v-model="toBeClonestreamName"
-                :loading="isFetchingStreams"
-                :disable="!toBeClonestreamType"
-                label="Stream Name"
-                :options="streamNames"
-                @change="updateStreamName"
-                @filter="filterStreams"
-                use-input
-                fill-input
-                hide-selected
-                :input-debounce="400"
-                borderless
-                dense
-                class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
-              />
-              <div class="q-mb-lg">
-                <SelectFolderDropDown
-                  :type="'alerts'"
-                  @folder-selected="updateFolderIdToBeCloned"
-                  :activeFolderId="folderIdToBeCloned"
-                />
-              </div>
-              <div class="flex justify-end tw:gap-2 q-mt-sm">
-                <OButton
-                  data-test="clone-alert-cancel-btn"
-                  v-close-popup="true"
-                  variant="outline"
-                  size="sm-action"
-                >{{ t('alerts.cancel') }}</OButton>
-                <OButton
-                  data-test="clone-alert-submit-btn"
-                  variant="primary"
-                  size="sm-action"
-                  type="submit"
-                  :disabled="isSubmitting"
-                >{{ t('alerts.save') }}</OButton>
-              </div>
-            </q-form>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
-      <q-dialog
-        v-model="showMoveAlertDialog"
-        position="right"
-        full-height
-        maximized
-        data-test="dashboard-move-to-another-folder-dialog"
+      <ODialog data-test="alert-list-form-dialog"
+        v-model:open="showForm"
+        persistent
+        size="sm"
+        :title="t('alerts.cloneTitle')"
+        :secondary-button-label="t('alerts.cancel')"
+        :primary-button-label="t('alerts.save')"
+        :primary-button-disabled="isSubmitting"
+        @click:secondary="showForm = false"
+        @click:primary="submitForm"
       >
-        <MoveAcrossFolders
-          :activeFolderId="activeFolderToMove"
-          :moduleId="selectedAlertToMove"
-          :anomalyConfigIds="selectedAnomalyConfigsToMove"
-          type="alerts"
-          @updated="updateAcrossFolders"
-        />
-      </q-dialog>
+        <template #header-left>
+          <div
+            data-test="add-alert-back-btn"
+            class="flex justify-center items-center cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="showForm = false"
+          >
+            <OIcon name="arrow-back-ios-new" size="xs" />
+          </div>
+        </template>
+        <q-form @submit="submitForm">
+          <q-input
+            data-test="to-be-clone-alert-name"
+            v-model="toBeCloneAlertName"
+            label="Alert Name"
+            class="showLabelOnTop"
+            stack-label
+            hide-bottom-space
+            borderless
+            dense
+          />
+          <q-select
+            data-test="to-be-clone-stream-type"
+            v-model="toBeClonestreamType"
+            label="Stream Type"
+            :options="streamTypes"
+            @update:model-value="updateStreams()"
+            borderless
+            dense
+            class="showLabelOnTop no-case tw:mt-[1px]"
+          />
+          <q-select
+            data-test="to-be-clone-stream-name"
+            v-model="toBeClonestreamName"
+            :loading="isFetchingStreams"
+            :disable="!toBeClonestreamType"
+            label="Stream Name"
+            :options="streamNames"
+            @change="updateStreamName"
+            @filter="filterStreams"
+            use-input
+            fill-input
+            hide-selected
+            :input-debounce="400"
+            borderless
+            dense
+            class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
+          />
+          <div class="q-mb-lg">
+            <SelectFolderDropDown
+              :type="'alerts'"
+              @folder-selected="updateFolderIdToBeCloned"
+              :activeFolderId="folderIdToBeCloned"
+            />
+          </div>
+        </q-form>
+      </ODialog>
+      <MoveAcrossFolders
+        v-model:open="showMoveAlertDialog"
+        :activeFolderId="activeFolderToMove"
+        :moduleId="selectedAlertToMove"
+        :anomalyConfigIds="selectedAnomalyConfigsToMove"
+        type="alerts"
+        @updated="updateAcrossFolders"
+        data-test="dashboard-move-to-another-folder-dialog"
+      />
 
       <!-- Alert Details Dialog -->
-      <q-dialog
-        v-model="showAlertDetailsDrawer"
-        position="right"
-        full-height
-        maximized
+      <AlertHistoryDrawer
+        v-model:open="showAlertDetailsDrawer"
+        :alert-details="selectedAlertDetails"
+        :alert-id="selectedAlertDetails?.alert_id || ''"
+        :alert-type="selectedAlertDetails?.alert_type"
+        @edit="editAlertFromDrawer"
         data-test="alert-details-dialog"
-      >
-        <AlertHistoryDrawer
-          :alert-details="selectedAlertDetails"
-          :alert-id="selectedAlertDetails?.alert_id || ''"
-          :alert-type="selectedAlertDetails?.alert_type"
-          @close="showAlertDetailsDrawer = false"
-          @edit="editAlertFromDrawer"
-        />
-      </q-dialog>
+      />
     </template>
   </div>
 </template>
@@ -902,13 +849,7 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedDriveFileMove,
-  outlinedMoreVert,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
@@ -917,13 +858,14 @@ import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { LayoutList, CalendarClock, Zap, TrendingUp } from "lucide-vue-next";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -941,17 +883,15 @@ export default defineComponent({
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
-    LayoutList,
-    CalendarClock,
-    Zap,
-    TrendingUp,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
     OButton,
+    OIcon,
+    ODialog,
+    OSpinner,
   },
   emits: [
-    "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
@@ -2937,7 +2877,6 @@ export default defineComponent({
       isFetchingStreams,
       isSubmitting,
       changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -2955,9 +2894,6 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
-      outlinedPause,
-      outlinedPlayArrow,
-      toggleAlertState,
       alertStateLoadingMap,
       templates,
       routeTo,
@@ -2976,7 +2912,6 @@ export default defineComponent({
       editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
-      outlinedDriveFileMove,
       selectedAlertToMove,
       selectedAnomalyConfigsToMove,
       moveAlertToAnotherFolder,
@@ -2996,7 +2931,6 @@ export default defineComponent({
       allSelectedAlerts,
       copyToClipboard,
       openMenu,
-      outlinedMoreVert,
       getAlertsFn,
       multipleExportAlert,
       computedName,

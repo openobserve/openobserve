@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
+  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
     <div class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto">
       <div class="q-px-sm q-py-sm tw:h-full">
         <!-- Hero Section -->
@@ -37,19 +37,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ store.state.zoConfig.version }}</span>
                 </div>
                 <div class="build-badge tw:capitalize" :class="store.state.theme === 'dark' ? 'build-badge-dark' : 'build-badge-light'">
-                  <q-icon name="workspaces" size="20px" />
+                  <OIcon name="workspaces" size="sm" />
                   <span>{{ store.state.zoConfig.build_type }}</span>
                 </div>
               </div>
             </div>
             <div class="stats-grid">
               <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
-                <q-icon name="code" size="32px" class="stat-icon" />
+                <OIcon name="code" size="lg" class="stat-icon" />
                 <div class="stat-label">{{ t("about.commit_lbl") }}</div>
                 <div class="stat-value tw:font-mono">{{ store.state.zoConfig.commit_hash }}</div>
               </div>
               <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
-                <q-icon name="event" size="32px" class="stat-icon" />
+                <OIcon name="event" size="lg" class="stat-icon" />
                 <div class="stat-label">{{ t("about.build_lbl") }}</div>
                 <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
               </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="code" size="24px" />
+                  <OIcon name="code" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.os_libraries") }}</h3>
               </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-                <q-icon name="settings" size="16px" class="tw:mr-1" />
+                <OIcon name="settings" size="sm" class="tw:mr-1" />
                 Cargo.toml
               </a>
               <a
@@ -86,15 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-              <q-icon name="backpack" class="tw:mr-1" />
+              <OIcon name="backpack" size="sm" class="tw:mr-1" />
                 package.json
               </a>
               <a href="https://npmjs.com" target="_blank" class="link-badge">
-                <q-icon name="javascript" size="16px" class="tw:mr-1" />
+                <OIcon name="javascript" size="md" class="tw:mr-1" />
                 npmjs.com
               </a>
               <a href="https://crates.io" target="_blank" class="link-badge">
-                <q-icon name="inventory_2" size="16px" class="tw:mr-1" />
+                <OIcon name="inventory-2" size="sm" class="tw:mr-1" />
                 crates.io
               </a>
             </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="shield" size="24px" />
+                  <OIcon name="shield" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.license_info") }}</h3>
               </div>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:mt-4 tw:p-3 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-blue-400' : 'tw:bg-blue-500'">
               <p class="tw:text-sm tw:mb-0">
-                <q-icon name="info" size="16px" class="tw:mr-1" />
+                <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
                 {{ t("about.license_info_note") }}
               </p>
             </div>
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4" style="min-height: 120px;">
               <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="groups" size="24px" />
+                  <OIcon name="groups" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.community_lbl") }}</h3>
               </div>
@@ -149,11 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
               <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
-                <q-icon name="code" size="16px" class="tw:mr-1" />
+                <OIcon name="code" size="sm" class="tw:mr-1" />
                 GitHub
               </a>
               <a href="https://openobserve.ai" target="_blank" class="link-badge">
-                <q-icon name="language" size="16px" class="tw:mr-1" />
+                <OIcon name="language" size="sm" class="tw:mr-1" />
                 Website
               </a>
             </div>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
               <div class="tw:flex tw:items-center tw:gap-3">
                 <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="workspace_premium" size="24px" />
+                  <OIcon name="workspace-premium" size="md" />
                 </div>
                 <h3 class="feature-title">{{ t("about.ent_lincese_detail_lbl") }}</h3>
               </div>
@@ -178,13 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="loadingLicense" class="tw:text-center tw:py-8">
-              <q-spinner size="40px" color="primary" />
+              <OSpinner size="md" />
               <div class="tw:mt-3 tw:text-sm tw:opacity-70">{{ t("about.loading_license_info") }}</div>
             </div>
 
             <div v-else-if="!licenseData || !licenseData.license" class="tw:py-4">
               <div class="tw:flex tw:items-start tw:gap-3 tw:p-4 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-yellow-400' : 'tw:bg-yellow-500'">
-                <q-icon name="warning" size="24px" class="tw:text-yellow-500" />
+                <OIcon name="warning" size="md" class="tw:text-yellow-500" />
                 <div>
                   <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
                   <p class="tw:text-sm tw:mb-2 tw:opacity-80">
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -281,12 +281,16 @@ import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
     FeatureComparisonTable,
     OButton,
+    OIcon,
+    OSpinner,
   },
   setup() {
     const store = useStore();

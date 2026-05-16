@@ -18,6 +18,7 @@ import { Notify, Dialog, Quasar, AppFullscreen } from "quasar";
 import "quasar/src/css/index.sass";
 import "@quasar/extras/roboto-font/roboto-font.css";
 import "@quasar/extras/material-icons/material-icons.css";
+import "@quasar/extras/material-icons-outlined/material-icons-outlined.css";
 
 import store from "./stores";
 import App from "./App.vue";

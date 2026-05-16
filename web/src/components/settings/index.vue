@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="tw:h-full">
+  <div class="tw:rounded-md tw:h-full">
     <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 q-py-sm o2-management-header">
       {{ t("settings.header") }}
     </div> -->
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="controlManagementTabs"
           >
             <template #icon-left>
-              <q-icon :name="showManagementTabs ? 'chevron_left' : 'chevron_right'" />
+              <OIcon :name="showManagementTabs ? 'chevron-left' : 'chevron-right'" size="sm" />
             </template>
           </OButton>
       </template>
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-splitter>
 
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -294,14 +294,15 @@ import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "AppSettings",
   components: {
     OTabs,
     ORouteTab,
     OButton,
-  },
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -421,7 +422,7 @@ export default defineComponent({
       // Expose methods for testing
       handleSettingsRouting,
       storePreviousStoreModel,
-      outlinedSettings,
+      "settings": "settings",
     };
   },
 });

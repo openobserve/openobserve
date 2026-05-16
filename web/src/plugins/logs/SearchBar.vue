@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
             <template #icon-left>
-              <ScanSearch class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="search" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("common.search") }}
           </OToggleGroupItem>
@@ -43,12 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <ChartLine class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.visualize") }}
-            <q-tooltip v-if="isVisualizeDisabled">
-              {{ t("search.enableSqlModeOrSelectSingleStream") }}
-            </q-tooltip>
+            <OTooltip v-if="isVisualizeDisabled" :content="t('search.enableSqlModeOrSelectSingleStream')" />
           </OToggleGroupItem>
 
           <OToggleGroupItem
@@ -57,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Wrench class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="build" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.buildQuery") }}
           </OToggleGroupItem>
@@ -69,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Layers class="tw:size-3.5 tw:shrink-0" />
+              <OIcon name="layers" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.showPatternsLabel") }}
           </OToggleGroupItem>
@@ -78,47 +76,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!shouldMoveSqlToggleToMenu"
           class="toolbar-toggle-container element-box-shadow"
         >
-          <q-toggle
+          <OSwitch
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
+            size="sm"
           >
-            <q-icon name="bar_chart" size="14px" />
-            <q-tooltip>{{ t("search.showHistogramLabel") }}</q-tooltip>
-          </q-toggle>
+            <template #label>
+              <OIcon name="bar-chart" size="xs" />
+              <OTooltip :content="t('search.showHistogramLabel')" />
+            </template>
+          </OSwitch>
         </div>
         <div
           v-if="!shouldMoveSqlToggleToMenu"
           class="toolbar-toggle-container element-box-shadow"
         >
-          <q-toggle
+          <OSwitch
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
-            :disable="isSqlModeDisabled"
-            class="o2-toggle-button-xs"
-            size="xs"
-            flat
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
+            :disabled="isSqlModeDisabled"
+            size="sm"
           >
-            <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
-            <q-tooltip v-if="isSqlModeDisabled">
-              {{ t("search.sqlModeDisabledForVisualization") }}
-            </q-tooltip>
-            <q-tooltip v-else>
-              {{ t("search.sqlModeLabel") }}
-            </q-tooltip>
-          </q-toggle>
+            <template #label>
+              <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
+              <OTooltip :content="isSqlModeDisabled ? t('search.sqlModeDisabledForVisualization') : t('search.sqlModeLabel')" />
+            </template>
+          </OSwitch>
         </div>
         <OButtonGroup
           v-if="!shouldMoveSavedViewToMenu"
@@ -131,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             @click="fnSavedView"
           >
-            <q-icon name="save" size="16px" />
-            <q-tooltip>{{ t("search.savedViewsLabel") }}</q-tooltip>
+            <OIcon name="save" size="sm" />
+            <OTooltip :content="t('search.savedViewsLabel')" />
           </OButton>
           <!-- List saved views dropdown -->
           <ODropdown
@@ -152,9 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-toolbar"
               >
-                <q-icon name="saved_search" size="16px" />
-                <q-icon name="arrow_drop_down" size="18px" class="tw:-ms-1" />
-                <q-tooltip>{{ t("search.listSavedViews") }}</q-tooltip>
+                <OIcon name="saved-search" size="sm" />
+                <OIcon name="arrow-drop-down" size="sm" class="tw:-ms-1" />
+                <OTooltip :content="t('search.listSavedViews')" />
               </OButton>
             </template>
             <div
@@ -192,21 +175,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #top-right>
                         <div class="full-width">
-                          <q-input
+                          <OInput
                             data-test="log-search-saved-view-field-search-input"
                             v-model="searchObj.data.savedViewFilterFields"
-                            data-cy="index-field-search-input"
-                            borderless
-                            dense
                             clearable
-                            debounce="1"
+                            :debounce="1"
                             class="tw:mx-2 tw:my-2"
                             :placeholder="t('search.searchSavedView')"
                           >
                             <template #prepend>
-                              <q-icon name="search" />
+                              <OIcon name="search" size="sm" />
                             </template>
-                          </q-input>
+                          </OInput>
                         </div>
                         <div
                           v-if="searchObj.loadingSavedView == true"
@@ -215,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             class="text-subtitle2 text-weight-bold float-left"
                           >
-                            <q-spinner-hourglass size="20px" />
+                            <OSpinner size="xs" />
                             {{ t("confirmDialog.loading") }}
                           </div>
                         </div>
@@ -266,11 +246,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon
+                                <OIcon
                                   :name="
                                     favoriteViews.includes(props.row.view_id)
                                       ? 'favorite'
-                                      : 'favorite_border'
+                                      : 'favorite-border'
                                   "
                                   size="xs"
                                 />
@@ -287,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="edit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </OButton>
                             </q-item-section>
                             <q-item-section
@@ -301,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="delete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </OButton>
                             </q-item-section>
                           </q-item>
@@ -364,11 +344,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 )
                               "
                             >
-                              <q-icon
+                              <OIcon
                                 :name="
                                   favoriteViews.includes(props.row.view_id)
                                     ? 'favorite'
-                                    : 'favorite_border'
+                                    : 'favorite-border'
                                 "
                                 color="grey"
                                 size="xs"
@@ -385,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="edit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </OButton>
                             </q-item-section>
                             <q-item-section
@@ -399,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="delete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </OButton>
                             </q-item-section>
                           </q-item>
@@ -421,17 +401,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           @click="resetFilters"
         >
-          <q-icon name="restart_alt" size="16px" />
-          <q-tooltip>{{ t("search.resetFilters") }}</q-tooltip>
+          <OIcon name="restart-alt" size="sm" />
+          <OTooltip :content="t('search.resetFilters')" />
         </OButton>
         <!-- this is the button group responsible for showing all the utilities -->
         <OButton
           data-test="logs-search-bar-utilities-menu-btn"
           class="group-menu-btn element-box-shadow"
+          icon-left="more-horiz"
           variant="outline"
           size="xs"
         >
-          <Ellipsis class="tw:size-3.5 tw:shrink-0" />
           More
           <q-menu anchor="bottom left" self="top left">
             <q-list>
@@ -455,16 +435,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-right: 12px;
                       "
                     >
-                      <q-toggle
+                      <OSwitch
                         v-model="searchObj.meta.showHistogram"
-                        size="xs"
-                        flat
-                        class="o2-toggle-button-xs"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
+                        size="sm"
                         @click.stop
                       />
                     </div>
@@ -494,17 +467,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-right: 12px;
                       "
                     >
-                      <q-toggle
+                      <OSwitch
                         v-model="searchObj.meta.sqlMode"
-                        :disable="isSqlModeDisabled"
-                        size="xs"
-                        flat
-                        class="o2-toggle-button-xs"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
+                        :disabled="isSqlModeDisabled"
+                        size="sm"
                         @click.stop
                       />
                     </div>
@@ -530,17 +496,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         margin-right: 12px;
                       "
                     >
-                      <q-toggle
+                      <OSwitch
                         :model-value="searchObj.meta.quickMode"
-                        size="xs"
-                        flat
+                        size="sm"
                         data-test="logs-search-bar-quick-mode-toggle"
-                        class="o2-toggle-button-xs"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-toggle-button-xs-dark'
-                            : 'o2-toggle-button-xs-light'
-                        "
                         @click.stop="handleQuickMode"
                       />
                     </div>
@@ -564,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="saved_search" size="xs" />
+                    <OIcon name="saved-search" size="xs" />
                     {{ t("search.listSavedViews") }}
                   </q-item-label>
                 </q-item-section>
@@ -581,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="add_circle_outline" size="xs" />
+                    <OIcon name="add-circle-outline" size="xs" />
                     {{ t("search.createSavedView") }}
                   </q-item-label>
                 </q-item-section>
@@ -602,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="restart_alt" size="xs" />
+                    <OIcon name="restart-alt" size="xs" />
                     {{ t("search.resetFilters") }}
                   </q-item-label>
                 </q-item-section>
@@ -648,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           style="order: 4"
         >
-          <q-icon name="menu" size="16px" />
+          <OIcon name="menu" size="sm" />
           <q-menu>
             <q-list>
               <!-- Share Link (moved from toolbar at <= 1100px) -->
@@ -708,7 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
                 <q-item-section side>
-                  <q-icon name="keyboard_arrow_right" />
+                  <OIcon name="keyboard-arrow-right" size="sm" />
                 </q-item-section>
                 <q-menu
                   v-model="showDownloadMenu"
@@ -728,9 +687,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon
-                        name="grid_on"
-                        size="14px"
+                      <OIcon
+                        name="grid-on"
+                        size="xs"
                         class="q-pr-sm q-pt-xs"
                       />
                       <q-item-section>
@@ -750,9 +709,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon
-                        name="data_object"
-                        size="14px"
+                      <OIcon
+                        name="data-object"
+                        size="xs"
                         class="q-pr-sm q-pt-xs"
                       />
                       <q-item-section>
@@ -801,7 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section v-close-popup>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="lightbulb" size="20px" />
+                    <OIcon name="lightbulb" size="md" />
                     {{ t("search.explainQuery") }}</q-item-label
                   >
                 </q-item-section>
@@ -869,16 +828,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:items-center tw:gap-2"
                     data-test="search-inspect-label"
                   >
-                    <q-icon name="troubleshoot" size="20px" />
+                    <OIcon name="troubleshoot" size="md" />
                     Search Inspect
                   </q-item-label>
                 </q-item-section>
               </q-item>
             </q-list>
           </q-menu>
-          <q-tooltip style="width: 110px">
-            {{ t("search.moreActions") }}
-          </q-tooltip>
+          <OTooltip style="width: 110px" :content="t('search.moreActions')" />
         </OButton>
         <share-button
           v-if="!shouldMoveShareToMenu"
@@ -934,24 +891,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <q-icon
-                      name="arrow_drop_down"
-                      size="18px"
+                    <OIcon
+                      name="arrow-drop-down"
+                      size="sm"
                       class="tw:ml-1"
                     />
                   </OButton>
                 </template>
                 <div class="tw:p-2 tw:min-w-[240px]">
-                  <q-input
-                    ref="reginFilterRef"
-                    borderless
-                    dense
+                  <OInput
                     clearable
                     class="tw:mb-[0.375rem]! indexlist-search-input q-mx-sm q-mt-sm"
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
-                  >
-                  </q-input>
+                  />
                   <q-tree
                     class="col-12 col-sm-6 q-mx-sm q-mb-sm"
                     :nodes="store.state.regionInfo"
@@ -1044,7 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'search-button-normal-border-radius',
                       ]"
                     >
-                      <q-icon name="arrow_drop_down" size="18px" />
+                      <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
                   <ODropdownItem
@@ -1060,7 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="handleRunQueryFn(true)"
                   >
                     <template #icon-left
-                      ><q-icon name="refresh" size="16px"
+                      ><OIcon name="refresh" size="sm"
                     /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
@@ -1145,7 +1098,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'search-button-normal-border-radius',
                       ]"
                     >
-                      <q-icon name="arrow_drop_down" size="18px" />
+                      <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
                   <ODropdownItem
@@ -1161,7 +1114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="handleRunQueryFn(true)"
                   >
                     <template #icon-left
-                      ><q-icon name="refresh" size="16px"
+                      ><OIcon name="refresh" size="sm"
                     /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
@@ -1232,22 +1185,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.data.stream.selectedStream.length)
                 "
               >
-                <q-tooltip
+                <OTooltip
                   v-if="
                     searchObj.meta.liveMode &&
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
-                  >{{ t("search.autoRunEnabled") }}</q-tooltip
-                >
-                <q-icon
+                  :content="t('search.autoRunEnabled')"
+                />
+                <OIcon
                   v-if="
                     searchObj.meta.liveMode &&
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
                   name="autorenew"
-                  size="14px"
+                  size="xs"
                   class="q-mr-xs"
                 />
                 {{
@@ -1296,7 +1249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'search-button-normal-border-radius',
                     ]"
                   >
-                    <q-icon name="arrow_drop_down" size="18px" />
+                    <OIcon name="arrow-drop-down" size="sm" />
                   </OButton>
                 </template>
                 <!-- Normal mode: Refresh + Live Mode items -->
@@ -1314,7 +1267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="handleRunQueryFn(true)"
                 >
                   <template #icon-left
-                    ><q-icon name="refresh" size="16px"
+                    ><OIcon name="refresh" size="sm"
                   /></template>
                   {{ t("search.refreshCacheAndRunQuery") }}
                 </ODropdownItem>
@@ -1334,9 +1287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="toggleLiveMode"
                 >
                   <template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
-                        searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                        searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
                       size="16px"
                       :color="searchObj.meta.liveMode ? 'primary' : ''"
@@ -1511,10 +1464,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       data-test="vrl-editor-disabled-warning"
                     >
-                      <q-icon
+                      <OIcon
                         name="warning"
-                        color="warning"
-                        size="20px"
+                        size="md"
                         class="q-mx-sm"
                       />
                       <span
@@ -1543,6 +1495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-splitter>
       </div>
       <OButton
+        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
         data-test="logs-query-editor-full_screen-btn"
         :title="isFocused ? t('search.collapse') : t('search.expand')"
         variant="ghost"
@@ -1565,414 +1518,220 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? '1.6rem'
               : '4rem',
         }"
-      >
-        <Maximize size="0.8rem" v-if="!isFocused" />
-        <Minimize size="0.8rem" v-else />
-      </OButton>
+      />
     </div>
 
-    <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
-      <q-card>
-        <q-card-section>
-          {{ confirmMessage }}
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            @click="cancelConfirmDialog"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmDialogOK"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog
-      ref="confirmSavedViewDialog"
-      v-model="confirmSavedViewDialogVisible"
+    <ODialog data-test="search-bar-confirm-dialog"
+      ref="confirmDialog"
+      v-model:open="confirmDialogVisible"
+      size="xs"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="cancelConfirmDialog"
+      @click:primary="confirmDialogOK"
     >
-      <q-card>
-        <q-card-section>
-          {{ confirmMessageSavedView }}
-        </q-card-section>
+      <p>{{ confirmMessage }}</p>
+    </ODialog>
 
-        <q-card-actions align="right" class="tw:gap-2">
+    <ODialog data-test="search-bar-confirm-saved-view-dialog"
+      ref="confirmSavedViewDialog"
+      v-model:open="confirmSavedViewDialogVisible"
+      size="xs"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="cancelConfirmDialog"
+      @click:primary="confirmDialogOK"
+    >
+      <p>{{ confirmMessageSavedView }}</p>
+    </ODialog>
+    <ODialog data-test="search-bar-custom-download-dialog"
+      v-model:open="customDownloadDialog"
+      size="md"
+      title="Custom Download"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('search.btnDownload')"
+      @click:secondary="customDownloadDialog = false"
+      @click:primary="downloadRangeData"
+    >
+      <p>{{ t('search.customDownloadMessage') }}</p>
+      <OInput
+        type="number"
+        data-test="custom-download-initial-number-input"
+        v-model="downloadCustomInitialNumber"
+        :label="t('search.initialNumber')"
+        min="1"
+      />
+      <OSelect
+        data-test="custom-download-range-select"
+        v-model="downloadCustomRange"
+        :options="downloadCustomRangeOptions"
+        :label="t('search.range')"
+        class="q-py-sm"
+      />
+      <div class="q-py-sm file-type">
+        <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
+        <OButtonGroup
+          data-test="custom-download-file-type-button-group"
+          class="file-type-button-group q-mt-xs"
+        >
           <OButton
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
+            v-for="option in downloadCustomFileTypeOptions"
+            :key="option.value"
+            :data-test="`custom-download-file-type-${option.value}-btn`"
+            :active="downloadCustomFileType === option.value"
             variant="outline"
-            size="sm-action"
-            @click="cancelConfirmDialog"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmDialogOK"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="customDownloadDialog">
-      <q-card>
-        <q-card-section>
-          {{ t("search.customDownloadMessage") }}
-        </q-card-section>
-
-        <q-card-section>
-          <q-input
-            type="number"
-            data-test="custom-download-initial-number-input"
-            v-model="downloadCustomInitialNumber"
-            :label="t('search.initialNumber')"
-            default-value="1"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            tabindex="0"
-            min="1"
-          />
-          <q-select
-            data-test="custom-download-range-select"
-            v-model="downloadCustomRange"
-            :options="downloadCustomRangeOptions"
-            :label="t('search.range')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-          />
-          <div class="q-py-sm file-type">
-            <label class="q-pr-sm">{{ t("search.fileType") }}</label
-            ><br />
-            <OButtonGroup
-              data-test="custom-download-file-type-button-group"
-              class="file-type-button-group q-mt-xs"
+            size="sm"
+            @click="downloadCustomFileType = option.value"
+          >{{ option.label }}</OButton>
+        </OButtonGroup>
+      </div>
+    </ODialog>
+    <ODialog data-test="search-bar-store-state-saved-view-dialog"
+      v-model:open="store.state.savedViewDialog"
+      size="md"
+      :title="t('search.savedViewsLabel')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('common.save')"
+      :primary-button-loading="saveViewLoader"
+      @click:secondary="store.state.savedViewDialog = false"
+      @click:primary="handleSavedView"
+    >
+      <div v-if="isSavedViewAction == 'create'">
+        <OInput
+          data-test="add-alert-name-input"
+          v-model="savedViewName"
+          :label="t('search.savedViewName')"
+          :error="!!savedViewNameError"
+          :error-message="savedViewNameError"
+          @update:model-value="savedViewNameError = ''"
+        />
+      </div>
+      <div v-else>
+        <OSelect
+          data-test="saved-view-name-select"
+          v-model="savedViewSelectedName"
+          :options="searchObj.data.savedViews"
+          labelKey="view_name"
+          valueKey="view_id"
+          :label="t('search.savedViewName')"
+          class="q-py-sm"
+          :error="!!savedViewSelectError"
+          :error-message="savedViewSelectError"
+          @update:model-value="savedViewSelectError = ''"
+        />
+      </div>
+    </ODialog>
+    <ODialog data-test="search-bar-store-state-saved-function-dialog"
+      v-model:open="store.state.savedFunctionDialog"
+      size="md"
+      :title="t('search.functionPlaceholder')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      :primary-button-loading="saveFunctionLoader"
+      @click:secondary="store.state.savedFunctionDialog = false"
+      @click:primary="saveFunction"
+    >
+      <div class="tw:flex tw:items-center">
+        <span class="tw:mt-2">Update</span>
+        <OSwitch
+          data-test="saved-function-action-toggle"
+          :disabled="functionOptions.length == 0"
+          v-model="isSavedFunctionAction"
+          checked-value="create"
+          unchecked-value="update"
+          size="lg"
+          @update:model-value="savedFunctionName = ''"
+        />
+        <span class="tw:mt-2">Create</span>
+      </div>
+      <div v-if="isSavedFunctionAction == 'create'">
+        <OInput
+          data-test="saved-function-name-input"
+          v-model="savedFunctionName"
+          :label="t('search.saveFunctionName')"
+          :error="!!savedFunctionNameError"
+          :error-message="savedFunctionNameError"
+          @update:model-value="savedFunctionNameError = ''"
+        />
+      </div>
+      <div v-else>
+        <OSelect
+          data-test="saved-function-name-select"
+          v-model="savedFunctionSelectedName"
+          :options="functionOptions"
+          labelKey="name"
+          valueKey="name"
+          :label="t('search.saveFunctionName')"
+          :placeholder="'Select Function Name'"
+          class="q-py-sm"
+          :error="!!savedFunctionSelectError"
+          :error-message="savedFunctionSelectError"
+          @update:model-value="savedFunctionSelectError = ''"
+        />
+      </div>
+    </ODialog>
+    <ODialog data-test="search-bar-search-scheduler-job-dialog"
+      v-model:open="searchSchedulerJob"
+      size="md"
+      :title="t('search.scheduleSearchJob')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="searchSchedulerJob = false; searchObj.meta.showSearchScheduler = false;"
+      @click:primary="addJobScheduler"
+    >
+      <div>
+        <div class="text-left q-mb-xs">
+          {{ t("search.noOfRecords") }}:
+          <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer">
+            <OTooltip
+              side="right"
+              align="center"
+              max-width="300px"
             >
-              <OButton
-                v-for="option in downloadCustomFileTypeOptions"
-                :key="option.value"
-                :data-test="`custom-download-file-type-${option.value}-btn`"
-                :active="downloadCustomFileType === option.value"
-                variant="outline"
-                size="sm"
-                @click="downloadCustomFileType = option.value"
-                >{{ option.label }}</OButton
-              >
-            </OButtonGroup>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="logs-search-bar-confirm-dialog-cancel-btn"
-            v-close-popup
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="logs-search-bar-confirm-dialog-ok-btn"
-            @click="downloadRangeData"
-            >{{ t("search.btnDownload") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="store.state.savedViewDialog">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div v-if="isSavedViewAction == 'create'">
-            <q-input
-              data-test="add-alert-name-input"
-              v-model="savedViewName"
-              :label="t('search.savedViewName')"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[
-                (val) => !!val.trim() || 'This field is required',
-                (val) =>
-                  /^[-A-Za-z0-9 /@/_]+$/.test(val) ||
-                  'Input must be alphanumeric',
-              ]"
-              tabindex="0"
-            />
-          </div>
-          <div v-else>
-            <q-select
-              data-test="saved-view-name-select"
-              v-model="savedViewSelectedName"
-              :options="searchObj.data.savedViews"
-              option-label="view_name"
-              option-value="view_id"
-              :label="t('search.savedViewName')"
-              :popup-content-style="{ textTransform: 'capitalize' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="saved-view-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="saved-view-dialog-save-btn"
-            v-if="!saveViewLoader"
-            variant="primary"
-            size="sm-action"
-            @click="handleSavedView"
-            >{{ t("common.save") }}</OButton
-          >
-          <OButton
-            data-test="saved-view-dialog-loading-btn"
-            v-if="saveViewLoader"
-            variant="primary"
-            size="sm-action"
-            :loading="true"
-            >{{ t("confirmDialog.loading") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="store.state.savedFunctionDialog">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.functionPlaceholder") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="tw:flex tw:items-center">
-            <span class="tw:mt-2">Update</span>
-            <q-toggle
-              data-test="saved-function-action-toggle"
-              v-bind:disable="functionOptions.length == 0"
-              name="saved_function_action"
-              v-model="isSavedFunctionAction"
-              true-value="create"
-              false-value="update"
-              label=""
-              size="lg"
-              class="o2-toggle-button-lg"
-              @change="savedFunctionName = ''"
-            />
-            <span class="tw:mt-2">Create</span>
-          </div>
-          <div v-if="isSavedFunctionAction == 'create'">
-            <q-input
-              data-test="saved-function-name-input"
-              v-model="savedFunctionName"
-              :label="t('search.saveFunctionName')"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[
-                (val) => !!val.trim() || 'This field is required',
-                (val) =>
-                  /^[-A-Za-z0-9/_]+$/.test(val) || 'Input must be alphanumeric',
-              ]"
-              tabindex="0"
-            />
-          </div>
-          <div v-else>
-            <q-select
-              data-test="saved-function-name-select"
-              v-model="savedFunctionSelectedName"
-              :options="functionOptions"
-              option-label="name"
-              option-value="name"
-              :label="t('search.saveFunctionName')"
-              placeholder="Select Function Name"
-              :popup-content-style="{ textTransform: 'capitalize' }"
-              class="q-py-sm showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val || 'Field is required!']"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="saved-function-dialog-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="saved-view-dialog-save-btn"
-            v-if="!saveFunctionLoader"
-            variant="primary"
-            size="sm-action"
-            @click="saveFunction"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-          <OButton
-            data-test="saved-function-dialog-loading-btn"
-            v-if="saveFunctionLoader"
-            variant="primary"
-            size="sm-action"
-            :loading="true"
-            >{{ t("confirmDialog.loading") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="searchSchedulerJob">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">{{ t("search.scheduleSearchJob") }}</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <div class="text-left q-mb-xs">
-              {{ t("search.noOfRecords") }}:
-              <q-icon name="info" size="17px" class="q-ml-xs cursor-pointer">
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("search.noOfRecordsTooltip")
-                  }}</span>
-                </q-tooltip>
-              </q-icon>
-            </div>
-            <q-input
-              type="number"
-              data-test="search-scheuduler-max-number-of-records-input"
-              v-model="searchObj.meta.jobRecords"
-              default-value="100"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              tabindex="0"
-              min="100"
-            />
-          </div>
-          <div class="text-left">
-            {{ t("search.maxEventsScheduleJob") }}
-          </div>
-          <div
-            style="opacity: 0.8"
-            class="text-left mapping-warning-msg q-mt-md"
-          >
-            <q-icon name="warning" color="red" class="q-mr-sm" />
-            <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="search-scheduler-max-records-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            @click="
-              {
-                searchSchedulerJob = false;
-                searchObj.meta.showSearchScheduler = false;
-              }
-            "
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            data-test="search-scheduler-max-records-submit-btn"
-            variant="primary"
-            size="sm-action"
-            @click="addJobScheduler"
-            v-close-popup
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+              <template #content>
+                <span style="font-size: 14px">{{ t("search.noOfRecordsTooltip") }}</span>
+              </template>
+            </OTooltip>
+          </OIcon>
+        </div>
+        <OInput
+          type="number"
+          data-test="search-scheuduler-max-number-of-records-input"
+          v-model="searchObj.meta.jobRecords"
+          min="100"
+        />
+      </div>
+      <div class="text-left">
+        {{ t("search.maxEventsScheduleJob") }}
+      </div>
+      <div
+        style="opacity: 0.8"
+        class="text-left mapping-warning-msg q-mt-md"
+      >
+        <OIcon name="warning" size="sm" class="q-mr-sm" />
+        <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
+      </div>
+    </ODialog>
 
     <!-- Search Inspect Dialog -->
-    <q-dialog v-model="searchInspectDialog">
-      <q-card style="width: 500px; max-width: 90vw">
-        <q-card-section>
-          <div class="text-h6">Search Inspect</div>
-        </q-card-section>
-        <q-card-section class="q-pt-none">
-          <div class="text-left q-mb-xs">Trace ID:</div>
-          <q-input
-            v-model="searchInspectTraceId"
-            placeholder="Enter trace ID"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            autofocus
-            data-test="search-inspect-trace-id-input"
-          />
-        </q-card-section>
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            @click="searchInspectDialog = false"
-            >{{ t("confirmDialog.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!searchInspectTraceId.trim()"
-            @click="navigateToSearchInspect"
-            v-close-popup
-            data-test="search-inspect-submit-btn"
-            >{{ t("confirmDialog.ok") }}</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="search-bar-search-inspect-dialog"
+      v-model:open="searchInspectDialog"
+      size="sm"
+      title="Search Inspect"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      :primary-button-disabled="!searchInspectTraceId.trim()"
+      @click:secondary="searchInspectDialog = false"
+      @click:primary="navigateToSearchInspect"
+    >
+      <div class="text-left q-mb-xs">Trace ID:</div>
+      <OInput
+        v-model="searchInspectTraceId"
+        placeholder="Enter trace ID"
+        autofocus
+        data-test="search-inspect-trace-id-input"
+      />
+    </ODialog>
 
     <ConfirmDialog
       title="Change Query Mode"
@@ -1999,28 +1758,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
 
     <!-- Saved Views List Dialog -->
-    <q-dialog
-      v-model="savedViewsListDialog"
+    <ODialog
+      v-model:open="savedViewsListDialog"
+      size="lg"
+      :title="t('search.savedViewsLabel')"
       data-test="saved-views-list-dialog"
     >
-      <q-card
-        :style="
-          localSavedViews.length > 0
-            ? 'width: 600px; max-width: 80vw'
-            : 'width: 350px; max-width: 80vw'
-        "
-      >
-        <q-card-section class="row items-center q-pb-none q-pa-md">
-          <div class="text-h6">{{ t("search.savedViewsLabel") }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-circle" v-close-popup>
-            <q-icon name="cancel" />
-          </OButton>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section class="q-pt-md">
+      <div>
           <q-list data-test="logs-search-saved-view-list">
             <q-item style="padding: 0px 0px 0px 0px">
               <q-item-section
@@ -2050,27 +1794,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #top>
                     <div class="full-width">
-                      <q-input
+                      <OInput
                         data-test="log-search-saved-view-field-search-input"
                         v-model="searchObj.data.savedViewFilterFields"
-                        borderless
-                        dense
                         clearable
-                        debounce="300"
+                        :debounce="300"
                         class="tw:mx-2 tw:my-2"
                         :placeholder="t('search.searchSavedView')"
                       >
                         <template #prepend>
-                          <q-icon name="search" />
+                          <OIcon name="search" size="sm" />
                         </template>
-                      </q-input>
+                      </OInput>
                     </div>
                     <div
                       v-if="searchObj.loadingSavedView == true"
                       class="full-width q-pa-sm"
                     >
                       <div class="text-subtitle2 text-weight-bold">
-                        <q-spinner-hourglass size="20px" />
+                        <OSpinner size="xs" />
                         {{ t("confirmDialog.loading") }}
                       </div>
                     </div>
@@ -2117,11 +1859,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon
+                            <OIcon
                               :name="
                                 favoriteViews.includes(props.row.view_id)
                                   ? 'favorite'
-                                  : 'favorite_border'
+                                  : 'favorite-border'
                               "
                               size="xs"
                             />
@@ -2138,7 +1880,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="edit" size="xs" />
+                            <OIcon name="edit" size="xs" />
                           </OButton>
                         </q-item-section>
                         <q-item-section
@@ -2152,7 +1894,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="delete" size="xs" />
+                            <OIcon name="delete" size="xs" />
                           </OButton>
                         </q-item-section>
                       </q-item>
@@ -2212,11 +1954,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                         >
-                          <q-icon
+                          <OIcon
                             :name="
                               favoriteViews.includes(props.row.view_id)
                                 ? 'favorite'
-                                : 'favorite_border'
+                                : 'favorite-border'
                             "
                             color="grey"
                             size="xs"
@@ -2233,7 +1975,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="edit" size="xs" />
+                            <OIcon name="edit" size="xs" />
                           </OButton>
                         </q-item-section>
                         <q-item-section
@@ -2247,7 +1989,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="delete" size="xs" />
+                            <OIcon name="delete" size="xs" />
                           </OButton>
                         </q-item-section>
                       </q-item>
@@ -2257,9 +1999,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </q-list>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -2287,6 +2028,7 @@ import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -2351,20 +2093,7 @@ import {
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
-import {
-  Bookmark,
-  ChartLine,
-  ChartNoAxesColumn,
-  RefreshCcw,
-  ScanSearch,
-  Share,
-  Ellipsis,
-  Maximize,
-  Minimize,
-  Wrench,
-  Code2,
-  Layers,
-} from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -2377,6 +2106,11 @@ import {
   replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/plugins/logs/filterUtils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 const defaultValue: any = () => {
   return {
@@ -2438,6 +2172,7 @@ export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
     OButtonGroup,
+    ODialog,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -2452,20 +2187,14 @@ export default defineComponent({
     CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
-    ScanSearch,
-    ChartLine,
-    ChartNoAxesColumn,
-    RefreshCcw,
-    Bookmark,
-    Share,
-    Ellipsis,
-    Maximize,
-    Minimize,
-    Wrench,
-    Code2,
-    Layers,
+    OIcon,
     OToggleGroup,
     OToggleGroupItem,
+    OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
+    OSwitch,
   },
   emits: [
     "searchdata",
@@ -2658,6 +2387,8 @@ export default defineComponent({
 
     const isSavedFunctionAction: string = ref("create");
     const savedFunctionName: string = ref("");
+    const savedFunctionNameError = ref("");
+    const savedFunctionSelectError = ref("");
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
 
@@ -2708,6 +2439,8 @@ export default defineComponent({
 
     const isSavedViewAction = ref("create");
     const savedViewName = ref("");
+    const savedViewNameError = ref("");
+    const savedViewSelectError = ref("");
     const savedViewSelectedName = ref("");
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
@@ -3422,7 +3155,23 @@ export default defineComponent({
       let fnName = "";
       if (isSavedFunctionAction.value == "create") {
         fnName = savedFunctionName.value;
+        if (!fnName.trim()) {
+          savedFunctionNameError.value = "This field is required";
+          saveFunctionLoader.value = false;
+          return;
+        }
+        const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+        if (!pattern.test(fnName)) {
+          savedFunctionNameError.value = "Input must be alphanumeric";
+          saveFunctionLoader.value = false;
+          return;
+        }
       } else {
+        if (!savedFunctionSelectedName.value) {
+          savedFunctionSelectError.value = "Field is required!";
+          saveFunctionLoader.value = false;
+          return;
+        }
         fnName = savedFunctionSelectedName.value.name;
       }
 
@@ -3431,16 +3180,6 @@ export default defineComponent({
           type: "warning",
           message:
             "The function field must contain a value and cannot be left empty.",
-        });
-        saveFunctionLoader.value = false;
-        return;
-      }
-
-      const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
-      if (!pattern.test(fnName)) {
-        $q.notify({
-          type: "negative",
-          message: "Function name is not valid.",
         });
         saveFunctionLoader.value = false;
         return;
@@ -4173,19 +3912,20 @@ export default defineComponent({
 
     const handleSavedView = () => {
       if (isSavedViewAction.value == "create") {
-        if (
-          savedViewName.value == "" ||
-          /^[A-Za-z0-9 \-\_]+$/.test(savedViewName.value) == false
-        ) {
-          $q.notify({
-            message: `Please provide valid view name.`,
-            color: "negative",
-            position: "bottom",
-            timeout: 1000,
-          });
-        } else {
-          saveViewLoader.value = true;
-          createSavedViews(savedViewName.value);
+        if (!savedViewName.value.trim()) {
+          savedViewNameError.value = "This field is required";
+          return;
+        }
+        if (!/^[-A-Za-z0-9 /@/_]+$/.test(savedViewName.value)) {
+          savedViewNameError.value = "Input must be alphanumeric";
+          return;
+        }
+        saveViewLoader.value = true;
+        createSavedViews(savedViewName.value);
+      } else {
+        if (!savedViewSelectedName.value) {
+          savedViewSelectError.value = "Field is required!";
+          return;
         }
       }
       //  else {
@@ -5283,6 +5023,8 @@ export default defineComponent({
       applySavedView,
       isSavedViewAction,
       savedViewName,
+      savedViewNameError,
+      savedViewSelectError,
       savedViewSelectedName,
       handleSavedView,
       deleteSavedViews,
@@ -5295,6 +5037,8 @@ export default defineComponent({
       fnSavedFunctionDialog,
       isSavedFunctionAction,
       savedFunctionName,
+      savedFunctionNameError,
+      savedFunctionSelectError,
       savedFunctionSelectedName,
       saveFunctionLoader,
       shareURL,
@@ -5766,8 +5510,8 @@ export default defineComponent({
     font-size: inherit !important;
     font-weight: inherit !important;
 
-    .q-icon {
-      font-size: 1.25rem; // match q-icon size="xs" used by other items
+    .OIcon {
+      font-size: 1.25rem; // match OIcon size="xs" used by other items
     }
 
     .q-btn__content {
@@ -5792,7 +5536,7 @@ export default defineComponent({
   transition: all 0.2s ease;
   min-height: 1.875rem; // 30px
 
-  .q-icon {
+  .OIcon {
     font-size: 1.215rem; // 16px
   }
 
@@ -5820,7 +5564,7 @@ export default defineComponent({
   font-size: 0.75rem; // 12px
   font-weight: 500;
 
-  .q-icon {
+  .OIcon {
     font-size: 1.125rem; // 18px
   }
 

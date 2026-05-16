@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Header bar -->
       <div
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('aiToolset.search')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </q-input>
           <OButton
@@ -98,18 +98,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               :title="t('common.edit')"
               @click="editToolset(props.row)"
-            >
-              <template #icon-left><Pencil class="tw:size-3.5 tw:shrink-0" /></template>
-            </OButton>
+              icon-left="edit"
+            />
             <OButton
               :data-test="`ai-toolset-${props.row.name}-delete`"
               variant="ghost-destructive"
               size="icon-xs-sq"
               :title="t('common.delete')"
               @click="confirmDeleteToolset(props.row)"
-            >
-              <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
-            </OButton>
+              icon-left="delete"
+            />
           </q-td>
         </template>
 
@@ -134,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else>
       <AddAiToolset @cancel:hideform="hideAddDialog" />
     </div>
-  </q-page>
+  </div>
 
   <!-- Delete confirmation -->
   <ConfirmDialog
@@ -161,9 +159,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -186,9 +183,8 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-    Pencil,
-    Trash2,
-  },
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -410,7 +406,7 @@ export default defineComponent({
       visibleRows,
       hasVisibleRows,
       confirmDelete,
-      outlinedDelete,
+      "delete": "delete",
       addToolset,
       editToolset,
       hideAddDialog,

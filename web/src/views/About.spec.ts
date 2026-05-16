@@ -337,7 +337,7 @@ describe("About", () => {
     });
 
     const buildBadge = wrapper.find(".build-badge");
-    const icon = buildBadge.find(".q-icon");
+    const icon = buildBadge.find(".OIcon");
     expect(icon.exists()).toBe(true);
   });
 

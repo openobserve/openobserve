@@ -33,7 +33,7 @@ export default class DashboardFolder {
   async createFolder(folderName) {
     const newFolderBtn = this.page.locator('[data-test="dashboard-new-folder-btn"]');
     const nameInput = this.page.locator('[data-test="dashboard-folder-add-name"]');
-    const saveBtn = this.page.locator('[data-test="dashboard-folder-add-save"]');
+    const saveBtn = this.page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]');
   
     await newFolderBtn.waitFor({ state: "visible", timeout: 5000 });
     await newFolderBtn.click();
@@ -76,7 +76,9 @@ export default class DashboardFolder {
     await deleteIcon.click();
 
     // Confirm deletion
-    const confirmButton = page.locator('[data-test="confirm-button"]');
+    const confirmButton = page.locator(
+      '[data-test="dashboard-confirm-delete-folder-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
     await confirmButton.click();
   }
 
@@ -117,7 +119,7 @@ export default class DashboardFolder {
     await nameInput.fill(newName);
 
     // Save
-    await page.locator('[data-test="dashboard-folder-add-save"]').click();
+    await page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]').click();
   }
 }
 

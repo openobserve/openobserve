@@ -1,25 +1,13 @@
 <template>
   <div class="row">
-    <q-select
+    <OSelect
       v-model="fields.functionName"
       label="Select Function"
       :options="filteredFunctions"
       data-test="dashboard-function-dropdown"
-      input-debounce="0"
-      behavior="menu"
-      use-input
-      borderless
-      dense
-      hide-selected
-      fill-input
-      @filter="filterFunctionsOptions"
-      option-label="label"
-      option-value="value"
-      emit-value
-      map-options
-      class="tw:w-72 o2-custom-select-dashboard"
-    >
-    </q-select>
+      class="tw:w-72"
+      @search="onFunctionSearch"
+    />
     <div class="tw:w-full tw:p-3 tw:flex tw:gap-2">
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="tw:w-full">
@@ -61,7 +49,7 @@
               </div>
               <div class="tw:flex">
                 <!-- type selector -->
-                <q-select
+                <OSelect
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
                   :options="
@@ -70,25 +58,16 @@
                       argIndex,
                     )
                   "
-                  option-label="label"
-                  option-value="value"
-                  behavior="menu"
-                  map-options
-                  emit-value
-                  dense
-                  filled
-                  :display-value="''"
                   class="o2-custom-select-dashboard arg-type-select tw:mr-0.5"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
-                  <template v-slot:prepend>
-                    <q-icon
-                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
-                      padding="sm"
+                  <template #icon-left>
+                    <OIcon
+                      :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm"
                     />
                   </template>
-                </q-select>
+                </OSelect>
                 <!-- Left field selector using StreamFieldSelect -->
                 <div
                   class="tw:w-52"
@@ -101,25 +80,21 @@
                   />
                 </div>
 
-                <q-input
+                <OInput
                   v-if="fields.args[argIndex]?.type === 'string'"
                   type="text"
                   v-model="fields.args[argIndex].value"
                   placeholder="Enter string"
-                  :required="isRequired(fields.functionName, argIndex)"
                   class="tw:w-52"
-                  dense
                   :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
                 />
 
-                <q-input
+                <OInput
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
                   placeholder="Enter number"
-                  :required="isRequired(fields.functionName, argIndex)"
                   class="tw:w-52"
-                  dense
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
@@ -137,7 +112,7 @@
                   :model-value="fields.args[argIndex].value"
                   @update:modelValue="
                     (newValue: any) => {
-                      fields.args[argIndex].value = newValue.value;
+                      fields.args[argIndex].value = newValue;
                     }
                   "
                   class="tw:w-52"
@@ -151,8 +126,8 @@
                   size="icon"
                   @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </div>
             </div>
@@ -184,12 +159,15 @@ import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import {
   symOutlinedFunction,
   symOutlinedTitle,
   symOutlined123,
   symOutlinedList,
 } from "@quasar/extras/material-symbols-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default {
   name: "SelectFunction",
@@ -198,6 +176,8 @@ export default {
     StreamFieldSelect,
     SubTaskArrow,
     OButton,
+    OSelect,
+    OInput,
   },
   props: {
     modelValue: {
@@ -279,6 +259,22 @@ export default {
           }))
           .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
       });
+    };
+
+    const onFunctionSearch = (val: string) => {
+      let filteredFunctionsValidation = functionValidation;
+      if (props.allowAggregation === false) {
+        filteredFunctionsValidation = filteredFunctionsValidation.filter(
+          (v) => !v.isAggregation,
+        );
+      }
+      const searchVal = val?.toLowerCase() ?? "";
+      filteredFunctions.value = filteredFunctionsValidation
+        .map((v) => ({
+          label: v.functionLabel,
+          value: v.functionName,
+        }))
+        .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
     };
 
     // const availableFunctions = ref(["arrzip", "concat", "count", "sum"]);
@@ -528,6 +524,7 @@ export default {
       getSupportedTypeBasedOnFunctionNameAndIndex,
       filteredFunctions,
       filterFunctionsOptions,
+      onFunctionSearch,
       initializeFunctions,
       onArgTypeChange,
       getAllSelectedStreams,
@@ -565,12 +562,12 @@ export default {
     align-items: center !important;
   }
 
-  :deep(.q-field__append .q-icon) {
+  :deep(.q-field__append .OIcon) {
     color: var(--o2-primary-btn-bg) !important;
     font-size: 18px !important;
   }
 
-  :deep(.q-field__prepend .q-icon) {
+  :deep(.q-field__prepend .OIcon) {
     color: var(--o2-primary-btn-bg) !important;
     font-size: 18px !important;
   }

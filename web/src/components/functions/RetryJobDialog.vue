@@ -36,11 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon"
+              icon-left="close"
               @click="handleCancel"
               aria-label="Close"
-            >
-              <q-icon name="close" size="20px" />
-            </OButton>
+            />
           </div>
 
           <!-- Content -->
@@ -58,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Range Support Warning -->
             <div v-if="!supportsRange" class="warning-banner">
-              <q-icon name="warning" size="20px" class="warning-icon" />
+              <OIcon name="warning" size="sm" class="warning-icon" />
               <div class="warning-text">
                 <strong>Range requests not supported</strong>
                 <p>
@@ -83,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div class="option-content">
                     <div class="option-header">
-                      <q-icon name="refresh" size="20px" class="option-icon" />
+                      <OIcon name="refresh" size="sm" class="option-icon" />
                       <span class="option-name">Start from Beginning</span>
                     </div>
                     <p class="option-description">
@@ -104,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div class="option-content">
                     <div class="option-header">
-                      <q-icon name="play_arrow" size="20px" class="option-icon" />
+                      <OIcon name="play-arrow" size="sm" class="option-icon" />
                       <span class="option-name">Resume from Last Position</span>
                       <span class="recommended-badge">Recommended</span>
                     </div>
@@ -156,10 +155,11 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "RetryJobDialog",
-  components: { OButton },
+  components: { OButton, OIcon },
   props: {
     modelValue: {
       type: Boolean,

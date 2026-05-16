@@ -89,11 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-pb-lg flex items-center justify-center text-center tw:h-full"
                 >
                   <div>
-                    <q-spinner-hourglass
-                      color="primary"
-                      size="2.5rem"
-                      class="tw:mx-auto tw:block"
-                    />
+                    <OSpinner size="md" class="tw:mx-auto tw:block" />
                     <div class="text-center full-width">
                       {{ t("rum.loadingSessions") }}
                     </div>
@@ -188,6 +184,7 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Session {
   timestamp: string;
@@ -280,7 +277,7 @@ const columns = ref([
     field: "",
     label: "",
     type: "action",
-    icon: "play_circle_filled",
+    icon: "play-circle-filled",
     class: "session-play-icon",
     style: { width: "3.5rem" },
   },
@@ -818,7 +815,7 @@ const getStarted = () => {
     .q-btn__content {
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
-      .q-icon {
+      .OIcon {
         font-size: 0.9375rem;
         color: #ffffff;
       }
@@ -827,7 +824,7 @@ const getStarted = () => {
 
   .app-table-container {
     .session-play-icon {
-      .q-icon {
+      .OIcon {
         &:hover {
           color: var(--q-primary);
         }

@@ -70,8 +70,9 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
 
     // Verify variable scope is global in the settings
     await pm.dashboardSetting.openSetting();
-    // Wait for settings dialog to open
-    await page.locator(SELECTORS.DIALOG).waitFor({ state: "visible", timeout: 5000 });
+    // Wait for the settings ODrawer to be visible (replaced legacy .q-dialog selector)
+    const settingsDrawer = page.locator('[data-test="dashboard-settings-drawer"]');
+    await settingsDrawer.waitFor({ state: "visible", timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     // Wait for variables tab to be active
     await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
@@ -83,14 +84,12 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     // Click on the variable to edit
     await page.locator(getEditVariableBtn(variableName)).click();
 
-    // Wait for the edit dialog to open
-    await page.locator(SELECTORS.DIALOG).filter({ hasText: 'Edit Variable' }).waitFor({ state: "visible", timeout: 5000 });
+    // The Edit Variable form replaces the variable list inside the same drawer;
+    // wait for the form scope select to be visible to confirm the edit view loaded.
+    await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).waitFor({ state: "visible", timeout: 5000 });
 
-    // Verify scope shows "Global" - check for the visible text in the form
-    // The scope value is displayed as a badge or text, not directly in the select input
-    const editDialog = page.locator(SELECTORS.DIALOG).filter({ hasText: 'Edit Variable' });
-    await editDialog.waitFor({ state: "visible", timeout: 5000 });
-    await expect(editDialog).toContainText('Global', { ignoreCase: true });
+    // Verify scope shows "Global" — scope is rendered inside the drawer's edit form
+    await expect(settingsDrawer).toContainText('Global', { ignoreCase: true });
 
     await pm.dashboardSetting.closeSettingWindow();
 

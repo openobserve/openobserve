@@ -23,13 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex justify-between items-center">
         <div class="text-bold text-h6">Resource Details</div>
         <OButton
+          icon-left="close"
           variant="ghost"
           size="icon-sm"
           data-test="close-drawer-btn"
           @click="closeDrawer"
-        >
-          <X class="tw:size-4" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -44,20 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="row items-center q-gutter-sm text-grey-7">
             <div class="row items-center">
-              <q-icon name="schedule" size="sm" class="q-mr-xs" />
+              <OIcon name="schedule" size="sm" class="q-mr-xs" />
               <span>{{
                 formatTimestamp(resource[store.state.zoConfig.timestamp_column])
               }}</span>
             </div>
             <q-separator vertical />
             <div class="row items-center">
-              <q-icon name="access_time" size="sm" class="q-mr-xs" />
+              <OIcon name="access-time" size="sm" class="q-mr-xs" />
               <span>{{ formatDuration(resource.resource_duration) }}</span>
             </div>
             <q-separator vertical />
             <div class="row items-center">
-              <q-icon
-                :name="getStatusIcon(resource.resource_status_code)"
+              <OIcon
+                :name="getStatusIcon(resource.resource-status-code)"
                 :color="getStatusColor(resource.resource_status_code)"
                 size="sm"
                 class="q-mr-xs"
@@ -127,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="q-pa-md text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
         >
-          <q-icon name="info" color="info" size="md" class="q-mb-sm" />
+          <OIcon name="info" size="md" class="q-mb-sm" />
           <div class="text-grey-7">
             No trace information available for this resource.
           </div>
@@ -145,21 +144,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         <div class="row q-gutter-sm">
             <OButton
+              icon-left="play-circle"
               variant="outline"
               size="sm-action"
               data-test="view-session-replay-btn"
               @click="viewSessionReplay"
             >
-              <PlayCircle class="tw:size-4 tw:mr-1" />
               View Session Replay
             </OButton>
             <OButton
+              icon-left="format-list-bulleted"
               variant="ghost"
               size="sm-action"
               data-test="view-session-events-btn"
               @click="viewSessionEvents"
             >
-              <List class="tw:size-4 tw:mr-1" />
               View All Session Events
             </OButton>
           </div>
@@ -176,7 +175,8 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X, PlayCircle, List } from 'lucide-vue-next';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
 
 const props = defineProps({
   modelValue: {

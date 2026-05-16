@@ -16,50 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <q-dialog
-    :model-value="modelValue"
-    @update:model-value="$emit('update:modelValue', $event)"
-    position="right"
-    full-height
-    maximized
+    <ODrawer data-test="pattern-details-dialog"
+    :open="modelValue"
+    @update:open="$emit('update:modelValue', $event)"
+    :width="90"
+    :title="t('search.patternDetailsTitle')"
+    :sub-title="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
   >
-    <q-card
-      v-if="selectedPattern"
-      class="column full-height no-wrap detail-table-dialog tw:w-[90vw]! tw:max-w-[90vw]! tw:border-t-4 tw:border-t-[var(--q-primary)] tw:border-solid"
-    >
-      <!-- Header -->
-      <q-card-section class="q-px-md q-pb-sm">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div class="text-body1 text-bold">{{ t("search.patternDetailsTitle") }}</div>
-            <div
-              class="text-caption"
-              :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-              "
-            >
-              {{ t("search.patternXofY", { index: selectedPattern.index + 1, total: totalPatterns }) }}
-            </div>
-          </div>
-          <div class="col-auto">
-            <OButton
-              variant="ghost"
-              size="icon-circle"
-              data-test="close-pattern-dialog"
-              @click="$emit('update:modelValue', false)"
-            >
-              <q-icon name="cancel" />
-            </OButton>
-          </div>
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <!-- Content - Single Scrollable View -->
-      <q-card-section
-        class="tw:py-[0.375rem] tw:px-[0.625rem] tw:flex-1 tw:overflow-y-auto"
-      >
+    <div class="tw:px-5 tw:py-3">
+    <template v-if="selectedPattern">
         <!-- Statistics -->
         <div class="tw-mb-[1rem]">
           <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
@@ -122,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw-rounded tw-border tw-border-solid tw-border-negative tw-px-3 tw-py-2 tw-flex tw-gap-3 tw-items-start"
               :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-white'"
             >
-              <q-icon name="warning" color="negative" size="sm" class="tw-mt-[2px] tw-flex-shrink-0" />
+              <OIcon name="warning" size="sm" class="tw-mt-[2px] tw-flex-shrink-0" />
               <div>
                 <div class="text-weight-bold text-negative">{{ t("search.patternAnomalyDetected") }}</div>
                 <div
@@ -262,21 +227,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-      </q-card-section>
+      </template>
+    </div>
 
       <!-- Footer Navigation -->
-      <q-separator />
-      <q-card-section class="tw:px-[0.625rem] tw:py-[0.375rem]">
-        <div class="row items-center no-wrap justify-between">
+    <template #footer>
+      <div class="row items-center no-wrap justify-between">
           <div class="col-auto">
             <OButton
-              variant="secondary"
+              variant="outline"
               size="sm"
               data-test="pattern-detail-previous-btn"
               :disabled="selectedPattern.index === 0"
               @click="$emit('navigate', false, true)"
+              icon-left="chevron-left"
             >
-              <template #icon-left><q-icon name="navigate_before" /></template>
               {{ t('search.patternNavPrevious') }}
             </OButton>
           </div>
@@ -287,20 +252,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto">
             <OButton
-              variant="secondary"
+              variant="outline"
               size="sm"
               data-test="pattern-detail-next-btn"
               :disabled="selectedPattern.index >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
+              icon-right="chevron-right"
             >
               {{ t('search.patternNavNext') }}
-              <template #icon-right><q-icon name="navigate_next" /></template>
             </OButton>
           </div>
         </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+    </template>
+  </ODrawer>
 
     <WildcardValuePopover
       :visible="!!hoveredToken"
@@ -321,6 +285,8 @@ import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,

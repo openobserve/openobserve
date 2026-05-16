@@ -2,6 +2,8 @@
  * ODropdownItem.types.ts — public types for ODropdownItem.
  */
 
+import type { IconName } from "../../core/Icon/OIcon.icons";
+
 /** Visual intent of the item */
 export type DropdownItemVariant = "default" | "destructive";
 
@@ -12,6 +14,8 @@ export interface DropdownItemProps {
   disabled?: boolean;
   /** Text used for typeahead matching (overrides text content) */
   textValue?: string;
+  /** Icon placed before the label — renders an OIcon internally */
+  iconLeft?: IconName;
 }
 
 export interface DropdownItemEmits {

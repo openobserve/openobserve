@@ -21,7 +21,7 @@ limitations under the License. -->
       class="o2-test-success"
     >
       <div class="result-icon">
-        <q-icon name="check_circle" size="20px" />
+        <OIcon name="check-circle" size="md" />
       </div>
       <div class="result-content">
         <div data-test="test-success-message" class="result-title">
@@ -46,7 +46,7 @@ limitations under the License. -->
       class="o2-test-failure"
     >
       <div class="result-icon">
-        <q-icon name="error" size="20px" />
+        <OIcon name="error" size="md" />
       </div>
       <div class="result-content">
         <div data-test="test-failure-message" class="result-title">
@@ -64,7 +64,7 @@ limitations under the License. -->
 
         <!-- Suggested Fix -->
         <div v-if="getSuggestedFix(result)" class="result-suggestion">
-          <q-icon name="lightbulb" size="16px" />
+          <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
 
@@ -78,7 +78,7 @@ limitations under the License. -->
         >
           <template #header>
             <div class="expansion-header">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <OIcon name="info" size="xs" class="q-mr-xs" />
               <span class="text-caption">{{ t('alerts.viewDetails') }}</span>
             </div>
           </template>
@@ -108,8 +108,8 @@ limitations under the License. -->
             variant="ghost-primary"
             size="xs"
             @click="$emit('retry')"
+            icon-left="refresh"
           >
-            <template #icon-left><q-icon name="refresh" /></template>
             {{ t('alerts.retry') }}
           </OButton>
         </div>
@@ -123,7 +123,7 @@ limitations under the License. -->
       class="o2-test-loading"
     >
       <div class="result-icon">
-        <q-spinner color="primary" size="20px" />
+        <OSpinner size="xs" />
       </div>
       <div class="result-content">
         <div class="result-title">
@@ -141,7 +141,7 @@ limitations under the License. -->
       data-test="test-result-idle"
       class="o2-test-idle"
     >
-      <q-icon name="info" size="16px" />
+      <OIcon name="info" size="sm" />
       <span class="idle-text">
         {{ t('alerts.testIdleMessage') }}
       </span>
@@ -155,6 +155,8 @@ import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import { date } from 'quasar';
 import type { TestResult } from '@/utils/prebuilt-templates/types';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Define component props
 interface Props {
@@ -415,7 +417,7 @@ function getSuggestedFix(result: TestResult): string | null {
       color: var(--q-text);
       line-height: 1.4;
 
-      .q-icon {
+      .OIcon {
         color: var(--q-warning);
         flex-shrink: 0;
         margin-top: 1px;
@@ -493,7 +495,7 @@ function getSuggestedFix(result: TestResult): string | null {
     background-color: rgba(0, 0, 0, 0.02);
     border: 1px solid rgba(0, 0, 0, 0.08);
 
-    .q-icon {
+    .OIcon {
       color: var(--q-text-secondary);
       opacity: 0.7;
     }

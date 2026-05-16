@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-cy="date-time-button"
     variant="outline"
     class="date-time-button"
+    icon-left="schedule"
   >
-    <template #icon-left><q-icon name="schedule" /></template>
     <span class="date-time-label">{{ displayValue }}</span>
     <template #icon-right
-      ><q-icon name="arrow_drop_down" class="date-time-arrow"
+      ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
     /></template>
     <q-menu
       no-route-dismiss
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :rules="['time']"
                   >
                     <template #append>
-                      <q-icon name="access_time" class="cursor-pointer">
+                      <OIcon name="access-time" size="sm" class="cursor-pointer">
                         <q-popup-proxy
                           transition-show="scale"
                           transition-hide="scale"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </q-time>
                         </q-popup-proxy>
-                      </q-icon>
+                      </OIcon>
                     </template>
                   </q-input>
                 </td>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :rules="['time']"
                   >
                     <template #append>
-                      <q-icon name="access_time" class="cursor-pointer">
+                      <OIcon name="access-time" size="sm" class="cursor-pointer">
                         <q-popup-proxy
                           transition-show="scale"
                           transition-hide="scale"
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </q-time>
                         </q-popup-proxy>
-                      </q-icon>
+                      </OIcon>
                     </template>
                   </q-input>
                 </td>
@@ -213,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";
@@ -220,7 +221,9 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "DateTimePicker",
-  components: { OTabPanels, OTabPanel, OButton },
+  components: { OTabPanels, OTabPanel, OButton,
+    OIcon,
+},
   props: {
     modelValue: {
       type: Object,

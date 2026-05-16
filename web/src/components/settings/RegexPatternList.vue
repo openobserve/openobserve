@@ -1,22 +1,20 @@
 ﻿<template>
-    <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
+    <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);" 
     >
     <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
     >
       <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}
           </div>
-          <q-input
+          <OInput
             v-model="filterQuery"
-            borderless
-            dense
             class="q-ml-auto no-border o2-search-input"
             :placeholder="t('regex_patterns.search')"
           >
           <template #prepend>
-            <q-icon class="o2-search-input-icon"  name="search" />
+            <OIcon class="o2-search-input-icon"  name="search" size="sm" />
           </template>
-        </q-input>
+        </OInput>
           <OButton
             class="q-ml-sm"
             variant="outline"
@@ -55,20 +53,19 @@
             <NoData />
           </div>
           <div v-else class="full-width column flex-center q-mt-xs" style="font-size: 1.5rem">
-            <q-spinner-hourglass size="50px" color="primary" style="margin-top: 20vh" />
+            <OSpinner size="lg" class="tw:mt-[20vh]" />
 
           </div>
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
         </template>
         <template v-slot:header="props">
          <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                   class="o2-table-checkbox"
                 />
@@ -90,7 +87,7 @@
           <q-tr :props="props">
           <!-- render checkbox column -->
           <q-td auto-width>
-            <q-checkbox v-model="props.selected" size="sm" class="o2-table-checkbox" />
+            <OCheckbox v-model="props.selected" class="o2-table-checkbox" />
           </q-td>
 
           <!-- render the body of the columns -->
@@ -108,27 +105,24 @@
                   size="icon-xs-sq"
                   title="Export Regex Pattern"
                   @click.stop="exportRegexPattern(props.row)"
-                >
-                  <template #icon-left><Download class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                  icon-left="download"
+                />
                 <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
                   variant="ghost"
                   size="icon-xs-sq"
                   :title="t('regex_patterns.edit')"
                   @click.stop="editRegexPattern(props.row)"
-                >
-                  <template #icon-left><Pencil class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                  icon-left="edit"
+                />
                 <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   :title="t('regex_patterns.delete')"
                   @click.stop="confirmDeleteRegexPattern(props.row)"
-                >
-                  <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                  icon-left="delete"
+                />
               </div>
             </template>
           </q-td>
@@ -146,8 +140,8 @@
               variant="outline"
               size="sm-action"
               @click="openBulkDeleteDialog"
+              icon-left="delete"
             >
-              <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
               Delete
             </OButton>
             <QTablePagination
@@ -181,10 +175,15 @@
           @update:cancel="confirmBulkDelete = false"
           v-model="confirmBulkDelete"
         />
-        <q-dialog v-model="showAddRegexPatternDialog.show" position="right" full-height maximized>
-          <AddRegexPattern :data="showAddRegexPatternDialog.data" :is-edit="showAddRegexPatternDialog.isEdit" @update:list="getRegexPatterns" @close="closeAddRegexPatternDialog" />
-        </q-dialog>
-      </q-page>
+        <AddRegexPattern
+          data-test="regex-pattern-list-add-regex-pattern-drawer"
+          v-model:open="showAddRegexPatternDialog.show"
+          :data="showAddRegexPatternDialog.data"
+          :is-edit="showAddRegexPatternDialog.isEdit"
+          @update:list="getRegexPatterns"
+          @close="closeAddRegexPatternDialog"
+        />
+    </div>
   </template>
 
 <script lang="ts">
@@ -204,9 +203,11 @@
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
-    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-    import OButton from "@/lib/core/Button/OButton.vue";
-    import { Pencil, Trash2, Download } from "lucide-vue-next";
+        import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+    import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+    import OInput from "@/lib/forms/Input/OInput.vue";
+    import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -218,10 +219,11 @@
             ImportRegexPattern,
             NoData,
             OButton,
-            Pencil,
-            Trash2,
-            Download,
-        },
+            OSpinner,
+            OInput,
+            OCheckbox,
+            OIcon,
+},
     setup() {
 
     const regexPatternListTableRef = ref(null);
@@ -561,7 +563,7 @@
         closeAddRegexPatternDialog,
         visibleRows,
         hasVisibleRows,
-        outlinedDelete,
+        "delete": "delete",
         selectedPatterns,
         confirmBulkDelete,
         openBulkDeleteDialog,

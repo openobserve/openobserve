@@ -41,7 +41,7 @@
         >
           {{ index + 1 }}. {{ data.name }}
         </div>
-        <q-icon
+        <OIcon
           class="q-mr-xs"
           size="15px"
           name="close"
@@ -59,15 +59,13 @@
     >
       + Add
     </OButton>
-    <app-dialog v-model="showDrilldownPopUp">
-      <drilldown-pop-up
-        :drilldown-data-index="selectedDrilldownIndexToEdit"
-        :is-edit-mode="isDrilldownEditMode"
-        :variables-data="variablesData"
-        @close="saveDrilldownData"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </app-dialog>
+    <DrilldownPopUp
+      :open="showDrilldownPopUp"
+      :drilldown-data-index="selectedDrilldownIndexToEdit"
+      :is-edit-mode="isDrilldownEditMode"
+      :variables-data="variablesData"
+      @close="saveDrilldownData"
+    />
   </div>
 </template>
 
@@ -76,14 +74,16 @@ import { defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import AppDialog from "../../common/AppDialog.vue";
 import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, AppDialog, OButton },
+  components: { DrilldownPopUp, OButton,
+    OIcon,
+},
   props: ["variablesData"],
   setup() {
     const { t } = useI18n();

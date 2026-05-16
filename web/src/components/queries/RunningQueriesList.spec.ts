@@ -72,6 +72,9 @@ describe('RunningQueriesList.vue', () => {
         plugins: [i18n, Quasar, store],
         stubs: {
           QueryList: {
+            name: 'QueryList',
+            props: ['schemaData'],
+            emits: ['close'],
             template: '<div data-test="query-list"><slot /></div>'
           },
           QTablePagination: {
@@ -79,6 +82,12 @@ describe('RunningQueriesList.vue', () => {
           },
           NoData: {
             template: '<div data-test="no-data">No Data</div>'
+          },
+          ODrawer: {
+            name: 'ODrawer',
+            props: ['open', 'size', 'persistent', 'title', 'subTitle', 'showClose', 'width', 'primaryButtonLabel', 'secondaryButtonLabel', 'neutralButtonLabel'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+            template: '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /><slot name="header" /><slot name="footer" /></div>'
           }
         }
       }
@@ -591,8 +600,8 @@ describe('RunningQueriesList.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should have access to outlinedCancel icon', () => {
-      expect(wrapper.vm.outlinedCancel).toBeDefined();
+    it('should have access to "cancel" icon', () => {
+      expect(wrapper.vm["cancel"]).toBeDefined();
     });
   });
 
@@ -643,6 +652,87 @@ describe('RunningQueriesList.vue', () => {
     it('should allow updating showListSchemaDialog', () => {
       wrapper.vm.showListSchemaDialog = true;
       expect(wrapper.vm.showListSchemaDialog).toBe(true);
+    });
+  });
+
+  describe('ODrawer Schema Dialog Migration', () => {
+    beforeEach(() => {
+      wrapper = createWrapper();
+    });
+
+    it('should render ODrawer stub for schema dialog', () => {
+      const drawer = wrapper.find('[data-test="list-schema-dialog"]');
+      expect(drawer.exists()).toBe(true);
+    });
+
+    it('should pass size="lg" to ODrawer', () => {
+      const drawer = wrapper.find('[data-test="list-schema-dialog"]');
+      expect(drawer.attributes('data-size')).toBe('lg');
+    });
+
+    it('should pass showListSchemaDialog state as ODrawer open prop (false by default)', () => {
+      const drawer = wrapper.find('[data-test="list-schema-dialog"]');
+      expect(drawer.attributes('data-open')).toBe('false');
+    });
+
+    it('should sync ODrawer open prop when showListSchemaDialog becomes true', async () => {
+      wrapper.vm.showListSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.find('[data-test="list-schema-dialog"]');
+      expect(drawer.attributes('data-open')).toBe('true');
+    });
+
+    it('should update showListSchemaDialog when ODrawer emits update:open=false', async () => {
+      wrapper.vm.showListSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      expect(drawer.exists()).toBe(true);
+      await drawer.vm.$emit('update:open', false);
+
+      expect(wrapper.vm.showListSchemaDialog).toBe(false);
+    });
+
+    it('should update showListSchemaDialog when ODrawer emits update:open=true', async () => {
+      expect(wrapper.vm.showListSchemaDialog).toBe(false);
+
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      await drawer.vm.$emit('update:open', true);
+
+      expect(wrapper.vm.showListSchemaDialog).toBe(true);
+    });
+
+    it('should set showListSchemaDialog to false when QueryList emits close', async () => {
+      wrapper.vm.showListSchemaDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const queryList = wrapper.findComponent({ name: 'QueryList' });
+      expect(queryList.exists()).toBe(true);
+
+      await queryList.vm.$emit('close');
+
+      expect(wrapper.vm.showListSchemaDialog).toBe(false);
+    });
+
+    it('should render QueryList inside ODrawer default slot', () => {
+      const drawer = wrapper.find('[data-test="list-schema-dialog"]');
+      expect(drawer.html()).toContain('data-test="query-list"');
+    });
+
+    it('should pass schemaData prop to QueryList', () => {
+      const queryList = wrapper.findComponent({ name: 'QueryList' });
+      expect(queryList.exists()).toBe(true);
+      expect(queryList.props('schemaData')).toEqual({});
+    });
+
+    it('should pass updated schemaData to QueryList after change', async () => {
+      const newSchema = { stream: 'logs', field: 'msg' };
+      wrapper.vm.schemaData = newSchema;
+      await wrapper.vm.$nextTick();
+
+      const queryList = wrapper.findComponent({ name: 'QueryList' });
+      expect(queryList.props('schemaData')).toEqual(newSchema);
     });
   });
 

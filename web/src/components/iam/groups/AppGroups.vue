@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
     <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('iam.searchGroup')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
         </div>
@@ -53,74 +53,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:w-full tw:h-full">
       <div class="card-container"  style="height: calc(100vh - var(--navbar-height) - 92px)">      
-        <app-table
-        data-test="iam-groups-table-section"
-        class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-        :tableStyle="hasVisibleRows ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' : ''"
-        :rows="visibleRows"
-        :columns="columns"
-        pagination
-        :rows-per-page="20"
-        :filter="{
-          value: filterQuery,
-          method: filterGroups,
-        }"
-        :bordered="false"
-        :title="t('iam.groups')"
-        :hideTopPagination="true"
-        :showBottomPaginationWithTitle="true"
-        selection="multiple"
-        row-key="group_name"
-        v-model:selected="selectedGroups"
-        :theme="store.state.theme"
-      >
-        <template  v-slot:actions="slotProps: any">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
+        <OTable
+          data-test="iam-groups-table-section"
+          :data="rows"
+          :columns="columns"
+          row-key="group_name"
+          :selected-ids="selectedGroupNames"
+          :global-filter="filterQuery"
+          pagination="client"
+          :page-size="20"
+          sorting="client"
+          selection="multiple"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #cell-actions="{ row }">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
+              <OButton
+                :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
+                variant="ghost"
+                size="icon-circle-sm"
+                :title="t('common.edit')"
+                @click="editGroup(row)"
+              >
+                <OIcon name="edit" size="sm" />
+              </OButton>
+              <OButton
+                :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
+                variant="ghost"
+                size="icon-circle-sm"
+                :title="t('common.delete')"
+                @click="showConfirmDialog(row)"
+              >
+                <OIcon name="delete" size="sm" />
+              </OButton>
+            </div>
+          </template>
+          <template #bottom>
             <OButton
-              :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('common.edit')"
-              @click="editGroup(slotProps.column.row)"
+              v-if="selectedGroups.length > 0"
+              data-test="iam-groups-bulk-delete-btn"
+              variant="outline"
+              size="sm"
+              @click="openBulkDeleteDialog"
+              icon-left="delete"
             >
-              <q-icon name="edit" />
+              {{ t('common.delete') }}
             </OButton>
-            <OButton
-              :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('common.delete')"
-              @click="showConfirmDialog(slotProps.column.row)"
-            >
-              <q-icon :name="outlinedDelete" />
-            </OButton>
-          </div>
-        </template>
-        <template v-slot:bottom-actions>
-          <OButton
-            v-if="selectedGroups.length > 0"
-            data-test="iam-groups-bulk-delete-btn"
-            variant="outline"
-            size="sm"
-            class="tw:mr-2"
-            @click="openBulkDeleteDialog"
-          >
-            <template #icon-left><q-icon name="delete" /></template>
-            {{ t('common.delete') }}
-          </OButton>
-        </template>
-      </app-table>
+          </template>
+        </OTable>
     </div>
     </div>
     </div>
-    <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-      <AddGroup
-        style="width: 30vw"
-        :org_identifier="store.state.selectedOrganization.identifier"
-        @cancel:hideform="hideAddGroup"
-        @added:group="setupGroups"
-      />
-    </q-dialog>
+    <AddGroup
+      v-model:open="showAddGroup"
+      :org_identifier="store.state.selectedOrganization.identifier"
+      @added:group="setupGroups"
+    />
     <ConfirmDialog
       title="Delete Group"
       :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
@@ -135,15 +126,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
-import AppTable from "@/components/AppTable.vue";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -152,7 +144,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const showAddGroup = ref(false);
 
@@ -178,32 +170,43 @@ const deleteConformDialog = ref({
 });
 
 const selectedGroups: any = ref([]);
+const selectedGroupNames = computed(() =>
+  selectedGroups.value.map((g: any) => g.group_name),
+);
+
+const handleSelectedIdsUpdate = (ids: string[]) => {
+  const groupsMap = new Map(rows.value.map((g: any) => [g.group_name, g]));
+  selectedGroups.value = ids.map((id) => groupsMap.get(id)).filter(Boolean);
+};
+
 const confirmBulkDelete = ref(false);
 
-const columns: any = [
+const columns: OTableColumnDef[] = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
-    style: "width: 67px;",
+    id: "#",
+    header: "#",
+    accessorFn: (row: any) => row["#"],
+    size: 36,
+    minSize: 32,
+    maxSize: 40,
+    meta: { compactPadding: true, align: "left" },
   },
   {
-    name: "group_name",
-    field: "group_name",
-    label: t("iam.groupName"),
-    align: "left",
+    id: "group_name",
+    header: t("iam.groupName"),
+    accessorKey: "group_name",
     sortable: true,
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "actions",
-    field: "actions",
-    label: t("alerts.actions"),
-    align: "center",
-    sortable: false,
-    slot: true,
-    slotName: "actions",
-    classes: "actions-column",
+    id: "actions",
+    header: t("alerts.actions"),
+    isAction: true,
+    pinned: "right",
+    size: 80,
+    minSize: 64,
+    maxSize: 100,
+    meta: { align: "left" },
   },
 ];
 
@@ -260,16 +263,6 @@ const hideAddGroup = () => {
   showAddGroup.value = false;
 };
 
-const filterGroups = (rows: any, terms: any) => {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i]["group_name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-    }
-  }
-  return filtered;
-};
 
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
@@ -355,12 +348,6 @@ const bulkDeleteUserGroups = async () => {
   }
 };
 
-const visibleRows = computed(() => {
-  if (!filterQuery.value) return rows.value || []
-  return filterGroups(rows.value || [], filterQuery.value)
-})
-
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
 </script>
 
 <style scoped></style>

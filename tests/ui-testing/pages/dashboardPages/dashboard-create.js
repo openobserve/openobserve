@@ -9,9 +9,13 @@ export default class DashboardCreate {
     this.page = page;
     this.dashCreateBtn = this.page.locator('[data-test="dashboard-new"]');
     this.dashName = this.page.locator('[data-test="add-dashboard-name"]');
-    this.submitBtn = this.page.locator('[data-test="dashboard-add-submit"]');
+    this.submitBtn = this.page.locator(
+      '[data-test="dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+    );
     this.deleteIcon = this.page.locator('[data-test="dashboard-delete"]');
-    this.confirmDelete = this.page.locator('[data-test="confirm-button"]');
+    this.confirmDelete = this.page.locator(
+      '[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
     this.searchDash = this.page.locator('[data-test="dashboard-search"]');
     this.addPanelIfEmptyBtn = this.page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
@@ -122,7 +126,7 @@ export default class DashboardCreate {
     );
     await confirmDialog.waitFor({ state: "visible" });
     const confirmDeleteButton = confirmDialog.locator(
-      '[data-test="confirm-button"]'
+      '[data-test="o-dialog-primary-btn"]'
     );
     await confirmDeleteButton.waitFor({ state: "visible" });
     await confirmDeleteButton.click();

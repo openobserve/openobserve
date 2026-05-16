@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="t('ticket.search')"
       >
         <template #append>
-          <q-icon name="search" class="cursor-pointer" />
+          <OIcon name="search" size="sm" class="cursor-pointer" />
         </template>
       </q-input>
       <OButton
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         @click="addTicket"
       >
-        <q-icon name="add" size="14px" class="q-mr-xs" />
+        <OIcon name="add" size="xs" class="q-mr-xs" />
         {{ t(`ticket.add`) }}
       </OButton>
     </template>
@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 

@@ -15,24 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-condition-section"
-    class="stream-routing-section full-width"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.conditionTitle')"
+    :width="45"
+    :show-close="true"
+    @keydown.stop
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-condition-section"
+      class="stream-routing-section full-width"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
-      {{ t("pipeline.conditionTitle") }}
-      <div>
-        <OButton variant="ghost" size="icon" @click="openCancelDialog">
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
 
-    <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
+
+    <div class="stream-routing-container q-px-md q-pt-md">
       <q-form ref="routeFormRef" @submit.prevent="saveCondition">
         <div
           class="q-pt-sm showLabelOnTop text-bold text-h7"
@@ -65,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="note-heading">Condition value Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     >To check for an empty value, use
                     <span class="highlight">""</span>. Example:
@@ -73,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     >To check for an Null value, use
                     <span class="highlight">null</span>. Example:
@@ -81,21 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     >To add a custom column, type column name and press
                     <span class="highlight">Enter</span>.</span
                   >
                 </div>
                 <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <OIcon name="warning" size="sm" class="q-mr-sm" />
                   <span
                     >If conditions are not met, the record will be
                     dropped.</span
                   >
                 </div>
                 <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <OIcon name="warning" size="sm" class="q-mr-sm" />
                   <span
                     >If the record does not have the specified field, it will be
                     dropped.</span
@@ -132,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-form>
     </div>
   </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -152,6 +151,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import {
   getTimezoneOffset,
   getUUID,
@@ -159,6 +159,7 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
@@ -220,6 +221,17 @@ const { getStream, getStreams } = useStreams();
 const { buildQueryPayload } = useQuery();
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
+
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 
 const isUpdating = ref(false);
 

@@ -23,26 +23,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="0.875rem" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="language" size="0.875rem" class="q-pr-xs" />
+          <OIcon name="language" size="xs" class="q-pr-xs" />
           {{ sessionDetails.ip }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="calendar_month" size="0.875rem" class="q-pr-xs" />
+          <OIcon name="calendar-month" size="xs" class="q-pr-xs" />
           {{ sessionDetails.date }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="person" size="0.875rem" class="q-pr-xs" />
+          <OIcon name="person" size="xs" class="q-pr-xs" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="location_on" size="0.875rem" class="q-pr-xs" />
+          <OIcon name="location-on" size="xs" class="q-pr-xs" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
         <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
+          <OIcon name="settings" size="xs" class="q-pr-xs" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
-          <q-icon
-            name="sentiment_very_dissatisfied"
+          <OIcon
+            name="sentiment-very-dissatisfied"
             size="0.875rem"
             class="q-pr-xs"
             style="color: #fb923c"
@@ -113,6 +113,7 @@ import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import { date } from "quasar";
 import { getUUID } from "@/utils/zincutils";

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="props.row.name === 'no-fields-found'"
         class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <OIcon name="info" size="xs" />
         <span class="tw:pl-[0.375rem]">No matching fields found.</span>
       </q-tr>
 
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-xs-sq"
           >
-            <q-icon
+            <OIcon
               :name="
                 expandGroupRows[props.row.group]
-                  ? 'expand_more'
-                  : 'chevron_right'
+                  ? 'expand-more'
+                  : 'chevron-right'
               "
               size="14px"
             />
@@ -170,26 +170,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #top-right>
       <div class="field-list-search-container">
-        <q-input
+        <OInput
           data-test="log-search-index-list-field-search-input"
           :model-value="filterField"
           @update:model-value="$emit('update:filter-field', $event)"
           data-cy="index-field-search-input"
-          borderless
-          dense
           clearable
-          debounce="1"
+          :debounce="1"
           :placeholder="t('search.searchField')"
           class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
-            <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
+            <OIcon name="search" size="1.25rem" class="o2-search-input-icon" />
           </template>
-        </q-input>
+        </OInput>
         <q-tr v-if="loadingStream == true">
           <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
             <div class="text-subtitle2 text-weight-bold">
-              <q-spinner-hourglass size="1.25rem" />
+              <OSpinner size="xs" />
               {{ t("confirmDialog.loading") }}
             </div>
           </q-td>
@@ -228,6 +226,9 @@ import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
 import FieldListPagination from "./FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const { t } = useI18n();
 
@@ -407,7 +408,7 @@ defineExpose({
     padding-top: 0.5rem !important;
   }
 
-  .q-icon {
+  .OIcon {
     height: 1rem;
     width: 1rem;
     margin-right: 0.625rem;

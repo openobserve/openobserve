@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
 
 // Mock Vuex store
@@ -31,7 +30,7 @@ vi.mock('vue-router', () => ({
 vi.mock('vue-i18n', () => ({
   useI18n: vi.fn(() => ({
     t: vi.fn((key) => {
-      const translations = {
+      const translations: Record<string, string> = {
         'dashboard.scheduledDashboards': 'Scheduled Dashboards',
         'dashboard.newReport': 'New Report',
         'reports.cached': 'Cached',
@@ -51,7 +50,7 @@ vi.mock('vue-i18n', () => ({
     ...config,
     global: {
       t: vi.fn((key) => {
-        const translations = {
+        const translations: Record<string, string> = {
           'dashboard.scheduledDashboards': 'Scheduled Dashboards',
           'dashboard.newReport': 'New Report',
           'reports.cached': 'Cached',
@@ -66,7 +65,8 @@ vi.mock('vue-i18n', () => ({
         };
         return translations[key] || key;
       })
-    }
+    },
+    install: vi.fn()
   }))
 }));
 
@@ -116,6 +116,7 @@ const i18n = createI18n({
 
 describe('ScheduledDashboards', () => {
   const defaultProps = {
+    open: true,
     reports: [],
     loading: false,
     folderId: 'test-folder',
@@ -132,6 +133,16 @@ describe('ScheduledDashboards', () => {
       global: {
         plugins: [i18n],
         stubs: {
+          // ODrawer stub — renders default slot + header-right slot so child markup mounts
+          'ODrawer': {
+            name: 'ODrawer',
+            template: `<div class="o-drawer-mock" :data-open="open">
+              <div class="o-drawer-header-right"><slot name="header-right" /></div>
+              <div class="o-drawer-body"><slot /></div>
+            </div>`,
+            props: ['open', 'width', 'title', 'subTitle', 'showClose', 'persistent', 'size'],
+            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
+          },
           'q-table': {
             name: 'q-table',
             template: `<div class="q-table-mock">
@@ -184,13 +195,13 @@ describe('ScheduledDashboards', () => {
           },
           'OButton': {
             name: 'OButton',
-            template: '<button class="q-btn-mock"><slot /></button>',
+            template: '<button class="o-btn-mock q-btn-mock" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
             props: ['variant', 'size', 'disabled', 'loading', 'active'],
             emits: ['click']
           },
-          'q-icon': {
-            name: 'q-icon',
-            template: '<div class="q-icon-mock"></div>',
+          'OIcon': {
+            name: 'OIcon',
+            template: '<div class="OIcon-mock"></div>',
             props: ['name']
           }
         }
@@ -208,9 +219,31 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('should display the correct title', () => {
+    it('should render ODrawer with correct open prop', () => {
+      const wrapper = createWrapper({ open: true });
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.props('open')).toBe(true);
+    });
+
+    it('should pass title to ODrawer', () => {
       const wrapper = createWrapper();
-      expect(wrapper.text()).toContain('Scheduled Dashboards');
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      expect(drawer.props('title')).toBe('Scheduled Dashboards');
+    });
+
+    it('should pass width prop to ODrawer', () => {
+      const wrapper = createWrapper();
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      expect(drawer.props('width')).toBe(60);
+    });
+
+    it('should emit update:open when ODrawer emits update:open', async () => {
+      const wrapper = createWrapper();
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      await drawer.vm.$emit('update:open', false);
+      expect(wrapper.emitted('update:open')).toBeTruthy();
+      expect(wrapper.emitted('update:open')?.[0]).toEqual([false]);
     });
 
     it('should apply dark-mode class when theme is dark', () => {
@@ -229,7 +262,6 @@ describe('ScheduledDashboards', () => {
   describe('Props Handling', () => {
     it('should handle empty reports array', () => {
       const wrapper = createWrapper({ reports: [] });
-      // Since formattedReports is internal state in script setup, we check props instead
       expect(wrapper.props('reports')).toEqual([]);
     });
 
@@ -238,13 +270,17 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.props('loading')).toBe(true);
     });
 
+    it('should default open to false', () => {
+      const wrapper = createWrapper({ open: false });
+      expect(wrapper.props('open')).toBe(false);
+    });
+
     it('should handle folder and dashboard IDs', () => {
       const wrapper = createWrapper({
         folderId: 'custom-folder',
         dashboardId: 'custom-dashboard',
         tabId: 'custom-tab'
       });
-      // With script setup, props are accessible through wrapper.props()
       expect(wrapper.props('folderId')).toBe('custom-folder');
       expect(wrapper.props('dashboardId')).toBe('custom-dashboard');
       expect(wrapper.props('tabId')).toBe('custom-tab');
@@ -303,7 +339,7 @@ describe('ScheduledDashboards', () => {
 
     it('should format reports correctly', () => {
       const wrapper = createWrapper({ reports: mockReports });
-      
+
       // Component processes reports multiple times due to watchers, resulting in more items than input
       expect(wrapper.props('reports')).toHaveLength(4);
       expect(wrapper.props('reports')[0].name).toBe('Test Report 1');
@@ -313,21 +349,11 @@ describe('ScheduledDashboards', () => {
 
     it('should handle frequency formatting for different types', () => {
       const wrapper = createWrapper();
-      
-      // In script setup, internal functions are not directly accessible
-      // We test the behavior through the component's output or mock the utility
-      // Test that the component renders without errors with different frequency types
       expect(wrapper.exists()).toBe(true);
-      
-      // We can create a separate test for the frequency formatting logic
-      // by testing it as a utility function or through integration tests
     });
 
     it('should handle time range formatting', () => {
       const wrapper = createWrapper();
-      
-      // In script setup, internal functions are not directly accessible
-      // We test the behavior through component rendering or integration
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -338,8 +364,6 @@ describe('ScheduledDashboards', () => {
           { tabId: 'tab2', name: 'Second Tab' }
         ]
       });
-      
-      // Test that tabs are passed correctly as props
       expect(wrapper.props('tabs')).toEqual([
         { tabId: 'tab1', name: 'First Tab' },
         { tabId: 'tab2', name: 'Second Tab' }
@@ -369,15 +393,13 @@ describe('ScheduledDashboards', () => {
 
     it('should filter cached reports by default', () => {
       const wrapper = createWrapper({ reports: mockReports });
-      
-      // Test that component renders with cached reports
+
       expect(wrapper.exists()).toBe(true);
-      // Component processes reports multiple times due to watchers, resulting in more items than input  
+      // Component processes reports multiple times due to watchers, resulting in more items than input
       expect(wrapper.props('reports')).toHaveLength(4);
     });
 
     it('should handle tab changes', () => {
-      // Use simpler data structure to avoid timerange processing issues
       const simpleReports = [
         {
           name: 'Simple Report',
@@ -388,10 +410,9 @@ describe('ScheduledDashboards', () => {
           destinations: []
         }
       ];
-      
+
       const wrapper = createWrapper({ reports: simpleReports });
-      
-      // Test that component handles tab changes
+
       const appTabs = wrapper.findComponent({ name: 'AppTabs' });
       expect(appTabs.exists()).toBe(true);
     });
@@ -402,9 +423,9 @@ describe('ScheduledDashboards', () => {
         { name: 'Report 2', destinations: [], created_at: 1640908800, org_id: 'test-org', dashboards: [{ tabs: ['test-tab'], timerange: { type: 'relative', period: '1d' }}], frequency: { type: 'once' }},
         { name: 'Report 3', destinations: [], created_at: 1640908800, org_id: 'test-org', dashboards: [{ tabs: ['test-tab'], timerange: { type: 'relative', period: '1d' }}], frequency: { type: 'once' }}
       ];
-      
+
       const wrapper = createWrapper({ reports: mockReports });
-      
+
       // Component processes reports multiple times due to watchers: 3 input -> 6 processed
       expect(wrapper.props('reports')).toHaveLength(6);
     });
@@ -419,8 +440,7 @@ describe('ScheduledDashboards', () => {
 
     it('should handle filter functionality', () => {
       const wrapper = createWrapper();
-      
-      // Test that the q-table component receives filter-related props
+
       const table = wrapper.findComponent({ name: 'q-table' });
       expect(table.exists()).toBe(true);
       expect(table.props()).toHaveProperty('filter');
@@ -450,15 +470,37 @@ describe('ScheduledDashboards', () => {
         dashboardId: 'test-dashboard',
         tabId: 'test-tab'
       });
-      
-      // Check if the button exists by looking for the data-test attribute or text content
-      const buttons = wrapper.findAll('.q-btn-mock');
-      const hasNewReportButton = buttons.some(btn => 
-        btn.text().includes('New Report') || 
-        btn.text().includes('dashboard.newReport') ||
-        btn.attributes('data-test') === 'alert-list-add-alert-btn'
+
+      // The new-report button is now an OButton in the ODrawer header-right slot
+      const buttons = wrapper.findAllComponents({ name: 'OButton' });
+      expect(buttons.length).toBeGreaterThan(0);
+      const newReportButton = buttons.find((btn) =>
+        btn.text().includes('New Report')
       );
-      expect(hasNewReportButton).toBe(true);
+      expect(newReportButton).toBeDefined();
+    });
+
+    it('should navigate to create report when new report button is clicked', async () => {
+      const wrapper = createWrapper({
+        folderId: 'fid',
+        dashboardId: 'did',
+        tabId: 'tid'
+      });
+
+      const buttons = wrapper.findAllComponents({ name: 'OButton' });
+      const newReportButton = buttons.find((btn) => btn.text().includes('New Report'));
+      expect(newReportButton).toBeDefined();
+      await newReportButton!.trigger('click');
+
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: 'createReport',
+        query: {
+          folderId: 'fid',
+          dashboardId: 'did',
+          tabId: 'tid',
+          type: 'cached'
+        }
+      });
     });
 
     it('should handle row clicks on table', () => {
@@ -493,7 +535,7 @@ describe('ScheduledDashboards', () => {
   describe('Watch Effects', () => {
     it('should react to prop changes', async () => {
       const wrapper = createWrapper({ reports: [] });
-      
+
       await wrapper.setProps({
         reports: [{
           name: 'New Report',
@@ -504,13 +546,26 @@ describe('ScheduledDashboards', () => {
           frequency: { type: 'once' }
         }]
       });
-      
+
       expect(wrapper.props('reports')).toHaveLength(1);
+    });
+
+    it('should react to open prop changes', async () => {
+      const wrapper = createWrapper({ open: false });
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      expect(drawer.props('open')).toBe(false);
+      await wrapper.setProps({ open: true });
+      expect(drawer.props('open')).toBe(true);
     });
   });
 
   describe('Component Integration', () => {
-    it('should render AppTabs component', () => {
+    it('should render ODrawer', () => {
+      const wrapper = createWrapper();
+      expect(wrapper.findComponent({ name: 'ODrawer' }).exists()).toBe(true);
+    });
+
+    it('should render AppTabs component inside ODrawer header', () => {
       const wrapper = createWrapper();
       expect(wrapper.find('.app-tabs-mock').exists()).toBe(true);
     });

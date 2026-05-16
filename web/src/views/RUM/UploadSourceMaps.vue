@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="navigateBack()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div>
           <div class="text-h6 text-weight-medium">Upload Source Maps</div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div v-if="!formData.file" class="upload-content">
-              <q-icon name="cloud_upload" size="3rem" color="grey-6" class="tw:mb-3" />
+              <OIcon name="backup" size="xl" class="tw:mb-3" />
               <div class="text-h6 text-grey-8 tw:mb-2">Drop your file here</div>
               <div class="text-body2 text-grey-6 tw:mb-3">or click to browse</div>
               <div class="text-caption text-grey-5">.zip files only</div>
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="file-info">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <q-icon name="insert_drive_file" size="2rem" color="primary" />
+                  <OIcon name="draft" size="lg" />
                   <div>
                     <div class="text-subtitle2 text-weight-medium">{{ formData.file.name }}</div>
                     <div class="text-caption text-grey-6">{{ formatFileSize(formData.file.size) }}</div>
@@ -118,10 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon"
+                  icon-left="close"
                   @click.stop="removeFile"
-                >
-                  <q-icon name="close" size="16px" />
-                </OButton>
+                />
               </div>
             </div>
           </div>
@@ -156,6 +155,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -365,7 +365,7 @@ const uploadSourceMaps = async () => {
 }
 
 .file-info {
-  .q-icon {
+  .OIcon {
     flex-shrink: 0;
   }
 }

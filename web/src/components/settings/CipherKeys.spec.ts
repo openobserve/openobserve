@@ -152,10 +152,7 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QPage: {
-          template: "<div data-test-stub='q-page'><slot></slot></div>",
-        },
-        QTable: {
+                QTable: {
           template: `<div data-test-stub='q-table'>
             <slot name='top'></slot>
             <slot name='header'></slot>
@@ -206,7 +203,7 @@ const createWrapper = (props = {}, options = {}) => {
           emits: ["update:modelValue"],
         },
         QIcon: {
-          template: "<span data-test-stub='q-icon'></span>",
+          template: "<span data-test-stub='OIcon'></span>",
           props: ["name"],
         },
         QTh: {

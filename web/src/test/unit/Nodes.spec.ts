@@ -194,12 +194,6 @@ describe("Nodes.vue", () => {
         stubs: {
           QTablePagination: true,
           NoData: true,
-          'q-layout': {
-            template: '<div><slot /></div>'
-          },
-          'q-page': {
-            template: '<div><slot /></div>'
-          },
           'q-splitter': {
             template: '<div><slot /></div>'
           },

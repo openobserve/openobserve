@@ -75,8 +75,8 @@ describe('ScriptToolbar.vue', () => {
           _q_: mockQuasar
         },
         stubs: {
-          'q-icon': {
-            template: '<div class="q-icon-stub" :name="name"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
+          'OIcon': {
+            template: '<div class="OIcon-stub" :name="name"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
             props: ['name', 'size']
           },
           'q-input': {

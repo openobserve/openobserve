@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:flex tw:items-start tw:justify-between tw:mb-1">
       <div class="tw:flex tw:items-center tw:gap-2">
-        <q-icon
+        <OIcon
           v-if="icon"
           :name="icon"
           size="1rem"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ label }}
         </span>
       </div>
-      <q-icon
+      <OIcon
         v-if="status"
         :name="statusIcon"
         size="0.875rem"
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="tw:text-[var(--o2-text-secondary)]">Threshold</span>
         <span class="tw:font-medium">{{ threshold }}</span>
       </div>
-      <q-linear-progress
+      <OProgressBar
         :value="progressValue"
-        :color="statusColor"
-        size="4px"
+        :variant="progressVariant"
+        size="xs"
       />
     </div>
   </div>
@@ -70,7 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
   label: string;
   value: number | null | undefined;
@@ -164,5 +166,14 @@ const statusColor = computed(() => {
 const progressValue = computed(() => {
   if (props.value == null || !props.maxValue) return 0;
   return Math.min((props.value / props.maxValue) * 1, 1);
+});
+const progressVariant = computed(() => {
+  if (!props.status) return "default";
+  const map: Record<string, string> = {
+    good: "default",
+    "needs-improvement": "warning",
+    poor: "danger",
+  };
+  return map[props.status] || "default";
 });
 </script>

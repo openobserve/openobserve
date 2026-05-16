@@ -17,6 +17,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MenuLink from "@/components/MenuLink.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
@@ -93,7 +94,7 @@ describe("MenuLink", async () => {
 
   it("should render icon when icon prop is provided", async () => {
     await wrapper.setProps({ icon: "home" });
-    expect(wrapper.find(".q-icon").exists()).toBe(true);
+    expect(wrapper.findComponent(OIcon).exists()).toBe(true);
   });
 
   it("should render with iconComponent when provided", async () => {

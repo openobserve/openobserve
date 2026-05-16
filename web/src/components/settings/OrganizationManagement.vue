@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <div>
       <q-table
         data-test="org-management-list-table"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="otg-management-extend-trial-btn"
                 @click.stop="toggleExtendTrialDialog(props.row)"
               >
-                <q-icon name="event" size="14px" />
+                <OIcon name="event" size="xs" />
                 <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
               </OButton>
               <OButton
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-add-contract-btn"
                 @click.stop="toggleContractDialog(props.row, 'create')"
               >
-                <q-icon name="note_add" size="14px" />
+                <OIcon name="note-add" size="xs" />
                 <q-tooltip>Add Contract</q-tooltip>
               </OButton>
               <OButton
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-extend-contract-btn"
                 @click.stop="toggleContractDialog(props.row, 'extend')"
               >
-                <q-icon name="event" size="14px" />
+                <OIcon name="event" size="xs" />
                 <q-tooltip>Extend Contract</q-tooltip>
               </OButton>
               <OButton
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-revoke-contract-btn"
                 @click.stop="confirmRevokeContract(props.row)"
               >
-                <q-icon name="block" size="14px" />
+                <OIcon name="block" size="xs" />
                 <q-tooltip>Revoke</q-tooltip>
               </OButton>
               <OButton
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(props.row)"
               >
-                <q-icon name="cloud_upload" size="14px" />
+                <OIcon name="cloud-upload" size="xs" />
                 <q-tooltip>Enable Storage</q-tooltip>
               </OButton>
               <OButton
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-positive"
                 data-test="org-management-storage-enabled-btn"
               >
-                <q-icon name="cloud_done" size="14px" />
+                <OIcon name="cloud-done" size="xs" />
                 <q-tooltip>Storage Enabled</q-tooltip>
               </OButton>
             </div>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('settings.searchOrgs')"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </q-input>
 
@@ -144,121 +144,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Extend Trial Dialog -->
-    <q-dialog v-model="extendTrialPrompt">
-      <q-card class="q-pa-sm" style="min-width: 450px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="extendTrialDataRow.name"
-              >Extend Trial for {{ extendTrialDataRow.name }}</span
-            >
-            <span class="text-subtitle2 flex"
-              >Set the new trial extension period.</span
-            >
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div>
-            <div class="float-left text-bold">Week(s)</div>
-            <div class="float-right q-gutter-xs">
-              <span
-                v-for="page in 4"
-                :key="page"
-                @click="extendedTrial = page"
-                :class="[
-                  'cursor-pointer q-px-sm q-py-xs page-border',
-                  extendedTrial === page
-                    ? 'bg-primary text-white'
-                    : 'bg-white text-gray-700 border-gray-3',
-                ]"
-              >
-                {{ page }}
-              </span>
-            </div>
-          </div>
-        </q-card-section>
-        <q-card-actions align="right" class="text-primary q-mt-md">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
+    <ODialog data-test="organization-management-extend-trial-dialog"
+      v-model:open="extendTrialPrompt"
+      size="sm"
+      :title="`Extend Trial for ${extendTrialDataRow?.name}`"
+      sub-title="Set the new trial extension period."
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      @click:secondary="extendTrialPrompt = false"
+      @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
+    >
+      <div>
+        <div class="float-left text-bold">Week(s)</div>
+        <div class="float-right q-gutter-xs">
+          <span
+            v-for="page in 4"
+            :key="page"
+            @click="extendedTrial = page"
+            :class="[
+              'cursor-pointer q-px-sm q-py-xs page-border',
+              extendedTrial === page
+                ? 'bg-primary text-white'
+                : 'bg-white text-gray-700 border-gray-3',
+            ]"
           >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
-          >
-            Extend trial by {{ extendedTrial }} week(s)
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+            {{ page }}
+          </span>
+        </div>
+      </div>
+    </ODialog>
 
     <!-- External Contract Dialog -->
-    <q-dialog v-model="contractPrompt">
-      <q-card class="q-pa-sm" style="min-width: 500px">
-        <q-toolbar>
-          <q-toolbar-title>
-            <span class="text-weight-bold" :title="contractDataRow.name">
-              {{ contractMode === "create" ? "Create" : "Extend" }} External
-              Contract for {{ contractDataRow.name }}
-            </span>
-          </q-toolbar-title>
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-toolbar>
-
-        <q-card-section>
-          <div class="q-mb-md">
-            <div class="text-bold q-mb-xs">
-              {{ contractMode === "create" ? "End Date" : "New End Date" }}
-            </div>
-            <q-input
-              v-model="contractEndDate"
-              dense
-              outlined
-              type="date"
-              data-test="contract-end-date-input"
-            />
-          </div>
-          <div
-            v-if="
-              contractMode === 'extend' && contractDataRow.contract_end_date
-            "
-            class="text-caption text-grey"
-          >
-            Current end date:
-            {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="text-primary">
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            class="q-mr-md"
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click.stop="submitContract"
-          >
-            {{ contractMode === 'create' ? 'Create Contract' : 'Extend Contract' }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog data-test="organization-management-contract-dialog"
+      v-model:open="contractPrompt"
+      size="sm"
+      :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      @click:secondary="contractPrompt = false"
+      @click:primary="submitContract"
+    >
+      <div class="q-mb-md">
+        <div class="text-bold q-mb-xs">
+          {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
+        </div>
+        <q-input
+          v-model="contractEndDate"
+          dense
+          outlined
+          type="date"
+          data-test="contract-end-date-input"
+        />
+      </div>
+      <div
+        v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
+        class="text-caption text-grey"
+      >
+        Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
+      </div>
+    </ODialog>
+  </div>
 </template>
 <script lang="ts">
 import {
@@ -279,6 +224,8 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import orgStorageService from "@/services/org_storage";
 export default defineComponent({
   name: "PageAlerts",
@@ -286,7 +233,9 @@ export default defineComponent({
     NoData,
     QTablePagination,
     OButton,
-  },
+    ODialog,
+    OIcon,
+},
   setup() {
     const qTable = ref();
     const store = useStore();

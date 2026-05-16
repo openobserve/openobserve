@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <q-table
       data-test="log-stream-table"
       ref="qTable"
@@ -49,13 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleStreamRow(props)"
         >
           <q-td auto-width>
-            <OButton
+              <OButton
               variant="ghost"
               size="icon-sm"
-            >
-              <ChevronDown v-if="expandedRow.name != props.row.name" :size="14" />
-              <ChevronUp v-else :size="14" />
-            </OButton>
+              :icon-left="expandedRow.name != props.row.name ? 'expand-more' : 'expand-less'"
+            />
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             {{ col.value }}
@@ -80,11 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-pl-md q-py-xs"
               style="height: 60px"
             >
-              <q-inner-loading
-                size="sm"
+              <OInnerLoading
                 :showing="loadingFunctions"
                 label="Fetching functions..."
-                label-style="font-size: 1.1em"
+                size="sm"
               />
             </div>
             <div v-show="!loadingFunctions">
@@ -116,9 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       key="applyBeforeFlattening"
                       :props="props"
                     >
-                      <q-toggle
+                      <OSwitch
                         data-test="stream-association-applyBeforeFlattening-toggle"
-                        class="q-mt-sm"
                         v-model="props.row.applyBeforeFlattening"
                         @update:model-value="
                           updateAssociatedFunctions(props.row)
@@ -132,10 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-ml-xs"
                         variant="ghost-destructive"
                         size="icon-sm"
-                        @click.stop="deleteFunctionFromStream(props.row.name)"
-                      >
-                        <Trash2 :size="14" />
-                      </OButton>
+                        icon-left="delete"
+                      />
                     </q-td>
                   </q-tr>
                 </template>
@@ -143,22 +137,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr v-if="addFunctionInProgress">
                     <q-td></q-td>
                     <q-td data-test="stream-association-functions-select-input">
-                      <q-select
+                      <OSelect
                         v-model="selectedFunction"
-                        option-value="name"
-                        option-label="name"
+                        labelKey="name"
+                        valueKey="name"
                         :label="t('function.selectFunction')"
                         :options="filterFunctions"
                         :loading="addFunctionInProgressLoading"
-                        :disable="addFunctionInProgressLoading"
-                        filled
-                        borderless
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        @filter="filterFn"
-                      ></q-select>
+                        :disabled="addFunctionInProgressLoading"
+                        searchable
+                        @search="filterFn"
+                      />
                     </q-td>
                     <q-td></q-td>
                     <q-td> </q-td>
@@ -217,18 +206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("logStream.header") }}
         </div>
         <div class="q-ml-auto" data-test="stream-association-search-input">
-          <q-input
+          <OInput
             v-model="filterQuery"
-            borderless
-            filled
-            dense
             class="q-mb-xs no-border"
             :placeholder="t('logStream.search')"
           >
             <template #prepend>
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
         <OButton
           data-test="log-stream-refresh-stats-btn"
@@ -236,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-action"
           @click="getLogStream"
+          icon-left="refresh"
         >
-          <RefreshCw :size="14" class="tw:mr-1" />
           {{ t(`logStream.refreshStats`) }}
         </OButton>
 
@@ -263,15 +249,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
-    <q-dialog
-      v-model="showIndexSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer data-test="associated-stream-function-index-schema-drawer"
+      v-model:open="showIndexSchemaDialog"
+      size="lg"
     >
       <SchemaIndex v-model="schemaData" />
-    </q-dialog>
-  </q-page>
+    </ODrawer>
+  </div>
 </template>
 
 <script lang="ts">
@@ -296,14 +280,20 @@ import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Trash2, ChevronDown, ChevronUp, RefreshCw } from "lucide-vue-next";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, Trash2, ChevronDown, ChevronUp, RefreshCw },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OInput,
+    OIcon,
+},
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -488,16 +478,14 @@ export default defineComponent({
       });
     };
 
-    const filterFn = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        filterFunctions.value = allFunctionsList.value
-          .filter(
-            (item: any) =>
-              !functionsList.value.some((obj: any) => obj.name === item.name)
-          ) // filter existing applied functions
-          .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
-      });
+    const filterFn = (val: string) => {
+      const needle = val.toLowerCase();
+      filterFunctions.value = allFunctionsList.value
+        .filter(
+          (item: any) =>
+            !functionsList.value.some((obj: any) => obj.name === item.name)
+        ) // filter existing applied functions
+        .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
     };
 
     getLogStream();
@@ -754,7 +742,7 @@ export default defineComponent({
       filterFunctions,
       addFunctionInProgressLoading,
       toggleStreamRow,
-      outlinedDelete,
+      "delete": "delete",
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();

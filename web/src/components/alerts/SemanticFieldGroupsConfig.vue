@@ -28,18 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Category Filter -->
     <div class="row q-col-gutter-md q-mb-md">
       <div class="col-12 col-md-4">
-        <q-select
+        <OSelect
           data-test="semantic-group-category-select"
           v-model="selectedCategory"
           :options="categoryOptions"
           :label="t('correlation.category')"
           :hint="t('correlation.categoryHint')"
-          dense
-          borderless
-          stack-label
           class="showLabelOnTop"
-          emit-value
-          map-options
           style="max-width: 100%"
         >
           <template v-slot:option="scope">
@@ -55,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </template>
-        </q-select>
+        </OSelect>
       </div>
       <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
         <OButton
@@ -93,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md" class="q-mb-sm" />
+      <OIcon name="info" size="md" class="q-mb-sm" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -120,18 +115,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="text-subtitle1 q-mb-sm">
         {{ t("correlation.deduplicateFields") }} *
-        <q-tooltip>{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip>
+        <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
       <div class="text-caption text-grey-7 q-mb-md">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="fingerprint-checkboxes">
-        <q-checkbox
+        <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
           :key="group.id"
           v-model="localFingerprintFields"
-          :val="group.id"
+          :value="group.id"
           :label="group.display"
           class="fingerprint-checkbox"
           @update:model-value="emitUpdate"
@@ -146,16 +141,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Import Dialog -->
-    <q-dialog v-model="showImportDrawer" maximized position="right" full-height>
-      <q-card class="import-dialog-card">
-        <ImportSemanticGroupsDrawer
-          :current-groups="localGroups"
-          :org-id="store.state.selectedOrganization.identifier"
-          @apply="handleImportApply"
-          @close="showImportDrawer = false"
-        />
-      </q-card>
-    </q-dialog>
+    <ODrawer
+      data-test="semantic-field-groups-config-import-drawer"
+      v-model:open="showImportDrawer"
+      size="xl"
+      title="Import Semantic Groups"
+      sub-title="Upload JSON file to import semantic field groups"
+    >
+      <ImportSemanticGroupsDrawer
+        :current-groups="localGroups"
+        :org-id="store.state.selectedOrganization.identifier"
+        @apply="handleImportApply"
+        @close="showImportDrawer = false"
+      />
+    </ODrawer>
   </div>
 </template>
 
@@ -167,6 +166,11 @@ import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const { t } = useI18n();

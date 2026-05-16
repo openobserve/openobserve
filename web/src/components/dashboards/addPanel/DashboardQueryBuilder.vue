@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="display: flex; flex-direction: row">
           <div class="layout-name">
             {{ currentXLabel }}
-            <q-icon name="info_outline" class="q-ml-xs">
+            <OIcon name="info-outline" size="sm" class="q-ml-xs">
               <q-tooltip>
                 {{ xAxisHint }}
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <span class="layout-separator">:</span>
           <div
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="13px" />
                   </template>
                 </OButton>
                 <OButton
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ xLabel[index] }}
                   <template #icon-right
-                    ><q-icon name="arrow_drop_down"
+                    ><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                   <q-menu
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
@@ -151,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-chip"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(index)"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? t("panel.pivotField")
                 : t("panel.breakdown")
             }}
-            <q-icon name="info_outline" class="q-ml-xs">
+            <OIcon name="info-outline" size="sm" class="q-ml-xs">
               <q-tooltip>
                 <span v-if="dashboardPanelData.data.type == 'table'">
                   {{ t("panel.pivotFieldTooltip") }}
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("panel.breakdownTooltipDefault") }}
                 </span>
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <span class="layout-separator">:</span>
           <div
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="13px" />
                   </template>
                 </OButton>
                 <OButton
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ bLabel[index] }}
                   <template #icon-right
-                    ><q-icon name="arrow_drop_down"
+                    ><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                   <q-menu
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
@@ -332,8 +332,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-chip"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(index)"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -362,11 +362,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ currentYLabel }}
-        <q-icon name="info_outline" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs">
           <q-tooltip>
             {{ yAxisHint }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
-                <q-icon name="drag_indicator" size="13px" />
+                <OIcon name="drag-indicator" size="13px" />
               </template>
             </OButton>
             <OButton
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${itemY?.alias}`"
             >
               {{ yLabel[index] }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
+              <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               <q-menu
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
                 class="field-function-menu-popup"
@@ -480,8 +480,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-chip"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(index)"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </OButtonGroup>
         </div>
@@ -512,11 +512,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
-          <q-icon name="info_outline" class="q-ml-xs">
+          <OIcon name="info-outline" size="sm" class="q-ml-xs">
             <q-tooltip>
               {{ zAxisHint }}
             </q-tooltip>
-          </q-icon>
+          </OIcon>
         </div>
         <span class="layout-separator">:</span>
         <div
@@ -572,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
-                  <q-icon name="drag_indicator" size="13px" />
+                  <OIcon name="drag-indicator" size="13px" />
                 </template>
               </OButton>
               <OButton
@@ -582,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ zLabel[index] }}
                 <template #icon-right
-                  ><q-icon name="arrow_drop_down"
+                  ><OIcon name="arrow-drop-down" size="sm"
                 /></template>
                 <q-menu
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
@@ -628,8 +628,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-chip"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(index)"
+                icon-left="close"
               >
-                <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </OButtonGroup>
           </div>
@@ -720,6 +720,7 @@ import type { PromVisualQuery } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -737,7 +738,8 @@ export default defineComponent({
     LabelFilterEditor,
     OperationsList,
     PromQLBuilderOptions,
-  },
+    OIcon,
+},
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],
   setup(props) {
@@ -1627,7 +1629,7 @@ export default defineComponent({
         opacity: 0;
         right: 0;
 
-        .q-icon {
+        .OIcon {
           cursor: pointer;
         }
       }

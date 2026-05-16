@@ -21,15 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <q-spinner-hourglass color="primary" size="1.875rem" />
+      <OSpinner size="sm" />
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="tw:text-center tw:py-8">
-      <q-icon
-        name="error_outline"
+      <OIcon
+        name="error-outline"
         size="3rem"
-        color="negative"
         class="tw:mb-4"
       />
       <div class="text-body1 text-negative">{{ error }}</div>
@@ -38,15 +37,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm-action"
         @click="loadServices"
+        icon-left="refresh"
       >
-        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
         {{ t("settings.correlation.retry") }}
       </OButton>
     </div>
 
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
-      <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
+      <OIcon name="search-off" size="3rem" class="tw:mb-4" />
       <div class="text-body1">
         {{ t("settings.correlation.noServicesYet") }}
       </div>
@@ -60,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="refreshing"
         class="tw:mt-3"
         @click="loadServices(true)"
+        icon-left="refresh"
       >
-        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
         {{ t("common.refresh") }}
       </OButton>
     </div>
@@ -72,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="info-banner tw:mb-3 tw:rounded-lg tw:flex tw:items-center tw:gap-3"
       >
-        <q-icon
+        <OIcon
           name="info"
           size="1.25rem"
           class="tw:shrink-0 info-banner-icon"
@@ -155,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-search-input"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
             <OButton
@@ -207,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading state -->
             <template #loading>
               <div class="tw:flex tw:items-center tw:justify-center tw:pb-40">
-                <q-spinner-hourglass color="primary" size="3rem" />
+                <OSpinner size="lg" />
               </div>
             </template>
             <template v-if="refreshing" #no-data>
@@ -223,11 +222,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-td key="service_name" :props="props">
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon
+                    <OIcon
                       :name="
                         expandedGroups.has(props.row.service_name)
-                          ? 'expand_more'
-                          : 'chevron_right'
+                          ? 'expand-more'
+                          : 'chevron-right'
                       "
                       size="1.25rem"
                       class="tw:text-gray-400"
@@ -408,191 +407,170 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Service detail side panel -->
-    <q-dialog
-      :model-value="!!selectedService"
-      position="right"
-      full-height
-      maximized
-      @update:model-value="
-        (val: boolean) => {
+    <ODrawer
+      :open="!!selectedService"
+      @update:open="
+        (val) => {
           if (!val) selectedService = null;
         }
       "
+      size="lg"
+      :title="selectedService?.service_name"
+      data-test="service-side-panel"
     >
-      <q-card class="service-side-panel" data-test="service-side-panel">
-        <!-- Header -->
-        <div class="panel-header">
-          <div
-            class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:flex-1 tw:min-w-0"
-          >
-            <span class="panel-service-name">{{
-              selectedService?.service_name
-            }}</span>
-            <span class="set-id-badge">{{ selectedService?.set_id }}</span>
-          </div>
-          <span class="tw:shrink-0">
-            <OButton variant="ghost" size="icon" v-close-popup>
-              <q-icon name="close" size="14px" />
-            </OButton>
-          </span>
+      <template #header-right>
+        <span class="set-id-badge">{{ selectedService?.set_id }}</span>
+      </template>
+
+      <!-- Default set warning banner -->
+      <div
+        v-if="selectedService?.set_id === 'default'"
+        class="panel-warning-banner"
+      >
+        <OIcon name="info-outline" size="1rem" class="tw:shrink-0 tw:mt-0.5" />
+        <div class="tw:text-xs tw:leading-relaxed">
+          <span class="tw:font-semibold">{{
+            t("settings.correlation.defaultSetWarningTitle")
+          }}</span>
+          {{ t("settings.correlation.defaultSetWarningBody") }}
         </div>
+      </div>
 
-        <!-- Default set warning banner -->
-        <div
-          v-if="selectedService?.set_id === 'default'"
-          class="panel-warning-banner"
-        >
-          <q-icon
-            name="info_outline"
-            size="1rem"
-            class="tw:shrink-0 tw:mt-0.5"
-          />
-          <div class="tw:text-xs tw:leading-relaxed">
-            <span class="tw:font-semibold">{{
-              t("settings.correlation.defaultSetWarningTitle")
-            }}</span>
-            {{ t("settings.correlation.defaultSetWarningBody") }}
+      <q-separator />
+
+      <!-- Scrollable body -->
+      <div class="panel-body">
+        <!-- Instance Identity -->
+        <div class="panel-block">
+          <div class="panel-block-label">
+            {{ t("settings.correlation.instanceIdentity") }}
           </div>
-        </div>
-
-        <q-separator />
-
-        <!-- Scrollable body -->
-        <div class="panel-body">
-          <!-- Instance Identity -->
-          <div class="panel-block">
-            <div class="panel-block-label">
-              {{ t("settings.correlation.instanceIdentity") }}
-            </div>
-            <div
-              v-if="
-                selectedService &&
-                Object.keys(selectedService.disambiguation).length > 0
-              "
-              class="tw:flex tw:flex-wrap tw:gap-1.5"
-            >
-              <span
-                v-for="[key, value] in Object.entries(
-                  selectedService.disambiguation,
-                ).sort(([a], [b]) => a.localeCompare(b))"
-                :key="`${key}=${value}`"
-                class="dimension-badge"
-                :class="getDimensionColorClass(key)"
-              >
-                <span class="tw:font-medium">{{ key }}</span
-                >=<span>{{ value }}</span>
-              </span>
-            </div>
-            <div v-else class="panel-empty-text">
-              {{ t("settings.correlation.noDimensionsCatchAll") }}
-            </div>
-          </div>
-
-          <!-- Stream Sources -->
-          <div class="panel-block">
-            <div class="panel-block-label">
-              {{ t("settings.correlation.streamSources") }}
-            </div>
-            <div class="tw:flex tw:flex-col tw:gap-3">
-              <!-- Logs -->
-              <div
-                v-if="
-                  selectedService && selectedService.logs_streams.length > 0
-                "
-              >
-                <div class="panel-signal-row">
-                  <span
-                    class="telemetry-badge telemetry-logs panel-signal-type"
-                    >{{ t("settings.correlation.logs") }}</span
-                  >
-                  <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                    <span
-                      v-for="stream in selectedService.logs_streams"
-                      :key="stream"
-                      class="stream-name-badge"
-                      >{{ stream }}</span
-                    >
-                  </div>
-                </div>
-              </div>
-
-              <!-- Traces -->
-              <div
-                v-if="
-                  selectedService && selectedService.traces_streams.length > 0
-                "
-              >
-                <div class="panel-signal-row">
-                  <span
-                    class="telemetry-badge telemetry-traces panel-signal-type"
-                    >{{ t("settings.correlation.traces") }}</span
-                  >
-                  <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                    <span
-                      v-for="stream in selectedService.traces_streams"
-                      :key="stream"
-                      class="stream-name-badge"
-                      >{{ stream }}</span
-                    >
-                  </div>
-                </div>
-              </div>
-
-              <!-- Metrics -->
-              <div
-                v-if="
-                  selectedService && selectedService.metrics_streams.length > 0
-                "
-              >
-                <div class="panel-signal-row">
-                  <span
-                    class="telemetry-badge telemetry-metrics panel-signal-type"
-                    >{{ t("settings.correlation.metrics") }}</span
-                  >
-                  <div class="tw:flex tw:flex-wrap tw:gap-1.5">
-                    <span
-                      v-for="stream in selectedService.metrics_streams"
-                      :key="stream"
-                      class="stream-name-badge"
-                      >{{ stream }}</span
-                    >
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Field Name Mapping -->
           <div
             v-if="
               selectedService &&
-              Object.keys(selectedService.field_name_mapping ?? {}).length > 0
+              Object.keys(selectedService.disambiguation).length > 0
             "
-            class="panel-block"
+            class="tw:flex tw:flex-wrap tw:gap-1.5"
           >
-            <div class="panel-block-label">
-              {{ t("settings.correlation.fieldNameMapping") }}
+            <span
+              v-for="[key, value] in Object.entries(
+                selectedService.disambiguation,
+              ).sort(([a], [b]) => a.localeCompare(b))"
+              :key="`${key}=${value}`"
+              class="dimension-badge"
+              :class="getDimensionColorClass(key)"
+            >
+              <span class="tw:font-medium">{{ key }}</span
+              >=<span>{{ value }}</span>
+            </span>
+          </div>
+          <div v-else class="panel-empty-text">
+            {{ t("settings.correlation.noDimensionsCatchAll") }}
+          </div>
+        </div>
+
+        <!-- Stream Sources -->
+        <div class="panel-block">
+          <div class="panel-block-label">
+            {{ t("settings.correlation.streamSources") }}
+          </div>
+          <div class="tw:flex tw:flex-col tw:gap-3">
+            <!-- Logs -->
+            <div
+              v-if="selectedService && selectedService.logs_streams.length > 0"
+            >
+              <div class="panel-signal-row">
+                <span
+                  class="telemetry-badge telemetry-logs panel-signal-type"
+                  >{{ t("settings.correlation.logs") }}</span
+                >
+                <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                  <span
+                    v-for="stream in selectedService.logs_streams"
+                    :key="stream"
+                    class="stream-name-badge"
+                    >{{ stream }}</span
+                  >
+                </div>
+              </div>
             </div>
-            <div class="panel-mapping-grid">
-              <template
-                v-for="[raw, mapped] in Object.entries(
-                  selectedService.field_name_mapping ?? {},
-                ).sort(([a], [b]) => a.localeCompare(b))"
-                :key="raw"
-              >
-                <span class="mapping-key">{{ raw }}</span>
-                <q-icon
-                  name="arrow_forward"
-                  size="0.75rem"
-                  class="tw:text-gray-400 tw:justify-self-center"
-                />
-                <span class="mapping-val">{{ mapped }}</span>
-              </template>
+
+            <!-- Traces -->
+            <div
+              v-if="
+                selectedService && selectedService.traces_streams.length > 0
+              "
+            >
+              <div class="panel-signal-row">
+                <span
+                  class="telemetry-badge telemetry-traces panel-signal-type"
+                  >{{ t("settings.correlation.traces") }}</span
+                >
+                <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                  <span
+                    v-for="stream in selectedService.traces_streams"
+                    :key="stream"
+                    class="stream-name-badge"
+                    >{{ stream }}</span
+                  >
+                </div>
+              </div>
+            </div>
+
+            <!-- Metrics -->
+            <div
+              v-if="
+                selectedService && selectedService.metrics_streams.length > 0
+              "
+            >
+              <div class="panel-signal-row">
+                <span
+                  class="telemetry-badge telemetry-metrics panel-signal-type"
+                  >{{ t("settings.correlation.metrics") }}</span
+                >
+                <div class="tw:flex tw:flex-wrap tw:gap-1.5">
+                  <span
+                    v-for="stream in selectedService.metrics_streams"
+                    :key="stream"
+                    class="stream-name-badge"
+                    >{{ stream }}</span
+                  >
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </q-card>
-    </q-dialog>
+
+        <!-- Field Name Mapping -->
+        <div
+          v-if="
+            selectedService &&
+            Object.keys(selectedService.field_name_mapping ?? {}).length > 0
+          "
+          class="panel-block"
+        >
+          <div class="panel-block-label">
+            {{ t("settings.correlation.fieldNameMapping") }}
+          </div>
+          <div class="panel-mapping-grid">
+            <template
+              v-for="[raw, mapped] in Object.entries(
+                selectedService.field_name_mapping ?? {},
+              ).sort(([a], [b]) => a.localeCompare(b))"
+              :key="raw"
+            >
+              <span class="mapping-key">{{ raw }}</span>
+              <OIcon
+                name="arrow-forward"
+                size="0.75rem"
+                class="tw:text-gray-400 tw:justify-self-center"
+              />
+              <span class="mapping-val">{{ mapped }}</span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </ODrawer>
 
     <ConfirmDialog
       :title="t('settings.correlation.resetServicesConfirmTitle')"
@@ -612,9 +590,11 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { RefreshCw } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;
@@ -1671,6 +1651,4 @@ onMounted(() => {
 :deep(th:last-child) {
   padding-right: 1.5rem !important;
 }
-
-
 </style>

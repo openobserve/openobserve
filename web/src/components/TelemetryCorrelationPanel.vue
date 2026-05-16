@@ -2,34 +2,33 @@
   <div v-if="show" class="correlation-panel">
     <div class="correlation-header">
       <div class="header-content">
-        <q-icon name="link" size="sm" />
+        <OIcon name="link" size="sm" />
         <span class="header-title">Related Telemetry</span>
       </div>
       <OButton
         variant="ghost"
         size="icon"
+        icon-left="close"
         @click="$emit('close')"
-      >
-        <q-icon name="close" size="16px" />
-      </OButton>
+      />
     </div>
 
     <div class="correlation-body">
       <!-- Loading State -->
       <div v-if="loading" class="correlation-loading">
-        <q-spinner color="primary" size="md" />
+        <OSpinner size="sm" />
         <span class="loading-text">Finding related data...</span>
       </div>
 
       <!-- Error State -->
       <div v-else-if="error" class="correlation-error">
-        <q-icon name="error_outline" color="negative" size="md" />
+        <OIcon name="error-outline" size="md" />
         <span class="error-text">{{ error }}</span>
       </div>
 
       <!-- No Correlation Available -->
       <div v-else-if="!correlationResult" class="correlation-empty">
-        <q-icon name="info_outline" color="grey-6" size="md" />
+        <OIcon name="info-outline" size="md" />
         <span class="empty-text">No related telemetry found</span>
       </div>
 
@@ -38,7 +37,7 @@
         <!-- Service Info -->
         <div class="service-info">
           <div class="service-name">
-            <q-icon name="cloud" size="xs" />
+            <OIcon name="cloud" size="xs" />
             {{ correlationResult.service.service_name }}
           </div>
 
@@ -49,7 +48,7 @@
             class="dimension-section"
           >
             <div class="dimension-section-header">
-              <q-icon name="link" size="xs" color="positive" />
+              <OIcon name="link" size="xs" />
               <span class="dimension-section-title">Matched Dimensions</span>
               <q-tooltip>These stable dimensions were used to find related telemetry</q-tooltip>
             </div>
@@ -76,7 +75,7 @@
             class="dimension-section"
           >
             <div class="dimension-section-header">
-              <q-icon name="tune" size="xs" color="grey-7" />
+              <OIcon name="tune" size="xs" />
               <span class="dimension-section-title">Additional Filters Available</span>
               <q-tooltip>These additional dimensions can be used for more specific filtering</q-tooltip>
             </div>
@@ -124,7 +123,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <q-icon name="timeline" color="primary" />
+              <OIcon name="timeline" size="sm" />
               <span class="section-title">Traces ({{ traceQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -149,7 +148,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <q-icon name="show_chart" color="secondary" />
+              <OIcon name="show-chart" size="sm" />
               <span class="section-title">Metrics ({{ metricQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -174,7 +173,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <q-icon name="article" color="accent" />
+              <OIcon name="article" size="sm" />
               <span class="section-title">Logs ({{ logQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -206,6 +205,8 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrelation";
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {
   show: boolean;

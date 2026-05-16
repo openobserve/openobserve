@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="col q-pa-none" >
+  <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full q-pa-none" >
     <div
-      class="flex justify-start q-px-md q-py-sm card-container"
-      style="position: sticky; top: 0px; z-index: 2"
+      class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
       <div class="q-mr-md">
@@ -60,43 +59,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mr-md"
         style="width: 400px"
       >
-        <q-input
+        <OInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          borderless
-          dense
           class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
           placeholder="Search Roles"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
+            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" />
           </template>
-        </q-input>
+        </OInput>
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
+    <div data-test="iam-roles-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
       <template v-if="rows.length">
-        <app-table
-          :rows="visibleRows"
+        <OTable
+          :data="rows"
           :columns="columns"
-          :dense="true"
-          :virtual-scroll="false"
-          :title="t('iam.roles')"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
-          :hideTopPagination="true"
-          :showBottomPaginationWithTitle="true"
+          row-key="role_name"
+          :global-filter="userSearchKey"
+          pagination="client"
+          :page-size="100"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          dense
         >
-          <template v-slot:select="slotProps: any">
-            <q-checkbox
-              :data-test="`iam-roles-selection-table-body-row-${slotProps.column.row.role_name}-checkbox`"
-              size="xs"
-              v-model="slotProps.column.row.isInGroup"
+          <template #cell-select="{ row }">
+            <OCheckbox
+              :data-test="`iam-roles-selection-table-body-row-${row.role_name}-checkbox`"
+              :model-value="row.isInGroup"
               class="filter-check-box cursor-pointer"
-              @click="toggleUserSelection(slotProps.column.row)"
+              @update:model-value="toggleUserSelection(row)"
             />
           </template>
-        </app-table>
+        </OTable>
       </template>
       <div
         data-test="iam-roles-selection-table-no-users-text"
@@ -111,8 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { watch, onBeforeMount, computed } from "vue";
-import AppTable from "@/components/AppTable.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
@@ -174,23 +175,23 @@ const store = useStore();
 
 const groupUsersMap = ref(new Set());
 
-const columns = [
+const columns: OTableColumnDef[] = [
   {
-    name: "select",
-    field: "",
-    label: "",
-    align: "left",
-    sortable: false,
-    slot: true,
-    slotName: "select",
-    style: "width: 67px",
+    id: "select",
+    header: "",
+    accessorKey: "isInGroup",
+    cell: (info: any) => info.getValue(),
+    size: 36,
+    minSize: 32,
+    maxSize: 40,
+    meta: { align: "center", compactPadding: true },
   },
   {
-    name: "role_name",
-    field: "role_name",
-    label: t("iam.roleName"),
-    align: "left",
+    id: "role_name",
+    header: t("iam.roleName"),
+    accessorKey: "role_name",
     sortable: true,
+    meta: { align: "left" },
   },
 ];
 
@@ -262,23 +263,6 @@ const toggleUserSelection = (user: any) => {
   }
 };
 
-const filterRoles = (rows: any[], term: string) => {
-  var filtered = [];
-  for (var i = 0; i < rows.length; i++) {
-    var user = rows[i];
-    if (user.role_name.toLowerCase().indexOf(term.toLowerCase()) > -1) {
-      filtered.push(user);
-    }
-  }
-  return filtered;
-};
-
-const visibleRows = computed(() => {
-  if (!userSearchKey.value) return rows.value || [];
-  return filterRoles(rows.value || [], userSearchKey.value);
-});
-
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 </script>
 
 <style scoped></style>

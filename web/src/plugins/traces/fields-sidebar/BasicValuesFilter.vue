@@ -18,9 +18,9 @@
           :title="row.label || row.name"
         >
           <span v-if="row.dataType" class="field-type-container">
-            <q-icon
+            <OIcon
               class="field-expand-icon"
-              :name="isExpanded ? 'expand_less' : 'expand_more'"
+              :name="isExpanded ? 'expand-less' : 'expand-more'"
               size="1rem"
             />
           </span>
@@ -36,21 +36,21 @@
             class="tw:mx-[0.375rem]!"
             @click.stop="addSearchTerm(`${row.name}=''`)"
           >
-            <q-icon :name="outlinedAdd" />
+            <OIcon name="add" size="sm" />
           </OButton>
-          <q-icon
+          <OIcon
             :data-test="`log-search-index-list-add-${row.name}-field-btn`"
             v-if="showVisibilityToggle && !isFieldSelected"
-            :name="outlinedVisibility"
+            name="visibility"
             size="1.1rem"
             title="Add field to table"
             class="tw:cursor-pointer! tw:mr-[0.375rem]!"
             @click.stop="$emit('toggle-field', row)"
           />
-          <q-icon
+          <OIcon
             :data-test="`log-search-index-list-remove-${row.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
-            :name="outlinedVisibilityOff"
+            name="visibility-off"
             size="1.1rem"
             title="Remove field from table"
             class="tw:cursor-pointer! tw:mr-[0.375rem]!"
@@ -67,7 +67,7 @@
             v-if="durationPercentilesLoading"
             class="tw:flex tw:justify-center tw:py-[0.5rem]"
           >
-            <q-spinner size="1rem" color="primary" />
+            <OSpinner size="xs" />
           </div>
           <template v-else-if="hasPercentiles">
             <div
@@ -93,8 +93,8 @@
                   @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(percentiles[p.key])}'`)"
                   class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-[var(--o2-border-color)]!"
                 >
-                  <q-icon
-                    :name="outlinedArrowForwardIos"
+                  <OIcon
+                    name="arrow-forward-ios" size="sm"
                     class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
                   />
                 </OButton>
@@ -106,8 +106,8 @@
                   @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(percentiles[p.key])}'`)"
                   class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
                 >
-                  <q-icon
-                    :name="outlinedArrowBackIos"
+                  <OIcon
+                    name="arrow-back-ios" size="sm"
                     class="tw:h-[0.5rem]! tw:w-[0.5rem]!"
                   />
                 </OButton>
@@ -161,11 +161,7 @@ import {
 import { useStore } from "vuex";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  outlinedAdd,
-  outlinedVisibility,
-  outlinedVisibilityOff,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import {
   removeFieldFromWhereAST,
@@ -176,13 +172,10 @@ import useDurationPercentiles, {
 } from "@/composables/useDurationPercentiles";
 import useParser from "@/composables/useParser";
 import {
-  outlinedArrowBackIos,
-  outlinedArrowForwardIos,
-} from "@quasar/extras/material-icons-outlined";
-import {
   SPAN_KIND_MAP,
   parseSpanKindWhereClause,
 } from "@/utils/traces/constants";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   row: {
@@ -464,7 +457,7 @@ defineExpose({ buildSql, openFilterCreator });
   .field_overlay {
     visibility: hidden;
 
-    .q-icon {
+    .OIcon {
       opacity: 0;
     }
   }
@@ -496,7 +489,7 @@ defineExpose({ buildSql, openFilterCreator });
       .field_overlay {
         visibility: visible;
 
-        .q-icon {
+        .OIcon {
           opacity: 1;
         }
       }
@@ -504,7 +497,7 @@ defineExpose({ buildSql, openFilterCreator });
   }
   .field-expansion-icon {
     margin-right: 4px !important;
-    .q-icon {
+    .OIcon {
       font-size: 18px;
       color: #808080;
     }

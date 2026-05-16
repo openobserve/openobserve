@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </q-input>
         </div>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left
-              ><q-icon name="refresh" size="14px"
+              ><OIcon name="refresh" size="xs"
             /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>
@@ -67,13 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading State -->
     <div v-if="loading && patterns.length === 0" class="text-center q-pa-xl">
-      <q-spinner-hourglass color="primary" size="50px" />
+      <OSpinner size="lg" />
       <div class="q-mt-md">{{ t("regex_patterns.loading_patterns") }}</div>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <OIcon name="error" size="50px" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
-                <q-icon name="more_vert" size="14px" />
+                <OIcon name="more-vert" size="xs" />
                 <q-tooltip>{{ t("regex_patterns.preview") }}</q-tooltip>
               </OButton>
             </q-item-section>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item v-if="filteredPatterns.length === 0">
             <q-item-section class="text-center text-grey-6">
               <div class="q-pa-xl">
-                <q-icon name="search_off" size="50px" />
+                <OIcon name="search-off" size="50px" />
                 <div class="q-mt-md">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
@@ -164,115 +164,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Preview Dialog -->
-    <q-dialog v-model="showPreview" data-test="pattern-preview-dialog">
-      <q-card style="min-width: 600px">
-        <q-card-section>
-          <div class="text-h6">{{ previewedPattern?.name }}</div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section
-          class="q-pt-none"
-          style="max-height: 60vh; overflow-y: auto"
-        >
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.description") }}
-            </div>
-            <div>
-              {{
-                previewedPattern?.description ||
-                t("regex_patterns.no_description")
-              }}
-            </div>
+    <ODialog
+      v-model:open="showPreview"
+      size="md"
+      :title="previewedPattern?.name"
+      data-test="pattern-preview-dialog"
+      :secondary-button-label="t('regex_patterns.close')"
+      :primary-button-label="t('regex_patterns.import_this_pattern')"
+      @click:secondary="showPreview = false"
+      @click:primary="importSinglePattern"
+    >
+      <div style="max-height: 60vh; overflow-y: auto">
+        <div class="q-mb-md">
+          <div class="text-weight-bold q-mb-xs">
+            {{ t('regex_patterns.description') }}
           </div>
-
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.pattern") }}
-            </div>
-            <q-input
-              :model-value="previewedPattern?.pattern"
-              type="textarea"
-              readonly
-              outlined
-              dense
-              rows="3"
-            />
+          <div>
+            {{ previewedPattern?.description || t('regex_patterns.no_description') }}
           </div>
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.tags") }}
-            </div>
-            <q-chip
-              v-for="tag in previewedPattern?.tags"
-              :key="tag"
-              color="primary"
-              text-color="white"
-              dense
-            >
-              {{ tag }}
-            </q-chip>
-          </div>
+        <div class="q-mb-md">
+          <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.pattern') }}</div>
+          <q-input
+            :model-value="previewedPattern?.pattern"
+            type="textarea"
+            readonly
+            outlined
+            dense
+            rows="3"
+          />
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.rarity") }}
-            </div>
-            <div>{{ previewedPattern?.rarity }}</div>
-          </div>
-
-          <div
-            v-if="previewedPattern?.examples?.Valid?.length > 0"
-            class="q-mb-md"
+        <div class="q-mb-md">
+          <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.tags') }}</div>
+          <q-chip
+            v-for="tag in previewedPattern?.tags"
+            :key="tag"
+            color="primary"
+            text-color="white"
+            dense
           >
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.valid_examples") }}
-            </div>
-            <q-list dense bordered>
-              <q-item
-                v-for="(example, idx) in previewedPattern.examples.Valid.slice(
-                  0,
-                  3,
-                )"
-                :key="idx"
-              >
-                <q-item-section>
-                  <q-item-label
-                    caption
-                    class="text-wrap"
-                    style="word-break: break-all"
-                  >
-                    {{ example.substring(0, 200)
-                    }}{{ example.length > 200 ? "..." : "" }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
+            {{ tag }}
+          </q-chip>
+        </div>
+
+        <div class="q-mb-md">
+          <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.rarity') }}</div>
+          <div>{{ previewedPattern?.rarity }}</div>
+        </div>
+
+        <div
+          v-if="previewedPattern?.examples?.Valid?.length > 0"
+          class="q-mb-md"
+        >
+          <div class="text-weight-bold q-mb-xs">
+            {{ t('regex_patterns.valid_examples') }}
           </div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right">
-          <div class="tw:flex tw:gap-2">
-            <OButton variant="outline" size="sm-action" v-close-popup>
-              {{ t("regex_patterns.close") }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="importSinglePattern"
-              data-test="import-single-pattern-btn"
+          <q-list dense bordered>
+            <q-item
+              v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
+              :key="idx"
             >
-              {{ t("regex_patterns.import_this_pattern") }}
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+              <q-item-section>
+                <q-item-label caption class="text-wrap" style="word-break: break-all">
+                  {{ example.substring(0, 200) }}{{ example.length > 200 ? '...' : '' }}
+                </q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </div>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -284,6 +247,9 @@ import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface PatternExample {
   Valid: string[];
@@ -303,7 +269,9 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton },
+  components: { OButton, ODialog, OSpinner,
+    OIcon,
+},
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();

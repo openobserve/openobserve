@@ -44,7 +44,7 @@ describe("MetricCard", () => {
         },
       });
 
-      const icon = wrapper.find('.q-icon[aria-hidden="true"]');
+      const icon = wrapper.find('.OIcon[aria-hidden="true"]');
       expect(icon.exists()).toBe(true);
     });
 
@@ -56,7 +56,7 @@ describe("MetricCard", () => {
         },
       });
 
-      const icons = wrapper.findAll('.q-icon');
+      const icons = wrapper.findAll('.OIcon');
       // Should have no icon since none was provided and no status
       expect(icons.length).toBe(0);
     });
@@ -150,7 +150,7 @@ describe("MetricCard", () => {
       expect(wrapper_div.exists()).toBe(true);
 
       // Check for status icon
-      const statusIcon = wrapper.findAll('.q-icon');
+      const statusIcon = wrapper.findAll('.OIcon');
       expect(statusIcon.length).toBeGreaterThan(0);
     });
 
@@ -169,7 +169,7 @@ describe("MetricCard", () => {
       expect(wrapper_div.exists()).toBe(true);
 
       // Check for status icon
-      const statusIcon = wrapper.findAll('.q-icon');
+      const statusIcon = wrapper.findAll('.OIcon');
       expect(statusIcon.length).toBeGreaterThan(0);
     });
 
@@ -188,7 +188,7 @@ describe("MetricCard", () => {
       expect(wrapper_div.exists()).toBe(true);
 
       // Check for status icon
-      const statusIcon = wrapper.findAll('.q-icon');
+      const statusIcon = wrapper.findAll('.OIcon');
       expect(statusIcon.length).toBeGreaterThan(0);
     });
 

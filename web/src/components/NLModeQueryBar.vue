@@ -55,9 +55,9 @@
             :disabled="disabled || (isAIMode && isGenerating)"
             @click="handleButtonClick"
           >
-            <q-icon
+            <OIcon
               v-if="showIcon"
-              :name="isAIMode ? 'auto_awesome' : 'search'"
+              :name="isAIMode ? 'auto-awesome' : 'search'" size="sm"
               class="q-mr-xs"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
@@ -74,7 +74,7 @@
                   class="tw:h-[29px] search-button-dropdown"
                   :class="dropdownClasses"
                 >
-                  <q-icon name="arrow_drop_down" size="18px" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                 </OButton>
               </template>
               <!-- Normal Mode: Refresh option -->
@@ -84,7 +84,7 @@
                   @select="$emit('refresh')"
                 >
                   <template #icon-left>
-                    <q-icon name="refresh" size="16px" />
+                    <OIcon name="refresh" size="sm" />
                   </template>
                   {{ t('search.refreshCacheAndRunQuery') }}
                 </ODropdownItem>
@@ -112,7 +112,7 @@
           <!-- Show streaming status with spinner -->
           <div v-if="isGenerating" class="ai-bar-streaming tw:flex tw:items-center tw:gap-2">
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
-            <q-spinner-dots color="primary" size="1.2em" />
+            <OSpinner variant="dots" size="xs" />
             <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
@@ -162,6 +162,8 @@ import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
 import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   // Query props

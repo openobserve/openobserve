@@ -15,42 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <AppTable
-    :rows="rows"
-    :columns="columns"
-    :hide-header="true"
-    class="q-mt-sm"
-    :style="{
-      height: resource.expand ? '100%' : '0px',
-      transition: 'height 0.3s ease-in',
-    }"
-    :filter="{
-      value: searchKey,
-      method: filterEntities,
-    }"
-  >
-    <template v-slot:permission="slotProps: any">
-      <q-checkbox
-        v-show="slotProps.column.row.permission[slotProps.columnName].show"
-        size="xs"
-        v-model="slotProps.column.row.permission[slotProps.columnName].value"
-        :val="slotProps.columnName"
-        class="filter-check-box cursor-pointer"
-        @click="
-          handlePermissionChange(slotProps.column.row, slotProps.columnName)
-        "
-      />
-    </template>
-  </AppTable>
+  <div :style="{ height: resource.expand ? '100%' : '0px', transition: 'height 0.3s ease-in' }">
+    <OTable
+      :data="rows"
+      :columns="columns"
+      row-key="name"
+      :global-filter="searchKey"
+      filter-mode="client"
+      :default-columns="false"
+      :show-global-filter="false"
+      dense
+      :bordered="false"
+    >
+      <template v-for="col in permissionColumnIds" :key="col" #[`cell-${col}`]="{ row }">
+        <OCheckbox
+          v-show="row.permission[col]?.show"
+          v-model="row.permission[col].value"
+          :value="col"
+          class="filter-check-box cursor-pointer"
+          @click="handlePermissionChange(row, col)"
+        />
+      </template>
+    </OTable>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import AppTable from "@/components/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import usePermissions from "@/composables/iam/usePermissions";
 import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const props = defineProps({
   resource: {
@@ -75,82 +73,99 @@ const rows: any = ref([]);
 
 const { permissionsState } = usePermissions();
 
-const columns: any = [
+const permissionColumnIds = computed(() =>
+  columns.value
+    .filter((c) => c.id.startsWith("Allow"))
+    .map((c) => c.id),
+);
+
+const columns = computed<OTableColumnDef[]>(() => [
   {
-    name: "expand",
-    label: "",
-    field: "expand",
-    align: "center",
-    style: "width: 57px",
+    id: "expand",
+    header: "",
+    accessorKey: "expand",
+    cell: (info: any) => info.getValue(),
+    size: 36,
+    minSize: 32,
+    maxSize: 40,
+    meta: { align: "center", compactPadding: true },
   },
   {
-    name: "name",
-    field: "name",
-    label: t("iam.entityName"),
-    align: "left",
+    id: "name",
+    header: t("iam.entityName"),
+    accessorKey: "name",
     sortable: true,
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "type",
-    field: "type",
-    label: t("common.type"),
-    align: "left",
-    style: "width: 100px",
+    id: "type",
+    header: t("common.type"),
+    accessorKey: "type",
+    sortable: true,
+    size: 100,
+    meta: { align: "left" },
   },
   {
-    name: "AllowAll",
-    field: "permission",
-    label: t("iam.all"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: "width: 80px",
+    id: "AllowAll",
+    header: t("iam.all"),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "center" },
   },
   {
-    name: "AllowList",
-    field: "permission",
-    label: t("iam.list"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: "width: 80px",
+    id: "AllowList",
+    header: t("iam.list"),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "center" },
   },
   {
-    name: "AllowGet",
-    field: "permission",
-    label: t("iam.get"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: "width: 80px",
+    id: "AllowGet",
+    header: t("iam.get"),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "center" },
   },
   {
-    name: "AllowDelete",
-    field: "permission",
-    label: t("iam.delete"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: "width: 80px",
+    id: "AllowDelete",
+    header: t("iam.delete"),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "center" },
   },
   {
-    name: "AllowPost",
-    field: "permission",
-    label: t("iam.create"),
-    align: "center",
-    slot: true,
-    style: "width: 80px",
+    id: "AllowPost",
+    header: t("iam.create"),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "center" },
   },
   {
-    name: "AllowPut",
-    field: "permission",
-    label: t("iam.update"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: "width: 80px",
+    id: "AllowPut",
+    header: t("iam.update"),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "center" },
   },
-];
+]);
 
 const getResourceEntities = () => {
   return props.resource.entities;
@@ -184,16 +199,6 @@ watch(
   },
 );
 
-const filterEntities = (rows: Entity[], terms: string) => {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i]["name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-    }
-  }
-  return filtered;
-};
 </script>
 
 <style scoped></style>

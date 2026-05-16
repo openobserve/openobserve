@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <q-icon name="search" size="12px" />
+                      <OIcon name="search" size="xs" />
                     </OButton>
                   </div>
                 </div>
@@ -211,12 +211,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="ellipsis flex items-center span-name-section-content"
                     >
-                      <q-icon
+                      <OIcon
                         v-if="
                           (spans as any[])[virtualRow.index].spanStatus ===
                           'ERROR'
                         "
-                        name="error"
+                        name="error" size="sm"
                         class="text-red-6 q-mr-xs"
                         title="Error Span"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         class="q-mr-sm"
                       >
-                        <q-icon name="functions" size="10px" />
+                        <OIcon name="functions" size="10px" />
                         {{
                           formatTokens(
                             (spans as any[])[virtualRow.index].genAiUsage.total,
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (spans as any[])[virtualRow.index].genAiCost?.total > 0
                         "
                       >
-                        <q-icon name="attach_money" size="10px" />
+                        <OIcon name="attach-money" size="10px" />
                         {{
                           formatCost(
                             (spans as any[])[virtualRow.index].genAiCost.total,
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
-                      <q-icon name="event_note" size="0.625rem" />
+                      <OIcon name="event-note" size="0.625rem" />
                       {{ getEventCount((spans as any[])[virtualRow.index]) }}
                     </span>
                   </div>
@@ -424,6 +424,7 @@ import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -841,7 +842,9 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OButton },
+  components: { SpanBlock, SpanKindBadge, OButton,
+    OIcon,
+},
 });
 </script>
 

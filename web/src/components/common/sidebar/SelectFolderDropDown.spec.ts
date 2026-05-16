@@ -49,17 +49,87 @@ function setStoreFolders(type: string, folders: any[]) {
   };
 }
 
+// ─── Stubs ────────────────────────────────────────────────────────────────────
+
+// ODrawer stub: mirrors the migrated ODrawer surface — v-model:open, button labels,
+// and click:primary/click:secondary emits. Renders default slot only when open.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "width",
+    "showClose",
+    "title",
+    "subTitle",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+    "persistent",
+    "size",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div v-if="open" class="o-drawer-stub" :data-test="$attrs['data-test']">
+      <button
+        class="o-drawer-primary"
+        :data-test="'o-drawer-primary'"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        class="o-drawer-secondary"
+        :data-test="'o-drawer-secondary'"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <slot />
+    </div>
+  `,
+};
+
+// OButton stub: emits click on native button so [data-test] selectors keep working
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled"],
+  emits: ["click"],
+  template: `
+    <button
+      :data-test="$attrs['data-test']"
+      :disabled="disabled"
+      @click="$emit('click', $event)"
+    ><slot /></button>
+  `,
+};
+
+// AddFolder stub: mirrors the self-contained AddFolder that owns its own
+// ODrawer. Receives `open` via v-model:open and emits `update:open` to close.
+const submitSpy = vi.fn();
+const AddFolderStub = {
+  name: "AddFolder",
+  props: ["type", "editMode", "open"],
+  emits: ["update:modelValue", "update:open"],
+  template: '<div class="add-folder-stub" />',
+  setup(_: any, { expose }: any) {
+    expose({ submit: submitSpy });
+    return {};
+  },
+};
+
 // ─── Global mount config ──────────────────────────────────────────────────────
 
 const globalConfig = {
   plugins: [i18n],
   stubs: {
-    AddFolder: { template: '<div class="add-folder-stub" />' },
-    "q-dialog": {
-      template:
-        '<div v-if="modelValue" class="q-dialog-stub"><slot /></div>',
-      props: ["modelValue"],
-    },
+    AddFolder: AddFolderStub,
+    ODrawer: ODrawerStub,
+    OButton: OButtonStub,
     "q-select": {
       template: `
         <div class="q-select-stub" :data-test="$attrs['data-test']">
@@ -70,12 +140,7 @@ const globalConfig = {
       props: ["modelValue", "options", "label", "disable"],
       emits: ["update:modelValue"],
     },
-    "q-btn": {
-      template:
-        '<button :data-test="$attrs[\'data-test\']" :disabled="disable" @click="$emit(\'click\')"><slot /><q-icon v-if="$attrs.name" /></button>',
-      props: ["disable"],
-    },
-    "q-icon": { template: '<i :class="name" />', props: ["name", "size"] },
+    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
     "q-item": { template: "<div class='q-item-stub'><slot /></div>" },
     "q-item-section": { template: "<div><slot /></div>" },
   },
@@ -88,6 +153,7 @@ describe("SelectFolderDropDown.vue", () => {
 
   beforeEach(() => {
     setStoreFolders("alerts", MOCK_FOLDERS);
+    submitSpy.mockClear();
     vi.clearAllMocks();
   });
 
@@ -195,7 +261,7 @@ describe("SelectFolderDropDown.vue", () => {
     });
   });
 
-  // ─── showAddFolderDialog ─────────────────────────────────────────────────────
+  // ─── showAddFolderDialog (ODrawer) ───────────────────────────────────────────
 
   describe("showAddFolderDialog", () => {
     it("initializes showAddFolderDialog to false", () => {
@@ -203,21 +269,43 @@ describe("SelectFolderDropDown.vue", () => {
       expect((wrapper.vm as any).showAddFolderDialog).toBe(false);
     });
 
-    it("opens dialog when add button is clicked", async () => {
+    it("AddFolder open is false initially", () => {
+      wrapper = createWrapper();
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.props("open")).toBe(false);
+    });
+
+    it("opens AddFolder when add button is clicked", async () => {
       wrapper = createWrapper();
       const addBtn = wrapper.find(`[data-test="alerts-folder-move-new-add"]`);
       await addBtn.trigger("click");
+      await nextTick();
       expect((wrapper.vm as any).showAddFolderDialog).toBe(true);
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.props("open")).toBe(true);
     });
 
-    it("does NOT open the dialog when dropdown is disabled", async () => {
+    it("does NOT render AddFolder when dropdown is disabled (v-if guard)", async () => {
       wrapper = createWrapper({ disableDropdown: true });
-      const addBtn = wrapper.find(`[data-test="alerts-folder-move-new-add"]`);
-      // In the template the button also has :disable="disableDropdown" — even if
-      // click fires, the dialog guard prevents rendering
-      expect(wrapper.find("q-dialog").exists() || !(wrapper.vm as any).showAddFolderDialog).toBe(
-        true
-      );
+      // AddFolder is rendered with v-if="!disableDropdown" — should never appear
+      expect(wrapper.findComponent(AddFolderStub).exists()).toBe(false);
+    });
+  });
+
+  // ─── AddFolder interactions ───────────────────────────────────────────────────
+
+  describe("AddFolder interactions", () => {
+    it("closes showAddFolderDialog when AddFolder emits update:open=false", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.showAddFolderDialog = true;
+      await nextTick();
+
+      const addFolder = wrapper.findComponent(AddFolderStub);
+      expect(addFolder.exists()).toBe(true);
+      await addFolder.vm.$emit("update:open", false);
+      await nextTick();
+      expect(vm.showAddFolderDialog).toBe(false);
     });
   });
 

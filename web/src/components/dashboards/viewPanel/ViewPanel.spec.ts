@@ -326,8 +326,66 @@ describe("ViewPanel", () => {
             emits: ["click"],
             inheritAttrs: false,
           },
+          "OIcon": {
+            template: '<i class="OIcon"></i>',
+            props: ["name"],
+          },
           "q-tooltip": {
             template: '<div class="q-tooltip"><slot /></div>',
+          },
+          OButton: {
+            name: "OButton",
+            template:
+              '<button @click="$emit(\'click\', $event)" :disabled="disabled" :data-test="$attrs[\'data-test\']"><slot name="icon-left" /><slot /></button>',
+            props: [
+              "variant",
+              "size",
+              "disabled",
+              "loading",
+              "label",
+            ],
+            emits: ["click"],
+            inheritAttrs: false,
+          },
+          ODialog: {
+            name: "ODialog",
+            inheritAttrs: false,
+            template:
+              '<div data-test="o-dialog" v-if="open"><slot name="header" /><slot /><slot name="footer" /></div>',
+            props: [
+              "open",
+              "size",
+              "title",
+              "subTitle",
+              "showClose",
+              "persistent",
+              "width",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+              "primaryButtonVariant",
+              "secondaryButtonVariant",
+              "neutralButtonVariant",
+              "primaryButtonDisabled",
+              "secondaryButtonDisabled",
+              "neutralButtonDisabled",
+              "primaryButtonLoading",
+              "secondaryButtonLoading",
+              "neutralButtonLoading",
+            ],
+            emits: [
+              "update:open",
+              "click:primary",
+              "click:secondary",
+              "click:neutral",
+            ],
+          },
+          ShowLegendsPopup: {
+            name: "ShowLegendsPopup",
+            template:
+              '<div data-test="show-legends-popup"><button data-test="show-legends-popup-close" @click="$emit(\'update:open\', false)">close</button></div>',
+            props: ["panelData", "open"],
+            emits: ["update:open"],
           },
         },
       },
@@ -1132,6 +1190,85 @@ describe("ViewPanel", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.searchRequestTraceIds).toBeDefined();
+    });
+  });
+
+  describe("Show Legends Dialog (ODialog)", () => {
+    it("should not render ODialog when showLegendsDialog is false", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+    });
+
+    it("should show ShowLegendsPopup with open=true when showLegendsDialog is true", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
+    });
+
+    it("should pass panelData prop to ShowLegendsPopup when dialog opens", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
+      expect(popup.props("panelData")).toBeDefined();
+    });
+
+    it("should close dialog when ShowLegendsPopup emits update:open=false", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      await popup.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
+      expect(popup.props("open")).toBe(false);
+    });
+
+    it("should render ShowLegendsPopup inside the dialog with panelData", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("panelData")).toBeDefined();
+    });
+
+    it("should close dialog when ShowLegendsPopup emits update:open false", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showLegendsDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent({ name: "ShowLegendsPopup" });
+      await popup.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showLegendsDialog).toBe(false);
+    });
+
+    it("should expose currentPanelData for the popup", () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.currentPanelData).toBeDefined();
+      expect(typeof wrapper.vm.currentPanelData).toBe("object");
+      // currentPanelData always includes config
+      expect(wrapper.vm.currentPanelData.config).toBeDefined();
     });
   });
 

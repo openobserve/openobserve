@@ -22,13 +22,71 @@ import { createStore } from "vuex";
 
 installQuasar({ plugins: [Dialog] });
 
-// NOTE: PerformanceFieldsDialog wraps all content in <q-dialog>, which uses
-// Vue Teleport to render content directly in document.body (outside the
-// wrapper's DOM element). Therefore:
-//  - wrapper.text() always returns '' (wrapper element is empty)
-//  - Use wrapper.vm.fieldsByType for computed data assertions
-//  - Use document.querySelector() / document.body.textContent for DOM assertions
-//    (requires mountDialog to use attachTo: document.body)
+// PerformanceFieldsDialog now wraps content in <ODialog> (migrated from
+// <q-dialog>). The dialog exposes:
+//   - prop  : open (v-model:open), persistent, size, title,
+//             primary-button-label, secondary-button-label
+//   - emits : update:open, click:primary, click:secondary
+// In tests we stub ODialog with a minimal template that renders the default
+// slot inline (no Teleport), exposes the title/labels via data attributes and
+// emits click:primary / click:secondary from inline buttons. This keeps the
+// tests deterministic and removes the need to query document.body.
+
+const ODialogStub = {
+  name: "ODialog",
+  template: `
+    <div
+      v-if="open"
+      data-test-stub="o-dialog"
+      :data-size="size"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <div data-test="o-dialog-title">{{ title }}</div>
+      <div data-test="o-dialog-body"><slot /></div>
+      <button
+        data-test="o-dialog-secondary"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-close"
+        @click="$emit('update:open', false)"
+      >close</button>
+    </div>
+  `,
+  props: [
+    "open",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: [
+    "update:open",
+    "click:primary",
+    "click:secondary",
+    "click:neutral",
+  ],
+};
 
 describe("PerformanceFieldsDialog", () => {
   let store: any;
@@ -55,13 +113,17 @@ describe("PerformanceFieldsDialog", () => {
     }
   });
 
-  // Mounts with attachTo:document.body so that Quasar's Teleport puts dialog
-  // content into document.body, making it accessible via document.querySelector.
-  const mountDialog = (missingFields: any[] = [], modelValue = true) => {
+  const mountDialog = (
+    missingFields: any[] = [],
+    modelValue = true,
+    customStore: any = store,
+  ) => {
     wrapper = mount(PerformanceFieldsDialog, {
       props: { modelValue, missingFields },
-      global: { plugins: [store] },
-      attachTo: document.body,
+      global: {
+        plugins: [customStore],
+        stubs: { ODialog: ODialogStub },
+      },
     });
     return wrapper;
   };
@@ -73,39 +135,40 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
     });
 
-    it("should render title 'Index Fields Detected'", async () => {
+    it("should render the ODialog with title 'Index Fields Detected'", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      // Content is teleported to document.body
-      expect(document.body.textContent).toContain("Index Fields Detected");
+      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.attributes("data-title")).toBe("Index Fields Detected");
     });
 
-    it("should render description text about fields affecting performance", async () => {
+    it("should pass size='md' to ODialog", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      expect(document.body.textContent).toContain("full-text search or secondary indexes");
+      expect(
+        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-size"),
+      ).toBe("md");
     });
 
-    it("should render Skip button", async () => {
+    it("should render Skip as the secondary button label", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
-      const skipBtn = allBtns.find(btn => btn.textContent?.trim() === 'Skip');
-      expect(skipBtn).not.toBeUndefined();
+      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
+      expect(dialog.attributes("data-secondary-label")).toBe("Skip");
     });
 
-    it("should render Add Fields button", async () => {
+    it("should render Add Fields as the primary button label", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
-      const addBtn = allBtns.find(btn => btn.textContent?.trim() === 'Add Fields');
-      expect(addBtn).not.toBeUndefined();
+      const dialog = wrapper.find('[data-test-stub="o-dialog"]');
+      expect(dialog.attributes("data-primary-label")).toBe("Add Fields");
     });
 
-    it("should render the close button area", async () => {
-      mountDialog([mockFtsFiled]);
+    it("should not render the dialog body when modelValue is false", async () => {
+      mountDialog([mockFtsFiled], false);
       await flushPromises();
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="o-dialog"]').exists()).toBe(false);
     });
   });
 
@@ -114,8 +177,8 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
       const vm = wrapper.vm as any;
-      // Section visibility is driven by the fieldsByType computed
       expect(vm.fieldsByType.fts.length).toBeGreaterThan(0);
+      expect(wrapper.text()).toContain("Full Text Search (1)");
     });
 
     it("should show correct FTS field count", async () => {
@@ -126,6 +189,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBe(2);
+      expect(wrapper.text()).toContain("Full Text Search (2)");
     });
 
     it("should display FTS field chip with the field name", async () => {
@@ -133,6 +197,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts[0].name).toBe("log_field");
+      expect(wrapper.text()).toContain("log_field");
     });
 
     it("should not show FTS section when no FTS fields", async () => {
@@ -140,6 +205,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBe(0);
+      expect(wrapper.text()).not.toContain("Full Text Search (");
     });
   });
 
@@ -149,6 +215,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBeGreaterThan(0);
+      expect(wrapper.text()).toContain("Secondary Index (1)");
     });
 
     it("should show correct secondary index field count", async () => {
@@ -160,6 +227,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBe(3);
+      expect(wrapper.text()).toContain("Secondary Index (3)");
     });
 
     it("should display secondary index field chip with the field name", async () => {
@@ -167,6 +235,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex[0].name).toBe("user_id");
+      expect(wrapper.text()).toContain("user_id");
     });
 
     it("should not show secondary index section when no secondary index fields", async () => {
@@ -174,6 +243,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBe(0);
+      expect(wrapper.text()).not.toContain("Secondary Index (");
     });
   });
 
@@ -229,33 +299,49 @@ describe("PerformanceFieldsDialog", () => {
   });
 
   describe("Emits", () => {
-    it("should emit skip when Skip button is clicked", async () => {
+    it("should emit skip when ODialog emits click:secondary", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      // Buttons are inside the teleported dialog — find via document
-      // OButton renders as <button data-o2-btn ...>; skip is first button (outline variant)
-      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
-      const skipBtn = allBtns.find(btn => btn.textContent?.trim() === 'Skip') as HTMLElement | undefined;
-      expect(skipBtn).not.toBeUndefined();
-      skipBtn!.click();
-      await flushPromises();
+      await wrapper
+        .find('[data-test="o-dialog-secondary"]')
+        .trigger("click");
 
       expect(wrapper.emitted("skip")).toBeTruthy();
+      expect(wrapper.emitted("skip")!.length).toBe(1);
     });
 
-    it("should emit add-fields when Add Fields button is clicked", async () => {
+    it("should emit add-fields when ODialog emits click:primary", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      // OButton renders as <button data-o2-btn ...>; add-fields is primary variant button
-      const allBtns = Array.from(document.querySelectorAll('button[data-o2-btn]')) as HTMLElement[];
-      const addBtn = allBtns.find(btn => btn.textContent?.trim() === 'Add Fields') as HTMLElement | undefined;
-      expect(addBtn).not.toBeUndefined();
-      addBtn!.click();
-      await flushPromises();
+      await wrapper
+        .find('[data-test="o-dialog-primary"]')
+        .trigger("click");
 
       expect(wrapper.emitted("add-fields")).toBeTruthy();
+      expect(wrapper.emitted("add-fields")!.length).toBe(1);
+    });
+
+    it("should emit update:modelValue when ODialog emits update:open", async () => {
+      mountDialog([mockFtsFiled]);
+      await flushPromises();
+
+      await wrapper
+        .find('[data-test="o-dialog-close"]')
+        .trigger("click");
+
+      const events = wrapper.emitted("update:modelValue");
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([false]);
+    });
+
+    it("should not emit skip or add-fields before user interaction", async () => {
+      mountDialog([mockFtsFiled]);
+      await flushPromises();
+
+      expect(wrapper.emitted("skip")).toBeFalsy();
+      expect(wrapper.emitted("add-fields")).toBeFalsy();
     });
   });
 
@@ -263,7 +349,9 @@ describe("PerformanceFieldsDialog", () => {
     it("should render correctly in light theme", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      expect(wrapper.exists()).toBe(true);
+      // light theme adds the light scroll-area class
+      expect(wrapper.html()).toContain("bordered-scroll-area-light");
+      expect(wrapper.html()).not.toContain("bordered-scroll-area-dark");
     });
 
     it("should render correctly in dark theme", async () => {
@@ -274,14 +362,10 @@ describe("PerformanceFieldsDialog", () => {
         },
       });
 
-      wrapper = mount(PerformanceFieldsDialog, {
-        props: { modelValue: true, missingFields: [mockFtsFiled] },
-        global: { plugins: [darkStore] },
-        attachTo: document.body,
-      });
-
+      mountDialog([mockFtsFiled], true, darkStore);
       await flushPromises();
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.html()).toContain("bordered-scroll-area-dark");
+      expect(wrapper.html()).not.toContain("bordered-scroll-area-light");
     });
   });
 });

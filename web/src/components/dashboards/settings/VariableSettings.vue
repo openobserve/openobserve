@@ -74,9 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-variable-settings-draggable-row"
           >
             <div class="draggable-handle">
-              <q-icon
-                name="drag_indicator"
-                color="grey-13"
+              <OIcon
+                name="drag-indicator" size="sm"
                 class="'q-mr-xs"
                 data-test="dashboard-variable-settings-drag-handle"
               />
@@ -159,8 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.edit')"
                   @click="editVariableFn(variable.name)"
                   :data-test="`dashboard-edit-variable-${variable.name}`"
+                  icon-left="edit"
                 >
-                  <template #icon-left><q-icon name="edit" /></template>
                 </OButton>
                 <OButton
                   variant="ghost"
@@ -172,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-delete-variable"
                 >
                   <template #icon-left
-                    ><q-icon :name="outlinedDelete"
+                    ><OIcon name="delete" size="sm"
                   /></template>
                 </OButton>
               </div>
@@ -187,27 +186,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <q-dialog v-model="showVariablesDependenciesGraphPopUp">
-          <q-card
-            style="width: 60vw; min-width: 60vw; height: 70vh; min-height: 70vh"
-          >
-            <q-toolbar>
-              <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <OButton variant="ghost" size="icon" v-close-popup="true">
-                <template #icon-left><q-icon name="close" /></template>
-              </OButton>
-            </q-toolbar>
-            <q-card-section style="width: 100%; height: calc(100% - 50px)">
-              <VariablesDependenciesGraph
-                :variablesList="dashboardVariablesList"
-                :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-                @closePopUp="
-                  () => (showVariablesDependenciesGraphPopUp = false)
-                "
-              />
-            </q-card-section>
-          </q-card>
-        </q-dialog>
+        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
+          <div style="height: 60vh">
+            <VariablesDependenciesGraph
+              :variablesList="dashboardVariablesList"
+              :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+              @closePopUp="
+                () => (showVariablesDependenciesGraphPopUp = false)
+              "
+            />
+          </div>
+        </ODialog>
       </div>
     </div>
   </div>
@@ -231,15 +220,16 @@ import {
   deleteVariable,
   updateDashboard,
 } from "../../../utils/commons";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import NoData from "../../shared/grid/NoData.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -251,6 +241,8 @@ export default defineComponent({
     DashboardHeader,
     VariablesDependenciesGraph,
     OButton,
+    OIcon,
+    ODialog,
   },
   emits: ["save"],
   setup(props, { emit }) {
@@ -458,7 +450,6 @@ export default defineComponent({
       addVariables,
       dashboardVariablesList,
       isAddVariable,
-      outlinedDelete,
       showDeleteDialogFn,
       confirmDeleteDialog,
       deleteVariableFn,

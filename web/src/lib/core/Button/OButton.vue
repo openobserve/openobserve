@@ -2,6 +2,7 @@
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
 import { computed } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -258,8 +259,9 @@ const classes = computed<string[]>(() => [
     ? "tw:flex tw:w-full tw:items-center tw:justify-center"
     : "tw:inline-flex tw:items-center tw:justify-center",
   "tw:whitespace-nowrap",
-  "tw:font-medium tw:transition-colors tw:duration-150",
+  "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
   "tw:outline-none",
+  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:disabled:cursor-not-allowed tw:enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],
@@ -286,8 +288,12 @@ function handleClick(event: MouseEvent): void {
     v-bind="$attrs"
     @click="handleClick"
   >
-    <slot name="icon-left" />
+    <slot name="icon-left">
+      <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+    </slot>
     <slot />
-    <slot name="icon-right" />
+    <slot name="icon-right">
+      <OIcon v-if="iconRight" :name="iconRight" size="sm" />
+    </slot>
   </Primitive>
 </template>

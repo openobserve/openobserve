@@ -15,34 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="add-function-node-routing-section"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    :style="computedStyleForFunction"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('pipeline.associateFunction')"
+    :width="createNewFunction ? '97' : '30'"
+    @keydown.stop
   >
     <div
-      class="stream-routing-title q-pb-sm q-pl-md tw:flex tw:items-center tw:justify-between"
+      data-test="add-function-node-routing-section"
+      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
-      {{ t("pipeline.associateFunction") }}
-      <div>
-        <OButton variant="ghost" size="icon" v-close-popup>
-          <q-icon name="cancel" size="14px" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
+
 
     <div v-if="loading">
-      <q-spinner
+      <OSpinner
         v-if="loading"
-        color="primary"
-        size="40px"
-        style="
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-        "
+        size="md"
+        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
       />
     </div>
     <div
@@ -169,14 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="note-heading">Function Execution Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     ><span class="highlight">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened</span
                   >
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     ><span class="highlight">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened</span
@@ -212,7 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-  </div>
+    </div>
+  </ODrawer>
   <confirm-dialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -236,8 +227,11 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface RouteCondition {
   column: string;
@@ -259,6 +253,10 @@ const AddFunction = defineAsyncComponent(
 );
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   functions: {
     type: Array,
     required: true,
@@ -281,6 +279,16 @@ const emit = defineEmits([
   "delete:node",
   "add:function",
 ]);
+
+const internalOpen = ref(!!props.open);
+watch(() => props.open, (v) => { internalOpen.value = !!v; });
+
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 
 const { t } = useI18n();
 

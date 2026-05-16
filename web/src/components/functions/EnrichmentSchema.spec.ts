@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mount, flushPromises, VueWrapper } from '@vue/test-utils';
 import { Quasar } from 'quasar';
 import EnrichmentSchema from './EnrichmentSchema.vue';
 import { createStore } from 'vuex';
@@ -40,6 +40,21 @@ vi.mock('vue-router', () => ({
   }),
 }));
 
+// Stub for ODrawer: exposes slots and re-emits update:open so tests can drive
+// drawer open/close interactions without rendering the real overlay.
+const ODrawerStub = {
+  name: 'ODrawer',
+  props: ['open', 'width', 'showClose', 'persistent', 'size', 'title', 'subTitle'],
+  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+  template: `
+    <div data-test-stub="o-drawer" :data-open="open" :data-title="title" :data-size="size">
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+};
+
 const mockStore = createStore({
   state: {
     theme: 'light',
@@ -74,11 +89,28 @@ const mockI18n = createI18n({
   },
 });
 
-describe('EnrichmentSchema.vue Branch Coverage', () => {
-  const defaultProps = {
-    selectedEnrichmentTable: 'test_table',
+function buildMountOptions(store: any = mockStore, props: Record<string, unknown> = {}) {
+  return {
+    props: {
+      selectedEnrichmentTable: 'test_table',
+      open: true,
+      ...props,
+    },
+    global: {
+      plugins: [Quasar, mockI18n],
+      provide: {
+        $store: store,
+        store,
+      },
+      stubs: {
+        ODrawer: ODrawerStub,
+        QTablePagination: true,
+      },
+    },
   };
+}
 
+describe('EnrichmentSchema.vue Branch Coverage', () => {
   const mockSchemaData = {
     name: 'test_stream',
     schema: [
@@ -92,38 +124,78 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     },
   };
 
+  let wrapper: VueWrapper<any>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetStream.mockResolvedValue(mockSchemaData);
   });
 
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  describe('ODrawer Integration', () => {
+    it('should render the ODrawer wrapper', async () => {
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
+      await flushPromises();
+      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
+    });
+
+    it('should pass open prop through to ODrawer', async () => {
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
+      await flushPromises();
+      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      expect(drawer.attributes('data-open')).toBe('true');
+    });
+
+    it('should set the drawer title from the i18n schemaHeader key', async () => {
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test-stub="o-drawer"]').attributes('data-title'),
+      ).toBe('Schema');
+    });
+
+    it('should pass size "lg" to ODrawer', async () => {
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test-stub="o-drawer"]').attributes('data-size'),
+      ).toBe('lg');
+    });
+
+    it('should propagate ODrawer update:open event to parent', async () => {
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
+      await flushPromises();
+
+      const drawer = wrapper.findComponent({ name: 'ODrawer' });
+      drawer.vm.$emit('update:open', false);
+      await flushPromises();
+
+      const events = wrapper.emitted('update:open');
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([false]);
+    });
+
+    it('should reflect open=false when the prop is set to false', async () => {
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test-stub="o-drawer"]').attributes('data-open'),
+      ).toBe('false');
+    });
+  });
+
   describe('Loading State Branch Coverage', () => {
     it('should show content after loading completes', async () => {
-      // Test when loading is complete (normal case)
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
-      // Wait for component to finish loading
       await nextTick();
       await nextTick();
 
-      // After loading should show content - Branch: loadingState = false (line 51) 
       expect(wrapper.find('.indexDetailsContainer').exists()).toBe(true);
-      
-      // Test loading state was initially true and error handling works
-      // We test this by triggering the loading state through the mounted lifecycle
-      expect(wrapper.vm).toBeDefined(); // Component mounted successfully
+      expect(wrapper.vm).toBeDefined();
     });
   });
 
@@ -133,32 +205,20 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
         state: {
           theme: 'light',
           zoConfig: {
-            show_stream_stats_doc_num: true, // Branch condition: true
+            show_stream_stats_doc_num: true,
           },
         },
       });
 
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: storeWithDocNum,
-            store: storeWithDocNum,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions(storeWithDocNum));
 
-      // Wait for component to load
       await nextTick();
       await nextTick();
 
-      // Branch: show_stream_stats_doc_num = true (line 64)
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some(el => el.text().includes('Documents'));
+      const hasDocCountElement = streamElements.some((el) =>
+        el.text().includes('Documents'),
+      );
       expect(hasDocCountElement).toBe(true);
     });
 
@@ -167,32 +227,20 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
         state: {
           theme: 'light',
           zoConfig: {
-            show_stream_stats_doc_num: false, // Branch condition: false
+            show_stream_stats_doc_num: false,
           },
         },
       });
 
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: storeWithoutDocNum,
-            store: storeWithoutDocNum,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions(storeWithoutDocNum));
 
-      // Wait for component to load
       await nextTick();
       await nextTick();
 
-      // Branch: show_stream_stats_doc_num = false (line 64)
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some(el => el.text().includes('Documents'));
+      const hasDocCountElement = streamElements.some((el) =>
+        el.text().includes('Documents'),
+      );
       expect(hasDocCountElement).toBe(false);
     });
   });
@@ -201,31 +249,18 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     it('should apply light theme class when theme is light', async () => {
       const lightStore = createStore({
         state: {
-          theme: 'light', // Branch condition: !== 'dark'
+          theme: 'light',
           zoConfig: {
             show_stream_stats_doc_num: true,
           },
         },
       });
 
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: lightStore,
-            store: lightStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions(lightStore));
 
       await nextTick();
       await nextTick();
 
-      // Branch: theme !== 'dark' (line 114-117)
       const tableContainer = wrapper.find('.q-mt-lg');
       expect(tableContainer.classes()).toContain('light-theme-table');
     });
@@ -233,31 +268,18 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     it('should apply dark theme class when theme is dark', async () => {
       const darkStore = createStore({
         state: {
-          theme: 'dark', // Branch condition: === 'dark'
+          theme: 'dark',
           zoConfig: {
             show_stream_stats_doc_num: true,
           },
         },
       });
 
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: darkStore,
-            store: darkStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions(darkStore));
 
       await nextTick();
       await nextTick();
 
-      // Branch: theme === 'dark' (line 114-117)
       const tableContainer = wrapper.find('.q-mt-lg');
       expect(tableContainer.classes()).toContain('dark-theme-table');
     });
@@ -266,87 +288,37 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
   describe('Error Handling Branch Coverage', () => {
     it('should handle getSchemaData error and set loading to false', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      // Reset and mock getStream to reject for this test
+
       mockGetStream.mockReset();
       mockGetStream.mockRejectedValueOnce(new Error('API Error'));
 
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
-      // Wait for error to be handled
-      await nextTick();
-      await nextTick();
-      await nextTick(); // Give more time for async error handling
-
-      // Branch: catch block in getSchemaData (line 261-264)
       expect(consoleSpy).toHaveBeenCalled();
-      
-      // Loading should be false after error - spinner should not exist
       expect(wrapper.find('.q-spinner-hourglass').exists()).toBe(false);
 
       consoleSpy.mockRestore();
     });
 
     it('should test loading state transitions', async () => {
-      // Test both branches: loading and loaded states
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
-      
-      // After mounting and data loading, should show content (loading = false branch)
-      // Branch: loadingState = false (line 51)
+
       expect(wrapper.find('.indexDetailsContainer').exists()).toBe(true);
-      
-      // The loading state branch (line 45) is tested implicitly during component initialization
-      // where getSchemaData sets loadingState.value = true initially
       expect(wrapper.vm).toBeDefined();
     });
   });
 
   describe('Filter Functionality Branch Coverage', () => {
     it('should filter fields correctly when component is mounted', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
-      // Test the filter function directly (exposed in setup)
       const filterFn = (wrapper.vm as any).filterFieldFn;
       const rows = [
         { name: 'username', type: 'string' },
@@ -354,12 +326,10 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
         { name: 'age', type: 'number' },
       ];
 
-      // Branch: field name includes search term (line 269)
       const filteredResults = filterFn(rows, 'user');
       expect(filteredResults).toHaveLength(1);
       expect(filteredResults[0].name).toBe('username');
 
-      // Branch: no matches
       const noResults = filterFn(rows, 'xyz');
       expect(noResults).toHaveLength(0);
     });
@@ -367,69 +337,28 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('Cloud Environment Simulation', () => {
     it('should handle cloud vs non-cloud display logic', async () => {
-      // Test with isCloud = 'false'
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
-      // The component uses config.isCloud which is mocked as 'false'
-      // Branch: isCloud !== 'true' should show compressed size element
-      // We can at least test that the template renders without error
       expect(wrapper.find('.stream_details_container').exists()).toBe(true);
     });
   });
 
   describe('Search Field Input Coverage', () => {
     it('should render schema field search input', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
-      // data-test="schema-field-search-input" should exist after loading
       const searchInput = wrapper.find('[data-test="schema-field-search-input"]');
       expect(searchInput.exists()).toBe(true);
     });
 
     it('should update filterField when search input changes', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
@@ -444,47 +373,19 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('Result Total and Field Count Coverage', () => {
     it('should set resultTotal from schema length after data load', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const vm = wrapper.vm as any;
-      // mockSchemaData has 2 schema fields
       expect(vm.resultTotal).toBe(2);
     });
 
     it('should display all-fields count in the display-total-fields element', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
-      await nextTick();
-      await nextTick();
-
-      // display-total-fields element shows "All Fields (count)"
       const totalFields = wrapper.find('.display-total-fields');
       expect(totalFields.exists()).toBe(true);
       expect(totalFields.text()).toContain('2');
@@ -493,25 +394,12 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('Pagination Coverage', () => {
     it('should update pagination values in changePagination', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
       const vm = wrapper.vm as any;
-      // qTable ref is null by default in tests (optional chaining handles this)
       vm.changePagination({ label: '10', value: 10 });
 
       expect(vm.selectedPerPage).toBe(10);
@@ -519,19 +407,7 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
 
     it('should handle changePagination when qTable ref is null (optional chaining)', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
@@ -539,7 +415,6 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       const vm = wrapper.vm as any;
       vm.qTable = null;
 
-      // Should not throw due to optional chaining (qTable.value?.setPagination)
       expect(() => {
         vm.changePagination({ label: '20', value: 20 });
       }).not.toThrow();
@@ -548,19 +423,7 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
 
     it('should have correct perPageOptions', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
@@ -575,19 +438,7 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('filterFieldFn Comprehensive Coverage', () => {
     it('should return all rows when terms is empty string', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
@@ -597,25 +448,12 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
         { name: 'field_b', type: 'number' },
       ];
 
-      // Empty string - includes('') is always true
       const result = vm.filterFieldFn(rows, '');
       expect(result).toHaveLength(2);
     });
 
     it('should filter case-insensitively', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
@@ -631,19 +469,7 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
 
     it('should return empty array when no rows match', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
+      wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
@@ -657,22 +483,9 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
 
   describe('Schema Data Loading Coverage', () => {
     it('should set schemaData correctly after successful load', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       expect(vm.schemaData.name).toBe('test_stream');
@@ -680,44 +493,21 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
 
     it('should reset loadingState to false after successful load', async () => {
-      const wrapper = mount(EnrichmentSchema, {
-        props: defaultProps,
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       const vm = wrapper.vm as any;
       expect(vm.loadingState).toBe(false);
     });
 
     it('should call getStream with enrichment_tables type', async () => {
-      mount(EnrichmentSchema, {
-        props: { selectedEnrichmentTable: 'my_table' },
-        global: {
-          plugins: [Quasar, mockI18n],
-          provide: {
-            $store: mockStore,
-            store: mockStore,
-          },
-          stubs: {
-            'QTablePagination': true,
-          },
-        },
-      });
-
-      await nextTick();
-      await nextTick();
+      wrapper = mount(
+        EnrichmentSchema,
+        buildMountOptions(mockStore, { selectedEnrichmentTable: 'my_table', open: false }),
+      );
+      await wrapper.setProps({ open: true });
+      await flushPromises();
 
       expect(mockGetStream).toHaveBeenCalledWith('my_table', 'enrichment_tables', true);
     });

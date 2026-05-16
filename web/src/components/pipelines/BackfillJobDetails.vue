@@ -15,36 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="show"
-    position="right"
-    full-height
-    maximized
+  <ODrawer
+    v-model:open="show"
+    :width="40"
+    title="Backfill Job Details"
     data-test="backfill-job-details-dialog"
   >
-    <q-card class="tw-w-full" style="width: 700px">
-      <q-card-section class="q-pa-md">
-        <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">Backfill Job Details</div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            v-close-popup
-            data-test="close-dialog-btn"
-          >
-            <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-          </OButton>
-        </div>
-      </q-card-section>
 
-      <q-separator />
+    <div v-if="loading" class="flex justify-center q-pa-lg">
+      <OSpinner size="lg" />
+    </div>
 
-      <q-card-section class="q-pa-md" style="max-height: calc(100vh - 100px); overflow-y: auto">
-        <div v-if="loading" class="flex justify-center q-pa-lg">
-          <q-spinner color="primary" size="50px" />
-        </div>
-
-        <div v-else-if="job" class="tw-space-y-6">
+    <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
           <!-- Status and Actions -->
           <div class="flex items-center justify-between">
             <q-badge
@@ -92,12 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
               </div>
-              <q-linear-progress
+              <OProgressBar
                 :value="job.progress_percent / 100"
-                :color="getProgressColor(job.deletion_status)"
-                size="12px"
-                rounded
-                class="q-mb-md"
+                :variant="getProgressColor(job.deletion_status) === 'positive' ? 'default' : 'default'"
+                size="sm"
               />
 
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
@@ -154,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-subtitle1 tw-font-semibold">Error Details</div>
             <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
               <div class="flex items-start">
-                <q-icon name="error" color="negative" size="24px" class="q-mr-sm tw-mt-1" />
+                <OIcon name="error" size="md" class="q-mr-sm tw-mt-1" />
                 <div class="tw-flex-1">
                   <div class="text-caption text-grey-6 q-mb-xs">Error Message</div>
                   <div class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
@@ -219,13 +199,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-          <q-icon name="error_outline" size="64px" color="grey-5" />
-          <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+    <div v-else class="flex flex-column items-center justify-center q-pa-lg">
+      <OIcon name="error-outline" size="64px" />
+      <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
+    </div>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -233,10 +211,13 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 interface Props {
   modelValue: boolean;

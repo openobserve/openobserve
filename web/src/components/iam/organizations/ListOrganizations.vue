@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit;">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit;">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('organization.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
           
@@ -52,96 +52,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div class="tw:w-full tw:h-full">
       <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
-      <q-table
-      ref="qTable"
-      :rows="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :pagination="pagination"
-      :loading="loading"
-      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-      style="overflow-y: auto;"
-      :style="hasVisibleRows
-            ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' 
-            : ''"
-    >
-      <template #no-data><NoData /></template>
+      <OTable
+        :data="organizations"
+        :columns="columns"
+        row-key="identifier"
+        :global-filter="filterQuery"
+        pagination="client"
+        :page-size="20"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+      >
+        <template #empty>
+          <NoData />
+        </template>
 
-      <!-- <template #body-cell-actions="props">
-        <q-td :props="props">
-          <OButton
-            v-if="props.row.role == 'Admin'"
-            :title="t('organization.invite')"
-            variant="ghost"
-            size="icon-sm"
-            @click="redirectToInviteMember(props)"
-          >
-            <q-icon name="group" />
-          </OButton>
-        </q-td>
-      </template> -->
+        <template #bottom>
+          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+            {{ organizations.length }} {{ t('organization.header') }}
+          </span>
+        </template>
 
-
-      <template #bottom="scope">
-        <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-          <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-            {{ resultTotal }} {{ t('organization.header') }}
-          </div>
-            <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
-        </div>
-      </template>
-
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
+        <template #cell-actions="{ row }">
           <OButton
             data-test="organization-name-edit"
             variant="ghost"
             size="icon-circle-sm"
             :title="'Edit'"
-            @click="renameOrganization(props)"
+            @click="renameOrganization(row)"
           >
-            <q-icon name="edit" />
+            <OIcon name="edit" size="sm" />
           </OButton>
-        </q-td>
-      </template>
-    </q-table>
+        </template>
+      </OTable>
     </div>
     </div>
     </div>
       </div>
-    <q-dialog
-      v-model="showAddOrganizationDialog"
-      position="right"
-      full-height
-      maximized
-      @before-hide="hideAddOrgDialog"
-    >
-      <add-update-organization @updated="updateOrganizationList" :model-value="toBeUpdatedOrganization" @cancel:hideform="hideAddOrgDialog" />
-    </q-dialog>
-  </q-page>
+    <add-update-organization
+      :open="showAddOrganizationDialog"
+      @update:open="onDrawerOpenChange"
+      @updated="updateOrganizationList"
+      :model-value="toBeUpdatedOrganization"
+    />
+  </div>
 </template>
 
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onBeforeMount, onUpdated, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, onUpdated, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { useQuasar, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
 import JoinOrganization from "./JoinOrganization.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -150,10 +124,11 @@ export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
-    QTablePagination,
     NoData,
     OButton,
-  },
+    OIcon,
+    OTable,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -165,79 +140,64 @@ export default defineComponent({
     const showJoinOrganizationDialog = ref(false);
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
-    const qTable: any = ref(null);
     const filterQuery = ref("");
     const toBeUpdatedOrganization = ref({
       id: "",
       name: "",
       identifier: "",
     });
-    const columns = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px;",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 36,
+        minSize: 32,
+        maxSize: 40,
+        meta: { align: "left", compactPadding: true },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("organization.name"),
-        align: "left",
+        id: "name",
+        header: t("organization.name"),
+        accessorKey: "name",
         sortable: true,
+        meta: { align: "left", autoWidth: true },
       },
       {
-        name: "identifier",
-        field: "identifier",
-        label: t("organization.identifier"),
-        align: "left",
+        id: "identifier",
+        header: t("organization.identifier"),
+        accessorKey: "identifier",
         sortable: true,
-        
+        meta: { align: "left" },
       },
       {
-        name: "type",
-        field: "type",
-        label: t("organization.type"),
-        align: "left",
+        id: "type",
+        header: t("organization.type"),
+        accessorKey: "type",
         sortable: true,
-        style: "width: 150px;",
+        size: 150,
+        meta: { align: "left" },
       },
-    ]);
+    ];
 
     if (config.isCloud == "true") {
-      columns.value.push({
-        name: "plan",
-        field: "plan",
-        label: t("organization.subscription_plan"),
-        align: "center",
+      columns.push({
+        id: "plan",
+        header: t("organization.subscription_plan"),
+        accessorKey: "plan",
         sortable: true,
+        meta: { align: "left" },
       });
     }
-      columns.value.push(
-        {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-        style: "width: 67px;",
-      }
-    )
-
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-    const resultTotal = ref<number>(0);
-    // const maxRecordToReturn = ref<number>(500);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
+    columns.push({
+      id: "actions",
+      header: t("user.actions"),
+      isAction: true,
+      pinned: "right",
+      size: 80,
+      minSize: 64,
+      maxSize: 100,
+      meta: { align: "left" },
     });
 
     watch(
@@ -302,12 +262,6 @@ export default defineComponent({
       }
     });
 
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-
     const getOrganizations = () => {
       const dismiss = $q.notify({
         spinner: true,
@@ -317,7 +271,6 @@ export default defineComponent({
         // Updating store so that organizations in navbar also gets updated
         store.dispatch("setOrganizations", res.data.data);
 
-        resultTotal.value = res.data.data.length;
         let counter = 1;
         const billingPlans = {
           "0": "Free",
@@ -393,6 +346,7 @@ export default defineComponent({
         name: "",
         identifier: "",
       };
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "add",
@@ -419,6 +373,11 @@ export default defineComponent({
       });
     };
 
+    const onDrawerOpenChange = (val: boolean) => {
+      showAddOrganizationDialog.value = val;
+      if (!val) hideAddOrgDialog();
+    };
+
     const inviteTeam = (props: any) => {
       organization.value = {
         id: props.row.id,
@@ -437,29 +396,13 @@ export default defineComponent({
       });
     };
 
-    const filterData = (rows: string | any[], terms: string) => {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms.trim()) || rows[i]["identifier"].toLowerCase().includes(terms.trim())) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
+    const renameOrganization = (row: any) => {
+      toBeUpdatedOrganization.value = {
+        id: row.identifier,
+        name: row.name,
+        identifier: row.identifier,
       };
-
-    const visibleRows = computed(() => {
-      if (!filterQuery.value) return organizations.value || []
-      return filterData(organizations.value || [], filterQuery.value)
-    });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
-
-    const renameOrganization = (props: any) => {
+      showAddOrganizationDialog.value = true;
       router.push({
         query: {
           action: "update",
@@ -467,20 +410,13 @@ export default defineComponent({
           to_be_updated_org_id: props.row.identifier,
           to_be_updated_org_name: props.row.name,
         },
-      })
-      toBeUpdatedOrganization.value = {
-        id: props.row.identifier,
-        name: props.row.name,
-        identifier: props.row.identifier,
-      };
-
+      });
     };
 
     return {
       t,
       store,
       router,
-      qTable,
       config,
       loading: ref(false),
       organizations,
@@ -493,17 +429,9 @@ export default defineComponent({
       addOrganization,
       getOrganizations,
       inviteTeam,
-      pagination,
-      resultTotal,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
       filterQuery,
-      filterData,
       hideAddOrgDialog,
-      visibleRows,
-      hasVisibleRows,
-
+      onDrawerOpenChange,
       renameOrganization,
       toBeUpdatedOrganization,
     };

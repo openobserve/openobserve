@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,45 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Dialog Mode -->
-  <q-dialog
+  <ODrawer data-test="telemetry-correlation-dashboard-drawer"
     v-if="props.mode === 'dialog'"
-    v-model="isOpen"
-    position="right"
-    full-height
-    maximized
-    transition-show="slide-left"
-    transition-hide="slide-right"
-    @hide="onClose"
+    v-model:open="isOpen"
+    side="right"
+    :width="90"
+    :title="`Correlated Streams - ${serviceName}`"
+    :sub-title="formatTimeRange(timeRange)"
+    @update:open="(v) => !v && onClose()"
   >
-    <q-card class="correlation-dashboard-card">
-      <!-- Header -->
-      <q-card-section
-        v-if="!isEmbeddedTabs"
-        class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-      >
-        <div class="tw:flex tw:items-center tw:gap-3">
-          <q-icon name="link" size="md" color="primary" />
-          <div class="tw:flex tw:flex-col tw:gap-0">
-            <span class="tw:text-lg tw:font-semibold">
-              Correlated Streams - {{ serviceName }}
-            </span>
-            <span class="tw:text-xs tw:opacity-70">
-              {{ formatTimeRange(timeRange) }}
-            </span>
-          </div>
-        </div>
-
-        <div class="tw:flex tw:items-center tw:gap-3">
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            @click="isOpen = false"
-            data-test="correlation-dashboard-close"
-          >
-            <X :size="14" />
-          </OButton>
-        </div>
-      </q-card-section>
+    <template #header-left>
+      <OIcon name="link" size="md" />
+    </template>
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
       <div
@@ -143,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="loadDashboard"
               :loading="loading"
             >
-              <RefreshCw :size="14" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="tw:mr-1" />
               {{ t('common.refresh') }}
             </OButton>
           </div>
@@ -153,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="loading"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <div class="tw:text-sm tw:opacity-70">
               {{ t("correlation.loadingLogs") }}
             </div>
@@ -191,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="splitterModel"
             class="tw:flex-1 full-height full-width"
           >
-            <!-- ── Left sidebar ── -->
+            <!-- -- Left sidebar -- -->
             <template #before>
               <div
                 class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
@@ -208,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                   >
                     <template #prepend>
-                      <q-icon name="search" size="xs" />
+                      <OIcon name="search" size="xs" />
                     </template>
                   </q-input>
                 </div>
@@ -234,16 +207,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div class="metric-group-label">
-                            <q-icon
+                            <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
-                                  ? 'chevron_right'
-                                  : 'expand_more'
+                                  ? 'chevron-right'
+                                  : 'expand-more'
                               "
                               size="0.875rem"
                               class="tw:mr-0.5"
                             />
-                            <q-icon
+                            <OIcon
                               v-if="typeof group.icon === 'string'"
                               :name="group.icon"
                               size="0.875rem"
@@ -325,12 +298,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <!-- ── Separator ── -->
+            <!-- -- Separator -- -->
             <template #separator>
               <div class="metric-splitter-separator" />
             </template>
 
-            <!-- ── Right area: group tabs + dashboard ── -->
+            <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
               <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
                 <!-- Group tabs -->
@@ -376,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="loading"
                     class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
                   >
-                    <q-spinner color="primary" size="md" />
+                    <OSpinner size="sm" />
                     <div class="tw:text-sm tw:opacity-70">
                       {{
                         t("correlation.loadingMetrics", {
@@ -402,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm-action"
                       @click="loadDashboard"
                     >
-                      <RefreshCw :size="14" class="tw:mr-1" />
+                      <OIcon name="refresh" size="xs" class="tw:mr-1" />
                       {{ t('correlation.retryButton') }}
                     </OButton>
                   </div>
@@ -446,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="tracesLoading"
             class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <div class="tw:text-sm tw:opacity-70">
               {{ t("correlation.loadingTraces") }}
             </div>
@@ -468,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm-action"
               @click="loadCorrelatedTraces"
             >
-              <RefreshCw :size="14" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="tw:mr-1" />
               {{ t('correlation.retryButton') }}
             </OButton>
           </div>
@@ -518,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="hub" color="primary" size="1.25rem" />
+                <OIcon name="hub" size="1.25rem" />
                 <div class="tw:flex tw:flex-col">
                   <span class="tw:text-sm tw:font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
@@ -535,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="correlation-view-traces-page"
                     class="tw:text-xs"
                   >
-                    <ExternalLink :size="12" class="tw:mr-1" />
+                    <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
                     {{ t('correlation.viewInTraces') }}
                     <q-tooltip>
                       {{ t("correlation.viewInTraces") }}
@@ -590,8 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
       </div>
-    </q-card>
-  </q-dialog>
+  </ODrawer>
 
   <!-- Embedded Tabs Mode -->
   <div v-else class="correlation-dashboard-embedded">
@@ -630,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="loadDashboard"
               :loading="loading"
             >
-              <RefreshCw :size="14" class="tw:mr-1" />
+              <OIcon name="refresh" size="xs" class="tw:mr-1" />
               {{ t('common.refresh') }}
             </OButton>
           </div>
@@ -641,7 +613,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3"
           style="flex: 1; min-height: 300px"
         >
-          <q-spinner color="primary" size="md" />
+          <OSpinner size="sm" />
           <div class="tw:text-sm tw:opacity-70">
             {{ t("correlation.loadingLogs") }}
           </div>
@@ -681,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="splitterModel"
           class="tw:flex-1 full-height full-width"
         >
-          <!-- ── Left sidebar ── -->
+          <!-- -- Left sidebar -- -->
           <template #before>
             <div
               class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
@@ -698,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" size="xs" />
+                    <OIcon name="search" size="xs" />
                   </template>
                 </q-input>
               </div>
@@ -724,11 +696,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div class="metric-group-label">
-                          <q-icon
+                          <OIcon
                             :name="
                               collapsedGroups.has(group.id)
-                                ? 'chevron_right'
-                                : 'expand_more'
+                                ? 'chevron-right'
+                                : 'expand-more'
                             "
                             size="0.875rem"
                             class="tw:mr-0.5"
@@ -738,7 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :is="group.icon"
                             class=""
                           />
-                          <q-icon
+                          <OIcon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
                             size="0.875rem"
@@ -820,12 +792,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <!-- ── Separator ── -->
+          <!-- -- Separator -- -->
           <template #separator>
             <div class="metric-splitter-separator" />
           </template>
 
-          <!-- ── Right area: group tabs + dashboard ── -->
+          <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
             <div class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
               <!-- Group tabs -->
@@ -849,7 +821,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="typeof group.icon !== 'string'"
                       :is="group.icon"
                     />
-                    <q-icon
+                    <OIcon
                       v-if="typeof group.icon === 'string'"
                       :name="group.icon"
                       size="xs"
@@ -877,7 +849,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="loading"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20 tw:gap-3"
                 >
-                  <q-spinner color="primary" size="md" />
+                  <OSpinner size="sm" />
                   <div class="tw:text-sm tw:opacity-70">
                     {{
                       t("correlation.loadingMetrics", {
@@ -903,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     @click="loadDashboard"
                   >
-                    <RefreshCw :size="14" class="tw:mr-1" />
+                    <OIcon name="refresh" size="xs" class="tw:mr-1" />
                     {{ t('correlation.retryButton') }}
                   </OButton>
                 </div>
@@ -941,7 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="tracesLoading"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
+          <OSpinner size="xl" class="tw:mb-4" />
           <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
@@ -950,10 +922,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="tracesError"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="error_outline"
+          <OIcon
+            name="error-outline"
             size="3.75rem"
-            color="negative"
             class="tw:mb-4"
           />
           <div class="tw:text-base tw:mb-2">
@@ -966,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mt-4"
             @click="loadCorrelatedTraces"
           >
-            <RefreshCw :size="14" class="tw:mr-1" />
+            <OIcon name="refresh" size="xs" class="tw:mr-1" />
             {{ t('correlation.retryButton') }}
           </OButton>
         </div>
@@ -1014,7 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="hub" color="primary" size="1.25rem" />
+              <OIcon name="hub" size="1.25rem" />
               <div class="tw:flex tw:flex-col">
                 <span class="tw:text-sm tw:font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
@@ -1034,7 +1005,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="correlation-view-traces-page"
                   class="tw:text-xs"
                 >
-                  <ExternalLink :size="12" class="tw:mr-1" />
+                  <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
                   {{ t('correlation.viewInTraces') }}
                   <q-tooltip>
                     {{ t("correlation.viewInTraces") }}
@@ -1061,10 +1032,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="traceCorrelationMode !== null"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="search_off"
+          <OIcon
+            name="search-off"
             size="3.75rem"
-            color="grey-6"
             class="tw:mb-4"
           />
           <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
@@ -1078,10 +1048,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="account_tree"
+          <OIcon
+            name="account-tree"
             size="3.75rem"
-            color="grey-6"
             class="tw:mb-4"
           />
           <div class="tw:text-base">
@@ -1096,120 +1065,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Metric Stream Selector Dialog -->
-  <q-dialog v-model="showMetricSelector">
-    <q-card class="metric-selector-dialog">
-      <q-card-section class="tw:p-4 tw:border-b">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
-          <div class="tw:text-base tw:font-semibold">
-            {{ t("correlation.selectMetrics") }}
-          </div>
-          <OButton variant="ghost" size="icon-sm" v-close-popup>
-            <X :size="14" />
-          </OButton>
-        </div>
+  <ODialog data-test="telemetry-correlation-dashboard-metric-selector-dialog" v-model:open="showMetricSelector" size="md" :title="t('correlation.selectMetrics')">
+    <!-- Search Input -->
+    <q-input
+      v-model="metricSearchText"
+      dense
+      outlined
+      :placeholder="t('search.searchField')"
+      clearable
+      class="tw:w-full tw:mb-3"
+    >
+      <template #prepend>
+        <OIcon name="search" size="sm" />
+      </template>
+    </q-input>
 
-        <!-- Search Input -->
-        <q-input
-          v-model="metricSearchText"
-          dense
-          outlined
-          :placeholder="t('search.searchField')"
-          clearable
-          class="tw:w-full"
-        >
-          <template #prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-      </q-card-section>
-
-      <q-card-section class="tw:p-0 metric-list-container">
+    <div class="metric-list-container">
+      <template
+        v-if="
+          groupedFilteredMetricStreams.groups.some(
+            (g) => g.streams.length > 0,
+          )
+        "
+      >
         <template
-          v-if="
-            groupedFilteredMetricStreams.groups.some(
-              (g) => g.streams.length > 0,
-            )
-          "
+          v-for="group in groupedFilteredMetricStreams.groups"
+          :key="group.id"
         >
-          <template
-            v-for="group in groupedFilteredMetricStreams.groups"
-            :key="group.id"
-          >
-            <!-- Group section — hidden when no streams match -->
-            <template v-if="group.streams.length > 0">
-              <!-- Group header -->
-              <div class="metric-group-header">
-                <div class="metric-group-label">
-                  <q-icon
-                    v-if="typeof group.icon === 'string'"
-                    :name="group.icon"
-                    size="0.875rem"
-                  />
-                  <span>{{ group.label }}</span>
-                  <q-badge
-                    color="grey-6"
-                    text-color="white"
-                    :label="group.streams.length"
-                    class="tw:ml-1"
-                  />
-                </div>
-                <div class="metric-group-actions">
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs"
-                    @click="selectAllInGroup(group.id)"
-                    :disabled="getGroupSelectionState(group.id) === 'all'"
-                  >
-                    All
-                  </OButton>
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs"
-                    @click="deselectAllInGroup(group.id)"
-                    :disabled="getGroupSelectionState(group.id) === 'none'"
-                  >
-                    None
-                  </OButton>
-                </div>
+          <!-- Group section — hidden when no streams match -->
+          <template v-if="group.streams.length > 0">
+            <!-- Group header -->
+            <div class="metric-group-header">
+              <div class="metric-group-label">
+                <OIcon
+                  v-if="typeof group.icon === 'string'"
+                  :name="group.icon"
+                  size="0.875rem"
+                />
+                <span>{{ group.label }}</span>
+                <q-badge
+                  color="grey-6"
+                  text-color="white"
+                  :label="group.streams.length"
+                  class="tw:ml-1"
+                />
               </div>
+              <div class="metric-group-actions">
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  @click="selectAllInGroup(group.id)"
+                  :disabled="getGroupSelectionState(group.id) === 'all'"
+                >
+                  All
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  @click="deselectAllInGroup(group.id)"
+                  :disabled="getGroupSelectionState(group.id) === 'none'"
+                >
+                  None
+                </OButton>
+              </div>
+            </div>
 
-              <!-- Metric items -->
-              <q-item
-                v-for="stream in group.streams"
-                :key="stream.stream_name"
-                dense
-                class="metric-list-item"
-              >
-                <q-item-section side>
-                  <q-checkbox
-                    :model-value="
-                      selectedMetricStreams.some(
-                        (s) => s.stream_name === stream.stream_name,
-                      )
-                    "
-                    @update:model-value="toggleMetricStream(stream)"
-                    color="primary"
-                    size="xs"
-                    dense
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="metric-label">{{
-                    stream.stream_name
-                  }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
+            <!-- Metric items -->
+            <q-item
+              v-for="stream in group.streams"
+              :key="stream.stream_name"
+              dense
+              class="metric-list-item"
+            >
+              <q-item-section side>
+                <q-checkbox
+                  :model-value="
+                    selectedMetricStreams.some(
+                      (s) => s.stream_name === stream.stream_name,
+                    )
+                  "
+                  @update:model-value="toggleMetricStream(stream)"
+                  color="primary"
+                  size="xs"
+                  dense
+                />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="metric-label">{{ stream.stream_name }}</q-item-label>
+              </q-item-section>
+            </q-item>
           </template>
         </template>
+      </template>
 
-        <!-- No results message -->
-        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
-          {{ t("search.noResult") }}
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      <!-- No results message -->
+      <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+        {{ t("search.noResult") }}
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
@@ -1256,7 +1210,11 @@ import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1611,7 +1569,7 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(sortedMetricStreams.value);
 });
 
-// Selected metric streams — prefer curated defaults from group definitions,
+// Selected metric streams � prefer curated defaults from group definitions,
 // fall back to first 6 unique streams for non-OTel deployments.
 // Apply SELECT_ALL_VALUE defaults for unstable dimensions.
 const selectedMetricStreams = ref<StreamInfo[]>(
@@ -1645,7 +1603,7 @@ const groupedFilteredMetricStreams = computed(() =>
   groupMetricsByCategory(filteredMetricStreams.value, groupDefs.value),
 );
 
-// Group ALL available unique metric streams — drives which tabs are visible
+// Group ALL available unique metric streams � drives which tabs are visible
 const groupedUniqueMetricStreams = computed(() =>
   groupMetricsByCategory(uniqueMetricStreams.value, groupDefs.value),
 );
@@ -1680,7 +1638,7 @@ const nonEmptyGroupTabs = computed(() =>
 /**
  * (Re)generate per-group dashboards from the currently selected streams.
  * Sidebar checkboxes control which metrics are selected and thus shown per group.
- * Pure computation — no API calls. Schemas are already cached in the store.
+ * Pure computation � no API calls. Schemas are already cached in the store.
  */
 const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   const grouped = groupMetricsByCategory(

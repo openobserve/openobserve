@@ -63,13 +63,15 @@ export class ServicesCatalogPage {
   async waitForLoad() {
     // Wait for loading spinner to disappear
     await this.page.locator(this.loading)
-      .waitFor({ state: 'hidden', timeout: 10000 })
+      .waitFor({ state: 'hidden', timeout: 15000 })
       .catch(() => {});
-    // Wait for either table or empty state
+    // Wait for the data to be ready: either at least one row rendered, or the empty state.
+    // The table data-test renders even while loading with 0 rows — waiting on it alone races the data.
     await Promise.race([
-      this.page.locator(this.table).waitFor({ state: 'visible', timeout: 10000 }),
-      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 10000 }),
-    ]);
+      this.page.locator('[data-test^="services-catalog-service-link-"]').first()
+        .waitFor({ state: 'attached', timeout: 30000 }),
+      this.page.locator(this.emptyState).waitFor({ state: 'visible', timeout: 30000 }),
+    ]).catch(() => {});
   }
 
   // ===== TOOLBAR =====
@@ -172,7 +174,11 @@ export class ServicesCatalogPage {
   }
 
   async isStatusPillVisible() {
-    return await this.page.locator(this.statusPill).isVisible().catch(() => false);
+    // Wait briefly for the pill to appear — it renders once services are loaded
+    return await this.page.locator(this.statusPill)
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   async isCriticalPillVisible() {
@@ -341,7 +347,7 @@ export class ServicesCatalogPage {
   async getSortIcon(columnKey) {
     const th = this.page.locator(`[data-test="o2-table-th-${columnKey}"]`);
     // Use :visible + .first() to get only the visible sort icon (avoid hidden duplicates)
-    const icon = th.locator('.material-icons:visible, .q-icon:visible').first();
+    const icon = th.locator('.material-icons:visible, .OIcon:visible').first();
     const text = await icon.textContent();
     return text;
   }
@@ -368,7 +374,11 @@ export class ServicesCatalogPage {
   // ===== EMPTY STATE =====
 
   async isTableVisible() {
-    return await this.page.locator(this.table).isVisible().catch(() => false);
+    // Wait briefly for the table to settle — after filter changes the DOM may flicker
+    return await this.page.locator(this.table)
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   async isEmptyStateVisible() {

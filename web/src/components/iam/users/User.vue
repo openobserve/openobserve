@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none">
+  <div class="tw:rounded-md q-pa-none">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
@@ -29,17 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.basicUsers") }}
         </div>
         <div class="full-width tw:flex tw:justify-end tw:gap-3">
-          <q-input
+          <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('user.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           <div class="col-6" v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
@@ -62,241 +60,151 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:w-full">
       <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
-        <q-table
-          ref="qTable"
-          :rows="visibleRows"
+        <OTable
+          :key="tableKey"
+          :data="rows"
           :columns="columns"
           row-key="email"
+          :selected-ids="selectedUserIds"
+          :global-filter="filterQuery"
+          pagination="client"
+          :page-size="20"
+          sorting="client"
           selection="multiple"
-          v-model:selected="selectedUsers"
-          :pagination="pagination"
-          :filter="filterQuery"
-          :style="hasVisibleRows ? 'height: calc(100vh - var(--navbar-height) - 92px); overflow-y: auto;' : ''"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <template #no-data>
-            <NoData></NoData>
+          <template #empty>
+            <NoData />
           </template>
-          <template v-slot:body-selection="scope">
-            <q-td auto-width>
-              <q-checkbox
-                v-model="scope.selected"
-                size="sm"
-                class="o2-table-checkbox"
-                :disable="!scope.row.enableDelete"
-              />
-            </q-td>
+          <template #cell-actions="{ row }">
+            <OButton
+              v-if="row.enableDelete && row.status != 'pending'"
+              :title="t('user.delete')"
+              variant="ghost"
+              size="icon-circle-sm"
+              :data-test="`delete-basic-user-${row.email}`"
+              @click="confirmDeleteAction(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+            <OButton
+              v-if="row.status == 'pending' && row.token"
+              :title="t('user.revoke_invite')"
+              variant="ghost"
+              size="icon-circle-sm"
+              :data-test="`revoke-invite-${row.email}`"
+              @click="confirmRevokeAction(row)"
+            >
+              <OIcon name="cancel" size="sm" />
+            </OButton>
+            <OButton
+              v-if="row.enableEdit && row.status != 'pending' && config.isCloud == 'false'"
+              :title="t('user.update')"
+              variant="ghost"
+              size="icon-circle-sm"
+              :data-test="`edit-basic-user-${row.email}`"
+              @click="addRoutePush(row)"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
           </template>
-          <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-               <q-th v-if="columns.length > 0" auto-width>
-                
-                <q-checkbox
-                  v-model="headerCheckboxValue"
-                  size="sm"
-                  toggle-indeterminate
-                  :disable="selectableRows.length === 0"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-table-checkbox-dark'
-                      : 'o2-table-checkbox-light'
-                  "
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-
-              <q-th v-for="col in props.cols"
-              :class="col.classes"
-              :style="col.style"
-              :key="col.name" :props="props">
-                <span>{{ col.label }}</span>
-              </q-th>
-            </q-tr>
+          <template
+            v-if="selectedUsers.length > 0"
+            #bottom
+          >
+            <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+              {{ selectedUsers.length }} selected
+            </span>
+            <OButton
+              data-test="users-list-delete-users-btn"
+              variant="outline"
+              size="sm"
+              icon-left="delete"
+              @click="openBulkDeleteDialog"
+            >
+              Delete
+            </OButton>
           </template>
-          <template #body-cell-actions="props">
-            <q-td :props="props" side>
-              <OButton
-                v-if="props.row.enableDelete && props.row.status != 'pending'"
-                :title="t('user.delete')"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="confirmDeleteAction(props)"
-                :data-test="`delete-basic-user-${props.row.email}`"
-              >
-                <q-icon :name="outlinedDelete" />
-              </OButton>
-              <OButton
-                v-if="props.row.status == 'pending' && props.row.token"
-                :title="t('user.revoke_invite')"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="confirmRevokeAction(props)"
-                :data-test="`revoke-invite-${props.row.email}`"
-              >
-                <q-icon name="cancel" />
-              </OButton>
-              <OButton
-                v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
-                :title="t('user.update')"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="addRoutePush(props)"
-                :data-test="`edit-basic-user-${props.row.email}`"
-              >
-                <q-icon name="edit" />
-              </OButton>
-            </q-td>
-          </template>
-          <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-              <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                {{ resultTotal }}
-                {{
-                  resultTotal === 1
-                    ? t("user.header")
-                    : t("user.header") + "s"
-                }}
-              </div>
-              <OButton
-                v-if="selectedUsers.length > 0"
-                data-test="users-list-delete-users-btn"
-                variant="outline"
-                size="sm"
-                class="tw:mr-2"
-                @click="openBulkDeleteDialog"
-              >
-                <template #icon-left><q-icon name="delete" /></template>
-                Delete
-              </OButton>
-              <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
-            </div>
-
-          </template>
-        </q-table>
+        </OTable>
         </div>
     </div>
     </div>
 
-    <q-dialog
+    <update-user-role
       v-if="config.isCloud == 'false'"
-      v-model="showUpdateUserDialog"
-      position="right"
-      full-height
-      maximized
+      v-model:open="showUpdateUserDialog"
+      v-model="selectedUser"
+      @updated="updateMember"
+    />
+
+    <add-user
+      v-model:open="showAddUserDialog"
+      v-if="config.isCloud == 'false'"
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      :userRole="currentUserRole"
+      :roles="options"
+      :customRoles="customRoles"
+      @updated="addMember"
+    />
+
+    <ODialog data-test="user-delete-dialog"
+      v-model:open="confirmDelete"
+      size="xs"
+      :title="t('user.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
     >
-      <update-user-role v-model="selectedUser" @updated="updateMember" />
-    </q-dialog>
+      <p>{{ t('user.confirmDeleteMsg') }}</p>
+    </ODialog>
 
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
+    <ODialog data-test="user-revoke-dialog"
+      v-model:open="confirmRevoke"
+      size="xs"
+      title="Revoke Invitation"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRevoke = false"
+      @click:primary="revokeInvite"
     >
-      <add-user
-        v-if="config.isCloud == 'false'"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        :userRole="currentUserRole"
-        :roles="options"
-        :customRoles="customRoles"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </q-dialog>
+      <p>Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</p>
+    </ODialog>
 
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("user.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("user.confirmDeleteMsg") }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="deleteUser"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmRevoke">
-      <q-card style="width: 400px">
-        <q-card-section class="confirmBody">
-          <div class="head">Revoke Invitation</div>
-          <div class="para">Are you sure you want to revoke the invitation for {{ revokeInviteEmail }}?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="revokeInvite"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Users</div>
-          <div class="para">Are you sure you want to delete {{ selectedUsers.length }} user(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="bulkDeleteUsers"
-          >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-page>
+    <ODialog data-test="user-bulk-delete-dialog"
+      v-model:open="confirmBulkDelete"
+      size="xs"
+      title="Delete Users"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteUsers"
+    >
+      <p>Are you sure you want to delete {{ selectedUsers.length }} user(s)?</p>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
 
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps, date } from "quasar";
+import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import usersService from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
@@ -305,36 +213,37 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed, nextTick } from "vue";
+import { computed } from "vue";
 import { getRoles } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
-    QTablePagination,
+    OTable,
     UpdateUserRole,
-    NoData,
     AddUser,
     MemberInvitation,
     OButton,
+    OIcon,
+    ODialog,
+    OInput,
+    NoData,
   },
   emits: [
     "updated:fields",
     "deleted:fields",
     "updated:dates",
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
   ],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-    const resultTotal = ref<number>(0);
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -342,7 +251,6 @@ export default defineComponent({
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
     const isUpdated: any = ref(false);
-    const qTable: any = ref(null);
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
@@ -353,6 +261,8 @@ export default defineComponent({
     };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
+    const rows = ref<any[]>([]);
+    const tableKey = ref(0);
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
@@ -394,56 +304,71 @@ export default defineComponent({
       // }
 
       updateUserActions();
+
+      // Handle deep-linked / refreshed URL
+      const query = router.currentRoute.value.query;
+      if (query.action === "add") {
+        addUser({}, false);
+      } else if (query.action === "update" && query.email) {
+        const match = usersState.users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
     });
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
+        id: "#",
+        header: "#",
+        accessorFn: (row: any) => row["#"],
+        size: 40,
+        minSize: 32,
+        maxSize: 50,
+        meta: { compactPadding: true, align: "left" },
       },
       {
-        name: "email",
-        field: "email",
-        label: t("user.email"),
-        align: "left",
+        id: "email",
+        header: t("user.email"),
+        accessorKey: "email",
         sortable: true,
+        meta: { align: "left", autoWidth: true },
       },
       {
-        name: "first_name",
-        field: "first_name",
-        label: t("user.firstName"),
-        align: "left",
+        id: "first_name",
+        header: t("user.firstName"),
+        accessorKey: "first_name",
         sortable: true,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "last_name",
-        field: "last_name",
-        label: t("user.lastName"),
-        align: "left",
+        id: "last_name",
+        header: t("user.lastName"),
+        accessorKey: "last_name",
         sortable: true,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "role",
-        field: "role",
-        label: t("user.role"),
-        align: "left",
+        id: "role",
+        header: t("user.role"),
+        accessorKey: "role",
         sortable: true,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        classes: 'actions-column',
-        style: "width: 100px"
+        id: "actions",
+        header: t("user.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 120,
+        minSize: 80,
+        maxSize: 140,
+        meta: { align: "left" },
       },
-    ]);
+    ];
     const userEmail: any = ref("");
     const options = ref([]);
     const customRoles = ref([]);
@@ -508,12 +433,10 @@ export default defineComponent({
         usersService
           .orgUsers(store.state.selectedOrganization.identifier)
           .then(async (res) => {
-            resultTotal.value = res.data.data.length;
             let users = [...res.data.data];
 
             if (config.isCloud == "true") {
               const invitedMembers: any = await getInvitedMembers();
-              resultTotal.value += invitedMembers.length;
               users = [...res.data.data, ...invitedMembers];
             }
             
@@ -542,39 +465,23 @@ export default defineComponent({
                 token: data?.token || null,
               };
             });
-
+            rows.value = usersState.users;
+            tableKey.value++;
             dismiss();
 
             resolve(true);
           })
-          .catch(() => {
+          .catch((err: any) => {
+            console.error("Failed to fetch org members:", err);
             dismiss();
+            $q.notify({
+              type: "negative",
+              message: "Failed to load users: " + (err?.response?.data?.message || err?.message || "Unknown error"),
+              timeout: 5000,
+            });
             reject(false);
           });
       });
-    };
-
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-    const maxRecordToReturn = ref<number>(500);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
 
     // const showAddUserBtn = computed(() => {
@@ -675,10 +582,6 @@ export default defineComponent({
       }
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
-
     const updateUser = (props: any) => {
       selectedUser.value = props.row;
       showUpdateUserDialog.value = true;
@@ -706,22 +609,17 @@ export default defineComponent({
       }, 100);
     };
 
-    const addRoutePush = (props: any) => {
-      if (props.row != undefined) {
+    const addRoutePush = (row: any) => {
+      if (row?.email) {
         router.push({
           name: "users",
           query: {
             action: "update",
             org_identifier: store.state.selectedOrganization.identifier,
-            email: props.row.email,
+            email: row.email,
           },
         });
-        addUser(
-          {
-            row: props.row,
-          },
-          true,
-        );
+        addUser({ row }, true);
       } else {
         addUser({}, false);
         router.push({
@@ -762,6 +660,7 @@ export default defineComponent({
           return user;
         });
         usersState.users = updatedUsers;
+        rows.value = usersState.users;
       });
     };
     const fetchUserRoles = (userEmail: any) => {
@@ -779,6 +678,7 @@ export default defineComponent({
           return user;
         });
         usersState.users = updatedUsers;
+        rows.value = usersState.users;
       });
     };
 
@@ -870,12 +770,13 @@ export default defineComponent({
       });
     };
 
-    const confirmDeleteAction = (props: any) => {
+    const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;
-      deleteUserEmail = props.row.email;
+      deleteUserEmail = row.email;
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       usersService
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
@@ -898,13 +799,14 @@ export default defineComponent({
         });
     };
 
-    const confirmRevokeAction = (props: any) => {
+    const confirmRevokeAction = (row: any) => {
       confirmRevoke.value = true;
-      revokeInviteToken = props.row.token;
-      revokeInviteEmail.value = props.row.email;
+      revokeInviteToken = row.token;
+      revokeInviteEmail.value = row.email;
     };
 
     const revokeInvite = async () => {
+      confirmRevoke.value = false;
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",
@@ -1042,62 +944,22 @@ export default defineComponent({
       });
     };
 
-    const filterData = (rows: any, terms: any) => {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
-            rows[i]["role"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      };
-
-      const visibleRows = computed(() => {
-      if (!filterQuery.value) return usersState.users || []
-      return filterData(usersState.users || [], filterQuery.value)
-    });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-    const selectableRows = computed(() =>
-      visibleRows.value.filter((row: any) => row.enableDelete)
+    const selectedUserIds = computed(() =>
+      selectedUsers.value.map((u: any) => u.email),
     );
 
-    const headerCheckboxValue = computed({
-      get() {
-        if (selectableRows.value.length === 0) return false;
-        const selectedCount = selectableRows.value.filter((row: any) =>
-          selectedUsers.value.some((u: any) => u.email === row.email)
-        ).length;
-        if (selectedCount === 0) return false;
-        if (selectedCount === selectableRows.value.length) return true;
-        return null; // indeterminate: some but not all selectable rows selected
-      },
-      set(val: boolean | null) {
-        if (val) {
-          selectedUsers.value = [...selectableRows.value];
-        } else {
-          selectedUsers.value = [];
-        }
-      },
-    });
-
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const usersMap = new Map(
+        usersState.users
+          .filter((u: any) => u.enableDelete)
+          .map((u: any) => [u.email, u]),
+      );
+      selectedUsers.value = ids.map((id) => usersMap.get(id)).filter(Boolean);
+    };
 
     // Watch selectedUsers to filter out disabled rows
     watch(selectedUsers, (newSelectedUsers) => {
-      // Filter out any disabled rows (those with enableDelete = false)
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
-
-      // If any disabled rows were selected, update to only include enabled ones
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
         selectedUsers.value = onlyEnabledSelected;
       }
@@ -1105,7 +967,6 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       router,
       store,
       config,
@@ -1129,21 +990,12 @@ export default defineComponent({
       hideForm,
       isUpdated,
       showAddUserDialog,
-      pagination,
-      resultTotal,
       selectedUser,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
-      maxRecordToReturn,
       showUpdateUserDialog,
-      changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       fetchUserGroups,
       toggleExpand,
       forceCloseRow,
-      filterData,
       userEmail,
       selectedRole,
       options,
@@ -1162,14 +1014,14 @@ export default defineComponent({
       shouldAllowChangeRole,
       shouldAllowDelete,
       fetchUserRoles,
-      visibleRows,
-      hasVisibleRows,
-      selectableRows,
-      headerCheckboxValue,
       selectedUsers,
+      selectedUserIds,
+      handleSelectedIdsUpdate,
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteUsers,
+      rows,
+      tableKey,
       // showAddUserBtn,
     };
   },

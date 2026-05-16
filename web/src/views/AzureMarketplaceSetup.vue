@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="setup-container q-pa-xl">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <q-icon name="warning" size="80px" color="warning" />
+        <OIcon name="warning" size="80px" />
         <h5 class="q-mt-md">No Marketplace Token Found</h5>
         <p class="text-grey-7">
           Please start the registration process from Azure Marketplace.
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
+        <OIcon name="error" size="80px" />
         <h5 class="q-mt-md">{{ errorMessage }}</h5>
         <OButton
           variant="primary"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <q-icon name="cloud" size="60px" color="primary" />
+        <OIcon name="cloud" size="60px" />
         <h4 class="q-mt-md">Complete Azure Marketplace Setup</h4>
         <p class="text-grey-7 q-mb-lg">
           Link your Azure Marketplace subscription to an organization
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
-        <q-spinner-dots size="60px" color="primary" />
+        <OSpinner variant="dots" size="xl" />
         <h5 class="q-mt-md">Setting up your subscription...</h5>
         <p class="text-grey-7">Please wait while we configure your account.</p>
       </div>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <q-icon name="check_circle" size="80px" color="positive" />
+        <OIcon name="check-circle" size="80px" />
         <h4 class="q-mt-md">Subscription Activated!</h4>
         <p class="text-grey-7">
           Your Azure Marketplace subscription is now active.
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
+        <OIcon name="error" size="80px" />
         <h5 class="q-mt-md">Payment Failed</h5>
         <p class="text-grey-7">
           There was an issue with activating Azure subscription. Please check
@@ -178,6 +178,8 @@ import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 type SetupState =
   | "select_org"
@@ -189,7 +191,9 @@ type SetupState =
 
 export default defineComponent({
   name: "AzureMarketplaceSetup",
-  components: { OButton },
+  components: { OButton, OSpinner,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

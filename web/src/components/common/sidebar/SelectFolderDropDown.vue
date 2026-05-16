@@ -46,22 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disableDropdown"
           @click="() => { showAddFolderDialog = true; }"
         >
-          <q-icon name="add" size="xs" />
+          <OIcon name="add" size="xs" />
         </OButton>
       </div>
     </div>
     <!-- add folder -->
-    <q-dialog
+    <AddFolder
       v-if="!disableDropdown"
-      v-model="showAddFolderDialog"
-      position="right"
-      full-height
-      maximized
-      
+      v-model:open="showAddFolderDialog"
       :data-test="`${type}-folder-move-dialog`"
-    >
-      <AddFolder style="width: 30vw;" :type="type" @update:modelValue="updateFolderList" :edit-mode="false" />
-    </q-dialog>
+      :type="type"
+      @update:modelValue="updateFolderList"
+      :edit-mode="false"
+    />
   </template>
 
   <script lang="ts">
@@ -73,10 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder, OButton },
+    components: { AddFolder, OButton,
+    OIcon,
+},
     emits: ["folder-selected"],
     props: {
       activeFolderId: {

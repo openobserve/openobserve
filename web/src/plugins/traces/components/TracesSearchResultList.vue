@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="noResults"
       class="text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
     >
-      <q-icon name="info" color="primary" size="md" />
+      <OIcon name="info" size="md" />
       {{ t("traces.noTracesFoundAdjust") }}
     </div>
 
@@ -88,11 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-table-loading-banner-row"
               class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <q-spinner-hourglass
-                color="primary"
-                size="1.25rem"
-                class="tw:mx-[0.25rem]"
-              />
+              <OSpinner size="xs" class="tw:mx-[0.25rem]" />
               <span
                 class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
                 >{{ t("traces.fetchingTraces") }}</span
@@ -106,11 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-table-loading-row"
               class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <q-spinner-hourglass
-                color="primary"
-                size="1.25rem"
-                class="tw:mr-[0.25rem]"
-              />
+              <OSpinner size="xs" class="tw:mr-[0.25rem]" />
               <span
                 class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
                 >{{ t("traces.fetchingTraces") }}</span
@@ -134,9 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-row-operation-name"
             >
               {{ item.operation_name }}
-              <q-tooltip anchor="bottom middle" self="top middle">
-                {{ item.operation_name }}
-              </q-tooltip>
+              <OTooltip :content="item.operation_name" side="bottom" align="center" />
             </span>
           </template>
 
@@ -229,6 +219,9 @@ import {
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   hits: any[];

@@ -396,7 +396,8 @@
     "traces": "Traços",
     "switchToLogs": "clique para voltar para Logs",
     "patternNoValuesAvailable": "Não há valores disponíveis",
-    "selectLogStream": "Selecione o fluxo de registros"
+    "selectLogStream": "Selecione o fluxo de registros",
+    "noData": "Não há dados disponíveis"
   },
   "menu": {
     "home": "Início",

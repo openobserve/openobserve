@@ -16,111 +16,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <q-select
+    <OSelect
+      ref="selectRef"
       style="min-width: 150px"
-      dense
-      borderless
-      hide-bottom-space
       v-model="selectedValue"
-      :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
-      :options="filteredOptions"
-      input-debounce="0"
-      emit-value
-      option-value="value"
-      option-label="label"
-      behavior="menu"
-      use-input
-      stack-label
-      @filter="filterOptions"
+      :options="computedOptions"
+      labelKey="label"
+      valueKey="value"
       class="textbox col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
-      popup-no-route-dismiss
-      popup-content-style="z-index: 10001"
-      @popup-show="onPopupShow"
-      @popup-hide="onPopupHide"
-      @update:model-value="onUpdateValue"
+      @search="onSearch"
+      @open="onPopupShow"
+      @close="onPopupHide"
       @keydown="handleKeydown"
-      ref="selectRef"
+      @update:model-value="onUpdateValue"
     >
-      <template v-slot:no-option>
-        <template v-if="filterText">
-          <q-item clickable @click="handleCustomValue(filterText)">
-            <q-item-section>
-              <q-item-label>
-                {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw:text-xs tw:italic"
-                  >(Custom)</span
-                >
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-separator />
-        </template>
-        <q-item v-else>
-          <q-item-section class="text-italic text-grey">
-            No Data Found
-          </q-item-section>
-        </q-item>
+      <template #trigger>
+        <span class="tw:flex-1 tw:text-start tw:truncate">{{ displayValue }}</span>
       </template>
-
-      <template v-if="filteredOptions.length > 0" v-slot:before-options>
-        <q-item>
-          <q-item-section v-if="variableItem.multiSelect" side>
-            <q-checkbox
-              v-model="isAllSelected"
-              @update:model-value="toggleSelectAll"
-              dense
-              class="q-ma-none"
-              @click.stop
-            />
-          </q-item-section>
-          <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
-            <q-item-label>{{
-              variableItem.multiSelect ? "Select All" : "All"
-            }}</q-item-label>
-          </q-item-section>
-        </q-item>
+      <template #before-options v-if="computedOptions.length > 0">
+        <div
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+          @click.stop="toggleSelectAll"
+        >
+          <OCheckbox :model-value="isAllSelected" @update:model-value="toggleSelectAll" @click.stop />
+          <span>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</span>
+        </div>
         <q-separator />
-        <template v-if="filterText">
-          <q-item clickable @click="handleCustomValue(filterText)">
-            <q-item-section>
-              <q-item-label>
-                {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw:text-xs tw:italic"
-                  >(Custom)</span
-                >
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-separator />
-        </template>
+        <div
+          v-if="currentSearchTerm"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+          @click.stop="handleCustomValue(currentSearchTerm)"
+        >
+          {{ currentSearchTerm }}
+          <span class="text-grey-6 tw:text-xs tw:italic">(Custom)</span>
+        </div>
+        <q-separator v-if="currentSearchTerm" />
       </template>
-      <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-        <q-item v-bind="itemProps">
-          <q-item-section side v-if="variableItem.multiSelect">
-            <q-checkbox
-              :model-value="selected || isAllSelected"
-              @update:model-value="toggleOption(opt)"
-              class="q-ma-none"
-              dense
-            />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>
-              <span>{{
-                typeof opt.value === 'string' &&
-                opt.value.endsWith(`${CUSTOM_VALUE}`)
-                  ? `${opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), '')} (Custom)`
-                  : opt.label
-              }}</span>
-            </q-item-label>
-          </q-item-section>
-        </q-item>
+      <template #empty>
+        <div
+          v-if="currentSearchTerm"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
+          @click.stop="handleCustomValue(currentSearchTerm)"
+        >
+          {{ currentSearchTerm }}
+          <span class="text-grey-6 tw:text-xs tw:italic">(Custom)</span>
+        </div>
+        <div v-else class="text-italic text-grey tw:px-3 tw:py-2">No Data Found</div>
       </template>
-    </q-select>
+    </OSelect>
   </div>
 </template>
 
@@ -135,22 +82,25 @@ import {
   nextTick,
   onUnmounted,
 } from "vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
+  components: { OSelect, OCheckbox },
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
     const selectedValue = ref(props.variableItem?.value);
-    const filterText = ref("");
+    const currentSearchTerm = ref("");
     const selectRef = ref(null);
     const isOpen = ref(false);
 
     const availableOptions = computed(() => props.variableItem?.options || []);
 
-    // Show searchResults if filterText is active, else normal options
-    const filteredOptions = computed(() => {
-      let opts = availableOptions.value.map((opt: any) => {
+    // Options with (Custom) label transformation — OSelect handles local filtering
+    const computedOptions = computed(() => {
+      return availableOptions.value.map((opt: any) => {
         if (
           typeof opt.value === "string" &&
           opt.value.endsWith(`${CUSTOM_VALUE}`)
@@ -160,15 +110,16 @@ export default defineComponent({
         }
         return opt;
       });
-      if (!filterText.value) return opts;
-      return opts.filter((opt: any) =>
-        opt.label.toLowerCase().includes(filterText.value.toLowerCase()),
-      );
     });
-    const filterOptions = (val: string, update: Function) => {
-      filterText.value = val;
-      update();
+
+    // Handler for OSelect @search event (replaces Quasar @filter)
+    const onSearch = (val: string) => {
+      currentSearchTerm.value = val;
+      updateSearch(val);
     };
+
+    // Kept for backwards compat with variableItem.options watch
+    const filterText = currentSearchTerm;
 
     // set debouced filterText value that can trigger search
     const searchText = ref("");
@@ -420,8 +371,9 @@ export default defineComponent({
 
     return {
       selectedValue,
-      filteredOptions,
-      filterOptions,
+      computedOptions,
+      onSearch,
+      currentSearchTerm,
       isAllSelected,
       toggleSelectAll,
       displayValue,
@@ -431,7 +383,6 @@ export default defineComponent({
       selectRef,
       handleKeydown,
       handleCustomValue,
-      filterText,
       CUSTOM_VALUE,
     };
   },
@@ -439,7 +390,7 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-select {
+.o2-custom-select-dashboard {
   max-width: 600px;
 }
 

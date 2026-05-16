@@ -18,81 +18,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="q-pa-none flex flex-col"
+    class="tw:flex tw:flex-col"
     :key="store.state.selectedOrganization.identifier"
+    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
     <!-- searchBar at top -->
-    <div class="tw:w-full tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
+    <div class="tw:shrink-0 tw:px-[0.625rem]">
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4"
         >
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
-          <div class="flex q-ml-auto tw:ps-2">
-            <q-input
+          <div class="tw:flex tw:flex-row tw:gap-x-2 tw:justify-end tw:items-center">
+            <OInput
               v-model="dynamicQueryModel"
-              dense
-              borderless
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
                   : t('dashboard.search')
               "
-              data-test="dashboard-search"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-              class="o2-search-input"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-dark'
-                  : 'o2-search-input-light'
-              "
-              hide-bottom-space
+              data-test="dashboard-search"
             >
-              <template #prepend>
-                <q-icon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search"
-                />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
-            </q-input>
-          </div>
-          <div class="tw:mb-2">
-            <q-toggle
+            </OInput>
+
+            <OSwitch
               data-test="dashboard-search-across-folders-toggle"
               v-model="searchAcrossFolders"
               label="All Folders"
               size="lg"
-              class="q-ml-sm tw:h-[36px] o2-toggle-button-lg"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-lg-dark'
-                  : 'o2-toggle-button-lg-light'
-              "
+              class="tw:whitespace-nowrap tw:shrink-0"
             >
-            </q-toggle>
-            <q-tooltip class="q-mt-lg" anchor="top middle" self="bottom middle">
-              {{
-                searchAcrossFolders
-                  ? t("dashboard.searchSelf")
-                  : t("dashboard.searchAll")
-              }}
-            </q-tooltip>
-          </div>
+              <template #tooltip>
+                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
+              </template>
+            </OSwitch>
+
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import">
+              <OButton variant="outline" size="sm" class="q-ml-sm" data-test="dashboard-import" icon-right="expand-more">
                 {{ t(`dashboard.import`) }}
-                <template #icon-right>
-                  <q-icon name="expand_more" size="xs" />
-                </template>
               </OButton>
             </template>
             <ODropdownItem
@@ -130,25 +101,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t(`dashboard.add`) }}
           </OButton>
+          </div>
         </div>
       </div>
     </div>
     <div
-      class="full-width alert-list-table"
-      style="height: calc(100vh - 116px)"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        style="height: calc(100vh - 116px)"
-        data-test="dashboard-splitter"
-      >
-        <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full">
-              <div
-                class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
+      <!-- Left: FolderList -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+        <div class="tw:h-full">
+          <div
+            class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
               >
                 <!-- folder list starts here -->
                 <div
@@ -167,13 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="outline"
                         size="icon"
+                        icon-left="add"
                         class="tw:h-7 tw:w-8"
                         @click.stop="addFolder"
                         data-test="dashboard-new-folder-btn"
                         title="Add Folder"
-                      >
-                        <q-icon name="add" size="xs" />
-                      </OButton>
+                      />
                     </div>
                   </div>
                   <q-separator
@@ -181,35 +144,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="2px"
                   ></q-separator>
                   <!-- Search Input -->
-                  <div style="width: 100%" class="flex folder-item q-py-xs">
-                    <q-input
+                  <div class="flex folder-item q-py-xs tw:w-full tw:px-2">
+                    <OInput
                       v-model="folderSearchQuery"
-                      dense
-                      borderless
                       data-test="folder-search"
                       placeholder="Search Folder"
-                      style="width: 100%"
                       clearable
-                      class="tw:mx-2 q-px-xs"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'o2-search-input-dark'
-                          : 'o2-search-input-light'
-                      "
-                      hide-bottom-space
+                      class="tw:w-full"
                     >
-                      <template #prepend>
-                        <q-icon
-                          class="o2-search-input-icon"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'o2-search-input-icon-dark'
-                              : 'o2-search-input-icon-light'
-                          "
-                          name="search"
-                        />
+                      <template #icon-left>
+                        <OIcon name="search" size="sm" />
                       </template>
-                    </q-input>
+                    </OInput>
                     <div></div>
                   </div>
                 </div>
@@ -251,18 +197,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OButton
                                 size="icon"
                                 variant="ghost"
+                                icon-left="more-vert"
                                 class="tw:h-6 tw:w-6"
                                 data-test="dashboard-more-icon"
-                              >
-                                <q-icon name="more_vert" size="xs" />
-                              </OButton>
+                              />
                             </template>
                             <ODropdownItem
                               @select="editFolder(tab.folderId)"
                               data-test="dashboard-edit-folder-icon"
                             >
                               <template #icon-left>
-                                <q-icon :name="outlinedEdit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </template>
                               Edit
                             </ODropdownItem>
@@ -271,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="dashboard-delete-folder-icon"
                             >
                               <template #icon-left>
-                                <q-icon :name="outlinedDelete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </template>
                               Delete
                             </ODropdownItem>
@@ -284,10 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </template>
-        <template v-slot:after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
+      <!-- Right: Table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
               <!-- add dashboard table -->
               <q-table
                 ref="qTable"
@@ -302,11 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loading"
                 @row-click="onRowClick"
                 data-test="dashboard-table"
-                :style="
-                  !filterQuery.length && dashboards.length > 0
-                    ? 'height: calc(100vh  - var(--navbar-height) - 80px)'
-                    : ''
-                "
+                style="width: 100%; height: 100%"
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
                 <!-- if data not available show nodata component -->
@@ -361,14 +301,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? props.value.slice(0, 30) + "..."
                           : props.value
                       }}
-                      <q-tooltip
+                      <OTooltip
                         v-if="props.value && props.value.length > 30"
-                        class="q-mt-lg tw:w-[300px]"
-                        anchor="top middle"
-                        self="bottom middle"
-                      >
-                        {{ props.value }}
-                      </q-tooltip>
+                        :content="props.value"
+                        max-width="300px"
+                      />
                     </div>
                   </q-td>
                 </template>
@@ -409,20 +346,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="showMoveDashboardPanel(props.row)"
                         data-test="dashboard-move-to-another-folder"
                       >
-                        <q-icon :name="outlinedDriveFileMove" size="16px" />
+                        <OIcon name="drive-file-move" size="sm" />
                       </OButton>
                       <OButton
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.duplicate')"
                         size="icon"
+                        icon-left="content-copy"
                         variant="ghost"
                         @click.stop="
                           duplicateDashboard(props.row.id, props.row.folder_id)
                         "
                         data-test="dashboard-duplicate"
-                      >
-                        <q-icon name="content_copy" size="16px" />
-                      </OButton>
+                      />
                       <OButton
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.delete')"
@@ -431,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="showDeleteDialogFn(props)"
                         data-test="dashboard-delete"
                       >
-                        <q-icon :name="outlinedDelete" size="16px" />
+                        <OIcon name="delete" size="sm" />
                       </OButton>
                     </div>
                   </q-td>
@@ -451,10 +387,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-mr-sm tw:h-9"
                         data-test="dashboard-list-move-across-folders-btn"
                         @click="moveMultipleDashboards"
+                        icon-left="drive-file-move"
                       >
-                        <template #icon-left>
-                          <q-icon :name="outlinedDriveFileMove" size="16px" />
-                        </template>
                         Move
                       </OButton>
                       <OButton
@@ -462,12 +396,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="sm"
                         class="q-mr-sm tw:h-9"
+                        icon-left="download"
                         data-test="dashboard-list-export-dashboards-btn"
                         @click="multipleExportDashboard"
                       >
-                        <template #icon-left>
-                          <q-icon name="download" size="16px" />
-                        </template>
                         Export
                       </OButton>
                       <OButton
@@ -475,12 +407,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="sm"
                         class="q-mr-sm tw:h-9"
+                        icon-left="delete"
                         data-test="dashboard-list-delete-dashboards-btn"
                         @click="openBulkDeleteDialog"
                       >
-                        <template #icon-left>
-                          <q-icon name="delete" size="16px" />
-                        </template>
                         Delete
                       </OButton>
                     </div>
@@ -497,19 +427,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-table>
 
               <!-- add dashboard -->
-              <q-dialog
-                v-model="showAddDashboardDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showAddDashboardDialog"
+                :width="30"
+                :title="t('dashboard.createdashboard')"
                 data-test="dashboard-add-dialog"
+                :secondary-button-label="t('dashboard.cancel')"
+                :primary-button-label="t('dashboard.save')"
+                @click:secondary="showAddDashboardDialog = false"
+                @click:primary="addDashboardRef?.submit()"
               >
                 <AddDashboard
-                  style="width: 30vw"
+                  ref="addDashboardRef"
+                  @close="showAddDashboardDialog = false"
                   @updated="updateDashboardList"
                   :activeFolderId="activeFolderId"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- add dashboard from GitHub gallery -->
               <AddDashboardFromGitHub
@@ -518,35 +452,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- add/edit folder -->
-              <q-dialog
-                v-model="showAddFolderDialog"
-                position="right"
-                full-height
-                maximized
+              <ODrawer
+                v-model:open="showAddFolderDialog"
+                :width="30"
+                :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
                 data-test="dashboard-folder-dialog"
+                :secondary-button-label="t('dashboard.cancel')"
+                :primary-button-label="t('dashboard.save')"
+                @click:secondary="showAddFolderDialog = false"
+                @click:primary="addFolderRef?.submit()"
               >
                 <AddFolder
-                  style="width: 30vw"
+                  ref="addFolderRef"
                   @update:modelValue="updateFolderList"
                   :edit-mode="isFolderEditMode"
                   :folder-id="selectedFolderToEdit ?? 'default'"
                 />
-              </q-dialog>
+              </ODrawer>
 
               <!-- move dashboard to another folder -->
-              <q-dialog
-                v-model="showMoveDashboardDialog"
-                position="right"
-                full-height
-                maximized
+              <MoveDashboardToAnotherFolder
+                v-model:open="showMoveDashboardDialog"
+                @updated="handleDashboardMoved"
+                :dashboard-ids="selectedDashboardIdToMove"
+                :activeFolderId="activeFolderToMove"
                 data-test="dashboard-move-to-another-folder-dialog"
-              >
-                <MoveDashboardToAnotherFolder
-                  @updated="handleDashboardMoved"
-                  :dashboard-ids="selectedDashboardIdToMove"
-                  :activeFolderId="activeFolderToMove"
-                />
-              </q-dialog>
+              />
 
               <!-- delete dashboard dialog -->
               <ConfirmDialog
@@ -577,10 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:cancel="confirmBulkDelete = false"
                 v-model="confirmBulkDelete"
               />
-            </div>
-          </div>
-        </template>
-      </q-splitter>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -589,8 +518,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 // @ts-nocheck
 import {
   computed,
@@ -622,11 +556,6 @@ import {
   getFoldersList,
   moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
-import {
-  outlinedDelete,
-  outlinedDriveFileMove,
-  outlinedEdit,
-} from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { filter, forIn } from "lodash-es";
@@ -654,9 +583,14 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
+    OInput,
+    OSwitch,
+    ODrawer,
     AddDashboard,
+    OTooltip,
     AddDashboardFromGitHub,
     QTablePagination,
     NoData,
@@ -672,6 +606,8 @@ export default defineComponent({
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
     const showAddFolderDialog = ref(false);
+    const addDashboardRef: any = ref(null);
+    const addFolderRef: any = ref(null);
     const qTable: any = ref(null);
     const router = useRouter();
     const route = useRoute();
@@ -1444,9 +1380,6 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedEdit,
-      outlinedDriveFileMove,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,
@@ -1470,6 +1403,8 @@ export default defineComponent({
       activeFolderId,
       addFolder,
       showAddFolderDialog,
+      addDashboardRef,
+      addFolderRef,
       isFolderEditMode,
       updateFolderList,
       editFolder,

@@ -18,32 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="column full-height">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
-      <q-form ref="addDashboardForm" @submit="onSubmit">
-        <q-input
+    <div class="tw:flex tw:flex-col tw:gap-3">
+        <OInput
           v-model="dashboardData.title"
           :label="t('dashboard.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           data-test="dashboard-general-setting-name"
-          borderless
-          hide-bottom-space
         />
-        <span>&nbsp;</span>
-        <q-input
+        <OInput
           v-model="dashboardData.description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          dense
           data-test="dashboard-general-setting-description"
-          borderless
-          hide-bottom-space
         />
         <div
           v-if="dateTimeValue"
@@ -60,21 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :auto-apply-dashboard="true"
           />
         </div>
-        <q-toggle
+        <OSwitch
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
           data-test="dashboard-general-setting-dynamic-filter"
-          class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
-        <div class="flex justify-center q-mt-lg tw:gap-2">
+        <div class="flex justify-center tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
             data-test="dashboard-general-setting-cancel-btn"
@@ -84,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="dashboardData.title.trim() === ''"
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="saveDashboardApi.execute()"
             :loading="saveDashboardApi.isLoading.value"
             data-test="dashboard-general-setting-save-btn"
             >{{ t("dashboard.save") }}</OButton
           >
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
 </template>
@@ -107,6 +85,8 @@ import { useLoading } from "@/composables/useLoading";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -114,8 +94,10 @@ export default defineComponent({
     DashboardHeader,
     DateTimePickerDashboard,
     OButton,
+    OInput,
+    OSwitch,
   },
-  emits: ["save"],
+  emits: ["save", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const { t } = useI18n();
@@ -246,10 +228,8 @@ export default defineComponent({
     return {
       t,
       dashboardData,
-      addDashboardForm,
       store,
       saveDashboardApi,
-      onSubmit,
       closeBtn,
       initialTimezone,
       dateTimeValue,

@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     @click.stop="addSearchTerm(`${props.row.name}=''`)"
                   >
-                    <q-icon :name="outlinedAdd" />
+                    <OIcon name="add" size="sm" />
                   </OButton>
                 </div>
               </div>
@@ -84,12 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div class="field_label ellipsis tw:flex tw:items-center">
                       <span class="field-type-container">
-                        <q-icon
+                        <OIcon
                           class="field-expand-icon"
                           :name="
                             expandedRows[props.row.name]
-                              ? 'expand_less'
-                              : 'expand_more'
+                              ? 'expand-less'
+                              : 'expand-more'
                           "
                           size="1rem"
                         />
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         @click.stop="addSearchTerm(`${props.row.name}=''`)"
                       >
-                        <q-icon :name="outlinedAdd" />
+                        <OIcon name="add" size="sm" />
                       </OButton>
                     </div>
                     <div
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-search-index-list-filter-${props.row.name}-copy-btn`"
                         @click.stop="copyContentValue(props.row.name)"
                       >
-                        <q-icon name="content_copy" />
+                        <OIcon name="content-copy" size="sm" />
                       </OButton>
                     </div>
                   </div>
@@ -147,33 +147,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #top-right>
-          <q-input
+          <OInput
             data-test="log-search-index-list-field-search-input"
             v-model="filterFieldValue"
             data-cy="index-field-search-input"
-            borderless
-            dense
             clearable
             debounce="1"
             :placeholder="t('search.searchField')"
             class="o2-search-input tw:min-w-full"
           >
             <template #prepend>
-              <q-icon name="search" class="o2-search-input-icon" />
+              <OIcon name="search" size="sm" class="o2-search-input-icon" />
             </template>
-          </q-input>
+          </OInput>
         </template>
 
         <template #pagination="scope">
           <div v-if="scope.pagesNumber > 1" class="field-list-pagination">
-            <q-tooltip
-              anchor="center left"
-              self="center right"
+            <OTooltip
+              side="left"
+              align="center"
               max-width="18.75rem"
-              class="text-body2"
-            >
-              Total Fields: {{ filteredFieldsCount }}
-            </q-tooltip>
+              :content="`Total Fields: ${filteredFieldsCount}`"
+            />
             <OButton
               variant="ghost-primary"
               size="icon-panel"
@@ -181,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.firstPage"
               class="pagination-nav-btn"
             >
-              <q-icon name="fast_rewind" />
+              <OIcon name="fast-rewind" size="sm" />
             </OButton>
             <template v-for="page in visiblePages" :key="page">
               <OButton
@@ -198,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="scope.lastPage"
               class="pagination-nav-btn"
             >
-              <q-icon name="fast_forward" />
+              <OIcon name="fast-forward" size="sm" />
             </OButton>
           </div>
         </template>
@@ -216,13 +212,15 @@ import { useRouter } from "vue-router";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   formatLargeNumber,
   getImageURL,
   b64EncodeUnicode,
 } from "@/utils/zincutils";
 import streamService from "@/services/stream";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -233,7 +231,10 @@ export default defineComponent({
   components: {
     FieldValuesPanel,
     OButton,
-  },
+    OInput,
+    OTooltip,
+    OIcon,
+},
   props: {
     fields: {
       type: Array,
@@ -538,7 +539,7 @@ export default defineComponent({
       fieldValues,
       expandedRows,
       defaultValuesCount,
-      outlinedAdd,
+      "add": "add",
       filterFieldValue,
       filteredFieldsCount,
       showPagination,
@@ -686,7 +687,7 @@ export default defineComponent({
       display: flex;
       align-items: center;
 
-      .q-icon {
+      .OIcon {
         cursor: pointer;
         opacity: 0;
         margin: 0 1px;
@@ -771,7 +772,7 @@ export default defineComponent({
           .field_overlay {
             visibility: visible;
 
-            .q-icon {
+            .OIcon {
               opacity: 1;
             }
           }
@@ -784,7 +785,7 @@ export default defineComponent({
         .field_overlay {
           visibility: visible;
 
-          .q-icon {
+          .OIcon {
             opacity: 1;
           }
         }

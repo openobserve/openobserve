@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="ingestionPage">
+  <div class="tw:rounded-md ingestionPage">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
       <div class="card-container">
         <div class="q-px-md q-pt-md full-width">
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="recommended-list-search-input"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </q-input>
           <span
@@ -218,13 +218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </router-view>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -249,7 +250,9 @@ import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, OTabs, ORouteTab, OButton },
+  components: { ConfirmDialog, OTabs, ORouteTab, OButton,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();
