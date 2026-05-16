@@ -2,8 +2,29 @@
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
+import { useSanitizedHtml } from "../composables/useSanitizedHtml";
+
+const { sanitize } = useSanitizedHtml();
+
+const copied = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function handleCopy(event: MouseEvent) {
+  event.stopPropagation();
+  const value = String(props.cell.getValue() ?? "");
+  try {
+    await navigator.clipboard.writeText(value);
+    copied.value = true;
+    if (copyTimer) clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => {
+      copied.value = false;
+    }, 1500);
+  } catch {
+    // clipboard write failed — silently ignore
+  }
+}
 
 const props = defineProps<{
   cell: Cell<any, any>;
@@ -14,6 +35,7 @@ const props = defineProps<{
   wrap?: boolean;
   dense?: boolean;
   bordered?: boolean;
+  enableCellCopy?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -37,7 +59,8 @@ const highlightedHtml = computed(() => {
   if (!props.highlightText || !props.shouldHighlight || !props.getHighlightedHtml) {
     return null;
   }
-  return props.getHighlightedHtml(props.cell.column.id, props.cell.getValue());
+  const raw = props.getHighlightedHtml(props.cell.column.id, props.cell.getValue());
+  return raw ? sanitize(raw) : null;
 });
 
 function handleClick() {
@@ -83,5 +106,17 @@ function handleClick() {
     <span v-else class="tw:text-text-primary tw:text-sm">
       {{ cell.renderValue() }}
     </span>
+
+    <!-- Cell copy button (visible on hover) -->
+    <button
+      v-if="enableCellCopy && !$slots.default"
+      type="button"
+      :data-test="`o2-table-cell-copy-${cell.column.id}`"
+      class="tw:absolute tw:right-1 tw:opacity-0 group-hover:tw:opacity-100 tw:bg-[var(--color-surface-default)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
+      :title="copied ? 'Copied!' : 'Copy'"
+      @click="handleCopy"
+    >
+      <q-icon :name="copied ? 'check' : 'content_copy'" size="0.8rem" />
+    </button>
   </td>
 </template>

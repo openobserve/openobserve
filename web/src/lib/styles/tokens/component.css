@@ -507,6 +507,8 @@
   --color-table-resize-handle: var(--color-primary-400);
   --color-table-sort-icon-active: var(--color-primary-600);
   --color-table-sort-icon-inactive: var(--color-text-disabled);
+  --color-table-streaming-bar: var(--color-primary-500);
+  --color-table-row-expanded-bg: var(--color-surface-subtle);
 }
 
 
@@ -979,4 +981,6 @@
   --color-table-resize-handle: var(--color-table-resize-handle);
   --color-table-sort-icon-active: var(--color-table-sort-icon-active);
   --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
+  --color-table-streaming-bar: var(--color-table-streaming-bar);
+  --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
 }

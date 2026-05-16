@@ -31,6 +31,10 @@ const props = defineProps<{
   baseOffset?: number;
   /** Virtual scroll: ref callback for measuring elements */
   measureElement?: (el: any) => void;
+  /** Status bar color function per row */
+  getStatusBarColor?: (row: any) => string | undefined;
+  /** Enable click-to-copy on cell values */
+  enableCellCopy?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -77,6 +81,8 @@ function getRowForIndex(index: number) {
       :striped="striped"
       :row-class-fn="rowClass"
       :row-style-fn="rowStyleFn"
+      :status-bar-color="getStatusBarColor?.(row.original)"
+      :enable-cell-copy="enableCellCopy"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="emit('row-click', $event[0], $event[1])"
@@ -127,6 +133,8 @@ function getRowForIndex(index: number) {
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
+      :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
+      :enable-cell-copy="enableCellCopy"
       :row-style-fn="(row: any) => ({
         ...(rowStyleFn?.(row) ?? {}),
         position: 'absolute',
