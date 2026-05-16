@@ -2,6 +2,8 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -13,18 +15,25 @@ const emit = defineEmits<{
   "update:modelValue": [value: boolean];
 }>();
 
-const computedValue = computed({
-  get: () => props.modelValue,
-  set: (val) => emit("update:modelValue", val),
+const checkboxModel = computed<CheckboxModelValue>(() => {
+  if (props.indeterminate) return "indeterminate";
+  return props.modelValue;
 });
+
+function handleUpdate(val: CheckboxModelValue) {
+  if (typeof val === "boolean") {
+    emit("update:modelValue", val);
+  } else {
+    emit("update:modelValue", true);
+  }
+}
 </script>
 
 <template>
-  <q-checkbox
-    v-model="computedValue"
+  <OCheckbox
+    :model-value="checkboxModel"
     :data-test="`o2-table-select-${rowId ?? 'header'}`"
-    :indeterminate="indeterminate"
     size="sm"
-    class="o2-table-checkbox"
+    @update:model-value="handleUpdate"
   />
 </template>

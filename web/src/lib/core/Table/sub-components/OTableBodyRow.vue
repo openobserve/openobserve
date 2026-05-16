@@ -127,7 +127,7 @@ function onDblclick(event: MouseEvent) {
     <!-- Selection checkbox cell -->
     <td
       v-if="selectionEnabled"
-      :class="['tw:w-9 tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
+      :class="['tw:w-9 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '']"
       data-test="o2-table-select-cell"
     >
       <OTableSelectCheckbox
