@@ -3,6 +3,7 @@
 
 import type { SwitchProps, SwitchEmits, SwitchSlots } from "./OSwitch.types";
 import { computed, ref, useAttrs, useId, useSlots, watch } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -151,13 +152,13 @@ const hasLabel = computed(
       ]"
     >
       <slot name="label">{{ label }}</slot>
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </span>
   </div>
 </template>

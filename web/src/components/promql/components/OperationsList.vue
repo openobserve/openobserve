@@ -23,7 +23,7 @@
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="13px" />
                   </template>
                   <q-tooltip>Drag to reorder</q-tooltip>
                 </OButton>
@@ -36,7 +36,7 @@
                 >
                   {{ computedLabel(element) }}
                   <template #icon-right
-                    ><q-icon name="arrow_drop_down"
+                    ><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
@@ -142,7 +142,7 @@
           class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
-          <q-icon name="add" size="14px" />
+          <OIcon name="add" size="xs" />
           <q-tooltip>Add operation</q-tooltip>
         </OButton>
       </div>
@@ -163,7 +163,7 @@
         clearable
       >
         <template v-slot:prepend>
-          <q-icon name="search" />
+          <OIcon name="search" size="sm" />
         </template>
       </q-input>
 
@@ -200,6 +200,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";

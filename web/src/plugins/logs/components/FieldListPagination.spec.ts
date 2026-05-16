@@ -47,7 +47,7 @@ const quasarStubs = {
   QIcon: {
     name: "QIcon",
     template:
-      '<span class="q-icon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click="$emit(\'click\', $event)"></span>',
+      '<span class="OIcon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click="$emit(\'click\', $event)"></span>',
     props: ["name"],
     emits: ["click"],
   },

@@ -347,7 +347,7 @@ export class ServicesCatalogPage {
   async getSortIcon(columnKey) {
     const th = this.page.locator(`[data-test="o2-table-th-${columnKey}"]`);
     // Use :visible + .first() to get only the visible sort icon (avoid hidden duplicates)
-    const icon = th.locator('.material-icons:visible, .q-icon:visible').first();
+    const icon = th.locator('.material-icons:visible, .OIcon:visible').first();
     const text = await icon.textContent();
     return text;
   }

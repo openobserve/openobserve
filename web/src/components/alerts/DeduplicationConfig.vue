@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.fingerprintFields") }}
-                <q-icon
-                  :name="outlinedInfo"
+                <OIcon
+                  name="info"
                   size="17px"
                   class="q-ml-xs cursor-pointer"
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :max-width="'300px'"
                     :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   />
-                </q-icon>
+                </OIcon>
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
@@ -75,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.timeWindow") }}
-                <q-icon
-                  :name="outlinedInfo"
+                <OIcon
+                  name="info"
                   size="17px"
                   class="q-ml-xs cursor-pointer"
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :max-width="'300px'"
                     :content="t('alerts.deduplication.timeWindowTooltip')"
                   />
-                </q-icon>
+                </OIcon>
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
@@ -113,11 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import AlertsContainer from "./AlertsContainer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 

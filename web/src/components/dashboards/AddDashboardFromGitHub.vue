@@ -39,10 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="error"
           class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:text-center"
         >
-          <q-icon
-            name="error_outline"
+          <OIcon
+            name="error-outline"
             size="3em"
-            color="negative"
             class="tw:mb-2"
           />
           <div class="text-negative">{{ error }}</div>
@@ -65,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-dashboard-github-search"
           >
             <template #icon-left>
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
             </template>
           </OInput>
 
@@ -143,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-dashboard-github-add-folder"
           title="Add New Folder"
         >
-          <template #icon-left><q-icon name="add" /></template>
+          <template #icon-left><OIcon name="add" size="sm" /></template>
         </OButton>
       </div>
     </ODialog>
@@ -178,6 +177,7 @@ import { useQuasar } from "quasar";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -195,7 +195,9 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton, ODialog, ODrawer, OInput, OSelect, OCheckbox, OSpinner },
+  components: { AddFolder, OButton, ODialog, ODrawer, OInput, OSelect, OCheckbox, OSpinner,
+    OIcon,
+},
   props: {
     modelValue: {
       type: Boolean,

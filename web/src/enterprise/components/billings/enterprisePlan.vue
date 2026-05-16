@@ -41,15 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="pricingError && !features?.length"
         class="row items-center q-mb-sm text-negative"
       >
-        <q-icon name="warning" size="16px" class="q-mr-sm" />
+        <OIcon name="warning" size="sm" class="q-mr-sm" />
         <span class="o2-page-subtitle3"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
       <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
         <div class="row items-center">
-          <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
-          <q-icon v-else name="" color="green" size="16px" class="q-mr-sm" />
+          <OIcon v-if="feature.is_parent" name="check-circle" size="sm" class="q-mr-sm" />
+          <OIcon v-else name="" color="green" size="16px" class="q-mr-sm" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
         <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
@@ -80,10 +80,13 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();

@@ -64,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
-          <q-icon
-            :name="outlinedInfo"
+          <OIcon
+            name="info"
             size="17px"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align="center"
               :content="t('alerts.correlation.fingerprintGroupsTooltip')"
             />
-          </q-icon>
+          </OIcon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mb-6">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t('alerts.correlation.defaultWindow') }}
-          <q-icon
-            :name="outlinedInfo"
+          <OIcon
+            name="info"
             size="17px"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align="center"
               :content="t('alerts.correlation.defaultWindowTooltip')"
             />
-          </q-icon>
+          </OIcon>
         </div>
         <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
@@ -152,13 +152,13 @@ import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import alertsService from "@/services/alerts";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const $q = useQuasar();

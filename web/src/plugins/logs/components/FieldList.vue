@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="props.row.name === 'no-fields-found'"
         class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
       >
-        <q-icon name="info" color="primary" size="xs" />
+        <OIcon name="info" size="xs" />
         <span class="tw:pl-[0.375rem]">No matching fields found.</span>
       </q-tr>
 
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-xs-sq"
           >
-            <q-icon
+            <OIcon
               :name="
                 expandGroupRows[props.row.group]
-                  ? 'expand_more'
-                  : 'chevron_right'
+                  ? 'expand-more'
+                  : 'chevron-right'
               "
               size="14px"
             />
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="indexlist-search-input tw:mb-[0.25rem]"
         >
           <template #prepend>
-            <q-icon name="search" size="1.25rem" class="o2-search-input-icon" />
+            <OIcon name="search" size="1.25rem" class="o2-search-input-icon" />
           </template>
         </OInput>
         <q-tr v-if="loadingStream == true">
@@ -226,6 +226,7 @@ import FieldRow from "./FieldRow.vue";
 import FieldExpansion from "./FieldExpansion.vue";
 import FieldListPagination from "./FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
@@ -407,7 +408,7 @@ defineExpose({
     padding-top: 0.5rem !important;
   }
 
-  .q-icon {
+  .OIcon {
     height: 1rem;
     width: 1rem;
     margin-right: 0.625rem;

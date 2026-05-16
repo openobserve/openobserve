@@ -26,10 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="tw:text-center tw:py-8">
-      <q-icon
-        name="error_outline"
+      <OIcon
+        name="error-outline"
         size="3rem"
-        color="negative"
         class="tw:mb-4"
       />
       <div class="text-body1 text-negative">{{ error }}</div>
@@ -46,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Empty State -->
     <div v-else-if="services.length === 0" class="tw:text-center tw:py-8">
-      <q-icon name="search_off" size="3rem" color="grey-5" class="tw:mb-4" />
+      <OIcon name="search-off" size="3rem" class="tw:mb-4" />
       <div class="text-body1">
         {{ t("settings.correlation.noServicesYet") }}
       </div>
@@ -72,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="info-banner tw:mb-3 tw:rounded-lg tw:flex tw:items-center tw:gap-3"
       >
-        <q-icon
+        <OIcon
           name="info"
           size="1.25rem"
           class="tw:shrink-0 info-banner-icon"
@@ -155,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-search-input"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
             <OButton
@@ -223,11 +222,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-td key="service_name" :props="props">
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon
+                    <OIcon
                       :name="
                         expandedGroups.has(props.row.service_name)
-                          ? 'expand_more'
-                          : 'chevron_right'
+                          ? 'expand-more'
+                          : 'chevron-right'
                       "
                       size="1.25rem"
                       class="tw:text-gray-400"
@@ -428,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="selectedService?.set_id === 'default'"
         class="panel-warning-banner"
       >
-        <q-icon name="info_outline" size="1rem" class="tw:shrink-0 tw:mt-0.5" />
+        <OIcon name="info-outline" size="1rem" class="tw:shrink-0 tw:mt-0.5" />
         <div class="tw:text-xs tw:leading-relaxed">
           <span class="tw:font-semibold">{{
             t("settings.correlation.defaultSetWarningTitle")
@@ -561,8 +560,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="raw"
             >
               <span class="mapping-key">{{ raw }}</span>
-              <q-icon
-                name="arrow_forward"
+              <OIcon
+                name="arrow-forward"
                 size="0.75rem"
                 class="tw:text-gray-400 tw:justify-self-center"
               />
@@ -591,6 +590,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";

@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="pause-job-btn"
                     icon-left="pause"
                   >
-                    <q-tooltip>Pause Job</q-tooltip>
+                    <q-tooltip>Job</q-tooltip>
                   </OButton>
                   <OButton
                     v-if="canResumeJob(props.row)"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="errorDialogVisible = false; closeErrorDialog()"
     >
       <template #header-left>
-        <q-icon name="error" color="negative" size="18px" />
+        <OIcon name="error" size="sm" />
       </template>
 
       <div v-if="errorDialogData">
@@ -357,29 +357,14 @@ import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import {
-  ChevronLeft,
-  RefreshCw,
-  Pause,
-  Play,
-  Pencil,
-  Eye,
-  Trash2,
-  AlertCircle,
-} from "lucide-vue-next";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";
 import QTablePagination from "../shared/grid/Pagination.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedVisibility,
-} from "@quasar/extras/material-icons-outlined";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 const router = useRouter();
@@ -631,7 +616,7 @@ const resetConfirmDialog = () => {
 const confirmPauseJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Pause Backfill Job",
+    title: "Backfill Job",
     message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
     onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
   };

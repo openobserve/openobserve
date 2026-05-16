@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce="300"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
               </OInput>
             </div>

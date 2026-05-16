@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-new-folder-btn"
               title="Add Folder"
             >
-              <q-icon name="add" />
+              <OIcon name="add" size="sm" />
             </OButton>
           </div>
         </div>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mx-2 q-px-xs"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
         </div>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="cursor: pointer; justify-self: end; height: 0.5rem"
                   data-test="dashboard-more-icon"
               >
-                  <q-icon name="more_vert" />
+                  <OIcon name="more-vert" size="sm" />
                   <q-menu>
                   <q-list dense>
                       <q-item

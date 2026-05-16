@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-circle-sm"
       >
-        <q-icon name="info_outline" size="18px" />
+        <OIcon name="info-outline" size="sm" />
         <q-tooltip
           :delay="200"
           anchor="bottom left"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
     >
-      <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
+      <OIcon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
       <div class="tw-text-center">
         <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
           Service Graph Unavailable
@@ -100,6 +100,7 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
@@ -109,7 +110,8 @@ export default defineComponent({
     DropzoneBackground,
     OButton,
     OSpinner,
-  },
+    OIcon,
+},
   props: {
     topologyContext: {
       type: Object as () => { nodes: AlertNode[]; edges: any[] } | null,

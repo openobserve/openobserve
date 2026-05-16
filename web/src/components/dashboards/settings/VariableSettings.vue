@@ -74,9 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-variable-settings-draggable-row"
           >
             <div class="draggable-handle">
-              <q-icon
-                name="drag_indicator"
-                color="grey-13"
+              <OIcon
+                name="drag-indicator" size="sm"
                 class="'q-mr-xs"
                 data-test="dashboard-variable-settings-drag-handle"
               />

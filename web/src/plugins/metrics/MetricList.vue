@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onMetricChange"
     >
       <template v-if="selectedMetric?.type" v-slot:prepend>
-        <q-icon
+        <OIcon
           :title="selectedMetric?.type"
           size="xs"
           :name="metricsIconMapping[selectedMetric?.type || '']"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="metric-explore-metric-icon"
             avatar
           >
-            <q-icon
+            <OIcon
               size="xs"
               :name="metricsIconMapping[scope?.opt?.type] || ''"
             />
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('search.searchField')"
             >
               <template #icon-left>
-                <q-icon name="search" />
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
           </template>
@@ -281,7 +281,6 @@ import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
 import stream from "@/services/stream";
-import { outlinedAdd } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import metricService from "@/services/metrics";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -290,13 +289,15 @@ import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
-import { Plus } from 'lucide-vue-next';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton, Plus, OInput, OInnerLoading },
+  components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
+    OIcon,
+},
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();
@@ -320,8 +321,8 @@ export default defineComponent({
     const metricsIconMapping: any = {
       summary: "description",
       gauge: "speed",
-      histogram: "bar_chart",
-      counter: "pin",
+      histogram: "bar-chart",
+      counter: "tag",
     };
     const { parsePromQlQuery } = usePromqlSuggestions();
     const { getStream } = useStreams();
@@ -528,7 +529,7 @@ export default defineComponent({
       onMetricChange,
       metricsIconMapping,
       setSelectedMetricType,
-      outlinedAdd,
+      "add": "add",
       addLabelToEditor,
       addValueToEditor,
       selectedMetric,
@@ -723,7 +724,7 @@ export default defineComponent({
       display: flex;
       align-items: center;
 
-      .q-icon {
+      .OIcon {
         cursor: pointer;
         opacity: 0;
         margin: 0 1px;
@@ -832,7 +833,7 @@ export default defineComponent({
           .field_overlay {
             visibility: visible;
 
-            .q-icon {
+            .OIcon {
               opacity: 1;
             }
           }
@@ -852,7 +853,7 @@ export default defineComponent({
         .field_overlay {
           visibility: visible;
 
-          .q-icon {
+          .OIcon {
             opacity: 1;
           }
         }

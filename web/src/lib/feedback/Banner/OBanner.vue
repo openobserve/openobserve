@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, useSlots } from "vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
   variant?: "default" | "info" | "success" | "warning" | "error";
   content?: string;
@@ -42,7 +43,7 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
   >
     <div v-if="showIconArea" class="obanner__icon">
       <slot name="icon">
-        <q-icon :name="icon" />
+        <OIcon :name="icon" size="sm" />
       </slot>
     </div>
 

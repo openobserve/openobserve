@@ -156,12 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @click="collapseFieldList"
                   ><template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
                         searchObj.meta.showFields
-                          ? 'chevron_left'
-                          : 'chevron_right'
-                      "
+                          ? 'chevron-left'
+                          : 'chevron-right'
+                      " size="sm"
                     /> </template
                 ></OButton>
               </template>
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <OIcon name="info" size="md" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </div>
                   </div>
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <OIcon name="info" size="md" />
                     {{ t("search.applySearch") }}
                   </div>
                   <div
@@ -361,6 +361,7 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 

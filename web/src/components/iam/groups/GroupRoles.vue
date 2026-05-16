@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search Roles"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
+            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" />
           </template>
         </OInput>
       </div>
@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { watch, onBeforeMount, computed } from "vue";
 import AppTable from "@/components/AppTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";

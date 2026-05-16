@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('common.goBack')"
           @click="$emit('cancel:hideform')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="col">
           <div class="text-h6">
@@ -148,8 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="header.visible ? 'text' : 'password'"
             >
               <template #append>
-                <q-icon
-                  :name="header.visible ? 'visibility_off' : 'visibility'"
+                <OIcon
+                  :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"
                   @click="header.visible = !header.visible"
                 />
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               @click="removeHeader(idx)"
             >
-              <q-icon name="delete" size="14px" />
+              <OIcon name="delete" size="xs" />
             </OButton>
           </div>
           <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
@@ -276,8 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :type="env.visible ? 'text' : 'password'"
             >
               <template #append>
-                <q-icon
-                  :name="env.visible ? 'visibility_off' : 'visibility'"
+                <OIcon
+                  :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"
                   @click="env.visible = !env.visible"
                 />
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               @click="removeEnvVar(idx)"
             >
-              <q-icon name="delete" size="14px" />
+              <OIcon name="delete" size="xs" />
             </OButton>
           </div>
           <OButton variant="ghost" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('common.delete')"
                 @click="removeCredFile(idx)"
               >
-                <q-icon name="delete" size="14px" />
+                <OIcon name="delete" size="xs" />
               </OButton>
             </div>
             <div class="tw:text-xs tw:text-gray-500 tw:mb-1">
@@ -407,6 +407,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 
 const QueryEditor = defineAsyncComponent(
@@ -415,7 +416,9 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { QueryEditor, OButton },
+  components: { QueryEditor, OButton,
+    OIcon,
+},
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();

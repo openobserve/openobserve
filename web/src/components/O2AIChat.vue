@@ -44,9 +44,9 @@
                     {{ displayedTitle }}
                   </q-tooltip>
                 </span>
-                <q-icon
-                  name="arrow_drop_down"
-                  size="20px"
+                <OIcon
+                  name="arrow-drop-down"
+                  size="md"
                   class="tw:flex-shrink-0"
                 />
               </div>
@@ -62,7 +62,7 @@
                       class="tw:mt-1"
                     >
                       <template #prepend>
-                        <q-icon name="search" />
+                        <OIcon name="search" size="sm" />
                       </template>
                     </q-input>
                   </div>
@@ -104,7 +104,7 @@
                               class="delete-history-btn"
                               @click.stop="deleteChat(chat.id)"
                             >
-                              <q-icon name="delete" />
+                              <OIcon name="delete" size="sm" />
                               <q-tooltip :delay="500">Delete chat</q-tooltip>
                             </OButton>
                           </div>
@@ -130,7 +130,7 @@
                       @click.stop="clearAllConversations"
                     >
                       <template #icon-left>
-                        <q-icon name="delete_sweep" />
+                        <OIcon name="delete-sweep" size="sm" />
                       </template>
                       Clear all conversations
                     </OButton>
@@ -148,11 +148,11 @@
               size="icon-sm"
               @click.stop="openEditTitleDialog"
             >
-              <q-icon name="edit" />
+              <OIcon name="edit" size="sm" />
               <q-tooltip :delay="500">Edit title</q-tooltip>
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="addNewChat">
-              <q-icon name="add" />
+              <OIcon name="add" size="sm" />
             </OButton>
             <OButton
               variant="ghost"
@@ -160,11 +160,11 @@
               data-test="ai-chat-expand-btn"
               @click="toggleExpand"
             >
-              <q-icon :name="
+              <OIcon :name="
                 store.state.isAiChatExpanded
-                  ? 'close_fullscreen'
-                  : 'open_in_full'
-              " />
+                  ? 'close-fullscreen'
+                  : 'open-in-full'
+              " size="sm" />
               <q-tooltip :delay="500"
                 >{{ store.state.isAiChatExpanded ? "Collapse" : "Expand" }} ({{
                   isMac ? "⌘" : "Ctrl+"
@@ -176,7 +176,7 @@
               size="icon-sm"
               @click="$emit('close')"
             >
-              <q-icon name="close" />
+              <OIcon name="close" size="sm" />
             </OButton>
           </div>
         </div>
@@ -323,7 +323,7 @@
                         size="icon-xs-circle"
                         class="send-button"
                       >
-                        <q-icon name="send" size="16px" />
+                        <OIcon name="send" size="sm" />
                       </OButton>
                     </div>
                   </div>
@@ -350,8 +350,8 @@
                     : 'light-user-avatar'
                 "
               >
-                <q-icon
-                  size="16px"
+                <OIcon
+                  size="sm"
                   name="person"
                   :color="store.state.theme == 'dark' ? 'white' : '#4a5568'"
                 />
@@ -402,15 +402,15 @@
                     "
                   >
                     <div class="tool-call-header">
-                      <q-icon
+                      <OIcon
                         :name="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
-                              ? 'open_in_new'
-                              : 'help_outline'
+                              ? 'open-in-new'
+                              : 'help-outline'
                             : block.success === false
                               ? 'error'
-                              : 'check_circle'
+                              : 'check-circle'
                         "
                         size="14px"
                         :color="
@@ -431,13 +431,12 @@
                         >{{ formatToolCallMessage(block).suffix }}
                       </span>
                       <!-- Navigation icon -->
-                      <q-icon
+                      <OIcon
                         v-if="
                           block.navigationAction && !block.pendingConfirmation
                         "
-                        name="open_in_new"
-                        size="14px"
-                        color="primary"
+                        name="open-in-new"
+                        size="xs"
                         class="navigation-icon"
                         @click.stop="
                           handleNavigationAction(block.navigationAction)
@@ -446,16 +445,16 @@
                         <q-tooltip>{{
                           block.navigationAction.label
                         }}</q-tooltip>
-                      </q-icon>
-                      <q-icon
+                      </OIcon>
+                      <OIcon
                         v-if="
                           hasToolCallDetails(block) &&
                           !block.pendingConfirmation
                         "
                         :name="
                           isToolCallExpanded(index, blockIndex)
-                            ? 'expand_less'
-                            : 'expand_more'
+                            ? 'expand-less'
+                            : 'expand-more'
                         "
                         size="16px"
                         class="expand-icon"
@@ -553,7 +552,7 @@
                                 getToolCallDisplayData(block.context)?.query,
                               )
                             ">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy query</q-tooltip>
             </OButton>
                         </div>
@@ -645,7 +644,7 @@
                                 getToolCallDisplayData(block.context)?.vrl,
                               )
                             ">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy VRL</q-tooltip>
             </OButton>
                         </div>
@@ -664,7 +663,7 @@
                                 getToolCallDisplayData(block.context)?.command,
                               )
                             ">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy command</q-tooltip>
             </OButton>
                         </div>
@@ -682,7 +681,7 @@
                                   JSON.stringify(block.response.hits, null, 2),
                                 )
                               ">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy results</q-tooltip>
             </OButton>
                           </div>
@@ -804,7 +803,7 @@
                                   JSON.stringify(block.response.items, null, 2),
                                 )
                               ">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy items</q-tooltip>
             </OButton>
                           </div>
@@ -841,7 +840,7 @@
                                   : JSON.stringify(block.response, null, 2),
                               )
                             ">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy response</q-tooltip>
             </OButton>
                         </div>
@@ -863,16 +862,15 @@
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
                     <div class="log-entry-header">
-                      <q-icon name="description" size="14px"
-color="primary" />
+                      <OIcon name="description" size="xs" />
                       <span class="log-entry-info">
                         {{ block.preview }}
                       </span>
-                      <q-icon
+                      <OIcon
                         :name="
                           isLogEntryExpanded(index, blockIndex)
-                            ? 'expand_less'
-                            : 'expand_more'
+                            ? 'expand-less'
+                            : 'expand-more'
                         "
                         size="16px"
                         class="expand-icon"
@@ -886,7 +884,7 @@ color="primary" />
                     >
                       <div class="log-entry-content">
                         <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="copyToClipboard(block.content)">
-              <q-icon name="content_copy" />
+              <OIcon name="content-copy" size="sm" />
               <q-tooltip>Copy content</q-tooltip>
             </OButton>
                         <code
@@ -905,8 +903,8 @@ color="primary" />
                     "
                   >
                     <div class="stream-error-header">
-                      <q-icon name="warning"
-size="16px" color="negative" />
+                      <OIcon name="warning"
+size="sm" />
                       <span class="stream-error-message">{{
                         block.message
                       }}</span>
@@ -935,7 +933,7 @@ size="16px" color="negative" />
                     "
                   >
                     <OButton variant="primary" size="xs" class="navigation-block-btn" @click="handleNavigationAction(block.navigationAction)">
-                    <template #icon-left><q-icon :name="'open_in_new'" /></template>
+                    <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
                     {{ block.navigationAction.label }}
                   </OButton>
                   </div>
@@ -956,7 +954,7 @@ size="16px" color="negative" />
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
                           <OButton variant="ghost" size="xs" class="copy-button" @click="copyToClipboard(textBlock.content)">
-                        <q-icon size="16px" name="content_copy" />
+                        <OIcon size="sm" name="content-copy" />
                         <span class="tw:ml-1">Copy</span>
                       </OButton>
                         </div>
@@ -970,7 +968,7 @@ size="16px" color="negative" />
                           class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
                         >
                           <OButton variant="ghost" size="xs" class="retry-button" @click="retryGeneration(message)">
-                        <q-icon size="16px" name="refresh" />
+                        <OIcon size="sm" name="refresh" />
                         <span class="tw:ml-1">Retry</span>
                       </OButton>
                         </div>
@@ -1022,7 +1020,7 @@ size="16px" color="negative" />
                           {{ getLanguageDisplay(block.language) }}
                         </span>
                         <OButton variant="ghost" size="xs" class="copy-button" @click="copyToClipboard(block.content)">
-                        <q-icon size="16px" name="content_copy" />
+                        <OIcon size="sm" name="content-copy" />
                         <span class="tw:ml-1">Copy</span>
                       </OButton>
                       </div>
@@ -1053,20 +1051,20 @@ size="16px" color="negative" />
                   <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_up'" :class="{
                       'feedback-selected': message.feedback === 'thumbs_up',
                     }" data-test="o2-ai-chat-thumbs-up-btn" @click="likeCodeBlock(index)">
-                    <q-icon :name="
+                    <OIcon :name="
                         message.feedback === 'thumbs_up'
                           ? matThumbUpAlt
-                          : outlinedThumbUpOffAlt
+                          : 'thumb-up-off-alt'
                       " size="14px" />
                     <q-tooltip>Helpful</q-tooltip>
                   </OButton>
                   <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_down'" :class="{
                       'feedback-selected': message.feedback === 'thumbs_down',
                     }" data-test="o2-ai-chat-thumbs-down-btn" @click="dislikeCodeBlock(index)">
-                    <q-icon :name="
+                    <OIcon :name="
                         message.feedback === 'thumbs_down'
                           ? matThumbDownAlt
-                          : outlinedThumbDownOffAlt
+                          : 'thumb-down-off-alt'
                       " size="14px" />
                     <q-tooltip>Not helpful</q-tooltip>
                   </OButton>
@@ -1155,7 +1153,7 @@ size="16px" color="negative" />
         <!-- Scroll to bottom button -->
         <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
           <OButton variant="ghost" size="icon-sm" class="scroll-to-bottom-btn" @click="scrollToBottomSmooth">
-            <q-icon name="arrow_downward" />
+            <OIcon name="arrow-downward" size="sm" />
             <q-tooltip anchor="top middle" self="bottom middle">
               Scroll to bottom
             </q-tooltip>
@@ -1225,7 +1223,7 @@ size="16px" color="negative" />
                 class="preview-image"
               />
               <OButton variant="ghost" size="icon-xs-circle" class="image-remove-btn" @click.stop="removeImage(index)">
-                <q-icon name="close" size="12px" />
+                <OIcon name="close" size="xs" />
               </OButton>
               <q-tooltip
                 >{{ img.filename }} ({{
@@ -1259,9 +1257,9 @@ size="16px" color="negative" />
                 size="icon-sm"
                 class="image-upload-btn"
               >
-                <q-icon
+                <OIcon
                   name="image"
-                  size="18px"
+                  size="sm"
                   :color="store.state.theme == 'dark' ? 'white' : 'grey-7'"
                 />
                 <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
@@ -1277,11 +1275,11 @@ size="16px" color="negative" />
                 class="auto-nav-toggle-btn"
                 :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
               >
-                <q-icon
+                <OIcon
                   :name="
                     isAutoNavigationEnabled
-                      ? 'check_circle'
-                      : 'radio_button_unchecked'
+                      ? 'check-circle'
+                      : 'radio-button-unchecked'
                   "
                   size="14px"
                   :color="
@@ -1314,7 +1312,7 @@ size="16px" color="negative" />
                 size="icon-xs-circle"
                 class="send-button"
               >
-                <q-icon name="send" size="16px" />
+                <OIcon name="send" size="sm" />
               </OButton>
 
               <!-- Stop button - shown when loading/streaming -->
@@ -1325,7 +1323,7 @@ size="16px" color="negative" />
                 size="icon-xs-circle"
                 class="stop-button"
               >
-                <q-icon name="stop" size="16px" />
+                <OIcon name="stop" size="sm" />
               </OButton>
             </div>
           </div>
@@ -1355,10 +1353,6 @@ import DOMPurify from "dompurify";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import useAiChat from "@/composables/useAiChat";
-import {
-  outlinedThumbUpOffAlt,
-  outlinedThumbDownOffAlt,
-} from "@quasar/extras/material-icons-outlined";
 import { matThumbUpAlt, matThumbDownAlt } from "@quasar/extras/material-icons";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
 import {
@@ -1381,6 +1375,7 @@ import {
   getDashboardEventType,
 } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -1427,7 +1422,8 @@ export default defineComponent({
     O2AIConfirmDialog,
     ODropdown,
     OSpinner,
-  },
+    OIcon,
+},
   props: {
     isOpen: {
       type: Boolean,
@@ -5569,8 +5565,8 @@ export default defineComponent({
       loadHistory,
       store,
       isMac,
-      outlinedThumbUpOffAlt,
-      outlinedThumbDownOffAlt,
+      outlinedThumbUpOffAlt: "thumb-up-off-alt",
+      outlinedThumbDownOffAlt: "thumb-down-off-alt",
       matThumbUpAlt,
       matThumbDownAlt,
       likeCodeBlock,
@@ -6534,7 +6530,7 @@ export default defineComponent({
     transform: scale(1);
   }
 
-  .q-icon {
+  .OIcon {
     font-size: 18px;
     animation: bounce 2s infinite;
     font-weight: bold;

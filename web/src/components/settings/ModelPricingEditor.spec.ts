@@ -175,7 +175,7 @@ const QSelectStub = {
 const QIconStub = {
   name: "QIcon",
   props: ["name", "size"],
-  template: `<span data-test-stub="q-icon" :data-name="name"><slot /></span>`,
+  template: `<span data-test-stub="OIcon" :data-name="name"><slot /></span>`,
 };
 
 const QTooltipStub = {

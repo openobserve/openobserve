@@ -31,8 +31,8 @@ describe("PanelSidebar", () => {
       global: {
         plugins: [Quasar],
         stubs: {
-          "q-icon": {
-            template: '<div class="q-icon" :class="$attrs.class" :data-test="$attrs[\'data-test\']" :name="name"><slot /></div>',
+          "OIcon": {
+            template: '<div class="OIcon" :class="$attrs.class" :data-test="$attrs[\'data-test\']" :name="name"><slot /></div>',
             props: ["name"],
             inheritAttrs: false,
           },
@@ -177,7 +177,7 @@ describe("PanelSidebar", () => {
 
       const collapseBtn = wrapper.find('[data-test="dashboard-sidebar-collapse-btn"]');
       expect(collapseBtn.exists()).toBe(true);
-      // OButton uses icon-left slot instead of icon prop; icon is rendered inside as q-icon
+      // OButton uses icon-left slot instead of icon prop; icon is rendered inside as OIcon
       expect(collapseBtn.html()).toContain("unfold_less");
       // OButton applies tw:rotate-90 from the class attr; collapse-button is only a CSS definition
       expect(collapseBtn.classes()).toContain("tw:rotate-90");
@@ -405,7 +405,7 @@ describe("PanelSidebar", () => {
         global: {
           plugins: [Quasar],
           stubs: {
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-separator": true,
           },
@@ -438,7 +438,7 @@ describe("PanelSidebar", () => {
     it("should apply correct icon classes", () => {
       wrapper = createWrapper({ modelValue: false });
       
-      const icon = wrapper.find(".q-icon");
+      const icon = wrapper.find(".OIcon");
       expect(icon.classes()).toContain("collapsed-icon");
       expect(icon.classes()).toContain("rotate-90");
     });

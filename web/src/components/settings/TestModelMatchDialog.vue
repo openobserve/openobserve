@@ -39,7 +39,7 @@
               data-test="test-match-model-input"
             >
               <template #prepend>
-                <q-icon name="smart_toy" size="18px" class="tmm-search-icon" />
+                <OIcon name="smart-toy" size="sm" class="tmm-search-icon" />
               </template>
               <template #append>
                 <OButton
@@ -50,7 +50,7 @@
                   @click="clearAndFocus"
                   data-test="test-match-clear-btn"
                 >
-                  <q-icon name="close" size="14px" />
+                  <OIcon name="close" size="xs" />
                 </OButton>
               </template>
             </q-input>
@@ -70,7 +70,7 @@
               class="tmm-empty-state"
               data-test="test-match-empty"
             >
-              <q-icon name="manage_search" size="40px" class="tmm-empty-icon" />
+              <OIcon name="manage-search" size="40px" class="tmm-empty-icon" />
               <div class="tmm-empty-text">
                 {{ t("modelPricing.enterModelName") }}
               </div>
@@ -83,7 +83,7 @@
               class="tmm-empty-state"
               data-test="test-match-waiting"
             >
-              <q-icon name="ads_click" size="40px" class="tmm-empty-icon" />
+              <OIcon name="ads-click" size="40px" class="tmm-empty-icon" />
               <div class="tmm-empty-text">
                 {{ t("modelPricing.clickToTest") }}
               </div>
@@ -98,7 +98,7 @@
             >
               <div class="tmm-status-card tmm-status-card--error">
                 <div class="tmm-status-icon-wrap tmm-status-icon-wrap--error">
-                  <q-icon name="error_outline" size="22px" />
+                  <OIcon name="error-outline" size="22px" />
                 </div>
                 <div>
                   <div class="tmm-status-title">
@@ -135,7 +135,7 @@
               <!-- Match status -->
               <div class="tmm-status-card tmm-status-card--success">
                 <div class="tmm-status-icon-wrap tmm-status-icon-wrap--success">
-                  <q-icon name="check_circle" size="22px" />
+                  <OIcon name="check-circle" size="22px" />
                 </div>
                 <div class="tw:flex-1 tw:min-w-0">
                   <div class="tmm-status-title">
@@ -166,7 +166,7 @@
                     :key="step.key"
                   >
                     <div class="tmm-flow-arrow" v-if="sIdx > 0">
-                      <q-icon name="arrow_forward" size="13px" color="grey-5" />
+                      <OIcon name="arrow-forward" size="13px" />
                     </div>
                     <div
                       class="tmm-flow-step"
@@ -175,15 +175,15 @@
                         'tmm-flow-step--dimmed': step.key !== winnerSource,
                       }"
                     >
-                      <q-icon
+                      <OIcon
                         :name="step.icon"
                         size="14px"
                         class="tmm-flow-step-icon"
                       />
                       <span class="tmm-flow-step-label">{{ step.label }}</span>
-                      <q-icon
+                      <OIcon
                         v-if="step.key === winnerSource"
-                        name="check_circle"
+                        name="check-circle"
                         size="13px"
                         class="tmm-flow-step-check"
                       />
@@ -235,7 +235,7 @@
                   </div>
                 </div>
                 <div v-else class="tmm-cost-empty">
-                  <q-icon name="info_outline" size="15px" />
+                  <OIcon name="info-outline" size="15px" />
                   {{ t("modelPricing.noPricingForTier") }}
                 </div>
               </div>
@@ -253,6 +253,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 const props = defineProps({

@@ -114,17 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="note-message"
             >
               <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Select an existing stream
+                <OIcon name="info" size="sm" class="q-pr-xs" /> Select an existing stream
                 from the list or enter the name to create a new one</span
               >
               <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Enrichment_tables as
+                <OIcon name="info" size="sm" class="q-pr-xs" /> Enrichment_tables as
                 destination stream is only available for scheduled
                 pipelines</span
               >
 
               <span class="tw:flex">
-                <q-icon name="info" class="q-pr-xs q-pt-xs" /> Use curly braces
+                <OIcon name="info" size="sm" class="q-pr-xs q-pt-xs" /> Use curly braces
                 '{}' to configure stream name dynamically. e.g.
                 static_text_{fieldname}_postfix. Static text before/after {} is
                 optional</span
@@ -181,6 +181,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
@@ -189,7 +190,6 @@ import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });

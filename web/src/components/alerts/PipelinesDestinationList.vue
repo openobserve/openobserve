@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('pipeline_destinations.search')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
           <OButton
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-                <q-icon name="edit" />
+                <OIcon name="edit" size="sm" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
+              <OIcon name="delete" size="sm" />
               <span class="tw:ml-2">Delete</span>
             </OButton>
             <QTablePagination

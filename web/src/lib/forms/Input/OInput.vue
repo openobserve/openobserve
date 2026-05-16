@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   computed,
   nextTick,
@@ -218,13 +219,13 @@ const wrapperClasses = computed(() => [
       class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </label>
 
     <!-- Input row -->

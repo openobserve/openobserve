@@ -99,7 +99,6 @@ import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { durationFormatter } from "@/utils/zincutils";
@@ -236,7 +235,7 @@ export default defineComponent({
       perPageOptions,
       showListSchemaDialog,
       changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       loadingState,
       isMetaOrg,
       resultTotal,

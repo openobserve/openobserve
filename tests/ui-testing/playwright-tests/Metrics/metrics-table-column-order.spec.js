@@ -1058,7 +1058,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Draggable list is visible');
 
     // Verify empty state icon is NOT shown
-    const emptyStateIcon = page.locator('.q-icon[name="view_column"]');
+    const emptyStateIcon = page.locator('.OIcon[name="view_column"]');
     const isEmptyStateVisible = await emptyStateIcon.isVisible().catch(() => false);
     expect(isEmptyStateVisible).toBe(false);
     testLogger.info('Empty state is correctly not shown when columns are available');

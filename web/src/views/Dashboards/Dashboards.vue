@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-search"
             >
               <template #icon-left>
-                <q-icon name="search" />
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
 
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:w-full"
                     >
                       <template #icon-left>
-                        <q-icon name="search" />
+                        <OIcon name="search" size="sm" />
                       </template>
                     </OInput>
                     <div></div>

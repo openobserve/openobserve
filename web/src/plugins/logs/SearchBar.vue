@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #label>
-              <q-icon name="bar_chart" size="14px" />
+              <OIcon name="bar-chart" size="xs" />
               <OTooltip :content="t('search.showHistogramLabel')" />
             </template>
           </OSwitch>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             @click="fnSavedView"
           >
-            <q-icon name="save" size="16px" />
+            <OIcon name="save" size="sm" />
             <OTooltip :content="t('search.savedViewsLabel')" />
           </OButton>
           <!-- List saved views dropdown -->
@@ -135,8 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-toolbar"
               >
-                <q-icon name="saved_search" size="16px" />
-                <q-icon name="arrow_drop_down" size="18px" class="tw:-ms-1" />
+                <OIcon name="saved-search" size="sm" />
+                <OIcon name="arrow-drop-down" size="sm" class="tw:-ms-1" />
                 <OTooltip :content="t('search.listSavedViews')" />
               </OButton>
             </template>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :placeholder="t('search.searchSavedView')"
                           >
                             <template #prepend>
-                              <q-icon name="search" />
+                              <OIcon name="search" size="sm" />
                             </template>
                           </OInput>
                         </div>
@@ -246,11 +246,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon
+                                <OIcon
                                   :name="
                                     favoriteViews.includes(props.row.view_id)
                                       ? 'favorite'
-                                      : 'favorite_border'
+                                      : 'favorite-border'
                                   "
                                   size="xs"
                                 />
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="edit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </OButton>
                             </q-item-section>
                             <q-item-section
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="delete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </OButton>
                             </q-item-section>
                           </q-item>
@@ -344,11 +344,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 )
                               "
                             >
-                              <q-icon
+                              <OIcon
                                 :name="
                                   favoriteViews.includes(props.row.view_id)
                                     ? 'favorite'
-                                    : 'favorite_border'
+                                    : 'favorite-border'
                                 "
                                 color="grey"
                                 size="xs"
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="edit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </OButton>
                             </q-item-section>
                             <q-item-section
@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 variant="ghost"
                                 size="icon"
                               >
-                                <q-icon name="delete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </OButton>
                             </q-item-section>
                           </q-item>
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           @click="resetFilters"
         >
-          <q-icon name="restart_alt" size="16px" />
+          <OIcon name="restart-alt" size="sm" />
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
         <!-- this is the button group responsible for showing all the utilities -->
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="saved_search" size="xs" />
+                    <OIcon name="saved-search" size="xs" />
                     {{ t("search.listSavedViews") }}
                   </q-item-label>
                 </q-item-section>
@@ -540,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="add_circle_outline" size="xs" />
+                    <OIcon name="add-circle-outline" size="xs" />
                     {{ t("search.createSavedView") }}
                   </q-item-label>
                 </q-item-section>
@@ -561,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="restart_alt" size="xs" />
+                    <OIcon name="restart-alt" size="xs" />
                     {{ t("search.resetFilters") }}
                   </q-item-label>
                 </q-item-section>
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           style="order: 4"
         >
-          <q-icon name="menu" size="16px" />
+          <OIcon name="menu" size="sm" />
           <q-menu>
             <q-list>
               <!-- Share Link (moved from toolbar at <= 1100px) -->
@@ -667,7 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
                 <q-item-section side>
-                  <q-icon name="keyboard_arrow_right" />
+                  <OIcon name="keyboard-arrow-right" size="sm" />
                 </q-item-section>
                 <q-menu
                   v-model="showDownloadMenu"
@@ -687,9 +687,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <q-icon
-                        name="grid_on"
-                        size="14px"
+                      <OIcon
+                        name="grid-on"
+                        size="xs"
                         class="q-pr-sm q-pt-xs"
                       />
                       <q-item-section>
@@ -709,9 +709,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'json')
                       "
                     >
-                      <q-icon
-                        name="data_object"
-                        size="14px"
+                      <OIcon
+                        name="data-object"
+                        size="xs"
                         class="q-pr-sm q-pt-xs"
                       />
                       <q-item-section>
@@ -760,7 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-item-section v-close-popup>
                   <q-item-label class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon name="lightbulb" size="20px" />
+                    <OIcon name="lightbulb" size="md" />
                     {{ t("search.explainQuery") }}</q-item-label
                   >
                 </q-item-section>
@@ -828,7 +828,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:items-center tw:gap-2"
                     data-test="search-inspect-label"
                   >
-                    <q-icon name="troubleshoot" size="20px" />
+                    <OIcon name="troubleshoot" size="md" />
                     Search Inspect
                   </q-item-label>
                 </q-item-section>
@@ -891,9 +891,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <q-icon
-                      name="arrow_drop_down"
-                      size="18px"
+                    <OIcon
+                      name="arrow-drop-down"
+                      size="sm"
                       class="tw:ml-1"
                     />
                   </OButton>
@@ -997,7 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'search-button-normal-border-radius',
                       ]"
                     >
-                      <q-icon name="arrow_drop_down" size="18px" />
+                      <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
                   <ODropdownItem
@@ -1013,7 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="handleRunQueryFn(true)"
                   >
                     <template #icon-left
-                      ><q-icon name="refresh" size="16px"
+                      ><OIcon name="refresh" size="sm"
                     /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
@@ -1098,7 +1098,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'search-button-normal-border-radius',
                       ]"
                     >
-                      <q-icon name="arrow_drop_down" size="18px" />
+                      <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
                   <ODropdownItem
@@ -1114,7 +1114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="handleRunQueryFn(true)"
                   >
                     <template #icon-left
-                      ><q-icon name="refresh" size="16px"
+                      ><OIcon name="refresh" size="sm"
                     /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
@@ -1193,14 +1193,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :content="t('search.autoRunEnabled')"
                 />
-                <q-icon
+                <OIcon
                   v-if="
                     searchObj.meta.liveMode &&
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
                   name="autorenew"
-                  size="14px"
+                  size="xs"
                   class="q-mr-xs"
                 />
                 {{
@@ -1249,7 +1249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'search-button-normal-border-radius',
                     ]"
                   >
-                    <q-icon name="arrow_drop_down" size="18px" />
+                    <OIcon name="arrow-drop-down" size="sm" />
                   </OButton>
                 </template>
                 <!-- Normal mode: Refresh + Live Mode items -->
@@ -1267,7 +1267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="handleRunQueryFn(true)"
                 >
                   <template #icon-left
-                    ><q-icon name="refresh" size="16px"
+                    ><OIcon name="refresh" size="sm"
                   /></template>
                   {{ t("search.refreshCacheAndRunQuery") }}
                 </ODropdownItem>
@@ -1287,9 +1287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="toggleLiveMode"
                 >
                   <template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
-                        searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                        searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
                       size="16px"
                       :color="searchObj.meta.liveMode ? 'primary' : ''"
@@ -1464,10 +1464,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       data-test="vrl-editor-disabled-warning"
                     >
-                      <q-icon
+                      <OIcon
                         name="warning"
-                        color="warning"
-                        size="20px"
+                        size="md"
                         class="q-mx-sm"
                       />
                       <span
@@ -1683,7 +1682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
-          <q-icon name="info_outline" size="17px" class="q-ml-xs cursor-pointer">
+          <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer">
             <OTooltip
               side="right"
               align="center"
@@ -1693,7 +1692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span style="font-size: 14px">{{ t("search.noOfRecordsTooltip") }}</span>
               </template>
             </OTooltip>
-          </q-icon>
+          </OIcon>
         </div>
         <OInput
           type="number"
@@ -1709,7 +1708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="opacity: 0.8"
         class="text-left mapping-warning-msg q-mt-md"
       >
-        <q-icon name="warning" color="red" class="q-mr-sm" />
+        <OIcon name="warning" size="sm" class="q-mr-sm" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1804,7 +1803,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('search.searchSavedView')"
                       >
                         <template #prepend>
-                          <q-icon name="search" />
+                          <OIcon name="search" size="sm" />
                         </template>
                       </OInput>
                     </div>
@@ -1860,11 +1859,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon
+                            <OIcon
                               :name="
                                 favoriteViews.includes(props.row.view_id)
                                   ? 'favorite'
-                                  : 'favorite_border'
+                                  : 'favorite-border'
                               "
                               size="xs"
                             />
@@ -1881,7 +1880,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="edit" size="xs" />
+                            <OIcon name="edit" size="xs" />
                           </OButton>
                         </q-item-section>
                         <q-item-section
@@ -1895,7 +1894,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="delete" size="xs" />
+                            <OIcon name="delete" size="xs" />
                           </OButton>
                         </q-item-section>
                       </q-item>
@@ -1955,11 +1954,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )
                           "
                         >
-                          <q-icon
+                          <OIcon
                             :name="
                               favoriteViews.includes(props.row.view_id)
                                 ? 'favorite'
-                                : 'favorite_border'
+                                : 'favorite-border'
                             "
                             color="grey"
                             size="xs"
@@ -1976,7 +1975,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="edit" size="xs" />
+                            <OIcon name="edit" size="xs" />
                           </OButton>
                         </q-item-section>
                         <q-item-section
@@ -1990,7 +1989,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             variant="ghost"
                             size="icon"
                           >
-                            <q-icon name="delete" size="xs" />
+                            <OIcon name="delete" size="xs" />
                           </OButton>
                         </q-item-section>
                       </q-item>
@@ -5511,8 +5510,8 @@ export default defineComponent({
     font-size: inherit !important;
     font-weight: inherit !important;
 
-    .q-icon {
-      font-size: 1.25rem; // match q-icon size="xs" used by other items
+    .OIcon {
+      font-size: 1.25rem; // match OIcon size="xs" used by other items
     }
 
     .q-btn__content {
@@ -5537,7 +5536,7 @@ export default defineComponent({
   transition: all 0.2s ease;
   min-height: 1.875rem; // 30px
 
-  .q-icon {
+  .OIcon {
     font-size: 1.215rem; // 16px
   }
 
@@ -5565,7 +5564,7 @@ export default defineComponent({
   font-size: 0.75rem; // 12px
   font-weight: 500;
 
-  .q-icon {
+  .OIcon {
     font-size: 1.125rem; // 18px
   }
 

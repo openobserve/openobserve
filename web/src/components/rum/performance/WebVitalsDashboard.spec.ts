@@ -104,9 +104,9 @@ describe("WebVitalsDashboard", () => {
       global: {
         plugins: [i18n],
         stubs: {
-                    "q-icon": {
-            name: "q-icon",
-            template: '<div class="q-icon"></div>',
+                    "OIcon": {
+            name: "OIcon",
+            template: '<div class="OIcon"></div>',
             props: ["name", "size", "class"]
           },
           "q-spinner-hourglass": {
@@ -203,7 +203,7 @@ describe("WebVitalsDashboard", () => {
     });
 
     it("should render info icon", () => {
-      const icon = wrapper.findComponent({ name: "q-icon" });
+      const icon = wrapper.findComponent({ name: "OIcon" });
       expect(icon.exists()).toBe(true);
     });
 

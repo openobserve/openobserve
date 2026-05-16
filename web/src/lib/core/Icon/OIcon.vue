@@ -12,7 +12,7 @@ defineSlots<IconSlots>();
 const iconComponent = computed(() => iconRegistry[props.name]);
 
 // Maps semantic size tokens to Tailwind size utilities (width + height).
-// md = 24px matches the default q-icon rendering size.
+// md = 24px matches the default OIcon rendering size.
 const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
   xs: "tw:size-3",   // 12px
   sm: "tw:size-4",   // 16px

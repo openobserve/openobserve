@@ -15,6 +15,7 @@ import {
   ComboboxViewport,
 } from "reka-ui";
 import { computed, ref, useAttrs, useId, useSlots, watch } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -125,13 +126,13 @@ const hasLabel = computed(
       class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </label>
 
     <ComboboxRoot

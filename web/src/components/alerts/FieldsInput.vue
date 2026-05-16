@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
           >
-            <q-icon name="add" />
+            <OIcon name="add" size="sm" />
           </OButton>
         </div>
       </div>
@@ -175,7 +175,7 @@ const addApiHeader = () => {
 
 <style lang="scss">
 .add-field {
-  .q-icon {
+  .OIcon {
     margin-right: 4px !important;
     font-size: 15px !important;
   }

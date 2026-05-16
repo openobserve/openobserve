@@ -600,8 +600,8 @@ describe('RunningQueriesList.vue', () => {
       wrapper = createWrapper();
     });
 
-    it('should have access to outlinedCancel icon', () => {
-      expect(wrapper.vm.outlinedCancel).toBeDefined();
+    it('should have access to "cancel" icon', () => {
+      expect(wrapper.vm."cancel").toBeDefined();
     });
   });
 

@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('logStream.search')"
           >
             <template #prepend>
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
             </template>
           </OInput>
         </div>
@@ -280,7 +280,6 @@ import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -292,7 +291,9 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw, OInnerLoading, OSwitch, OSelect, OInput },
+  components: { QTablePagination, SchemaIndex, NoData, OButton, ODrawer, Trash2, ChevronDown, ChevronUp, RefreshCw, OInnerLoading, OSwitch, OSelect, OInput,
+    OIcon,
+},
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {
     const store = useStore();
@@ -741,7 +742,7 @@ export default defineComponent({
       filterFunctions,
       addFunctionInProgressLoading,
       toggleStreamRow,
-      outlinedDelete,
+      "delete": "delete",
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();

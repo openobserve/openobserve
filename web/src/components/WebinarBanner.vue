@@ -344,7 +344,7 @@ onMounted(async () => {
   line-height: 1;
   color: var(--o2-text-secondary);
 
-  .q-icon {
+  .OIcon {
     flex-shrink: 0;
     position: relative;
     top: 0;

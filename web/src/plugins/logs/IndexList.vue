@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="stream-type-badge tw:shrink-0"
         @click="onStreamTypeChange('logs')"
       >
-        <q-icon :name="streamTypeIcon" size="16px" />
+        <OIcon :name="streamTypeIcon" size="16px" />
         <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="tw:flex-1 tw:min-w-0">
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-no-field-found-text"
         class="text-center col-10 q-mx-none q-pt-md"
       >
-        <q-icon name="info" color="primary"
+        <OIcon name="info"
 size="xs" />
         {{ t("search.noFieldFoundInStream") }}
       </div>
@@ -168,15 +168,6 @@ import {
   addSpacesToOperators,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
-import {
-  outlinedAdd,
-  outlinedVisibility,
-  outlinedVisibilityOff,
-  outlinedSearch,
-  outlinedBarChart,
-  outlinedAccountTree,
-  outlinedTableView,
-} from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -194,6 +185,7 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
@@ -215,7 +207,8 @@ export default defineComponent({
     ),
     OButton,
     OSelect,
-  },
+    OIcon,
+},
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {
@@ -349,20 +342,20 @@ export default defineComponent({
     });
 
     const streamTypes = [
-      { label: t("search.logs"), value: "logs", icon: outlinedSearch },
-      { label: t("search.traces"), value: "traces", icon: outlinedAccountTree },
-      { label: t("search.metrics"), value: "metrics", icon: outlinedBarChart },
+      { label: t("search.logs"), value: "logs", icon: "search" },
+      { label: t("search.traces"), value: "traces", icon: "account-tree" },
+      { label: t("search.metrics"), value: "metrics", icon: "bar-chart" },
       {
         label: t("search.enrichmentTables"),
         value: "enrichment_tables",
-        icon: outlinedTableView,
+        icon: "table-view",
       },
     ];
 
     const streamTypeIcon = computed(() => {
       const current = searchObj.data.stream.streamType;
       return (
-        streamTypes.find((t) => t.value === current)?.icon ?? outlinedSearch
+        streamTypes.find((t) => t.value === current)?.icon ?? "search"
       );
     });
 
@@ -1852,9 +1845,9 @@ export default defineComponent({
       streamTypeIcon,
       streamTypeLabel,
       onStreamTypeChange,
-      outlinedAdd,
-      outlinedVisibilityOff,
-      outlinedVisibility,
+      "add": "add",
+      "visibility-off": "visibility-off",
+      "visibility": "visibility",
       handleQueryData,
       onStreamChange,
       addToInterestingFieldList,
@@ -1945,7 +1938,7 @@ export default defineComponent({
     padding-top: 8px !important;
   }
 
-  .q-icon {
+  .OIcon {
     height: 16px;
     width: 16px;
     margin-right: 10px;

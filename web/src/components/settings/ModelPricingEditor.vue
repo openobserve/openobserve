@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('modelPricing.goBack')"
         @click="goBack"
       >
-        <q-icon name="arrow_back_ios_new" size="14px" />
+        <OIcon name="arrow-back-ios-new" size="xs" />
       </div>
       <div class="tw:flex tw:flex-col tw:justify-center">
         <div
@@ -69,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1">
               <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
                 {{ t("modelPricing.modelNameField") }}
-                <q-icon
+                <OIcon
                   name="info"
-                  size="14px"
+                  size="xs"
                   class="q-ml-xs cursor-pointer"
                   :class="
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       t("modelPricing.modelNameTooltip")
                     }}</span>
                   </q-tooltip>
-                </q-icon>
+                </OIcon>
               </div>
               <q-input
                 v-model="model.name"
@@ -107,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <q-icon
+                  <OIcon
                     name="info"
-                    size="14px"
+                    size="xs"
                     class="q-ml-xs cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         t("modelPricing.matchPatternTooltip")
                       }}</span>
                     </q-tooltip>
-                  </q-icon>
+                  </OIcon>
                 </div>
                 <q-input
                   v-model="model.match_pattern"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="pattern-examples-btn tw:mt-7"
                 @click="showExamples = true"
               >
-                <q-icon name="lightbulb_outline" size="14px" />
+                <OIcon name="lightbulb-outline" size="xs" />
                 <q-tooltip
                   anchor="top right"
                   self="bottom right"
@@ -186,8 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="examples-copy-btn"
                       @click="copyPattern(ex.match_pattern)"
                     >
-                      <q-icon
-                        :name="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
+                      <OIcon
+                        :name="copiedPattern === ex.match-pattern ? 'check' : 'content-copy'"
                         size="12px"
                         :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
                       />
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!addState[idx as number].key.trim()"
                         @click="addPrice(tier, idx)"
                       >
-                        <q-icon name="add" size="14px" />
+                        <OIcon name="add" size="xs" />
                       </OButton>
                     </div>
                   </div>

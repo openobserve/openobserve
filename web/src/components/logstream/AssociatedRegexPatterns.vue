@@ -42,7 +42,7 @@
                     clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <OIcon name="search" size="sm" />
                   </template>
                 </OInput>
                 </div>
@@ -79,7 +79,7 @@
                                   <span class="regex-pattern-name">
                                     {{ props.row.pattern_name }}
                                   </span>
-                                  <span><q-icon name="check" size="xs" color="primary" /></span>
+                                  <span><OIcon name="check" size="xs" /></span>
                                 </q-td>
                               </q-tr>
                             </template>
@@ -121,7 +121,7 @@
                                 <q-td :data-test="`associated-regex-patterns-all-patterns-table-cell-${props.row.pattern_id}`" class="tw:flex tw:justify-between tw:items-center " style="border-bottom: 0px;  font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px; " :props="props" key="pattern_name">
                                  <span class="regex-pattern-name">{{ props.row.pattern_name }}</span> 
                                   <span v-if="checkIfPatternIsApplied(props.row.pattern_id)">
-                                    <q-icon name="check" size="xs" color="primary" />
+                                    <OIcon name="check" size="xs" />
                                   </span>
                                 </q-td>
                               </q-tr>
@@ -300,7 +300,7 @@
                         <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'">
                           <div v-if="!testLoading && outputString.length === 0">
-                            <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#A8A8A8]'" />
+                            <OIcon name="lightbulb" size="md" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#A8A8A8]'" />
                             <span class="tw:text-[12px] tw:font-[400] tw:text-center" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#4B5563]'">
                               Please click Test Input to see the results
                             </span>
@@ -395,7 +395,6 @@ import { debounce, useQuasar } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from '../ConfirmDialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -403,6 +402,7 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import ORadioGroup from '@/lib/forms/Radio/ORadioGroup.vue';
 import ORadio from '@/lib/forms/Radio/ORadio.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface PatternAssociation {
     field: string;
@@ -422,7 +422,8 @@ export default defineComponent({
         ORadioGroup,
         ORadio,
         OCheckbox,
-    },
+        OIcon,
+},
     props: {
         data: {
             type: Array as PropType<PatternAssociation[]>,
@@ -816,7 +817,7 @@ export default defineComponent({
             testStringOutput,
             outputString,
             expandState,
-            outlinedLightbulb,
+            outlinedLightbulb: "lightbulb",
             resetInputValues,
             // Additional exposed methods for testing
             checkIfPatternIsAppliedAndUpdate,

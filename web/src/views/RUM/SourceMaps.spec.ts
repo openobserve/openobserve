@@ -24,7 +24,7 @@ vi.mock("@/services/sourcemaps", () => ({
 
 // Avoid pulling in the real icon module
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedDelete: "outlined-delete-icon",
+  "delete": "outlined-delete-icon",
 }));
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
       name: "QSpinnerHourglass",
       template: '<div data-test-stub="q-spinner-hourglass" />',
     },
-    "q-icon": true,
+    "OIcon": true,
     "q-table": {
       name: "QTable",
       props: ["rows", "columns", "rowKey", "pagination"],

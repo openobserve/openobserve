@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="recommended-list-search-input"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </q-input>
           <span
@@ -225,6 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -249,7 +250,9 @@ import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, OTabs, ORouteTab, OButton },
+  components: { ConfirmDialog, OTabs, ORouteTab, OButton,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

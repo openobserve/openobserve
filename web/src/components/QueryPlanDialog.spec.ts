@@ -142,7 +142,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
             '<div data-test="q-splitter"><slot name="before" /><slot name="after" /></div>',
         },
         "q-separator": true,
-        "q-icon": true,
+        "OIcon": true,
         "q-space": true,
         "q-tooltip": true,
         "q-spinner-dots": true,

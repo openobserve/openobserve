@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           placeholder="Search User"
         >
           <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
+            <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon"/>
           </template>
         </q-input>
       </div>
@@ -119,11 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:email="slotProps: any">
             <div class="flex items-center">
               <span>{{ slotProps.column.row.email }}</span>
-              <q-icon
+              <OIcon
                 v-if="shouldShowWarning(slotProps.column.row)"
                 name="info"
-                color="warning"
-                size="16px"
+                size="sm"
                 class="q-ml-xs cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${slotProps.column.row.email}`"
               >
@@ -138,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
                   </div>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </template>
         </app-table>
@@ -165,6 +164,7 @@ import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({

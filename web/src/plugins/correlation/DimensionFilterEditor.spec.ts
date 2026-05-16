@@ -117,7 +117,7 @@ describe("DimensionFilterEditor.vue", () => {
             props: ["variant", "size", "disabled", "loading"],
             emits: ["click"],
           },
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
           "q-input": {
             name: "QInput",

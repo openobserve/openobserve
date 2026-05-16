@@ -40,9 +40,8 @@
           class="draggable-row"
         >
           <div class="draggable-handle tw:self-center">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
+            <OIcon
+              name="drag-indicator" size="sm"
               class="q-mr-xs"
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
@@ -106,8 +105,8 @@
                   v-model="mapping.color"
                   class="tw:flex-1"
                 />
-                <q-icon
-                  :name="outlinedCancel"
+                <OIcon
+                  name="cancel"
                   class="cursor-pointer"
                   size="xs"
                   :title="t('dashboard.valueMappingRemoveColor')"
@@ -144,8 +143,8 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
@@ -153,7 +152,9 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any, OButton, OInput, OSelect, OColor, ODialog },
+  components: { draggable: VueDraggableNext as any, OButton, OInput, OSelect, OColor, ODialog,
+    OIcon,
+},
   props: {
     open: {
       type: Boolean,
@@ -263,7 +264,7 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
-      outlinedCancel,
+      "cancel": "cancel",
     };
   },
 });

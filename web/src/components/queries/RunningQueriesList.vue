@@ -112,7 +112,6 @@ import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
@@ -289,7 +288,7 @@ export default defineComponent({
       listSchema,
       showListSchemaDialog,
       changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       schemaData,
       loadingState,
       lastRefreshed,

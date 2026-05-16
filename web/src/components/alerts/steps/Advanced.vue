@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
             >
-              <q-icon name="info_outline" />
+              <OIcon name="info-outline" size="sm" />
               <q-tooltip>{{
                 t("alerts.alertSettings.templateTooltip")
               }}</q-tooltip>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.advanced.refreshTemplates')"
               @click="$emit('refresh:templates')"
             >
-              <q-icon name="refresh" />
+              <OIcon name="refresh" size="sm" />
             </OButton>
           </div>
         </div>
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
             >
-              <q-icon name="info_outline" />
+              <OIcon name="info-outline" size="sm" />
               <q-tooltip>{{ t("alerts.advanced.variablesTooltip") }}</q-tooltip>
             </OButton>
           </div>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-circle-sm"
                 @click="removeVariable(variable)"
               >
-                <q-icon name="delete_outline" />
+                <OIcon name="delete-outline" size="sm" />
               </OButton>
               <OButton
                 data-test="alert-variables-add-variable-btn"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-circle-sm"
                 @click="addVariable"
               >
-                <q-icon name="add" />
+                <OIcon name="add" size="sm" />
               </OButton>
             </div>
           </template>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
               >
-                <q-icon name="info_outline" />
+                <OIcon name="info-outline" size="sm" />
                 <q-tooltip>{{
                   t("alerts.advanced.rowTemplateTooltip")
                 }}</q-tooltip>

@@ -154,7 +154,7 @@
             @click="handleAddCondition(argIndex)"
             icon-left="add"
           >
-            <template #icon-left><q-icon name="add" /></template>
+            <template #icon-left><OIcon name="add" size="sm" /></template>
             <OTooltip content="Add another clause" />
           </OButton>
 
@@ -167,7 +167,7 @@
             :aria-label="t('panel.removeClause')"
             icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
+            <template #icon-left><OIcon name="close" size="sm" /></template>
             <OTooltip content="Remove clause" />
           </OButton>
         </div>
@@ -178,6 +178,7 @@
 
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
@@ -260,7 +261,8 @@ export default defineComponent({
     RightJoinTypeSvg,
     RightJoinLineSvg,
     InnerJoinTypeSvg,
-  },
+    OIcon,
+},
 
   props: {
     mainStream: {

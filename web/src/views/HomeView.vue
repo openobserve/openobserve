@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dragend="onTabDragEnd"
           @dragenter.prevent="onTabDragEnter(tab.id)"
         >
-          <q-icon
-          name="drag_indicator"
+          <OIcon
+          name="drag-indicator"
           class="home-tab-drag-handle"
           size="0.875em"
         />
@@ -89,6 +89,7 @@ import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -222,7 +223,8 @@ export default defineComponent({
     O2AIChat,
     HomeChatHistory,
     OButton,
-  },
+    OIcon,
+},
 });
 </script>
 

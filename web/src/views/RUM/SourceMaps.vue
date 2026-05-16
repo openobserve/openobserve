@@ -151,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-xs-sq"
                       :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
                     >
-                      <q-icon
-                        :name="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
+                      <OIcon
+                        :name="expandedRow !== getRowKey(props.row) ? 'expand-more' : 'expand-less'"
                         size="14px"
                       />
                     </OButton>

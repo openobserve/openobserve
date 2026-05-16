@@ -73,7 +73,7 @@ describe("DevOps Component", () => {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
           },
           'q-input': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-tabs': true,
           'q-route-tab': true,
           'router-view': true
@@ -134,7 +134,7 @@ describe("DevOps Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
             },
             'q-input': true,
-            'q-icon': true,
+            'OIcon': true,
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true

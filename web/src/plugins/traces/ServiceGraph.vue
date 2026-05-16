@@ -29,7 +29,7 @@
           clearable
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <OIcon class="o2-search-input-icon" size="1rem" name="search" />
           </template>
         </OInput>
       </div>
@@ -175,7 +175,7 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="error_outline" size="4em" color="negative" />
+                <OIcon name="error-outline" size="4em" />
                 <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
@@ -195,7 +195,7 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="hub" size="5em" color="grey-4" />
+                <OIcon name="hub" size="5em" />
                 <div class="text-h6 q-mt-md text-grey-7">
                   No Service Graph Data
                 </div>
@@ -290,6 +290,7 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -307,7 +308,8 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OInput,
-  },
+    OIcon,
+},
   emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();

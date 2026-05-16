@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:border-gray-200'
         ]"
       >
-        <q-icon data-test="toc-header-icon" name="format_list_bulleted" size="16px" class="tw:opacity-80" />
+        <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="tw:opacity-80" />
         <span data-test="toc-header-title" :class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
           Table of Contents
         </span>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ]"
               >
                 <!-- Icon on the left -->
-                <q-icon
+                <OIcon
                   :data-test="`toc-level1-icon-${item.id}`"
                   :name="item.children.length > 0 ? 'folder' : 'article'"
                   size="14px"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="$emit('toggle-section', item, $event)"
                   class="tw:flex-shrink-0"
                 >
-                  <q-icon :name="expandedSections[item.id] ? 'expand_more' : 'chevron_right'" size="14px" />
+                  <OIcon :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'" size="14px" />
                   <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
                 </OButton>
               </div>
@@ -103,10 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <!-- Icon on the left -->
-                      <q-icon
+                      <OIcon
                         :data-test="`toc-level2-icon-${child.id}`"
                         name="label"
-                        size="12px"
+                        size="xs"
                         class="tw:opacity-60 tw:flex-shrink-0"
                       />
                       <!-- Text in the middle - clickable to scroll -->
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="$emit('toggle-section', child, $event)"
                         class="tw:flex-shrink-0"
                       >
-                        <q-icon :name="expandedSections[child.id] ? 'expand_more' : 'chevron_right'" size="14px" />
+                        <OIcon :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'" size="14px" />
                         <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
                       </OButton>
                     </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'hover:tw:bg-blue-50 tw:text-gray-600'
                         ]"
                       >
-                        <q-icon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber_manual_record" size="8px" class="tw:opacity-60" />
+                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="8px" class="tw:opacity-60" />
                         <span :data-test="`toc-level3-text-${grandchild.id}`" class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
                       </div>
                     </div>
@@ -166,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface TocItem {
   id: string;
@@ -177,7 +178,9 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,

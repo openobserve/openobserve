@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-back-btn"
             >
               <template #icon-left
-                ><q-icon name="arrow_back_ios_new"
+                ><OIcon name="arrow-back-ios-new" size="sm"
               /></template>
             </OButton>
             <span
@@ -68,10 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="dots"
               size="sm"
             />
-            <q-icon
+            <OIcon
               class="q-table__title tw:text-gray-400 tw:mt-1"
-              name="chevron_right"
-            ></q-icon>
+              name="chevron-right" size="sm"
+             />
             <span
               class="q-table__title q-mx-sm tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
@@ -195,8 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-print-btn"
             >
               <template #icon-left
-                ><q-icon
-                  :name="store.state.printMode === true ? 'close' : 'print'"
+                ><OIcon
+                  :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
               <q-tooltip>{{
                 store.state.printMode === true
@@ -212,12 +212,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-fullscreen-btn"
             >
               <template #icon-left
-                ><q-icon
+                ><OIcon
                   :name="
                     quasar.fullscreen.isActive
-                      ? 'fullscreen_exit'
+                      ? 'fullscreen-exit'
                       : 'fullscreen'
-                  "
+                  " size="sm"
               /></template>
               <q-tooltip>{{
                 quasar.fullscreen.isActive
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="view-dashboard-scheduled-reports"
             >
               <template #icon-left
-                ><q-icon :name="outlinedDescription"
+                ><OIcon name="description" size="sm"
               /></template>
               <q-tooltip>{{ t("dashboard.scheduledDashboards") }}</q-tooltip>
             </OButton>
@@ -368,12 +368,12 @@ import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
-import { outlinedDescription } from "@quasar/extras/material-icons-outlined";
 import config from "@/aws-exports";
 import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
@@ -415,7 +415,8 @@ export default defineComponent({
     DashboardJsonEditor,
     OButton,
     OSpinner,
-  },
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const route = useRoute();
@@ -1888,7 +1889,7 @@ export default defineComponent({
       folderId,
       reportId,
       tabId,
-      outlinedDescription,
+      outlinedDescription: "description",
       searchRequestTraceIds,
       arePanelsLoading,
       cancelQuery,

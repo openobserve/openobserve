@@ -167,7 +167,7 @@ describe("RunningQueries", () => {
           "q-card-section": true,
           "q-card-actions": true,
           "q-separator": true,
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
           "q-badge": true,
           "q-chip": true,

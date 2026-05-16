@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('alert_destinations.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
           <OButton
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Export Destination"
                 @click.stop="exportDestination(props.row)"
               >
-                <q-icon name="download" />
+                <OIcon name="download" size="sm" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${props.row.name}-update-destination`"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-                <q-icon name="edit" />
+                <OIcon name="edit" size="sm" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
@@ -133,10 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                   :label="getPrebuiltTypeName(props.row)"
                 />
-                <q-icon
-                  name="auto_awesome"
-                  size="16px"
-                  color="primary"
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
                   :title="'Prebuilt ' + getPrebuiltTypeName(props.row) + ' destination'"
                 />
               </template>
@@ -148,10 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-xs"
                   :label="getCustomDestinationLabel(props.row)"
                 />
-                <q-icon
+                <OIcon
                   name="settings"
-                  size="16px"
-                  color="grey-6"
+                  size="sm"
                   :title="getCustomDestinationLabel(props.row)"
                 />
               </template>
@@ -176,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
+              <OIcon name="delete" size="sm" />
               <span class="tw:ml-2">Delete</span>
             </OButton>
           <QTablePagination

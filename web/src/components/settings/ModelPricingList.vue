@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs-sq"
             data-test="model-pricing-info-btn"
           >
-            <q-icon name="info_outline" size="14px" />
+            <OIcon name="info-outline" size="xs" />
             <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
           </OButton>
         </div>
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('modelPricing.searchPlaceholder')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
           <OButton
@@ -145,9 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="{ 'tw:pl-6': col.name === 'name' }"
                 >
                   {{ col.label }}
-                  <q-icon
+                  <OIcon
                     v-if="col.tooltip"
-                    name="info_outline"
+                    name="info-outline"
                     size="13px"
                     class="col-header-info-icon"
                   >
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       align="center"
                       :content="col.tooltip"
                     />
-                  </q-icon>
+                  </OIcon>
                 </span>
               </template>
             </q-th>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="full-width column flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
-            <q-icon name="monetization_on" size="48px" color="grey-4" />
+            <OIcon name="monetization-on" size="48px" />
             <div class="text-subtitle1 text-grey-7 q-mt-sm">
               {{ t("modelPricing.noModels") }}
             </div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="col.name === 'name'">
                 <div class="row items-center no-wrap tree-node-content">
                   <div class="tree-icon-wrapper">
-                    <q-icon
+                    <OIcon
                       v-if="props.row.children?.length > 0"
                       :name="
                         expandedParents.has(props.row.id)
@@ -244,26 +244,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
                   </span>
-                  <q-icon
+                  <OIcon
                     v-else-if="
                       getSource(props.row) === 'meta_org' ||
                       (getSource(props.row) === 'org' &&
                         props.row.org_id !== orgIdentifier)
                     "
-                    name="corporate_fare"
-                    size="16px"
+                    name="corporate-fare"
+                    size="sm"
                     class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                   >
                     <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-                  </q-icon>
-                  <q-icon
+                  </OIcon>
+                  <OIcon
                     v-else
                     name="person"
-                    size="16px"
+                    size="sm"
                     class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                   >
                     <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-                  </q-icon>
+                  </OIcon>
                   <div class="o2-table-cell-content">{{ props.row.name }}</div>
                   <OTooltip
                     v-if="props.row.name.length > 30"
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="openEditor(props.row)"
                       data-test="model-pricing-edit-btn"
                     >
-                      <q-icon name="edit" size="14px" />
+                      <OIcon name="edit" size="xs" />
                     </OButton>
                     <OButton
                       variant="ghost-destructive"
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="duplicateModel(props.row)"
                       data-test="model-pricing-duplicate-btn"
                     >
-                      <q-icon name="content_copy" size="14px" />
+                      <OIcon name="content-copy" size="xs" />
                     </OButton>
                   </template>
                   <template v-else>
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="duplicateModel(props.row)"
                       data-test="model-pricing-clone-btn"
                     >
-                      <q-icon name="content_copy" size="14px" />
+                      <OIcon name="content-copy" size="xs" />
                     </OButton>
                   </template>
                 </div>
@@ -420,8 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tr class="shadow-banner-row">
               <q-td :colspan="columns.length" class="shadow-banner-cell">
                 <div class="shadow-banner-tree-line"></div>
-                <q-icon
-                  name="warning_amber"
+                <OIcon
+                  name="warning-amber"
                   size="13px"
                   class="shadow-banner-icon"
                 />
@@ -482,26 +482,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
                     </span>
-                    <q-icon
+                    <OIcon
                       v-else-if="
                         getSource(child) === 'meta_org' ||
                         (getSource(child) === 'org' &&
                           child.org_id !== orgIdentifier)
                       "
-                      name="corporate_fare"
-                      size="16px"
+                      name="corporate-fare"
+                      size="sm"
                       class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                     >
                       <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-                    </q-icon>
-                    <q-icon
+                    </OIcon>
+                    <OIcon
                       v-else
                       name="person"
-                      size="16px"
+                      size="sm"
                       class="tw:shrink-0 tw:cursor-default tw:mr-1 source-icon"
                     >
                       <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-                    </q-icon>
+                    </OIcon>
                     <div class="o2-table-cell-content tw:opacity-70">
                       {{ child.name }}
                     </div>
@@ -519,14 +519,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-caption pattern-code o2-table-cell-content shadowed-pattern"
                       >{{ child.match_pattern }}</code
                     >
-                    <q-icon
-                      name="warning_amber"
-                      size="14px"
+                    <OIcon
+                      name="warning-amber"
+                      size="xs"
                       class="tw:shrink-0 shadowed-icon"
-                      color="orange-10"
                     >
                       <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: props.row.name })" />
-                    </q-icon>
+                    </OIcon>
                   </div>
                 </template>
                 <template v-else-if="col.name === 'pricing'">
@@ -611,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('modelPricing.actionEdit')"
                         @click.stop="openEditor(child)"
                       >
-                        <q-icon name="edit" size="14px" />
+                        <OIcon name="edit" size="xs" />
                       </OButton>
                       <OButton
                         variant="ghost-destructive"
@@ -627,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('modelPricing.actionDuplicate')"
                         @click.stop="duplicateModel(child)"
                       >
-                        <q-icon name="content_copy" size="14px" />
+                        <OIcon name="content-copy" size="xs" />
                       </OButton>
                     </template>
                     <template v-else>
@@ -637,7 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :title="t('modelPricing.actionClone')"
                         @click.stop="duplicateModel(child)"
                       >
-                        <q-icon name="content_copy" size="14px" />
+                        <OIcon name="content-copy" size="xs" />
                       </OButton>
                     </template>
                   </div>
@@ -667,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="exportSelected"
             >
               <template #icon-left
-                ><q-icon name="download" size="14px"
+                ><OIcon name="download" size="xs"
               /></template>
               {{ t("modelPricing.exportSelected", { count: selectedCount }) }}
             </OButton>
@@ -709,27 +708,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
           </span>
-          <q-icon
+          <OIcon
             v-else-if="
               pricingDialogRow &&
               (getSource(pricingDialogRow) === 'meta_org' ||
                 (getSource(pricingDialogRow) === 'org' &&
                   pricingDialogRow.org_id !== orgIdentifier))
             "
-            name="corporate_fare"
-            size="18px"
+            name="corporate-fare"
+            size="sm"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
              <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
-          </q-icon>
-          <q-icon
+          </OIcon>
+          <OIcon
             v-else
             name="person"
-            size="18px"
+            size="sm"
             class="tw:shrink-0 tw:cursor-default source-icon"
           >
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
-          </q-icon>
+          </OIcon>
       </template>
 
       <div class="q-pa-md pricing-dialog-body">

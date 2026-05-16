@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="events.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-16 tw:text-gray-500"
     >
-      <q-icon name="forum" size="56px" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="forum" size="56px" class="tw:mb-3 tw:opacity-40" />
       <div class="tw:text-base tw:font-medium tw:mb-1">No activity yet</div>
       <div class="tw:text-sm tw:text-gray-400">Events and comments will appear here</div>
     </div>
@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-        ><q-icon name="keyboard_arrow_up" size="18px" /><OTooltip content="Scroll to top" /></OButton>
+        ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip content="Scroll to top" /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-        ><q-icon name="keyboard_arrow_down" size="18px" /><OTooltip content="Scroll to bottom" /></OButton>
+        ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom" /></OButton>
       </div>
 
       <div ref="timelineContainer" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-3 tw:pt-2 tw:pb-4">
@@ -83,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
-                    <q-icon
+                    <OIcon
                       name="person"
-                      size="12px"
+                      size="xs"
                       :style="{ color: getAvatarColor(getUserId(event)) }"
                     />
                   </div>
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
-                    <q-icon
+                    <OIcon
                       :name="getEventIcon(event)"
                       size="14px"
                       :style="{ color: getEventBadgeColor(event) }"
@@ -211,9 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
-                    <q-icon
+                    <OIcon
                       name="person"
-                      size="12px"
+                      size="xs"
                       :style="{ color: getAvatarColor(getUserId(event)) }"
                     />
                   </div>
@@ -277,9 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
             }"
           >
-            <q-icon
+            <OIcon
               name="person"
-              size="12px"
+              size="xs"
               :style="{ color: getAvatarColor(getCurrentUserId()) }"
             />
           </div>
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="submitting"
               @click="submitComment"
               data-test="incident-timeline-comment-send"
-            ><q-icon name="send" size="16px" /><OTooltip content="Send comment" /></OButton>
+            ><OIcon name="send" size="sm" /><OTooltip content="Send comment" /></OButton>
           </div>
         </div>
       </div>
@@ -323,6 +323,7 @@ import { date } from "quasar";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

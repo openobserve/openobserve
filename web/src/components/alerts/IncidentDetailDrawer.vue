@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('alerts.incidents.goBack')"
           @click="close"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="text-h6">
           {{ t('alerts.incidents.incident') }}
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
-            <q-icon name="info" size="14px" />
+            <OIcon name="info" size="xs" />
             <span>{{ getStatusLabel(incidentDetails.status) }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
-            <q-icon name="warning" size="14px" />
+            <OIcon name="warning" size="xs" />
             <span>{{ incidentDetails.severity }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outline
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
-            <q-icon name="notifications_active" size="14px" />
+            <OIcon name="notifications-active" size="xs" />
             <span>{{ triggers.length }} Alerts</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="updating"
           @click="reopenIncident"
-        ><q-icon name="refresh" size="16px" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
+        ><OIcon name="refresh" size="sm" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
 
         <!-- Edit Title Button -->
         <OButton
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Total Alerts
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-amber-500/10' : 'tw:bg-amber-50'">
-                  <q-icon name="bolt" :class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'" style="font-size: 20px;" />
+                  <OIcon name="bolt" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-amber-400' : 'tw:text-amber-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.incidents.uniqueAlerts') }}
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/10' : 'tw:bg-blue-50'">
-                  <q-icon name="notifications_active" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
+                  <OIcon name="notifications-active" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Affected Services
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-purple-500/10' : 'tw:bg-purple-50'">
-                  <q-icon name="dns" :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" style="font-size: 20px;" />
+                  <OIcon name="dns" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-purple-400' : 'tw:text-purple-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Active Duration
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-green-500/10' : 'tw:bg-green-50'">
-                  <q-icon name="schedule" :class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'" style="font-size: 20px;" />
+                  <OIcon name="schedule" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Alert Frequency
                 </div>
                 <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center" :class="store.state.theme === 'dark' ? 'tw:bg-rose-500/10' : 'tw:bg-rose-50'">
-                  <q-icon name="show_chart" :class="store.state.theme === 'dark' ? 'tw:text-rose-400' : 'tw:text-rose-600'" style="font-size: 20px;" />
+                  <OIcon name="show-chart" size="sm" :class="store.state.theme === 'dark' ? 'tw:text-rose-400' : 'tw:text-rose-600'" style="font-size: 20px;" />
                 </div>
               </div>
 
@@ -498,8 +498,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.id || 'N/A' }}</span>
-                        <q-icon
-                          :name="copiedField === 'incident_id' ? 'check' : 'content_copy'"
+                        <OIcon
+                          :name="copiedField === 'incident-id' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_id' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -522,8 +522,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ incidentDetails?.title || 'N/A' }}</span>
-                        <q-icon
-                          :name="copiedField === 'incident_title' ? 'check' : 'content_copy'"
+                        <OIcon
+                          :name="copiedField === 'incident-title' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'incident_title' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -546,8 +546,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         <span class="tw:truncate tw:flex-1 tw:min-w-0">{{ getCorrelationMethodLabel(incidentDetails?.key_type) }}</span>
-                        <q-icon
-                          :name="copiedField === 'key_type' ? 'check' : 'content_copy'"
+                        <OIcon
+                          :name="copiedField === 'key-type' ? 'check' : 'content-copy'" size="sm"
                           :class="copiedField === 'key_type' ? 'tw:text-green-500' : 'tw:opacity-60 hover:tw:opacity-100 hover:tw:text-blue-500'"
                           class="tw:cursor-pointer tw:transition-all tw:flex-shrink-0"
                           style="font-size: 14px; cursor: pointer;"
@@ -879,7 +879,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:border-gray-200'
                 ]"
               >
-                <q-icon name="info" size="16px" class="tw:opacity-80" />
+                <OIcon name="info" size="sm" class="tw:opacity-80" />
                 <span :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-sm tw:font-semibold">
                   Alert Details
                 </span>
@@ -1015,8 +1015,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+            <OIcon
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
@@ -1032,7 +1032,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+            ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
@@ -1066,8 +1066,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+            <OIcon
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
@@ -1083,7 +1083,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+            ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1113,7 +1113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               :disabled="correlationLoading"
               @click="refreshCorrelation"
-            ><q-icon name="refresh" size="16px" /><OTooltip :content="t('alerts.incidents.refreshCorrelatedData')" /></OButton>
+            ><OIcon name="refresh" size="sm" /><OTooltip :content="t('alerts.incidents.refreshCorrelatedData')" /></OButton>
           </div>
 
           <!-- Loading State -->
@@ -1124,8 +1124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error/No Data State -->
           <div v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams" class="full-width column flex-center q-gutter-sm justify-center" style="margin: 15vh auto 2rem;">
-            <q-icon
-              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error_outline') : 'info_outline'"
+            <OIcon
+              :name="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'error-outline') : 'info-outline'"
               :color="correlationError ? (correlationError.includes('disambiguation fields') ? 'warning' : 'negative') : 'grey-5'"
               size="4rem"
             />
@@ -1141,7 +1141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="q-mt-md"
-            ><q-icon name="refresh" size="18px" class="tw:mr-1" />Retry</OButton>
+            ><OIcon name="refresh" size="sm" class="tw:mr-1" />Retry</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1204,6 +1204,7 @@ import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -1223,7 +1224,8 @@ export default defineComponent({
     OButton,
     OSpinner,
     OTooltip,
-  },
+    OIcon,
+},
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();

@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
-              <q-icon
-                :name="serviceNameDetected ? 'check_circle' : 'warning'"
+              <OIcon
+                :name="serviceNameDetected ? 'check-circle' : 'warning'"
                 size="18px"
                 :color="serviceNameDetected ? 'positive' : undefined"
                 :class="serviceNameDetected ? '' : 'tw:text-amber-500'"
@@ -75,11 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </template>
               </div>
-              <q-icon
+              <OIcon
                 :name="
                   serviceNameExpanded
-                    ? 'keyboard_arrow_up'
-                    : 'keyboard_arrow_down'
+                    ? 'keyboard-arrow-up'
+                    : 'keyboard-arrow-down'
                 "
                 size="18px"
                 class="tw:opacity-40 tw:shrink-0"
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:border-grey-4 tw:bg-grey-1'
               "
             >
-              <q-icon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
+              <OIcon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
               <span
                 class="tw:text-sm tw:font-medium"
                 :class="
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="addingToEnv = activeEnvironment"
               >
                 <template #icon-left
-                  ><q-icon name="add" size="14px"
+                  ><OIcon name="add" size="xs"
                 /></template>
                 {{ t("settings.correlation.addField") }}
               </OButton>
@@ -334,9 +334,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-blue-50 tw:text-blue-700'
                 "
               >
-                <q-icon
-                  name="auto_awesome"
-                  size="14px"
+                <OIcon
+                  name="auto-awesome"
+                  size="xs"
                   class="tw:shrink-0 tw:mt-0.5"
                 />
                 <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
@@ -618,7 +618,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
-          <q-icon name="radar" size="18px" class="tw:text-teal-6" />
+          <OIcon name="radar" size="sm" class="tw:text-teal-6" />
           <span class="tw:font-bold tw:text-sm">Workload Detection</span>
         </div>
 
@@ -635,18 +635,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
-            <q-icon name="check_circle" size="18px" color="positive" />
+            <OIcon name="check-circle" size="sm" />
             <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
               Workload detected using fields
               <span class="tw:text-xs tw:opacity-60"
                 >({{ trackedAliasIds.length }})</span
               >
             </div>
-            <q-icon
+            <OIcon
               :name="
                 trackedAliasExpanded
-                  ? 'keyboard_arrow_up'
-                  : 'keyboard_arrow_down'
+                  ? 'keyboard-arrow-up'
+                  : 'keyboard-arrow-down'
               "
               size="18px"
               class="tw:opacity-40 tw:shrink-0"
@@ -833,7 +833,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
               <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-                <q-icon name="add" size="16px" class="tw:text-grey-5" />
+                <OIcon name="add" size="sm" class="tw:text-grey-5" />
               </div>
 
               <!-- Dim card -->
@@ -846,7 +846,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                  <q-icon
+                  <OIcon
                     :name="card.theme.icon"
                     size="14px"
                     :class="card.theme.iconClass"
@@ -1038,7 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:opacity-40 hover:tw:opacity-100"
               @click="dismissSuggestion"
             >
-              <q-icon name="cancel" size="14px" />
+              <OIcon name="cancel" size="xs" />
             </OButton>
           </div>
         </div>
@@ -1084,9 +1084,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-grey-6'
                 "
               >
-                <q-icon
+                <OIcon
                   name="verified"
-                  size="14px"
+                  size="xs"
                   class="tw:text-positive"
                 />
                 <span
@@ -1240,7 +1240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'tw:bg-blue-1/40 tw:text-grey-6'
                   "
                 >
-                  <q-icon name="info" size="14px" />
+                  <OIcon name="info" size="xs" />
                   <span
                     >These are the related
                     <strong>{{
@@ -1339,7 +1339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-identity-warnings-banner"
         >
           <template #avatar>
-            <q-icon name="warning" color="warning" />
+            <OIcon name="warning" size="sm" />
           </template>
           <div class="tw:flex tw:flex-col tw:gap-1">
             <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
@@ -1584,6 +1584,7 @@ import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type {

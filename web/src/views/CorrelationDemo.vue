@@ -24,7 +24,7 @@
                     timeout
                   </div>
                 </div>
-                <q-icon name="link" class="correlation-hint" />
+                <OIcon name="link" size="sm" class="correlation-hint" />
               </div>
 
               <!-- Sample Log 2 -->
@@ -38,7 +38,7 @@
                     <strong>message:</strong> Database connection timeout
                   </div>
                 </div>
-                <q-icon name="link" class="correlation-hint" />
+                <OIcon name="link" size="sm" class="correlation-hint" />
               </div>
 
               <!-- Sample Log 3 -->
@@ -53,7 +53,7 @@
                     user_123
                   </div>
                 </div>
-                <q-icon name="link" class="correlation-hint" />
+                <OIcon name="link" size="sm" class="correlation-hint" />
               </div>
             </div>
           </q-card-section>
@@ -107,7 +107,7 @@
         <!-- Fallback when panel is closed -->
         <q-card v-if="!showCorrelation">
           <q-card-section class="text-center q-pa-lg">
-            <q-icon name="info" size="lg" color="grey-5" />
+            <OIcon name="info" size="lg" />
             <div class="text-grey-6 q-mt-md">
               Click a log line to see related telemetry
             </div>
@@ -140,6 +140,7 @@ import { ref } from "vue";
 import TelemetryCorrelationPanel from "@/components/TelemetryCorrelationPanel.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Demo state
 const showCorrelation = ref(false);

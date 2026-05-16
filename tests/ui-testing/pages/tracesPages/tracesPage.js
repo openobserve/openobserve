@@ -1980,7 +1980,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getSortIndicator() {
-    return this.page.locator('[class*="sort"], [data-test*="sort"], .q-icon:has-text("arrow")');
+    return this.page.locator('[class*="sort"], [data-test*="sort"], .OIcon:has-text("arrow")');
   }
 
   /**

@@ -195,11 +195,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Filters
                   </div>
-                  <q-icon
+                  <OIcon
                     class=""
                     style="margin-top: 25px; margin-left: 5px"
-                    size="20px"
-                    name="info_outline"
+                    size="md"
+                    name="info-outline"
                     data-test="dashboard-variables-setting-filter-info"
                   >
                     <OTooltip max-width="250px">
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="bg-highlight">$variableName</span>.
                       </template>
                     </OTooltip>
-                  </q-icon>
+                  </OIcon>
                 </div>
                 <div class="row items-center" style="width: 100%">
                   <div
@@ -572,6 +572,7 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -591,7 +592,9 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip },
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip,
+    OIcon,
+},
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data

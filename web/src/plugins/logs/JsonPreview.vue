@@ -16,7 +16,7 @@
         variant="outline"
         class="tw:mb-[0.375rem] q-mr-sm"
         @click="copyLogToClipboard"
-      ><q-icon name="content_copy" size="14px" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
@@ -25,7 +25,7 @@
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <q-icon name="link" size="14px" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
@@ -86,7 +86,7 @@
               class="q-ml-sm log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
-              <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
             </OButton>
           </template>
           <ODropdownItem
@@ -197,7 +197,7 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <OIcon name="content-copy" size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">

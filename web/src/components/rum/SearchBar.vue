@@ -458,7 +458,7 @@ export default defineComponent({
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
-      .q-icon {
+      .OIcon {
         font-size: 0.9375rem;
         color: #ffffff;
       }

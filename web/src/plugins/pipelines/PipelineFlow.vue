@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="pipeline-flow-container" class="container">
      <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="warning-text flex  items-center q-px-sm q-mr-md ">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
+      <OIcon name="info" class="q-mr-xs " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
    
    <!-- Edge deletion help notification -->
    <div v-if="showEdgeHelpNotification" class="edge-help-notification">
-     <q-icon name="info" class="q-mr-xs" size="16px" />
+     <OIcon name="info" class="q-mr-xs" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
    
@@ -122,6 +122,7 @@ import { useI18n } from "vue-i18n";
 /* import the required styles */
 
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const { onInit } = useVueFlow();
 
 export default {
@@ -289,7 +290,7 @@ q-btn {
   align-items: center;
   animation: slideDown 0.3s ease-out;
   
-  .q-icon {
+  .OIcon {
     color: #3b82f6;
   }
 }
@@ -301,7 +302,7 @@ q-btn {
   border: 1px solid #374151;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   
-  .q-icon {
+  .OIcon {
     color: #60a5fa;
   }
 }

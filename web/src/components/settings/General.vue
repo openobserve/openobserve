@@ -91,11 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 180px"
             >
               <template v-slot:append>
-                <q-icon name="info" size="xs" class="cursor-pointer">
+                <OIcon name="info" size="xs" class="cursor-pointer">
                   <q-tooltip max-width="300px">
                     {{ t("settings.maxSeriesPerQueryTooltip") }}
                   </q-tooltip>
-                </q-icon>
+                </OIcon>
               </template>
             </q-input>
             <span class="individual-setting-description">
@@ -122,10 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customLightColor }"
                 >
-                  <q-icon
+                  <OIcon
                     name="palette"
-                    size="14px"
-                    color="white"
+                    size="xs"
                     class="palette-icon"
                   />
                 </div>
@@ -143,10 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customDarkColor }"
                 >
-                  <q-icon
+                  <OIcon
                     name="palette"
-                    size="14px"
-                    color="white"
+                    size="xs"
                     class="palette-icon"
                   />
                 </div>
@@ -160,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <q-icon name="refresh" size="16px" />
+                <OIcon name="refresh" size="sm" />
                 <q-tooltip>{{ t("settings.resetToDefaultColors") }}</q-tooltip>
               </div>
             </div>
@@ -299,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mx-none o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
-                <q-icon name="attach_file" />
+                <OIcon name="attach-file" size="sm" />
               </template>
             </q-file>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
@@ -375,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mx-none o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
-                <q-icon name="attach_file" />
+                <OIcon name="attach-file" size="sm" />
               </template>
             </q-file>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
@@ -453,6 +451,7 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
@@ -476,7 +475,8 @@ export default defineComponent({
     OButton,
     ODialog,
     OSpinner,
-  },
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const q = useQuasar();
@@ -1166,7 +1166,7 @@ body.body--dark .theme-color-chip:hover {
   transform: translateY(-1px) rotate(180deg);
 }
 
-.theme-reset-chip:hover .q-icon {
+.theme-reset-chip:hover .OIcon {
   color: rgb(239, 68, 68);
 }
 
@@ -1179,7 +1179,7 @@ body.body--dark .theme-reset-chip:hover {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
-body.body--dark .theme-reset-chip:hover .q-icon {
+body.body--dark .theme-reset-chip:hover .OIcon {
   color: rgb(248, 113, 113);
 }
 </style>

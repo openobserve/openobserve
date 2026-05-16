@@ -40,9 +40,8 @@
           class="draggable-row"
         >
           <div class="draggable-handle tw:self-center">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
+            <OIcon
+              name="drag-indicator" size="sm"
               class="q-mr-xs"
               :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
             />
@@ -89,8 +88,8 @@
                   v-model="series.color"
                   class="tw:flex-1"
                 />
-                <q-icon
-                  :name="outlinedCancel"
+                <OIcon
+                  name="cancel"
                   class="cursor-pointer tw:align-middle"
                   size="xs"
                   title="Remove color"
@@ -115,7 +114,7 @@
                 @click="removecolorBySeriesByIndex(index)"
                 :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
               >
-                <template #icon-left><q-icon name="close" /></template>
+                <template #icon-left><OIcon name="close" size="sm" /></template>
               </OButton>
             </div>
           </div>
@@ -147,10 +146,10 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 
@@ -162,7 +161,8 @@ export default defineComponent({
     OButton,
     ODialog,
     OColor,
-  },
+    OIcon,
+},
   props: {
     open: {
       type: Boolean,
@@ -334,7 +334,7 @@ export default defineComponent({
       applycolorBySeries,
       cancelEdit,
       editColorBySeries,
-      outlinedCancel,
+      "cancel": "cancel",
       seriesDataItems,
       openColorPicker,
       selectColorBySeriesOption,

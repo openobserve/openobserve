@@ -49,13 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
           <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
-          <q-icon
-            name="info_outline"
+          <OIcon
+            name="info-outline"
             class="cursor-pointer tw:shrink-0"
-            size="14px"
+            size="xs"
           >
             <OTooltip content="1 unit = 30px" />
-          </q-icon>
+          </OIcon>
         </div>
 
      
@@ -74,9 +74,12 @@ import { getImageURL } from "../../utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODrawer, OInput, OTooltip },
+  components: { ODrawer, OInput, OTooltip,
+    OIcon,
+},
   props: {
     layout: {
       type: Object,

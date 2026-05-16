@@ -204,9 +204,9 @@ describe("VariableSettings", () => {
             props: ['icon', 'label', 'color', 'class'],
             emits: ['click']
           },
-          'q-icon': {
+          'OIcon': {
             name: 'QIcon',
-            template: '<span class="q-icon"><slot /></span>',
+            template: '<span class="OIcon"><slot /></span>',
             props: ['name', 'color']
           },
           'q-dialog': {

@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
               {{ t('correlation.logs.filters.matchedDimensions') }}
             </h3>
-            <q-icon name="info" size="sm" color="primary">
+            <OIcon name="info" size="sm">
               <q-tooltip max-width="300px">
                 {{ t('correlation.logs.filters.matchedDimensionsTooltip') }}
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
 
           <div class="tw:space-y-3">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`matched-dimension-${key}`"
             >
               <div class="tw:flex-1 tw:flex tw:items-center tw:gap-3">
-                <q-icon name="lock" size="sm" color="primary" />
+                <OIcon name="lock" size="sm" />
                 <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
                 <q-input
                   v-model="pendingFilters[key]"
@@ -65,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`matched-dimension-input-${key}`"
                 />
               </div>
-              <q-icon name="check_circle" size="sm" color="positive">
+              <OIcon name="check-circle" size="sm">
                 <q-tooltip>
                   {{ t('correlation.logs.filters.stableDimension') }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
         </div>
@@ -80,11 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h3 class="tw:text-base tw:font-semibold tw:m-0">
               {{ t('correlation.logs.filters.additionalDimensions') }}
             </h3>
-            <q-icon name="info" size="sm" color="warning">
+            <OIcon name="info" size="sm">
               <q-tooltip max-width="300px">
                 {{ t('correlation.logs.filters.additionalDimensionsTooltip') }}
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
 
           <div class="tw:space-y-3">
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-2">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <q-icon name="warning" size="sm" color="warning" />
+                  <OIcon name="warning" size="sm" />
                   <span class="tw:font-semibold tw:text-sm">{{ key }}:</span>
                   <q-input
                     v-model="pendingFilters[key]"
@@ -127,11 +127,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <q-icon name="sync_problem" size="sm" color="warning">
+              <OIcon name="sync-problem" size="sm">
                 <q-tooltip>
                   {{ t('correlation.logs.filters.unstableDimension') }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
         </div>
@@ -153,6 +153,7 @@ import { useI18n } from 'vue-i18n';
 import { SELECT_ALL_VALUE } from '@/utils/dashboard/constants';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   modelValue: boolean;

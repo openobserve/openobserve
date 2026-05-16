@@ -58,8 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!hasResults"
                 >
                   <template v-if="true">
-                    <q-icon name="view_column"
-size="16px"
+                    <OIcon name="view-column"
+size="sm"
 class="tw:mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
@@ -115,8 +115,8 @@ class="tw:mr-1" />
                     <q-item-label>{{ field }}</q-item-label>
                   </q-item-section>
                   <q-item-section side>
-                    <q-icon
-                      name="drag_indicator"
+                    <OIcon
+                      name="drag-indicator"
                       size="xs"
                       class="drag-handle tw:cursor-move"
                     />
@@ -245,6 +245,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";

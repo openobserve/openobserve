@@ -2,11 +2,11 @@
   <div data-test="add-stream-routing-section" class="bg-white full-height">
     <div class="q-py-sm q-px-md flex justify-between items-center">
       <div class="stream-routing-title">Stream Routing</div>
-      <q-icon
+      <OIcon
         data-test="stream-routing-close-dialog-btn"
         name="cancel"
         class="cursor-pointer"
-        size="20px"
+        size="md"
         @click="emits('cancel:hideform')"
       />
     </div>
@@ -120,6 +120,7 @@ import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 

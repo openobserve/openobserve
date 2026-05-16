@@ -78,7 +78,7 @@ describe("Languages Component", () => {
           'q-tabs': true,
           'q-route-tab': true,
           'router-view': true,
-          'q-icon': true
+          'OIcon': true
         }
       },
     });
@@ -124,7 +124,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -162,7 +162,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -189,7 +189,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -222,7 +222,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -257,7 +257,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -525,7 +525,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -571,7 +571,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -600,7 +600,7 @@ describe("Languages Component", () => {
               'q-tabs': true,
               'q-route-tab': true,
               'router-view': true,
-              'q-icon': true
+              'OIcon': true
             }
           },
         });
@@ -633,7 +633,7 @@ describe("Languages Component", () => {
             'q-tabs': true,
             'q-route-tab': true,
             'router-view': true,
-            'q-icon': true
+            'OIcon': true
           }
         },
       });
@@ -668,7 +668,7 @@ describe("Languages Component", () => {
               'q-tabs': true,
               'q-route-tab': true,
               'router-view': true,
-              'q-icon': true
+              'OIcon': true
             }
           },
         });

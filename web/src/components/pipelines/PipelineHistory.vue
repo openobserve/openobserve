@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="pipeline-history-title"
             >
               {{ t(`pipeline.history`) }}
-              <q-icon name="info" size="18px" color="grey-6">
+              <OIcon name="info" size="sm">
                 <q-tooltip>
                   History is only available for scheduled and manually triggered
                   pipelines. Real-time pipelines do not generate history
                   records.
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
           <div class="flex q-ml-auto items-center">
@@ -82,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template v-slot:prepend>
-                <q-icon
+                <OIcon
                   class="o2-search-input-icon"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-search-input-icon-dark'
                       : 'o2-search-input-icon-light'
                   "
-                  name="search"
+                  name="search" size="sm"
                 />
               </template>
               <template v-slot:no-option>
@@ -183,29 +183,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-is_realtime="props">
             <q-td :props="props">
-              <q-icon
-                :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
+              <OIcon
+                :name="props.row.is_realtime ? 'check-circle' : 'schedule'"
                 :color="props.row.is_realtime ? 'positive' : 'grey'"
                 size="xs"
               >
                 <q-tooltip>
                   {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </q-td>
           </template>
 
           <template #body-cell-is_silenced="props">
             <q-td :props="props">
-              <q-icon
-                :name="props.row.is_silenced ? 'volume_off' : 'volume_up'"
+              <OIcon
+                :name="props.row.is_silenced ? 'volume-off' : 'volume-up'"
                 :color="props.row.is_silenced ? 'grey' : 'positive'"
                 size="20px"
               >
                 <q-tooltip>
                   {{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </q-td>
           </template>
 
@@ -217,12 +217,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-is_partial="props">
             <q-td :props="props">
-              <q-icon
+              <OIcon
                 v-if="
                   props.row.is_partial !== null &&
                   props.row.is_partial !== undefined
                 "
-                :name="props.row.is_partial ? 'warning' : 'check_circle'"
+                :name="props.row.is_partial ? 'warning' : 'check-circle'"
                 :color="props.row.is_partial ? 'warning' : 'positive'"
                 size="xs"
               >
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : "Complete Results"
                   }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
               <span v-else>-</span>
             </q-td>
           </template>
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Type</div>
                   <div class="text-body2">
-                    <q-icon
+                    <OIcon
                       :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
                       class="q-mr-xs"
                       size="xs"
@@ -370,17 +370,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Silenced</div>
                   <div class="text-body2">
-                    <q-icon
+                    <OIcon
                       v-if="selectedRow.is_silenced"
-                      name="volume_off"
-                      color="warning"
+                      name="volume-off"
                       size="xs"
                       class="q-mr-xs"
                     />
-                    <q-icon
+                    <OIcon
                       v-else
-                      name="volume_up"
-                      color="positive"
+                      name="volume-up"
                       size="xs"
                       class="q-mr-xs"
                     />
@@ -441,9 +439,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       Result Status
                     </div>
                     <div class="text-body2">
-                      <q-icon
+                      <OIcon
                         :name="
-                          selectedRow.is_partial ? 'warning' : 'check_circle'
+                          selectedRow.is_partial ? 'warning' : 'check-circle'
                         "
                         :color="selectedRow.is_partial ? 'warning' : 'positive'"
                         size="xs"
@@ -472,9 +470,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
+                  <OIcon
                     name="error"
-                    color="negative"
                     size="xs"
                     class="q-mr-xs"
                   />
@@ -501,9 +498,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
-                    name="check_circle"
-                    color="positive"
+                  <OIcon
+                    name="check-circle"
                     size="xs"
                     class="q-mr-xs"
                   />
@@ -539,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <q-icon name="error" size="24px" class="error-icon" />
+        <OIcon name="error" size="md" class="error-icon" />
       </template>
       <div class="tw:mb-4">
         <div class="section-label tw:mb-2">Error Summary</div>
@@ -559,6 +555,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import pipelinesService from "@/services/pipelines";

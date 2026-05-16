@@ -148,7 +148,7 @@ const globalConfig = {
       props: ["modelValue", "options", "disable"],
       emits: ["update:modelValue"],
     },
-    "q-icon": { template: '<i :class="name" />', props: ["name", "size"] },
+    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
   },
 };
 

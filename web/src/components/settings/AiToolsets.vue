@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('aiToolset.search')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </q-input>
           <OButton
@@ -159,8 +159,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -183,7 +183,8 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
-  },
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -405,7 +406,7 @@ export default defineComponent({
       visibleRows,
       hasVisibleRows,
       confirmDelete,
-      outlinedDelete,
+      "delete": "delete",
       addToolset,
       editToolset,
       hideAddDialog,

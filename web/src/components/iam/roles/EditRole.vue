@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="onResourceChange"
                 >
                   <template #prepend>
-                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                    <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                   </template>
                 </q-input>
               </div>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
-                  <q-icon name="help" size="17px" />
+                  <OIcon name="help" size="17px" />
                   <span class="q-ml-xs"> Help </span>
                 </div>
               </div>
@@ -209,10 +209,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
                   <div class="flex justify-between items-center q-px-sm">
                     <div style="font-size: 16px">Quick Reference</div>
-                    <q-icon
+                    <OIcon
                       class="cursor-pointer"
                       name="close"
-                      size="14px"
+                      size="xs"
                       :title="t('common.close')"
                       @click="toggleHelpSection"
                     />
@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { cloneDeep } from "lodash-es";
 import { defineAsyncComponent, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18n } from "vue-i18n";

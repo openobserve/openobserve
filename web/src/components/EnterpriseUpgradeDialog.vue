@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded State: Show actual data -->
               <template v-else>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
-                  <q-icon :name="dialogConfig.primaryButtonIcon" />
+                  <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
                 </template>
               </OButton>
               <OButton
@@ -149,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -170,12 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -193,12 +193,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
@@ -1097,7 +1097,7 @@ export default defineComponent({
     margin-bottom: 24px;
     backdrop-filter: blur(10px);
 
-    .q-icon {
+    .OIcon {
       color: white;
     }
   }
@@ -1146,7 +1146,7 @@ export default defineComponent({
       color: white;
       box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
 
-      .q-icon {
+      .OIcon {
         color: white;
         font-size: 20px;
       }
@@ -1157,7 +1157,7 @@ export default defineComponent({
         color: white;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
-        .q-icon {
+        .OIcon {
           color: white;
         }
       }
@@ -1207,7 +1207,7 @@ export default defineComponent({
     backdrop-filter: blur(10px);
     white-space: nowrap;
 
-    .q-icon {
+    .OIcon {
       color: rgba(255, 255, 255, 0.85);
     }
   }
@@ -1363,7 +1363,7 @@ export default defineComponent({
       justify-content: center;
       color: var(--q-primary);
 
-      .q-icon {
+      .OIcon {
         font-size: 15px;
       }
     }

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
 
@@ -346,12 +346,6 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedDriveFileMove,
-} from "@quasar/extras/material-icons-outlined";
 import { useQuasar, date, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
@@ -361,6 +355,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),

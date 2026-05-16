@@ -53,7 +53,7 @@
           />
         </div>
 
-        <q-icon
+        <OIcon
           class="q-mr-xs"
           size="15px"
           name="close"
@@ -80,12 +80,15 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MarkLineConfig",
-  components: { OButton, OSelect, OInput },
+  components: { OButton, OSelect, OInput,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const { t } = useI18n();

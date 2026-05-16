@@ -29,9 +29,9 @@
                 :value-replace-fn="selectPromQlNameOption"
                 style="width: 260px"
               />
-              <q-icon
+              <OIcon
                 name="info"
-                size="16px"
+                size="sm"
                 class="cursor-pointer field-info-icon"
               >
                 <q-tooltip
@@ -45,7 +45,7 @@
                   <br />
                   {{ t("dashboard.overrideMessageExample") }}
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </div>
 
@@ -71,9 +71,9 @@
               style="width: 140px"
             >
               <template v-slot:append>
-                <q-icon
+                <OIcon
                   name="info"
-                  size="16px"
+                  size="sm"
                   class="cursor-pointer"
                 >
                   <q-tooltip
@@ -89,7 +89,7 @@
                     <br />
                     {{ t("dashboard.stepValueExample") }}
                   </q-tooltip>
-                </q-icon>
+                </OIcon>
               </template>
             </q-input>
           </div>
@@ -117,7 +117,7 @@
               style="width: 120px"
             >
               <template v-slot:append>
-                <q-icon name="info" size="16px" class="cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <q-tooltip
                     class="bg-grey-8"
                     anchor="top middle"
@@ -128,7 +128,7 @@
                     Range: Returns time series data over a time range.<br />
                     Instant: Returns single value at a specific point in time.
                   </q-tooltip>
-                </q-icon>
+                </OIcon>
               </template>
             </q-select>
           </div>
@@ -142,12 +142,14 @@
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PromQLBuilderOptions",
   components: {
     CommonAutoComplete,
-  },
+    OIcon,
+},
   props: {
     dashboardPanelData: {
       type: Object,

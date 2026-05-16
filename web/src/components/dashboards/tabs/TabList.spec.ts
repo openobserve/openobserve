@@ -82,8 +82,8 @@ describe("TabList", () => {
           "q-tooltip": {
             template: "<span data-test='tooltip-wrapper'><slot /></span>",
           },
-          "q-icon": {
-            template: "<span data-test='q-icon'></span>",
+          "OIcon": {
+            template: "<span data-test='OIcon'></span>",
           },
         },
         ...options,
@@ -452,8 +452,8 @@ describe("TabList", () => {
             "q-tooltip": {
               template: "<span data-test='tooltip-wrapper'><slot /></span>",
             },
-            "q-icon": {
-              template: "<span data-test='q-icon'></span>",
+            "OIcon": {
+              template: "<span data-test='OIcon'></span>",
             },
           },
         },

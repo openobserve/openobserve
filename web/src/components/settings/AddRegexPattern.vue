@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           @click="toggleFullScreen"
         >
-          <q-icon
+          <OIcon
             name="fullscreen"
-            size="14px"
+            size="xs"
             :color="isFullScreen ? 'primary' : undefined"
           />
         </OButton>
@@ -121,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Try O2 Assistant to write expressions
                   </span>
-                  <q-icon
+                  <OIcon
                     size="sm"
-                    name="arrow_right_alt"
+                    name="arrow-right-alt"
                     class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1"
                   />
                 </OButton>
@@ -272,9 +272,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div v-if="!testLoading && outputString.length === 0">
-                    <q-icon
-                      :name="outlinedLightbulb"
-                      size="24px"
+                    <OIcon
+                      name="lightbulb"
+                      size="md"
                       :class="
                         store.state.theme === 'dark'
                           ? 'tw:text-[#ffffff]'
@@ -349,11 +349,11 @@ import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
@@ -380,7 +380,8 @@ export default defineComponent({
     OButton,
     ODrawer,
     OSpinner,
-  },
+    OIcon,
+},
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -606,7 +607,7 @@ export default defineComponent({
       toggleFullScreen,
       outputString,
       testStringOutput,
-      outlinedLightbulb,
+      outlinedLightbulb: "lightbulb",
       testLoading,
       goToAILogo,
       inputContext,

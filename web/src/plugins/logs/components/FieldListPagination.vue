@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-user-defined-fields-btn"
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <q-icon name="person" class="tw:text-[12px]!"></q-icon>
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <OIcon name="person" size="sm" class="tw:text-[12px]!"></OIcon>
+            <OIcon name="schema" size="sm" class="tw:text-[12px]!"></OIcon>
             <OTooltip
               data-test="logs-page-fields-list-user-defined-fields-warning-tooltip"
               :content="t('search.userDefinedSchemaLabel')"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <OIcon name="schema" size="sm" class="tw:text-[12px]!"></OIcon>
             <OTooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
               max-width="18.75rem"
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <q-icon name="info_outline" class="tw:text-[12px]!" />
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <OIcon name="info-outline" size="sm" class="tw:text-[12px]!" />
+            <OIcon name="schema" size="sm" class="tw:text-[12px]!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="opt.slot === 'all_fields_slot' ? 'logs-all-fields-btn' : 'logs-interesting-fields-btn'"
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <OIcon name="schema" size="sm" class="tw:text-[12px]!"></OIcon>
             <OTooltip
               data-test="logs-page-fields-list-all-fields-warning-tooltip"
               max-width="18.75rem"
@@ -110,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <q-icon name="info_outline" class="tw:text-[12px]!" />
-            <q-icon name="schema" class="tw:text-[12px]!"></q-icon>
+            <OIcon name="info-outline" size="sm" class="tw:text-[12px]!" />
+            <OIcon name="schema" size="sm" class="tw:text-[12px]!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('first-page')"
           aria-label="First page"
         >
-          <q-icon name="fast_rewind" size="14px" />
+          <OIcon name="fast-rewind" size="xs" />
         </OButton>
 
         <!-- Page number buttons (3 at a time) -->
@@ -168,14 +168,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('last-page')"
           aria-label="Last page"
         >
-          <q-icon name="fast_forward" size="14px" />
+          <OIcon name="fast-forward" size="xs" />
         </OButton>
       </div>
 
       <!-- Reset Fields Icon -->
       <div class="field-list-reset">
-        <q-icon
-          name="restart_alt"
+        <OIcon
+          name="restart-alt" size="sm"
           data-test="logs-page-fields-list-reset-icon"
           class="cursor-pointer reset-icon"
           @click="$emit('reset-fields')"
@@ -198,6 +198,7 @@ import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const { t } = useI18n();

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-alert-back-btn"
               @click="goBackToAlertsList"
             >
-              <q-icon name="arrow_back_ios_new" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
 
           <!-- EDIT MODE: (folder → chevron → name) -->
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-table__title alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
-            <q-icon name="chevron_right" class="q-table__title tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
+            <OIcon name="chevron-right" size="sm" class="q-table__title tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
             <template v-if="!isAnomalyMode">
               <span class="q-table__title tw:truncate tw:max-w-[200px]">
                 {{ formData.name }}
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="tw:w-px tw:h-4" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" />
-              <q-icon :name="activeEvaluationStatus.wouldTrigger ? 'check_circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :color="activeEvaluationStatus.wouldTrigger ? 'positive' : 'grey-5'" size="16px" />
               <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-green-600' : 'tw:text-gray-400'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <q-icon name="query_stats" size="36px" class="tw:opacity-20" />
+                <OIcon name="query-stats" size="36px" class="tw:opacity-20" />
                 <span class="tw:text-sm tw:font-medium" :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
                   {{ t('alerts.previewEmptyState') }}
                 </span>

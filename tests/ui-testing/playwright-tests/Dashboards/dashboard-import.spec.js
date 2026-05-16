@@ -162,7 +162,7 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.uploadDashboardFile(fileContentPath);
 
-    const closeIcon = page.locator('.q-file .q-icon').filter({ hasText: 'close' });
+    const closeIcon = page.locator('.q-file .OIcon').filter({ hasText: 'close' });
     await closeIcon.waitFor({ state: 'visible', timeout: 5000 });
     await closeIcon.click();
 

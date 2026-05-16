@@ -220,7 +220,7 @@ describe("ErrorDetail Component", () => {
 
     it("should show schedule icon", () => {
       const scheduleIcon = wrapper.find(
-        ".error_time .q-icon, .error_time [class*='schedule']",
+        ".error_time .OIcon, .error_time [class*='schedule']",
       );
       expect(scheduleIcon.exists()).toBe(true);
     });

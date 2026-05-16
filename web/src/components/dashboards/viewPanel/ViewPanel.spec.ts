@@ -326,8 +326,8 @@ describe("ViewPanel", () => {
             emits: ["click"],
             inheritAttrs: false,
           },
-          "q-icon": {
-            template: '<i class="q-icon"></i>',
+          "OIcon": {
+            template: '<i class="OIcon"></i>',
             props: ["name"],
           },
           "q-tooltip": {

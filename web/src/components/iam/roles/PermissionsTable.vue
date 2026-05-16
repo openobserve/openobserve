@@ -187,11 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <template v-if="col.name === 'expand' && row.has_entities">
-                <q-icon
+                <OIcon
                   :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-icon`"
                   :name="
-                    row.expand ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
-                  "
+                    row.expand ? 'keyboard-arrow-up' : 'keyboard-arrow-down'
+                  " size="sm"
                   class="cursor-pointer"
                   :title="t('common.expand')"
                   @click="() => expandPermission(row)"
@@ -258,6 +258,7 @@ import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   selectedPermissionsHash: {
     type: Set,

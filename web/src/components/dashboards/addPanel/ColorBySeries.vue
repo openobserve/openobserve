@@ -27,7 +27,7 @@
         data-test="dashboard-addpanel-config-color-by-series"
         icon-left="info-outline"
       >
-        <template #icon-left><q-icon name="info_outline" /></template>
+        <template #icon-left><OIcon name="info-outline" size="sm" /></template>
         <OTooltip
           :content="t('dashboard.colorBySeriesTooltip')"
           side="bottom"
@@ -66,10 +66,13 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ColorBySeries",
-  components: { ColorBySeriesPopUp, OButton, OTooltip },
+  components: { ColorBySeriesPopUp, OButton, OTooltip,
+    OIcon,
+},
   props: {
     colorBySeriesData: {
       type: Object,

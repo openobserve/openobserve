@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             @click="resetFilters"
           >
-            <q-icon name="restart_alt" size="16px" />
+            <OIcon name="restart-alt" size="sm" />
             <OTooltip :content="t('search.resetFilters')" />
           </OButton>
           <!-- Error Only Toggle -->
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @update:model-value="onErrorOnlyToggle"
             />
-            <q-icon
+            <OIcon
               name="error"
               size="1.1rem"
               class="tw:mx-1 tw:text-red-500"
@@ -213,13 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :content="t('search.autoRunEnabled')"
               />
-              <q-icon
+              <OIcon
                 v-if="
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
                 name="autorenew"
-                size="14px"
+                size="xs"
                 class="q-mr-xs"
               />
               {{ t("search.runQuery") }}
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'search-button-dropdown-enterprise-border-radius',
                   ]"
                 >
-                  <q-icon name="arrow_drop_down" size="18px" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                 </OButton>
               </template>
               <ODropdownItem
@@ -251,9 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="toggleLiveMode"
               >
                 <template #icon-left>
-                  <q-icon
+                  <OIcon
                     :name="
-                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                      searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
                     size="16px"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Export Traces"
           @click="downloadLogs"
         >
-          <q-icon name="download" size="16px" />
+          <OIcon name="download" size="sm" />
         </OButton>
         <share-button
           data-test="logs-search-bar-share-link-btn"
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mr-[0.375rem]"
             @click="$emit('service-graph-refresh')"
           >
-            <q-icon name="refresh" size="16px" />
+            <OIcon name="refresh" size="sm" />
             <OTooltip :content="t('common.refresh')" />
           </OButton>
           <OToggleGroup
@@ -341,8 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             >
               <template #icon-left
-                ><Share2 class="tw:size-3.5 tw:shrink-0"
-              /></template>
+                ><OIcon name="share" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
@@ -382,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mr-[0.375rem]"
             @click="$emit('services-catalog-refresh')"
           >
-            <q-icon name="refresh" size="16px" />
+            <OIcon name="refresh" size="sm" />
             <OTooltip :content="t('common.refresh')" />
           </OButton>
         </div>
@@ -452,8 +451,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import { GitBranch } from 'lucide-vue-next';
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -484,8 +482,6 @@ export default defineComponent({
     OSwitch,
     OSelect,
     OTooltip,
-    Layers,
-    Network,
     GitBranch,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
@@ -1157,7 +1153,7 @@ export default defineComponent({
       border-radius: 3px 3px 3px 3px;
       padding: 0px 5px;
 
-      .q-icon {
+      .OIcon {
         font-size: 15px;
         color: #ffffff;
       }
@@ -1188,7 +1184,7 @@ export default defineComponent({
     width: 30px;
     height: 30px;
 
-    .q-icon {
+    .OIcon {
       margin-right: 0;
     }
   }

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
-      <q-icon name="link" size="md" color="primary" />
+      <OIcon name="link" size="md" />
     </template>
 
       <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                   >
                     <template #prepend>
-                      <q-icon name="search" size="xs" />
+                      <OIcon name="search" size="xs" />
                     </template>
                   </q-input>
                 </div>
@@ -207,16 +207,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div class="metric-group-label">
-                            <q-icon
+                            <OIcon
                               :name="
                                 collapsedGroups.has(group.id)
-                                  ? 'chevron_right'
-                                  : 'expand_more'
+                                  ? 'chevron-right'
+                                  : 'expand-more'
                               "
                               size="0.875rem"
                               class="tw:mr-0.5"
                             />
-                            <q-icon
+                            <OIcon
                               v-if="typeof group.icon === 'string'"
                               :name="group.icon"
                               size="0.875rem"
@@ -491,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
             >
               <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="hub" color="primary" size="1.25rem" />
+                <OIcon name="hub" size="1.25rem" />
                 <div class="tw:flex tw:flex-col">
                   <span class="tw:text-sm tw:font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
@@ -670,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" size="xs" />
+                    <OIcon name="search" size="xs" />
                   </template>
                 </q-input>
               </div>
@@ -696,11 +696,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div class="metric-group-label">
-                          <q-icon
+                          <OIcon
                             :name="
                               collapsedGroups.has(group.id)
-                                ? 'chevron_right'
-                                : 'expand_more'
+                                ? 'chevron-right'
+                                : 'expand-more'
                             "
                             size="0.875rem"
                             class="tw:mr-0.5"
@@ -710,7 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :is="group.icon"
                             class=""
                           />
-                          <q-icon
+                          <OIcon
                             v-if="typeof group.icon === 'string'"
                             :name="group.icon"
                             size="0.875rem"
@@ -821,7 +821,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="typeof group.icon !== 'string'"
                       :is="group.icon"
                     />
-                    <q-icon
+                    <OIcon
                       v-if="typeof group.icon === 'string'"
                       :name="group.icon"
                       size="xs"
@@ -922,10 +922,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="tracesError"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="error_outline"
+          <OIcon
+            name="error-outline"
             size="3.75rem"
-            color="negative"
             class="tw:mb-4"
           />
           <div class="tw:text-base tw:mb-2">
@@ -986,7 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
           >
             <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="hub" color="primary" size="1.25rem" />
+              <OIcon name="hub" size="1.25rem" />
               <div class="tw:flex tw:flex-col">
                 <span class="tw:text-sm tw:font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
@@ -1033,10 +1032,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="traceCorrelationMode !== null"
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="search_off"
+          <OIcon
+            name="search-off"
             size="3.75rem"
-            color="grey-6"
             class="tw:mb-4"
           />
           <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
@@ -1050,10 +1048,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
-          <q-icon
-            name="account_tree"
+          <OIcon
+            name="account-tree"
             size="3.75rem"
-            color="grey-6"
             class="tw:mb-4"
           />
           <div class="tw:text-base">
@@ -1079,7 +1076,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full tw:mb-3"
     >
       <template #prepend>
-        <q-icon name="search" />
+        <OIcon name="search" size="sm" />
       </template>
     </q-input>
 
@@ -1100,7 +1097,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Group header -->
             <div class="metric-group-header">
               <div class="metric-group-label">
-                <q-icon
+                <OIcon
                   v-if="typeof group.icon === 'string'"
                   :name="group.icon"
                   size="0.875rem"

@@ -8,6 +8,7 @@ import type {
   FileValue,
 } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -175,13 +176,13 @@ const wrapperClasses = computed(() => [
       class="tw:text-xs tw:font-medium tw:text-file-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-file-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </label>
 
     <div

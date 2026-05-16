@@ -85,7 +85,7 @@
                   :placeholder="t('search.searchField')"
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <OIcon name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -159,17 +159,12 @@
     import AppTabs from "@/components/common/AppTabs.vue";
 
     import QTablePagination from "@/components/shared/grid/Pagination.vue";
-    import {
-    outlinedSchema,
-    outlinedPerson,
-    outlinedDelete,
-    } from "@quasar/extras/material-icons-outlined";
-    import DateTime from "@/components/DateTime.vue";
+        import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
     import OInput from "@/lib/forms/Input/OInput.vue";
-    import { X } from "lucide-vue-next";
-    import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+        import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     const defaultStreamData = {
         name: '',
         schema: [],
@@ -202,9 +197,9 @@
         ODrawer,
         OButton,
         OInput,
-        X,
         OSpinner,
-    },
+        OIcon,
+},
     emits: ['update:open'],
     setup(props) {
         const { t } = useI18n();

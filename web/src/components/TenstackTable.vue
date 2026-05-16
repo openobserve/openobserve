@@ -80,9 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handlePivotSort(col.name)"
             >
               {{ col.label }}
-              <q-icon
+              <OIcon
                 :name="
-                  pivotSortState.descending ? 'arrow_downward' : 'arrow_upward'
+                  pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="12px"
                 class="q-ml-xs pivot-sort-icon"
@@ -117,10 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="cell._sortColumn && handlePivotSort(cell._sortColumn)"
             >
               {{ cell.label }}
-              <q-icon
+              <OIcon
                 v-if="level.isLeaf && cell._sortColumn"
                 :name="
-                  pivotSortState.descending ? 'arrow_downward' : 'arrow_upward'
+                  pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
                 "
                 size="12px"
                 class="q-ml-xs pivot-sort-icon"
@@ -247,21 +247,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (header.column.columnDef.meta as any)?.sortable
                     "
                   >
-                    <q-icon
+                    <OIcon
                       v-if="
                         (sortFieldMap?.[header.column.id] ??
                           header.column.id) === sortBy
                       "
                       :name="
-                        sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'
+                        sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'
                       "
                       data-test="tenstack-table-sort-icon-active"
                       size="0.85rem"
                       class="tw:text-[var(--o2-primary-color)]"
                     />
-                    <q-icon
+                    <OIcon
                       v-else
-                      name="unfold_more"
+                      name="unfold-more"
                       data-test="tenstack-table-sort-icon-inactive"
                       size="0.85rem"
                       class="tw:opacity-40"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (header.column.columnDef.meta as any)?.showWrap
                   "
                 >
-                  <q-icon
+                  <OIcon
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="cancel"
@@ -290,10 +290,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'text-grey-7'
                     "
                     :title="t('common.close')"
-                    size="18px"
+                    size="sm"
                     @click="closeColumn(header.column.columnDef)"
-                  >
-                  </q-icon>
+                   />
                 </div>
               </div>
             </th>
@@ -359,9 +358,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="table-row-expand-menu"
                   @click.capture.stop="expandFunctionError"
                 >
-                  <q-icon
+                  <OIcon
                     :name="
-                      isFunctionErrorOpen ? 'expand_more' : 'chevron_right'
+                      isFunctionErrorOpen ? 'expand-more' : 'chevron-right'
                     "
                     size="14px"
                   /> </OButton
@@ -508,11 +507,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                       >
-                        <q-icon
+                        <OIcon
                           :name="
                             isCellCopied(idx as number, cell.column.id)
                               ? 'check'
-                              : 'content_copy'
+                              : 'content-copy'
                           "
                           size="14px"
                         />
@@ -558,11 +557,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           )
                         "
                       >
-                        <q-icon
+                        <OIcon
                           :name="
                             isCellCopied(idx as number, cell.column.id)
                               ? 'check'
-                              : 'content_copy'
+                              : 'content-copy'
                           "
                           size="14px"
                         />
@@ -757,11 +756,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="table-row-expand-menu"
                       @click.capture.stop="handleExpandRow(virtualRow.index)"
                     >
-                      <q-icon
+                      <OIcon
                         :name="
                           expandedRowIndices.has(virtualRow.index)
-                            ? 'expand_more'
-                            : 'chevron_right'
+                            ? 'expand-more'
+                            : 'chevron-right'
                         "
                         size="14px"
                       />
@@ -813,11 +812,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-icon
+                            <OIcon
                               :name="
                                 isCellCopied(virtualRow.index, cell.column.id)
                                   ? 'check'
-                                  : 'content_copy'
+                                  : 'content-copy'
                               "
                               size="14px"
                             />
@@ -902,11 +901,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             "
                           >
-                            <q-icon
+                            <OIcon
                               :name="
                                 isCellCopied(virtualRow.index, cell.column.id)
                                   ? 'check'
-                                  : 'content_copy'
+                                  : 'content-copy'
                               "
                               size="14px"
                             />

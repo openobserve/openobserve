@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!editColumnOrder || editColumnOrder.length === 0"
         class="text-center q-pa-xl text-grey-6"
       >
-        <q-icon name="view_column" size="48px" class="q-mb-md" />
+        <OIcon name="view-column" size="48px" class="q-mb-md" />
         <div class="text-body1">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-caption">
           {{ t("dashboard.columnsDefaultOrder") }}
@@ -60,10 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Drag handle -->
           <div class="drag-handle">
-            <q-icon
-              name="drag_indicator"
-              color="grey-6"
-              size="20px"
+            <OIcon
+              name="drag-indicator"
+              size="md"
               :data-test="`column-order-drag-handle-${index}`"
             />
           </div>
@@ -108,6 +107,7 @@ import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
@@ -116,7 +116,8 @@ export default defineComponent({
     draggable: VueDraggableNext as any,
     OButton,
     ODialog,
-  },
+    OIcon,
+},
   props: {
     open: {
       type: Boolean,

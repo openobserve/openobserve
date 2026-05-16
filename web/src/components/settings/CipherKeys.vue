@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('cipherKey.search')"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
               </OInput>
               <OButton
@@ -171,12 +171,11 @@ import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -186,11 +185,10 @@ export default defineComponent({
     AddCipherKey,
     ConfirmDialog,
     OButton,
-    Pencil,
-    Trash2,
     OInput,
     OCheckbox,
-  },
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -508,7 +506,7 @@ export default defineComponent({
       cancelDeleteCipherKey,
       confirmDeleteCipherKey,
       confirmDelete,
-      outlinedDelete,
+      "delete": "delete",
       editCipherKey,
       deleteCipherKey,
       visibleRows,

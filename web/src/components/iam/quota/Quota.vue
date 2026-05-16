@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 Edit Quota
                 <template #icon-right>
-                  <q-icon name="edit" style="font-weight: 200; opacity: 0.7" />
+                  <OIcon name="edit" size="sm" style="font-weight: 200; opacity: 0.7" />
                 </template>
               </OButton>
             </div>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               >
                 <template #prepend>
-                  <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
               </q-input>
               <q-select
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs"
                   @click="triggerExpand(props)"
                 >
-                  <q-icon :name="expandedRow != props.row.uuid ? 'chevron_right' : 'expand_more'" />
+                  <OIcon :name="expandedRow != props.row.uuid ? 'chevron-right' : 'expand-more'" size="sm" />
                 </OButton>
                 {{ props.row[col.name] }}
               </template>
@@ -564,6 +564,7 @@ import {
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -576,14 +577,6 @@ import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedFileDownload,
-  outlinedFileUpload,
-  outlinedInsertDriveFile,
-} from "@quasar/extras/material-icons-outlined";
 import AppTable from "@/components/AppTable.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -600,7 +593,8 @@ export default defineComponent({
     ),
     NoData,
     OSpinner,
-  },
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
@@ -1689,10 +1683,10 @@ export default defineComponent({
       generateColumns,
       loading,
       isBulkUpdate,
-      outlinedFileDownload,
-      outlinedFileUpload,
+      outlinedFileDownload: "file-download",
+      outlinedFileUpload: "file-upload",
       uploadedRules,
-      outlinedInsertDriveFile,
+      outlinedInsertDriveFile: "insert-drive-file",
       getImageURL,
       fileListToDisplay,
       downloadTemplate,

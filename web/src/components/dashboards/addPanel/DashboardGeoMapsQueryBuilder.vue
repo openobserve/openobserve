@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.latitude") }}
-        <q-icon name="info_outline" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-latitude-item-${latitudeLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
           <OButton
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-latitude-item-${latitudeLabel}`"
           >
             {{ latitudeLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
@@ -138,11 +138,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.longitude") }}
-        <q-icon name="info_outline" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-longitude-item-${longitudeLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
           <OButton
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-longitude-item-${longitudeLabel}`"
           >
             {{ longitudeLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
@@ -256,11 +256,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.weight") }}
-        <q-icon name="info_outline" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs">
           <q-tooltip>
             {{ WeightHint }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-weight-item-${weightLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
           <OButton
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-weight-item-${weightLabel}`"
           >
             {{ weightLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
@@ -383,6 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -402,7 +403,8 @@ export default defineComponent({
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
-  },
+    OIcon,
+},
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();
@@ -869,7 +871,7 @@ export default defineComponent({
         opacity: 0;
         right: 0;
 
-        .q-icon {
+        .OIcon {
           cursor: pointer;
         }
       }

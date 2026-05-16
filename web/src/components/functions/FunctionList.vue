@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="t('function.search')"
                 >
                   <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
+                    <OIcon class="o2-search-input-icon" name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -242,8 +242,6 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import {
-} from "@quasar/extras/material-icons-outlined";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
@@ -252,7 +250,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -267,9 +264,7 @@ export default defineComponent({
     OInput,
     OTooltip,
     OCheckbox,
-    Pencil,
-    Trash2,
-  },
+    },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",

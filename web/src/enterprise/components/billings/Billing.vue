@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-pa-none q-mx-none tw:h-[40px] q-mt-xs"
           >
           <template v-slot:prepend>
-            <q-icon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
+            <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
           </template>
           </q-select>
         </div>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               @click="collapseSidebar"
             >
-              <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" />
+              <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="sm" />
             </OButton> -->
           </div>
         </div>
@@ -139,11 +139,14 @@ import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import BillingService from "@/services/billings";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs },
+    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

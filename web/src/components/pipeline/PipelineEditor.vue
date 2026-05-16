@@ -203,7 +203,6 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { Code2, Maximize2, Minimize2 } from "lucide-vue-next";
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

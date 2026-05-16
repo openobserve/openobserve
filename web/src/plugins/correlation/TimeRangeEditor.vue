@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50 tw:flex tw:items-center tw:gap-2"
           >
-            <q-icon name="schedule" size="sm" color="primary" />
+            <OIcon name="schedule" size="sm" />
             <span class="tw:font-mono tw:text-sm">{{ formatTimestamp(sourceTimestamp) }}</span>
           </div>
         </div>
@@ -155,6 +155,7 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { date } from 'quasar';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   modelValue: boolean;

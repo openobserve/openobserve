@@ -48,10 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="compact-file-input"
               >
                 <template v-slot:prepend>
-                  <q-icon name="cloud_upload" size="sm" />
+                  <OIcon name="cloud-upload" size="sm" />
                 </template>
                 <template v-slot:append>
-                  <q-icon
+                  <OIcon
                     v-if="jsonFile"
                     name="close"
                     size="sm"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="q-mb-sm">
               <div class="section-header text-positive q-pa-xs">
-                <q-icon name="add_circle" size="sm" />
+                <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
               </div>
               <q-list dense bordered separator class="compact-list">
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       @click.stop="viewGroup(group)"
                     >
-                      <q-icon name="visibility" />
+                      <OIcon name="visibility" size="sm" />
                     </OButton>
                   </q-item-section>
                 </q-item>
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="q-mb-sm">
               <div class="section-header text-warning q-pa-xs">
-                <q-icon name="edit" size="sm" />
+                <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
               </div>
               <q-list dense bordered separator class="compact-list">
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       @click.stop="viewModification(mod)"
                     >
-                      <q-icon name="compare" />
+                      <OIcon name="compare" size="sm" />
                     </OButton>
                   </q-item-section>
                 </q-item>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- No Diff State -->
         <div v-else-if="!isImporting && !diffData" class="card-container q-pa-lg text-center">
-          <q-icon name="cloud_upload" size="64px" color="grey-5" class="q-mb-md" />
+          <OIcon name="cloud-upload" size="64px" class="q-mb-md" />
           <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file to get started</div>
           <div class="text-body2 text-grey-6">
             The system will analyze the file and show you what will change
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ma-xs"
           >
             {{ field }}
-            <q-icon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
+            <OIcon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
           </q-chip>
         </div>
       </div>
@@ -317,6 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";

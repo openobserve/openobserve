@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('home.viewButton')"
             data-test="home-usage-tab-view-streams-btn"
           >
-            <OIcon name="arrow-forward" class="view-arrow-icon" />
+            <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
             <router-link
               exact
               :to="{
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-functions-btn"
                   >
-                    <OIcon name="arrow-forward" class="view-arrow-icon" />
+                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
                     <router-link
                       exact
                       :to="{
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-dashboards-btn"
                   >
-                    <OIcon name="arrow-forward" class="view-arrow-icon" />
+                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
                     <router-link
                       exact
                       :to="{
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('home.viewButton')"
                 data-test="home-usage-tab-view-alerts-btn"
               >
-                <OIcon name="arrow-forward" class="view-arrow-icon" />
+                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
                 <router-link
                   exact
                   :to="{
@@ -545,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('home.viewButton')"
                 data-test="home-usage-tab-view-pipelines-btn"
               >
-                <OIcon name="arrow-forward" class="view-arrow-icon" />
+                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
                 <router-link
                   exact
                   :to="{

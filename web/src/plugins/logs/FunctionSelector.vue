@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
         >
           <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
-          <q-icon name="arrow_drop_down" size="14px" class="tw:-ms-1" />
+          <OIcon name="arrow-drop-down" size="xs" class="tw:-ms-1" />
           <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
         </OButton>
       </template>
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="function-search-input"
           >
             <template #icon-left>
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
             </template>
           </OInput>
         </div>
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="icon-toolbar"
       @click="fnSavedFunctionDialog"
     >
-      <q-icon name="save" size="16px" />
+      <OIcon name="save" size="sm" />
       <OTooltip :content="t('common.save')" :side-offset="6" />
     </OButton>
   </OButtonGroup>
@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";

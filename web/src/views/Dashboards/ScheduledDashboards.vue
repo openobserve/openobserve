@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="t('reports.search')"
         >
           <template #icon-left>
-            <q-icon name="search" class="cursor-pointer" />
+            <OIcon name="search" size="sm" class="cursor-pointer" />
           </template>
         </OInput>
 
@@ -117,8 +117,8 @@ import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { Database, CalendarClock } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
@@ -163,8 +163,8 @@ const router = useRouter();
 const scheduledFilterQuery = ref("");
 const scheduledActiveTab = ref("cached");
 const scheduledReportTypeTabs = reactive([
-  { label: t("reports.cached"), value: "cached", icon: Database },
-  { label: t("reports.scheduled"), value: "shared", icon: CalendarClock },
+  { label: t("reports.cached"), value: "cached", icon: "database" },
+  { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
 ]);
 
 const createScheduledReport = () => {

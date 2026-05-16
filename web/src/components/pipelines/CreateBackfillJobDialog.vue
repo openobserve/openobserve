@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showAdvanced = !showAdvanced"
             >
               <div class="tw:flex tw:items-center tw:gap-2">
-                <q-icon name="settings" size="20px" />
+                <OIcon name="settings" size="md" />
                 <span class="tw:text-sm tw:font-semibold">Advanced Options</span>
               </div>
               <OButton
@@ -107,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="chunk-period-input"
                   >
                     <template #append>
-                      <q-icon name="info_outline" size="18px">
+                      <OIcon name="info-outline" size="sm">
                         <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
-                      </q-icon>
+                      </OIcon>
                     </template>
                   </OInput>
                 </div>
@@ -136,9 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="delay-between-chunks-input"
                   >
                     <template #append>
-                      <q-icon name="info_outline" size="18px">
+                      <OIcon name="info-outline" size="sm">
                         <OTooltip content="Default: 5 seconds" />
-                      </q-icon>
+                      </OIcon>
                     </template>
                   </OInput>
                 </div>
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   <div class="tw:flex tw:items-start tw:gap-3">
-                    <q-icon name="warning" :color="$q.dark.isActive ? 'orange-4' : 'orange'" size="20px" class="tw:mt-0.5" />
+                    <OIcon name="warning" :color="$q.dark.isActive ? 'orange-4' : 'orange'" size="md" class="tw:mt-0.5" />
                     <div>
                       <div :class="['tw:font-semibold tw:mb-2', $q.dark.isActive ? 'tw:text-orange-200' : 'tw:text-orange-900']">Warning: Irreversible Data Deletion</div>
                       <div :class="['text-caption tw:mb-3', $q.dark.isActive ? 'tw:text-orange-300' : 'tw:text-orange-800']">
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div :class="$q.dark.isActive ? 'tw:text-blue-200' : 'tw:text-blue-800'">
               <div class="tw:flex tw:items-center tw:gap-2 tw:font-medium tw:mb-1">
-                <q-icon name="schedule" size="18px" />
+                <OIcon name="schedule" size="sm" />
                 <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
               </div>
               <div v-if="estimatedInfo.chunks" class="text-caption tw:ml-6">
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error Message -->
           <div v-if="errorMessage" class="text-negative">
-            <q-icon name="error" class="q-mr-sm" />
+            <OIcon name="error" size="sm" class="q-mr-sm" />
             {{ errorMessage }}
           </div>
         </div>
@@ -235,12 +235,12 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { X, ChevronsUpDown } from "lucide-vue-next";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 

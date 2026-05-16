@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             placeholder="Search Service Accounts"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
+              <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" />
             </template>
           </OInput>
         </div>

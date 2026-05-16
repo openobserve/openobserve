@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
-          <q-icon
-            name="sentiment_very_dissatisfied"
+          <OIcon
+            name="sentiment-very-dissatisfied"
             size="0.875rem"
             class="q-pr-xs"
             style="color: #fb923c"

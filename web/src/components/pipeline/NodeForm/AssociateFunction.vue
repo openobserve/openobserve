@@ -159,14 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="note-heading">Function Execution Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     ><span class="highlight">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened</span
                   >
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     ><span class="highlight">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened</span
@@ -227,6 +227,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";

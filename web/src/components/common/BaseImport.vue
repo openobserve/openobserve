@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleBack"
               :data-test="`${testPrefix}-import-back-btn`"
             >
-              <q-icon name="arrow_back_ios_new" size="16px" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
             <div :class="titleClass" class="q-ml-md">{{ title }}</div>
           </div>
@@ -145,11 +145,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           multiple
                         >
                           <template v-slot:prepend>
-                            <q-icon name="cloud_upload" @click.stop.prevent />
+                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                           </template>
                           <template v-slot:append>
-                            <q-icon
-                              name="close"
+                            <OIcon
+                              name="close" size="sm"
                               @click.stop.prevent="jsonFiles = null"
                               class="cursor-pointer"
                             />
@@ -230,6 +230,7 @@ import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "BaseImport",
@@ -239,7 +240,8 @@ export default defineComponent({
     ),
     AppTabs,
     OButton,
-  },
+    OIcon,
+},
   props: {
     // Title for the import page
     title: {

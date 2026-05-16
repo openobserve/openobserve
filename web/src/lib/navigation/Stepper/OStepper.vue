@@ -9,9 +9,9 @@ import type {
 } from './OStepper.types'
 import { computed, provide, reactive } from 'vue'
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from './OStepper.types'
-import { Check, AlertCircle } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = withDefaults(defineProps<OStepperProps>(), {
   orientation: 'horizontal',
   animated: true,
@@ -141,8 +141,8 @@ function triggerClasses(step: StepRegistration): string {
           >
             <!-- Indicator circle -->
             <span :class="indicatorClasses(step)" aria-hidden="true">
-              <Check v-if="step.done && !step.error" class="tw:size-4" :stroke-width="2.5" />
-              <AlertCircle v-else-if="step.error" class="tw:size-4" :stroke-width="2.5" />
+              <OIcon name="check" size="sm" v-if="step.done && !step.error" class="tw:size-4" :stroke-width="2.5" />
+              <OIcon name="error-outline" size="sm" v-else-if="step.error" class="tw:size-4" :stroke-width="2.5" />
               <component
                 :is="step.icon as Component"
                 v-else-if="step.icon"

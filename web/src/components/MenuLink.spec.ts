@@ -93,7 +93,7 @@ describe("MenuLink", async () => {
 
   it("should render icon when icon prop is provided", async () => {
     await wrapper.setProps({ icon: "home" });
-    expect(wrapper.find(".q-icon").exists()).toBe(true);
+    expect(wrapper.find(".OIcon").exists()).toBe(true);
   });
 
   it("should render with iconComponent when provided", async () => {

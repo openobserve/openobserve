@@ -230,7 +230,7 @@ describe("AlertsDestinationList", () => {
             template: '<div class="q-btn-mock"><slot /></div>',
           },
           QIcon: {
-            template: '<div class="q-icon-mock"></div>',
+            template: '<div class="OIcon-mock"></div>',
           },
         },
       },

@@ -217,7 +217,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
     "q-item": true,
     "q-item-section": true,
     "q-item-label": true,
-    "q-icon": true,
+    "OIcon": true,
     "q-table": true,
     // Migrated overlay primitives — preserve props/emits for assertion
     ODrawer: {

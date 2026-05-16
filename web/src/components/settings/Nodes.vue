@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="q-pt-sm tw:mt-4" style="height: calc(100vh - 80px)">
           <div class="sticky-header q-px-sm">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px">
-              {{ t("nodes.filter_header") }} <q-icon name="filter_list" />
+              {{ t("nodes.filter_header") }} <OIcon name="filter-list" size="sm" />
               <div class="float-right">
                 <a
                   class="cursor-pointer text-caption tw:underline"
@@ -97,13 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="full-width q-pa-none q-ma-none filter-input"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <OIcon name="search" size="sm" />
                           </template>
                         </OInput>
                       </template>
                       <template v-slot:no-data>
                         <div class="full-width text-center q-pa-md">
-                          <q-icon name="warning" color="grey" size="md" />
+                          <OIcon name="warning" size="md" />
                           <span class="q-ml-sm">No data available</span>
                         </div>
                       </template>
@@ -168,13 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="full-width q-pa-none q-ma-none filter-input"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <OIcon name="search" size="sm" />
                           </template>
                         </OInput>
                       </template>
                       <template v-slot:no-data>
                         <div class="full-width text-center q-pa-md">
-                          <q-icon name="warning" color="grey" size="md" />
+                          <OIcon name="warning" size="md" />
                           <span class="q-ml-sm">No data available</span>
                         </div>
                       </template>
@@ -544,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('nodes.search')"
             >
               <template #prepend>
-                <q-icon name="search" class="o2-search-input-icon" />
+                <OIcon name="search" size="sm" class="o2-search-input-icon" />
               </template>
             </OInput>
             <OButton
@@ -674,6 +674,7 @@ import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -691,7 +692,8 @@ export default defineComponent({
     OInput,
     OCheckbox,
     OTooltip,
-  },
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

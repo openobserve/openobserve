@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
   >
-    <HelpCircle class="tw:size-4 tw:mr-1" />
+    <OIcon name="help" size="sm" class="tw:size-4 tw:mr-1" />
     {{ t('search.syntaxGuideLabel') }}
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
@@ -125,11 +125,13 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { HelpCircle } from "lucide-vue-next";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "SyntaxGuideMetrics",
-  components: { OButton, HelpCircle },
+  components: { OButton,
+    OIcon,
+},
   props: {
     sqlmode: {
       type: Boolean,

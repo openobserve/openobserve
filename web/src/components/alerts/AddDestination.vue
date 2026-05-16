@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="col" data-test="add-destination-title">
           <div v-if="destination" class="text-h6">
@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center q-pa-sm el-border el-border-radius"
                   data-test="destination-type-readonly"
                 >
-                  <q-icon
-                    :name="getDestinationTypeIcon(formData.destination_type)"
+                  <OIcon
+                    :name="getDestinationTypeIcon(formData.destination-type)"
                     size="20px"
                     class="q-mr-sm"
                   />
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="t('alert_templates.edit')"
                       @click="deleteApiHeader(header)"
                     >
-                      <q-icon name="delete" />
+                      <OIcon name="delete" size="sm" />
                     </OButton>
                     <OButton
                       data-test="add-destination-add-header-btn"
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="t('alert_templates.edit')"
                       @click="addApiHeader()"
                     >
-                      <q-icon name="add" />
+                      <OIcon name="add" size="sm" />
                     </OButton>
                   </div>
                 </div>
@@ -442,7 +442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('alert_templates.edit')"
                     @click="deleteApiHeader(header)"
                   >
-                    <q-icon name="delete" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                   <OButton
                     data-test="add-destination-add-header-btn"
@@ -453,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('alert_templates.edit')"
                     @click="addApiHeader()"
                   >
-                    <q-icon name="add" />
+                    <OIcon name="add" size="sm" />
                   </OButton>
                 </div>
               </div>
@@ -599,6 +599,7 @@ import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type {
   Template,
   DestinationData,

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="panel-title">
           <h2 class="edge-name" data-test="service-graph-edge-side-panel-route">
             <span class="from-service">{{ selectedEdge?.from }}</span>
-            <q-icon name="arrow_forward" size="14px" class="edge-arrow" />
+            <OIcon name="arrow-forward" size="xs" class="edge-arrow" />
             <span class="to-service">{{ selectedEdge?.to }}</span>
             <span class="health-badge" :class="edgeHealth.status">
               {{ edgeHealth.text }}
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleClose"
             data-test="service-graph-edge-side-panel-close-btn"
           >
-            <q-icon name="close" size="14px" />
+            <OIcon name="close" size="xs" />
           </OButton>
         </div>
       </div>
@@ -55,13 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Traffic Summary: Total | Failed | Error Rate -->
             <div class="traffic-row">
               <div class="traffic-pill total" data-test="service-graph-edge-side-panel-total">
-                <q-icon name="swap_horiz" size="13px" />
+                <OIcon name="swap-horiz" size="13px" />
                 <span class="traffic-label">Total</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.total_requests ?? 0) }}</span>
                 <OTooltip content="Total requests flowing through this connection" />
               </div>
               <div class="traffic-pill failed" data-test="service-graph-edge-side-panel-failed">
-                <q-icon name="close" size="13px" />
+                <OIcon name="close" size="13px" />
                 <span class="traffic-label">Failed</span>
                 <span class="traffic-value">{{ formatNumber(selectedEdge?.failed_requests ?? 0) }}</span>
                 <OTooltip content="Number of failed requests on this connection" />
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="getErrorRateClass()"
                 data-test="service-graph-edge-side-panel-error-rate"
               >
-                <q-icon name="error_outline" size="13px" />
+                <OIcon name="error-outline" size="13px" />
                 <span class="traffic-label">Error Rate</span>
                 <span class="traffic-value">{{ errorRateFormatted }}</span>
                 <OTooltip content="Percentage of requests that failed" />
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-baseline latency-baseline">{{ baselineP50 }}</span>
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p50DeltaPct)">
-                    <q-icon
+                    <OIcon
                       :name="p50DeltaPct > 2 ? 'arrow_upward' : p50DeltaPct < -2 ? 'arrow_downward' : 'remove'"
                       size="10px"
                     />
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-baseline latency-baseline">{{ baselineP95 }}</span>
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p95DeltaPct)">
-                    <q-icon
+                    <OIcon
                       :name="p95DeltaPct > 2 ? 'arrow_upward' : p95DeltaPct < -2 ? 'arrow_downward' : 'remove'"
                       size="10px"
                     />
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="col-baseline latency-baseline">{{ baselineP99 }}</span>
                 <span class="col-delta">
                   <span class="delta-badge" :class="getDeltaClass(p99DeltaPct)">
-                    <q-icon
+                    <OIcon
                       :name="p99DeltaPct > 2 ? 'arrow_upward' : p99DeltaPct < -2 ? 'arrow_downward' : 'remove'"
                       size="10px"
                     />
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="trendLoading"
               >
                 <template #icon-left>
-                  <q-icon name="refresh" size="12px" />
+                  <OIcon name="refresh" size="xs" />
                 </template>
                 Refresh
               </OButton>
@@ -195,13 +195,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error -->
           <div v-else-if="trendError" class="trend-state trend-error">
-            <q-icon name="warning" size="16px" />
+            <OIcon name="warning" size="sm" />
             <span>{{ trendError }}</span>
           </div>
 
           <!-- Empty -->
           <div v-else-if="!trendData || !trendDataPoints.length" class="trend-state trend-empty">
-            <q-icon name="show_chart" size="24px" class="trend-empty-icon" />
+            <OIcon name="show-chart" size="md" class="trend-empty-icon" />
             <span>No data available</span>
           </div>
 
@@ -238,12 +238,15 @@ import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 type ChartTab = 'rate' | 'errors' | 'duration';
 
 export default defineComponent({
   name: 'ServiceGraphEdgeSidePanel',
-  components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip },
+  components: { OButton, OToggleGroup, OToggleGroupItem, OSpinner, OTooltip,
+    OIcon,
+},
   props: {
     selectedEdge: {
       type: Object as PropType<{
@@ -996,7 +999,7 @@ export default defineComponent({
         transition: all 0.2s ease;
         cursor: default;
 
-        .q-icon { opacity: 0.8; }
+        .OIcon { opacity: 0.8; }
 
         .traffic-label {
           font-size: 9px;

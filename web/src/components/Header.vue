@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="warning-msg"
         style="display: inline"
       >
-        <q-icon name="warning"
+        <OIcon name="warning"
 size="xs" class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
@@ -163,7 +163,7 @@ size="xs" class="warning" />{{
         @click="openEnterpriseDialog"
       >
         <template #icon-left>
-          <q-icon name="card_giftcard" size="16px" />
+          <OIcon name="card-giftcard" size="sm" />
         </template>
         {{ enterpriseButtonText }}
       </OButton>
@@ -178,9 +178,9 @@ size="xs" class="warning" />{{
         size="icon-circle-sm"
         data-test="ingestion-quota-warning-icon"
       >
-        <q-icon
+        <OIcon
           name="warning"
-          size="24px"
+          size="md"
           class="header-icon tw:opacity-70"
           :style="{ color: ingestionQuotaColor }"
         />
@@ -216,7 +216,7 @@ size="xs" class="warning" />{{
             <div class="col tw:truncate">
               {{ userClickedOrg?.label || "" }}
             </div>
-            <q-icon name="arrow_drop_down" class="q-ml-xs" />
+            <OIcon name="arrow-drop-down" size="sm" class="q-ml-xs" />
           </div>
 
           <!-- Organization selection menu -->
@@ -270,7 +270,7 @@ size="xs" class="warning" />{{
                           :placeholder="'Search Organization'"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <OIcon name="search" size="sm" />
                           </template>
                         </q-input>
                       </div>
@@ -346,7 +346,7 @@ size="xs" class="warning" />{{
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <q-icon name="help_outline" size="20px" class="header-icon tw:opacity-70" />
+        <OIcon name="help-outline" size="md" class="header-icon tw:opacity-70" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.help") }}
         </q-tooltip>
@@ -424,7 +424,7 @@ size="xs" class="warning" />{{
         size="icon-circle-sm"
         data-test="header-my-account-profile-icon"
       >
-        <q-icon
+        <OIcon
           :name="user.picture ? user.picture : 'person'"
           size="20px"
           class="header-icon tw:opacity-70"
@@ -453,10 +453,10 @@ size="xs" class="warning" />{{
             <!-- User information -->
             <q-item>
               <q-item-section avatar>
-                <q-icon
+                <OIcon
                   :name="user.picture ? user.picture : 'person'"
                   size="xs"
-                ></q-icon>
+                ></OIcon>
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{
@@ -471,7 +471,7 @@ size="xs" class="warning" />{{
             <!-- Language selector -->
             <q-item clickable>
               <q-item-section avatar>
-                <q-icon size="xs"
+                <OIcon size="xs"
 name="language" class="padding-none" />
               </q-item-section>
               <q-item-section>
@@ -482,7 +482,7 @@ name="language" class="padding-none" />
               <q-item-section></q-item-section>
               <q-item-section side>
                 <div class="q-gutter-xs">
-                  <q-icon
+                  <OIcon
                     size="xs"
                     :name="selectedLanguage.icon"
                     class="padding-none"
@@ -494,9 +494,9 @@ name="language" class="padding-none" />
                 </div>
               </q-item-section>
               <q-item-section side style="padding-left: 0px">
-                <q-icon
+                <OIcon
                   class="icon-ley-arrow-right"
-                  name="keyboard_arrow_right"
+                  name="keyboard-arrow-right" size="sm"
                 />
               </q-item-section>
 
@@ -518,7 +518,7 @@ name="language" class="padding-none" />
                     @click="changeLanguage(lang)"
                   >
                     <q-item-section avatar>
-                      <q-icon
+                      <OIcon
                         size="xs"
                         :name="lang.icon"
                         class="padding-none"
@@ -545,8 +545,8 @@ name="language" class="padding-none" />
               @click="openPredefinedThemes"
             >
               <q-item-section avatar>
-                <q-icon size="xs"
-name="color_lens" class="padding-none" />
+                <OIcon size="xs"
+name="color-lens" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
@@ -563,8 +563,8 @@ name="color_lens" class="padding-none" />
               @click="signout"
             >
               <q-item-section avatar>
-                <q-icon size="xs"
-name="exit_to_app" class="padding-none" />
+                <OIcon size="xs"
+name="exit-to-app" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("menu.signOut") }}</q-item-label>

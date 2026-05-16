@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('iam.searchGroup')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
         </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('common.edit')"
               @click="editGroup(slotProps.column.row)"
             >
-              <q-icon name="edit" />
+              <OIcon name="edit" size="sm" />
             </OButton>
             <OButton
               :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"

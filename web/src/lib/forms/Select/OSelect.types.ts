@@ -71,7 +71,7 @@ export interface SelectProps {
   labelKey?: string;
   /** Key to read value from each option object */
   valueKey?: string;
-  /** Key to read a q-icon name from each option object — when set, renders an icon before the label in the dropdown list */
+  /** Key to read a OIcon name from each option object — when set, renders an icon before the label in the dropdown list */
   iconKey?: string;
   /** Floating label rendered above the trigger */
   label?: string;

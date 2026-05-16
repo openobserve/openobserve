@@ -10,6 +10,7 @@ import type {
 } from "./OSelect.types";
 import { SELECT_VALUE_MAP_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   ListboxFilter,
   ListboxItem,
@@ -672,13 +673,13 @@ const fieldWidthClass = computed(() => {
       class="tw:text-xs tw:font-medium tw:text-select-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </label>
 
     <template v-if="listboxModeEnabled">
@@ -1031,7 +1032,7 @@ const fieldWidthClass = computed(() => {
                         </span>
                       </template>
 
-                      <q-icon
+                      <OIcon
                         v-if="filteredOptions[vRow.index].icon"
                         :name="filteredOptions[vRow.index].icon"
                         size="xs"

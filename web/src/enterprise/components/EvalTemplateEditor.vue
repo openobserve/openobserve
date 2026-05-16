@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <OIcon name="info" size="xs" class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipName") }}</q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div class="o2-input" :class="{ 'field-error': errors.name }">
             <q-input
@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("common.description") }}</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <OIcon name="info" size="xs" class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipDescription") }}</q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div class="o2-input">
             <q-input v-model="form.description" borderless dense />
@@ -74,9 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 0 0 200px; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <OIcon name="info" size="xs" class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipResponseType") }}</q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div class="o2-input">
             <q-select
@@ -93,9 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
-            <q-icon name="info" size="14px" class="field-info-icon">
+            <OIcon name="info" size="xs" class="field-info-icon">
               <q-tooltip>{{ t("evalTemplate.tooltipDimensions") }}</q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <q-select
             v-model="dimensionsInput"
@@ -128,9 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
         <div class="field-label-row">
           <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
-          <q-icon name="info" size="14px" class="field-info-icon">
+          <OIcon name="info" size="xs" class="field-info-icon">
             <q-tooltip>{{ t("evalTemplate.tooltipPromptTemplate") }}</q-tooltip>
-          </q-icon>
+          </OIcon>
         </div>
         <div class="textarea-border" style="flex: 1; display: flex; flex-direction: column">
           <q-input
@@ -180,6 +180,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 
 const { t } = useI18n();
@@ -382,7 +383,7 @@ onBeforeMount(async () => {
   background-color: rgba(255, 255, 255, 0.1) !important;
   color: #e0e0e0 !important;
 
-  .q-icon {
+  .OIcon {
     color: #e0e0e0 !important;
     opacity: 0.8;
     &:hover { opacity: 1; }
@@ -393,7 +394,7 @@ onBeforeMount(async () => {
   background-color: rgba(0, 0, 0, 0.08) !important;
   color: #424242 !important;
 
-  .q-icon {
+  .OIcon {
     color: #424242 !important;
     opacity: 0.7;
     &:hover { opacity: 1; }

@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
               <template v-if="isCompactToolbar" #append>
                 <q-toggle
@@ -264,19 +264,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 :props="props">
                       <template v-if="col.name === 'name'">
                         <div class="tw:flex tw:items-center tw:gap-1.5">
-                          <q-icon
+                          <OIcon
                             v-if="props.row.is_real_time === 'anomaly'"
-                            name="query_stats"
+                            name="query-stats"
                             size="15px"
                             class="tw:text-blue-600 tw:shrink-0"
                           />
-                          <q-icon
+                          <OIcon
                             v-else-if="props.row.is_real_time"
                             name="bolt"
                             size="15px"
                             class="tw:text-orange-500 tw:shrink-0"
                           />
-                          <q-icon
+                          <OIcon
                             v-else
                             name="schedule"
                             size="15px"
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.edit')"
                             @click.stop="editAlert(props.row)"
                           >
-                            <q-icon name="edit" />
+                            <OIcon name="edit" size="sm" />
                           </OButton>
                           <OButton
                             :title="t('alerts.clone')"
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="duplicateAlert(props.row)"
                             :data-test="`alert-list-${props.row.name}-clone-alert`"
                           >
-                            <q-icon name="content_copy" />
+                            <OIcon name="content-copy" size="sm" />
                           </OButton>
                           <span>
                             <OButton
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="exportAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon size="16px" name="download" />
+                                    <OIcon size="sm" name="download" />
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     @click="triggerAlert(props.row)"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon
+                                      <OIcon
                                         size="16px"
                                         :name="symOutlinedSoundSampler"
                                       />
@@ -495,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     @click="retrainAnomaly(props.row)"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon size="16px" name="replay" />
+                                      <OIcon size="sm" name="replay" />
                                     </q-item-section>
                                     <q-item-section>Re-train</q-item-section>
                                   </q-item>
@@ -510,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="triggerAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
+                                    <OIcon
                                       size="16px"
                                       :name="symOutlinedSoundSampler"
                                     />
@@ -627,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="multipleExportAlert"
                     >
-                      <q-icon name="download" size="16px" />
+                      <OIcon name="download" size="sm" />
                       <span class="tw:ml-2">Export</span>
                     </OButton>
                     <OButton
@@ -638,7 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <q-icon name="pause" size="16px" />
+                      <OIcon name="pause" size="sm" />
                       <span class="tw:ml-2">Pause</span>
                     </OButton>
                     <OButton
@@ -649,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <q-icon name="play_arrow" size="16px" />
+                      <OIcon name="play-arrow" size="sm" />
                       <span class="tw:ml-2">Resume</span>
                     </OButton>
                     <OButton
@@ -660,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="openBulkDeleteDialog"
                     >
-                      <q-icon name="delete" size="16px" />
+                      <OIcon name="delete" size="sm" />
                       <span class="tw:ml-2">Delete</span>
                     </OButton>
                     <QTablePagination
@@ -747,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Go Back"
             @click="showForm = false"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
         </template>
         <q-form @submit="submitForm">

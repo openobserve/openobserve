@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="outline"
       :active="isAnimating"
     >
-      <q-icon
+      <OIcon
         name="update"
         :class="isAnimating ? 'rotating-icon' : ''"
-        size="18px"
+        size="sm"
       />
       <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
         {{ t("search.autoRefresh") }}: {{ selectedLabel }}
@@ -98,18 +98,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-toolbar"
         >
           <div class="row items-center no-wrap">
-            <q-icon
+            <OIcon
               left
-              name="update"
+              name="update" size="sm"
               :class="[
                 isAnimating ? 'rotating-icon' : '',
                 isAnimating ? 'text-primary' : '',
               ]"
             />
             <div class="text-center">{{ selectedLabel }}</div>
-            <q-icon
-              name="arrow_drop_down"
-              size="16px"
+            <OIcon
+              name="arrow-drop-down"
+              size="sm"
               class="tw:ml-0.5"
             />
           </div>
@@ -180,12 +180,15 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OButton, ODropdown, ODropdownSeparator },
+  components: { OButton, ODropdown, ODropdownSeparator,
+    OIcon,
+},
   props: {
     modelValue: {
       type: Number,

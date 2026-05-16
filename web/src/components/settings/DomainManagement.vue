@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="error-item tw:p-2 tw:mb-1"
                     >
                       <div class="tw:flex tw:items-start tw:mb-1">
-                        <q-icon name="error" color="negative" size="xs" class="tw:mr-1 tw:mt-1" />
+                        <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
                         <div class="tw:flex-1">
                           <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
                           <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
@@ -347,6 +347,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";

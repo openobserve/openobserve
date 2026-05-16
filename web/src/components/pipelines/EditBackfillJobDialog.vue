@@ -62,9 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px">
+                  <OIcon name="info-outline" size="sm">
                     <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
-                  </q-icon>
+                  </OIcon>
                 </div>
                 <OInput
                   v-model="formData.chunkPeriodMinutes"
@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px">
+                  <OIcon name="info-outline" size="sm">
                     <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
-                  </q-icon>
+                  </OIcon>
                 </div>
                 <OInput
                   v-model="formData.delayBetweenChunks"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
                   <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
+                    <OIcon name="warning" size="sm" class="q-mr-sm tw-mt-0.5" />
                     <div class="text-caption text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
                       <div class="tw-mb-2">
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error Message -->
       <div v-if="errorMessage" class="text-negative">
-        <q-icon name="error" class="q-mr-sm" />
+        <OIcon name="error" size="sm" class="q-mr-sm" />
         {{ errorMessage }}
       </div>
     </q-form>
@@ -144,9 +144,9 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   modelValue: boolean;

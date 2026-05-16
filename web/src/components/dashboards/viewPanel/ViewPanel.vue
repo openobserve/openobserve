@@ -224,12 +224,12 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -251,7 +251,8 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
-  },
+    OIcon,
+},
   props: {
     panelId: {
       type: String,
@@ -887,7 +888,7 @@ export default defineComponent({
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,
-      outlinedWarning,
+      "warning": "warning",
       symOutlinedDataInfoAlert,
       currentTabId,
       currentPanelId,

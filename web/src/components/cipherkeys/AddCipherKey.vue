@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="col" data-test="add-template-title">
           <div v-if="isUpdatingCipherKey" class="text-h6">
@@ -211,6 +211,7 @@ import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechani
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();

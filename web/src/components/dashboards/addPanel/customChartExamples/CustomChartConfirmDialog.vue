@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ]"
         >
           <template v-slot:avatar>
-            <q-icon
+            <OIcon
               name="warning"
               :class="
                 store.state.theme === 'dark'
                   ? 'tw:text-yellow-500/80'
                   : 'tw:text-orange-500'
               "
-              size="24px"
+              size="md"
             />
           </template>
           <div
@@ -86,10 +86,13 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "CustomChartConfirmDialog",
-  components: { ODialog, OCheckbox },
+  components: { ODialog, OCheckbox,
+    OIcon,
+},
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: {

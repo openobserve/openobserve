@@ -70,7 +70,7 @@ const ODialogStub = {
 const QIconStub = {
   name: "QIcon",
   props: ["name", "size"],
-  template: `<i data-test="q-icon" :data-name="name" />`,
+  template: `<i data-test="OIcon" :data-name="name" />`,
 };
 
 const mountComponent = (props: Record<string, any> = {}) => {
@@ -84,7 +84,7 @@ const mountComponent = (props: Record<string, any> = {}) => {
       plugins: [i18n],
       stubs: {
         ODialog: ODialogStub,
-        "q-icon": QIconStub,
+        "OIcon": QIconStub,
       },
     },
   });

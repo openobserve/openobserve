@@ -38,19 +38,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="thread-chip thread-chip--steps"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
-        <q-icon name="auto_awesome" size="12px" class="q-mr-xs" />
+        <OIcon name="auto-awesome" size="xs" class="q-mr-xs" />
         <span class="thread-chip__label">Steps</span>
         <span class="thread-chip__value">{{ summary.turnCount }}</span>
       </q-chip>
 
       <q-chip dense square class="thread-chip thread-chip--tools">
-        <q-icon name="build" size="12px" class="q-mr-xs" />
+        <OIcon name="build" size="xs" class="q-mr-xs" />
         <span class="thread-chip__label">Tools</span>
         <span class="thread-chip__value">{{ summary.toolCallCount }}</span>
       </q-chip>
 
       <q-chip dense square class="thread-chip thread-chip--duration">
-        <q-icon name="schedule" size="12px" class="q-mr-xs" />
+        <OIcon name="schedule" size="xs" class="q-mr-xs" />
         <span class="thread-chip__label">Duration</span>
         <span class="thread-chip__value">
           {{ formatDuration(summary.totalDurationNs) }}
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-chip>
 
       <q-chip dense square class="thread-chip thread-chip--cost">
-        <q-icon name="payments" size="12px" class="q-mr-xs" />
+        <OIcon name="payments" size="xs" class="q-mr-xs" />
         <span class="thread-chip__label">Cost</span>
         <span class="thread-chip__value">
           {{ formatCost(summary.totalCost) }}
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="thread-chip thread-chip--model"
         :title="summary.dominantModel"
       >
-        <q-icon name="bolt" size="12px" class="q-mr-xs" />
+        <OIcon name="bolt" size="xs" class="q-mr-xs" />
         <span class="thread-chip__label">Model</span>
         <span class="thread-chip__value">{{ summary.dominantModel }}</span>
       </q-chip>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         square
         class="thread-chip thread-chip--error"
       >
-        <q-icon name="error_outline" size="12px" class="q-mr-xs" />
+        <OIcon name="error-outline" size="xs" class="q-mr-xs" />
         <span class="thread-chip__label">Errors</span>
         <span class="thread-chip__value">{{ summary.errorCount }}</span>
       </q-chip>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showSystemFull = !showSystemFull"
         >
           <span class="thread-system__badge">
-            <q-icon name="settings" size="11px" class="q-mr-xs" />
+            <OIcon name="settings" size="11px" class="q-mr-xs" />
             System
           </span>
           <span
@@ -123,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span v-else class="tw:flex-1" />
           <span class="thread-system__toggle">
-            <q-icon
-              :name="showSystemFull ? 'expand_less' : 'expand_more'"
+            <OIcon
+              :name="showSystemFull ? 'expand-less' : 'expand-more'"
               size="18px"
             />
           </span>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-user-avatar"
             :title="group.userId || 'User'"
           >
-            <q-icon name="person" size="16px" />
+            <OIcon name="person" size="sm" />
             <OTooltip
               v-if="group.userId"
               :content="group.userId"
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-turn"
           >
           <div class="thread-turn__avatar">
-            <q-icon name="auto_awesome" size="14px" />
+            <OIcon name="auto-awesome" size="xs" />
           </div>
           <div class="thread-turn__body">
           <!-- Genuine follow-up user message(s). -->
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="emit('span-selected', t.span_id)"
                   title="Open span details"
                 >
-                  <q-icon name="open_in_new" size="14px" />
+                  <OIcon name="open-in-new" size="xs" />
                 </button>
               </div>
 
@@ -279,30 +279,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Footer. -->
           <div class="thread-turn__footer">
             <span class="thread-metric" :title="`Started at ${formatTime(turn.span.start_time)}`">
-              <q-icon name="schedule" size="11px" />
+              <OIcon name="schedule" size="11px" />
               {{ formatTime(turn.span.start_time) }}
             </span>
             <span class="thread-metric thread-metric--model" :title="getModel(turn.span)">
-              <q-icon name="bolt" size="11px" />
+              <OIcon name="bolt" size="11px" />
               {{ getModel(turn.span) || "unknown" }}
             </span>
             <span class="thread-metric" title="Duration">
-              <q-icon name="timer" size="11px" />
+              <OIcon name="timer" size="11px" />
               {{ formatDuration(turn.span.duration) }}
             </span>
             <span class="thread-metric" title="Tokens">
-              <q-icon name="data_usage" size="11px" />
+              <OIcon name="data-usage" size="11px" />
               {{ formatNumber(getTokens(turn.span)) }} tokens
             </span>
             <span class="thread-metric" title="Cost">
-              <q-icon name="payments" size="11px" />
+              <OIcon name="payments" size="11px" />
               {{ formatCost(getCost(turn.span)) }}
             </span>
             <span
               v-if="turn.span.span_status === 'ERROR'"
               class="thread-metric thread-metric--error"
             >
-              <q-icon name="error_outline" size="11px" />
+              <OIcon name="error-outline" size="11px" />
               Error
             </span>
             <button
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="emit('span-selected', turn.span.span_id)"
             >
               View span
-              <q-icon name="arrow_forward" size="12px" />
+              <OIcon name="arrow-forward" size="xs" />
             </button>
           </div>
           </div>
@@ -347,6 +347,7 @@ import {
   type Turn,
   type TraceGroup,
 } from "./threadView.utils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 
@@ -587,7 +588,7 @@ function formatTime(ns: number): string {
   font-feature-settings: "tnum";
   color: var(--o2-text-primary) !important;
 
-  :deep(.q-icon) {
+  :deep(.OIcon) {
     color: var(--o2-text-secondary);
   }
 
@@ -858,7 +859,7 @@ function formatTime(ns: number): string {
   white-space: nowrap;
   flex-shrink: 0;
 
-  .q-icon {
+  .OIcon {
     color: var(--o2-text-3);
   }
 
@@ -871,7 +872,7 @@ function formatTime(ns: number): string {
     overflow: hidden;
     text-overflow: ellipsis;
 
-    .q-icon {
+    .OIcon {
       color: #8b5cf6;
     }
   }
@@ -882,7 +883,7 @@ function formatTime(ns: number): string {
     border-color: rgba(220, 38, 38, 0.25);
     font-weight: 500;
 
-    .q-icon {
+    .OIcon {
       color: #dc2626;
     }
   }
@@ -1110,7 +1111,7 @@ function formatTime(ns: number): string {
       background: rgba(139, 92, 246, 0.12);
       border-color: rgba(139, 92, 246, 0.3);
 
-      .q-icon {
+      .OIcon {
         color: #c4b5fd;
       }
     }
@@ -1120,7 +1121,7 @@ function formatTime(ns: number): string {
       background: rgba(248, 113, 113, 0.12);
       border-color: rgba(248, 113, 113, 0.3);
 
-      .q-icon {
+      .OIcon {
         color: #f87171;
       }
     }

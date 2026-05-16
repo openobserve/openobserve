@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="action-list-search-input"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
             <OButton
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-circle-sm"
                   :title="t('alerts.edit')"
                   @click="showAddUpdateFn(props)"
-                  ><q-icon name="edit" size="16px"
+                  ><OIcon name="edit" size="sm"
                 /></OButton>
                 <OButton
                   :data-test="`alert-list-${props.row.name}-delete-alert`"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="secondary"
                     size="sm"
                     @click="openBulkDeleteDialog"
-                    ><q-icon name="delete" size="16px" /><span class="tw:ml-1.5"
+                    ><OIcon name="delete" size="sm" /><span class="tw:ml-1.5"
                       >Delete</span
                     ></OButton
                   >
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Go Back"
             @click="showForm = false"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
         </template>
             <q-form id="action-script-clone-form" @submit="submitForm">

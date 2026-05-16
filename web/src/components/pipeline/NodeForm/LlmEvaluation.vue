@@ -195,7 +195,6 @@ import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "LlmEvaluation",

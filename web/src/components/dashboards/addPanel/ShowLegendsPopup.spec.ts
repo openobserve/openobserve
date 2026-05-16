@@ -105,8 +105,8 @@ describe("ShowLegendsPopup Component", () => {
           "q-tooltip": {
             template: '<span class="q-tooltip"><slot /></span>',
           },
-          "q-icon": {
-            template: '<span class="q-icon">{{ $attrs.name }}</span>',
+          "OIcon": {
+            template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },
         },
       },

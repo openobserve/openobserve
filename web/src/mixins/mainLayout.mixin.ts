@@ -3,9 +3,6 @@ import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import PipelineIcon from "@/components/icons/PipelineIcon.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-
-const AccountTreeIcon = markRaw({ render: () => h(OIcon, { name: "account-tree" }) });
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -21,7 +18,7 @@ const MainLayoutOpenSourceMixin = {
     const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.pipeline"),
-        iconComponent: AccountTreeIcon,
+        iconComponent: markRaw(PipelineIcon),
         link: "/pipeline",
         name: "pipeline",
       });

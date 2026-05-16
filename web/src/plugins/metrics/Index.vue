@@ -645,7 +645,7 @@ export default defineComponent({
       background-color: var(--o2-hover-accent);
     }
 
-    .q-icon {
+    .OIcon {
       font-size: 1.125rem; // 18px
     }
   }

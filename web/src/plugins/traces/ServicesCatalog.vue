@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:w-[14rem]!"
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <OIcon class="o2-search-input-icon" size="1rem" name="search" />
           </template>
         </OInput>
       </div>
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)]"
       data-test="services-catalog-empty"
     >
-      <q-icon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="layers" size="3rem" class="tw:mb-3 tw:opacity-40" />
       <p class="tw:text-[0.9rem]">
         {{ t("traces.servicesCatalog.noServicesFound") }}
       </p>
@@ -427,6 +427,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const store = useStore();

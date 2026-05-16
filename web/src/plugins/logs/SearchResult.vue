@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info_outline" color="warning" size="sm"> </q-icon>
+            <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
           <!-- Inspect Button -->
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
-            <q-icon name="troubleshoot" size="xs" />
+            <OIcon name="troubleshoot" size="xs" />
             <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
           </OButton>
           <!-- Volume Analysis Button -->
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
-            <q-icon name="timeline" size="xs" />
+            <OIcon name="timeline" size="xs" />
             <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
           </OButton>
           <ORefreshButton
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
             "
           >
-            <q-icon name="wrap_text" />
+            <OIcon name="wrap-text" size="sm" />
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
         </div>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <h6 class="text-center">
               <span class="histogram-empty__message">
-                <q-icon name="warning" color="warning" size="xs"></q-icon> No
+                <OIcon name="warning" size="xs"></OIcon> No
                 data found for histogram.</span
               >
             </h6>
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data.histogram.errorCode != -1
             "
           >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> Error
+            <OIcon name="warning" size="xs"></OIcon> Error
             while fetching histogram data.
             <OButton
               variant="secondary"
@@ -563,6 +563,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -596,7 +597,8 @@ export default defineComponent({
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
-  },
+    OIcon,
+},
   emits: [
     "update:scroll",
     "update:datetime",

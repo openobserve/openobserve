@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.tableAggregations") }}
-              <q-icon class="q-ml-xs" size="20px" name="info_outline" />
+              <OIcon class="q-ml-xs" size="md" name="info-outline" />
               <OTooltip max-width="350px">
                 <template #content>
                   <b>Table Aggregations - </b>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info_outline">
+              <OIcon class="q-ml-xs" size="sm" name="info-outline">
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Visible Columns</b>
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     both are set.
                   </template>
                 </OTooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info_outline">
+              <OIcon class="q-ml-xs" size="sm" name="info-outline">
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Hidden Columns</b>
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     le (histogram buckets), quantile, etc.
                   </template>
                 </OTooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:label>
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.stickyColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info_outline">
+              <OIcon class="q-ml-xs" size="sm" name="info-outline">
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Sticky Columns</b>
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <b>Note:</b> Disabled when "Sticky First Column" is enabled.
                   </template>
                 </OTooltip>
-              </q-icon>
+              </OIcon>
             </div>
           </template>
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
@@ -481,6 +481,7 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -495,7 +496,8 @@ export default defineComponent({
     OInput,
     OSwitch,
     OTooltip,
-  },
+    OIcon,
+},
   props: {
     chartType: {
       type: String,

@@ -29,7 +29,7 @@
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
             @click="collapseSidebar"
           >
-            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="12px" />
           </OButton>
       </template>
       <template v-slot:after>
@@ -55,6 +55,7 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { resolveTab } from "@/utils/routeTabMaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
 

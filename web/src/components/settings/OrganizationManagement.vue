@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="otg-management-extend-trial-btn"
                 @click.stop="toggleExtendTrialDialog(props.row)"
               >
-                <q-icon name="event" size="14px" />
+                <OIcon name="event" size="xs" />
                 <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
               </OButton>
               <OButton
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-add-contract-btn"
                 @click.stop="toggleContractDialog(props.row, 'create')"
               >
-                <q-icon name="note_add" size="14px" />
+                <OIcon name="note-add" size="xs" />
                 <q-tooltip>Add Contract</q-tooltip>
               </OButton>
               <OButton
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-extend-contract-btn"
                 @click.stop="toggleContractDialog(props.row, 'extend')"
               >
-                <q-icon name="event" size="14px" />
+                <OIcon name="event" size="xs" />
                 <q-tooltip>Extend Contract</q-tooltip>
               </OButton>
               <OButton
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-revoke-contract-btn"
                 @click.stop="confirmRevokeContract(props.row)"
               >
-                <q-icon name="block" size="14px" />
+                <OIcon name="block" size="xs" />
                 <q-tooltip>Revoke</q-tooltip>
               </OButton>
               <OButton
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(props.row)"
               >
-                <q-icon name="cloud_upload" size="14px" />
+                <OIcon name="cloud-upload" size="xs" />
                 <q-tooltip>Enable Storage</q-tooltip>
               </OButton>
               <OButton
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-positive"
                 data-test="org-management-storage-enabled-btn"
               >
-                <q-icon name="cloud_done" size="14px" />
+                <OIcon name="cloud-done" size="xs" />
                 <q-tooltip>Storage Enabled</q-tooltip>
               </OButton>
             </div>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('settings.searchOrgs')"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
           </q-input>
 
@@ -224,6 +224,7 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import orgStorageService from "@/services/org_storage";
 export default defineComponent({
@@ -233,7 +234,8 @@ export default defineComponent({
     QTablePagination,
     OButton,
     ODialog,
-  },
+    OIcon,
+},
   setup() {
     const qTable = ref();
     const store = useStore();

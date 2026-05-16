@@ -454,7 +454,7 @@ export class AlertsPage {
     async expectAlertDetailsHistorySectionVisible() {
         // The history section shows either a q-table (when history exists) or an empty state
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
-        const emptyState = this.page.locator('text=No history available').or(this.page.locator('.q-icon:has-text("history")'));
+        const emptyState = this.page.locator('text=No history available').or(this.page.locator('.OIcon:has-text("history")'));
 
         // Wait for either to appear — use .first() because .or() can match multiple elements
         // (e.g. the history icon may appear in the dialog AND in navigation)
@@ -1779,7 +1779,7 @@ export class AlertsPage {
     /**
      * Get severity badge text from incident detail header.
      * Header has 3 badges: Status (icon=info), Severity (icon=warning), Alert Count (icon=notifications_active).
-     * Quasar renders q-icon name as <i> text content, NOT as an HTML attribute.
+     * Quasar renders OIcon name as <i> text content, NOT as an HTML attribute.
      * We match the badge that contains a P1/P2/P3/P4 span.
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
@@ -1916,8 +1916,8 @@ export class AlertsPage {
         }
 
         // Check for error icon (also acceptable — just means no correlation data)
-        // Note: Quasar renders q-icon name as text content, not HTML attribute
-        const errorIcon = this.page.locator('.q-icon:has-text("error_outline"), .q-icon:has-text("info_outline")');
+        // Note: Quasar renders OIcon name as text content, not HTML attribute
+        const errorIcon = this.page.locator('.OIcon:has-text("error_outline"), .OIcon:has-text("info_outline")');
         if (await errorIcon.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info(`Telemetry tab ${tabName}: info/error state`);
             return 'noData';

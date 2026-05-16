@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { useI18n } from "vue-i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 
@@ -25,7 +26,7 @@ const emit = defineEmits<{
     autofocus
   >
     <template #icon-left>
-      <q-icon name="search" size="xs" class="tw:text-[var(--o2-text-muted)]" />
+      <OIcon name="search" size="xs" class="tw:text-[var(--o2-text-muted)]" />
     </template>
   </OInput>
 </template>

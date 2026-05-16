@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
-      <q-icon name="timeline" size="1.5rem" color="primary" />
+      <OIcon name="timeline" size="1.5rem" />
       <!-- Time Range Display: Inline chips -->
       <div
         class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-2"
@@ -144,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dimension-search-input"
                   >
                     <template #prepend>
-                      <q-icon
-                        name="search"
+                      <OIcon
+                        name="search" size="sm"
                         class="tw:text-[1.2rem]! tw:text-[var(--o2-text-3)]"
                       />
                     </template>
@@ -258,10 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="error"
                   class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
                 >
-                  <q-icon
-                    name="error_outline"
+                  <OIcon
+                    name="error-outline"
                     size="3.75rem"
-                    color="negative"
                     class="tw:mb-4"
                   />
                   <div class="tw:text-base tw:mb-2">
@@ -305,6 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
@@ -1136,7 +1136,7 @@ watch(
   }
 
   .insights-dashboard-tabs {
-    :deep(.o-tabs__content .q-icon) {
+    :deep(.o-tabs__content .OIcon) {
       font-size: 1.2rem;
       display: flex;
       align-items: center;

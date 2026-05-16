@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('serviceAccounts.search')"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
               </OInput>
               <OButton
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="confirmRefreshAction(props.row)"
                   >
-                    <q-icon name="refresh" />
+                    <OIcon name="refresh" size="sm" />
                   </OButton>
                   <OButton
                     data-test="service-accounts-edit"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="addRoutePush(props)"
                   >
-                    <q-icon name="edit" />
+                    <OIcon name="edit" size="sm" />
                   </OButton>
                   <OButton
                     data-test="service-accounts-delete"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mr-1"
             @click.stop="copyToClipboard(serviceToken)"
           >
-            <q-icon name="content_copy" />
+            <OIcon name="content-copy" size="sm" />
           </OButton>
           <OButton
             variant="outline"
@@ -262,13 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('serviceAccounts.downloadToken')"
             @click.stop="downloadTokenAsFile(serviceToken)"
           >
-            <q-icon name="file_download" />
+            <OIcon name="file-download" size="sm" />
           </OButton>
         </div>
       </div>
 
       <div class="q-pt-md flex items-center warning-text">
-        <q-icon name="info" class="q-mr-xs" size="16px" />
+        <OIcon name="info" class="q-mr-xs" size="sm" />
         <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
       </div>
     </ODialog>
@@ -300,7 +300,6 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { outlinedVisibility } from "@quasar/extras/material-icons-outlined";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -772,7 +771,7 @@ export default defineComponent({
       hideForm,
       addUser,
       confirmDeleteAction,
-      outlinedVisibility,
+      "visibility": "visibility",
       deleteUser,
       getServiceAccountsUsers,
       pagination,

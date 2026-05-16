@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('evalTemplate.search')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
 
@@ -233,7 +233,6 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -242,6 +241,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Template {
   id: string;

@@ -3,6 +3,7 @@
 
 import type { SliderProps, SliderEmits, SliderSlots } from "./OSlider.types";
 import { computed, useAttrs, useId } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -105,13 +106,13 @@ const resolvedSize = computed(() => props.size ?? "md");
         ]"
       >
         <slot name="label">{{ label }}</slot>
-        <q-icon
+        <OIcon
           v-if="$slots.tooltip"
-          name="info_outline"
-          size="16px"
+          name="info-outline"
+          size="sm"
           :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
           class="tw:cursor-help tw:text-slider-label"
-        ><slot name="tooltip" /></q-icon>
+        ><slot name="tooltip" /></OIcon>
       </label>
       <span
         v-if="showValue"

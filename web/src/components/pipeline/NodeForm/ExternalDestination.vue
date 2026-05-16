@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 External Destination
                 <div>
                   <OButton variant="ghost" size="icon" v-close-popup>
-                    <q-icon name="cancel" size="14px" />
+                    <OIcon name="cancel" size="xs" />
                   </OButton>
                 </div>
               </div>
@@ -140,6 +140,7 @@ import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";

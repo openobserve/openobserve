@@ -815,7 +815,7 @@ const getStarted = () => {
     .q-btn__content {
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 
-      .q-icon {
+      .OIcon {
         font-size: 0.9375rem;
         color: #ffffff;
       }
@@ -824,7 +824,7 @@ const getStarted = () => {
 
   .app-table-container {
     .session-play-icon {
-      .q-icon {
+      .OIcon {
         &:hover {
           color: var(--q-primary);
         }

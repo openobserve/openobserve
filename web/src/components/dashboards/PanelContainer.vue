@@ -30,23 +30,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
         data-test="dashboard-panel-bar"
       >
-        <q-icon
+        <OIcon
           v-if="!viewOnly && !simplifiedPanelView"
-          name="drag_indicator"
+          name="drag-indicator" size="sm"
           data-test="dashboard-panel-drag"
         />
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
         <q-space />
-        <q-icon
+        <OIcon
           v-if="
             !viewOnly &&
             !simplifiedPanelView &&
             isCurrentlyHoveredPanel &&
             props.data.description != ''
           "
-          name="info_outline"
+          name="info-outline" size="sm"
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ props.data.description }}
             </div>
           </q-tooltip>
-        </q-icon>
+        </OIcon>
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
           variant="ghost"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
-              <q-icon name="more_vert" size="16px" />
+              <OIcon name="more-vert" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedDashboardCustomize" size="16px"
+              ><OIcon name="dashboard-customize" size="16px"
             /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DuplicatePanel')"
           >
             <template #icon-left
-              ><q-icon name="content_copy" size="16px"
+              ><OIcon name="content-copy" size="sm"
             /></template>
             {{ t("panel.duplicate") }}
           </ODropdownItem>
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('DeletePanel')"
           >
             <template #icon-left
-              ><q-icon name="delete_outline" size="16px"
+              ><OIcon name="delete-outline" size="sm"
             /></template>
             {{ t("panel.deletePanel") }}
           </ODropdownItem>
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="showViewPanel = true"
           >
             <template #icon-left
-              ><q-icon name="manage_search" size="16px"
+              ><OIcon name="manage-search" size="sm"
             /></template>
             {{ t("panel.queryInspector") }}
           </ODropdownItem>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><q-icon :name="outlinedFileDownload" size="16px"
+              ><OIcon name="file-download" size="16px"
             /></template>
             {{ t("panel.downloadAsCSV") }}
           </ODropdownItem>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #icon-left
-              ><q-icon name="data_object" size="16px"
+              ><OIcon name="data-object" size="sm"
             /></template>
             {{ t("panel.downloadAsJSON") }}
           </ODropdownItem>
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('CreateAlert')"
           >
             <template #icon-left
-              ><q-icon :name="outlinedReportProblem" size="16px"
+              ><OIcon name="report-problem" size="16px"
             /></template>
             {{ t("panel.createAlert") }}
           </ODropdownItem>
@@ -358,12 +358,6 @@ import { addPanel } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import {
-  outlinedRunningWithErrors,
-  outlinedReportProblem,
-  outlinedDashboardCustomize,
-  outlinedFileDownload,
-} from "@quasar/extras/material-icons-outlined";
 import {
   symOutlinedClockLoader20,
   symOutlinedDataInfoAlert,
@@ -909,10 +903,10 @@ export default defineComponent({
       t,
       showLegendsDialog,
       currentPanelData,
-      outlinedRunningWithErrors,
-      outlinedReportProblem,
-      outlinedDashboardCustomize,
-      outlinedFileDownload,
+      outlinedRunningWithErrors: "running-with-errors",
+      outlinedReportProblem: "report-problem",
+      outlinedDashboardCustomize: "dashboard-customize",
+      outlinedFileDownload: "file-download",
       symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
       store,

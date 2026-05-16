@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else-if="!traceId">
       <div class="q-pa-md text-center text-grey-7">
-        <q-icon name="info" size="1.5rem" class="q-mb-sm" />
+        <OIcon name="info" size="1.5rem" class="q-mb-sm" />
         <div>No trace information available for this event</div>
       </div>
     </template>
@@ -63,22 +63,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-grey-7 q-mb-xs">Span Hierarchy:</div>
           <div class="span-hierarchy q-ml-md">
             <div class="span-item">
-              <q-icon name="circle" size="xs" color="blue-6" class="q-mr-xs" />
+              <OIcon name="circle" size="xs" class="q-mr-xs" />
               <span class="text-grey-8">Application Span</span>
             </div>
             <div class="span-item q-ml-md">
-              <q-icon name="arrow_right" size="sm" class="q-mr-xs" />
-              <q-icon name="circle" size="xs" color="green-6" class="q-mr-xs" />
+              <OIcon name="arrow-right" size="sm" class="q-mr-xs" />
+              <OIcon name="circle" size="xs" class="q-mr-xs" />
               <span class="text-grey-8"
                 >Browser SDK Span ({{ formatSpanId(spanId) }})</span
               >
             </div>
             <div class="span-item q-ml-lg" v-if="backendSpanCount > 0">
-              <q-icon name="arrow_right" size="sm" class="q-mr-xs" />
-              <q-icon
+              <OIcon name="arrow-right" size="sm" class="q-mr-xs" />
+              <OIcon
                 name="circle"
                 size="xs"
-                color="orange-6"
                 class="q-mr-xs"
               />
               <span class="text-grey-8"
@@ -185,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-mt-md q-pa-sm tw:bg-[var(--o2-hover-accent)] tw:rounded"
         >
           <div class="row items-center">
-            <q-icon name="info" color="info" size="sm" class="q-mr-sm" />
+            <OIcon name="info" size="sm" class="q-mr-sm" />
             <div class="text-grey-8 text-caption">
               Backend trace data not yet available. Trace data may take up to 30
               seconds to be ingested.
@@ -205,6 +204,7 @@ import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { GitBranch } from 'lucide-vue-next';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   traceId: {

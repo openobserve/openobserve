@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="$emit('cancel')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="col" data-test="pipeline-destination-editor-title">
           <div v-if="destination" class="text-h6">
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 

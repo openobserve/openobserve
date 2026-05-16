@@ -123,7 +123,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <OIcon name="timeline" />
+              <OIcon name="timeline" size="sm" />
               <span class="section-title">Traces ({{ traceQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -148,7 +148,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <OIcon name="show-chart" />
+              <OIcon name="show-chart" size="sm" />
               <span class="section-title">Metrics ({{ metricQueries.length }})</span>
             </div>
             <div class="query-items">
@@ -173,7 +173,7 @@
             class="query-section"
           >
             <div class="section-header">
-              <OIcon name="article" />
+              <OIcon name="article" size="sm" />
               <span class="section-title">Logs ({{ logQueries.length }})</span>
             </div>
             <div class="query-items">

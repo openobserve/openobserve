@@ -16,11 +16,11 @@
             {{ t("confirmDialog.loading") }}
           </div>
         </div>
-        <q-icon
+        <OIcon
           v-if="!!error"
           name="info"
           class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-          size="16px"
+          size="sm"
         >
           <q-tooltip
             anchor="center right"
@@ -30,7 +30,7 @@
           >
             {{ error }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </template>
     </FullViewContainer>
     <div
@@ -57,6 +57,7 @@ const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEdi
 import axios from "axios";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   loading: {

@@ -54,11 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
               <span>{{ "Query " + (index + 1) }}</span>
-              <q-icon
+              <OIcon
                 v-if="promqlMode"
                 :name="
                   dashboardPanelData.layout.hiddenQueries.includes(index)
-                    ? 'visibility_off'
+                    ? 'visibility-off'
                     : 'visibility'
                 "
                 class="q-ml-xs dashboard-query-visibility-icon"
@@ -70,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   :content="dashboardPanelData.layout.hiddenQueries.includes(index) ? t('dashboard.showQueryResults') : t('dashboard.hideQueryResults')"
                 />
-              </q-icon>
-              <q-icon
+              </OIcon>
+              <OIcon
                 v-if="
                   index > 0 ||
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
                       <template #icon-left
-                        ><q-icon name="info_outline"
+                        ><OIcon name="info-outline" size="sm"
                       /></template>
                       <OTooltip
                         :content="t('dashboard.vrlExtractionTooltip')"
@@ -266,6 +266,7 @@ import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -282,7 +283,8 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
-  },
+    OIcon,
+},
   emits: ["searchdata", "run-query"],
   methods: {
     searchData() {

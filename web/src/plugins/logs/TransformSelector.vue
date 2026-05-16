@@ -46,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alt="Transform"
               class="tw:size-4"
             />
-            <q-icon v-else :name="transformIcon" size="16px" />
-            <q-icon name="arrow_drop_down" size="18px" class="tw:ms-0.5" />
+            <OIcon v-else :name="transformIcon" size="16px" />
+            <OIcon name="arrow-drop-down" size="sm" class="tw:ms-0.5" />
             <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>
         </template>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="function-search-input"
             >
               <template #icon-left>
-                <q-icon name="search" />
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
           </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :disabled="searchObj.data.transformType !== 'function'"
       @click="fnSavedFunctionDialog"
     >
-      <q-icon name="save" size="16px" />
+      <OIcon name="save" size="sm" />
       <OTooltip
         :content="searchObj.data.transformType === 'action' ? t('search.saveActionDisabled') : t('common.save')"
         :side-offset="6"
@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

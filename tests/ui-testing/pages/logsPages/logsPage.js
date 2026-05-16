@@ -1587,7 +1587,7 @@ export class LogsPage {
         for (let attempt = 1; attempt <= 3; attempt++) {
             const pageBtn = this.page
                 .locator(this.resultPagination)
-                .locator('button:not(:has(.q-icon))')
+                .locator('button:not(:has(.OIcon))')
                 .filter({ hasText: resultsPerPage })
                 .first();
             await pageBtn.click({ force: true }).catch(() => {});
@@ -4713,7 +4713,7 @@ export class LogsPage {
 
     async expectErrorIconVisible() {
         // Use specific selector for error icon (material-icons with text-negative class)
-        return await expect(this.page.locator('i.q-icon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
+        return await expect(this.page.locator('i.OIcon.text-negative.material-icons').filter({ hasText: 'error' })).toBeVisible();
     }
 
     async expectResultErrorDetailsButtonVisible() {
@@ -6727,7 +6727,7 @@ export class LogsPage {
      * Get anomaly warning icon count
      */
     async getAnomalyWarningIconCount() {
-        const count = await this.page.locator('tbody tr .q-icon, tbody tr i').filter({ hasText: /warning|alert|error/ }).count();
+        const count = await this.page.locator('tbody tr .OIcon, tbody tr i').filter({ hasText: /warning|alert|error/ }).count();
         testLogger.info(`Found ${count} anomaly warning icons`);
         return count;
     }
@@ -6752,7 +6752,7 @@ export class LogsPage {
                 const cells = Array.from(row.querySelectorAll('td'));
                 const anomalyCell = cells[colIndex];
                 return {
-                    hasIcon: anomalyCell?.querySelector('.q-icon, i') !== null,
+                    hasIcon: anomalyCell?.querySelector('.OIcon, i') !== null,
                     hasWarning: anomalyCell?.innerHTML.includes('warning') || anomalyCell?.innerHTML.includes('⚠'),
                     content: anomalyCell?.textContent?.trim() || ''
                 };

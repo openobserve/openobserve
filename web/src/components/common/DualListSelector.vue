@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ leftTitle }}</div>
       <OInput v-model="searchLeft" placeholder="Search..." class="tw:mb-3">
-        <template #prepend><q-icon name="search" /></template>
+        <template #prepend><OIcon name="search" size="sm" /></template>
       </OInput>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
         <q-list dense>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="index === 0"
                   @click.stop="moveUp(index)"
                 >
-                  <q-icon name="arrow_upward" size="14px" />
+                  <OIcon name="arrow-upward" size="xs" />
                 </OButton>
                 <OButton
                   variant="ghost"
@@ -51,14 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="index === modelValue.length - 1"
                   @click.stop="moveDown(index)"
                 >
-                  <q-icon name="arrow_downward" size="14px" />
+                  <OIcon name="arrow-downward" size="xs" />
                 </OButton>
                 <OButton
                   variant="ghost-destructive"
                   size="icon-xs"
                   @click.stop="removeItem(item.value)"
                 >
-                  <q-icon name="delete" size="14px" />
+                  <OIcon name="delete" size="xs" />
                 </OButton>
               </div>
             </q-item-section>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="rightSelected.length === 0"
         @click="addSelected"
       >
-        <q-icon name="arrow_back" size="16px" />
+        <OIcon name="arrow-back" size="sm" />
         <OTooltip content="Add selected" />
       </OButton>
       <OButton
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="availableItems.length === 0"
         @click="addAll"
       >
-        <q-icon name="keyboard_double_arrow_left" size="16px" />
+        <OIcon name="keyboard-double-arrow-left" size="sm" />
         <OTooltip content="Add all" />
       </OButton>
       <OButton
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="leftSelected.length === 0"
         @click="removeSelected"
       >
-        <q-icon name="arrow_forward" size="16px" />
+        <OIcon name="arrow-forward" size="sm" />
         <OTooltip content="Remove selected" />
       </OButton>
       <OButton
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="modelValue.length === 0"
         @click="removeAll"
       >
-        <q-icon name="keyboard_double_arrow_right" size="16px" />
+        <OIcon name="keyboard-double-arrow-right" size="sm" />
         <OTooltip content="Remove all" />
       </OButton>
     </div>
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ rightTitle }}</div>
       <OInput v-model="searchRight" placeholder="Search..." class="tw:mb-3">
-        <template #prepend><q-icon name="search" /></template>
+        <template #prepend><OIcon name="search" size="sm" /></template>
       </OInput>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
         <q-list dense>
@@ -152,6 +152,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Item {
   label: string;

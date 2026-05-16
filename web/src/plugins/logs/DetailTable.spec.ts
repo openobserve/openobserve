@@ -220,8 +220,8 @@ describe("DetailTable Component", () => {
             },
             emits: ['update:modelValue']
           },
-          'q-icon': {
-            template: '<div class="q-icon"><slot /></div>'
+          'OIcon': {
+            template: '<div class="OIcon"><slot /></div>'
           },
           'json-preview': {
             template: '<div data-test="json-preview"><slot /></div>',

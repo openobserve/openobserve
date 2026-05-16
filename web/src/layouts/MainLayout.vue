@@ -195,23 +195,6 @@ import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import {
-  outlinedHome,
-  outlinedSearch,
-  outlinedBarChart,
-  outlinedAccountTree,
-  outlinedDashboard,
-  outlinedWindow,
-  outlinedReportProblem,
-  outlinedFilterAlt,
-
-  outlinedSettings,
-  outlinedManageAccounts,
-  outlinedDescription,
-  outlinedCode,
-  outlinedDevices,
-  outlinedNotificationsActive,
-} from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
@@ -246,7 +229,7 @@ export default defineComponent({
     "q-toolbar": QToolbar,
     "router-view": RouterView,
     "q-avatar": QAvatar,
-    "q-icon": QIcon,
+    "OIcon": QIcon,
     "q-select": QSelect,
     SlackIcon,
     ManagementIcon,
@@ -391,62 +374,62 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: outlinedHome,
+        icon: "home",
         link: "/",
         exact: true,
         name: "home",
       },
       {
         title: t("menu.search"),
-        icon: outlinedSearch,
+        icon: "search",
         link: "/logs",
         name: "logs",
       },
       {
         title: t("menu.metrics"),
-        icon: outlinedBarChart,
+        icon: "bar-chart",
         link: "/metrics",
         name: "metrics",
       },
       {
         title: t("menu.traces"),
-        icon: outlinedAccountTree,
+        icon: "account-tree",
         link: "/traces",
         name: "traces",
       },
       {
         title: t("menu.rum"),
-        icon: outlinedDevices,
+        icon: "devices",
         link: "/rum",
         name: "rum",
       },
       {
         title: t("menu.dashboard"),
-        icon: outlinedDashboard,
+        icon: "dashboard",
         link: "/dashboards",
         name: "dashboards",
       },
       {
         title: t("menu.index"),
-        icon: outlinedWindow,
+        icon: "window",
         link: "/streams",
         name: "streams",
       },
       {
         title: t("menu.alerts"),
-        icon: outlinedReportProblem,
+        icon: "report-problem",
         link: "/alerts",
         name: "alertList",
       },
       {
         title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
+        icon: "filter-alt",
         link: "/ingestion",
         name: "ingestion",
       },
       {
         title: t("menu.iam"),
-        icon: outlinedManageAccounts,
+        icon: "manage-accounts",
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
@@ -582,7 +565,7 @@ export default defineComponent({
         if (alertIndex !== -1 && !incidentExists) {
           linksList.value.splice(alertIndex + 1, 0, {
             title: t("menu.incidents"),
-            icon: outlinedNotificationsActive,
+            icon: "notifications-active",
             link: "/incidents",
             name: "incidentList",
           });
@@ -603,7 +586,7 @@ export default defineComponent({
         if (incidentIndex !== -1 && !actionExists) {
           linksList.value.splice(incidentIndex + 1, 0, {
             title: t("menu.actions"),
-            icon: outlinedCode,
+            icon: "code",
             link: "/actions",
             name: "actionScripts",
           });
@@ -642,7 +625,7 @@ export default defineComponent({
     } else {
       linksList.value.splice(7, 0, {
         title: t("menu.report"),
-        icon: outlinedDescription,
+        icon: "description",
         link: "/reports",
         name: "reports",
       });
@@ -1176,7 +1159,7 @@ export default defineComponent({
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
-      outlinedSettings,
+      "settings": "settings",
       closeSocket,
       splitterModel,
       toggleAIChat,

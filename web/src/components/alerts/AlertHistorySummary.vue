@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-current_state="props">
         <q-td :props="props">
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon
+            <OIcon
               :name="getStateIcon(props.row.current_state)"
               :color="getStateColor(props.row.current_state)"
               size="18px"

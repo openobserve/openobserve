@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('user.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
           <div class="col-6" v-if="config.isCloud == 'true'">
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="confirmRevokeAction(props)"
                 :data-test="`revoke-invite-${props.row.email}`"
               >
-                <q-icon name="cancel" />
+                <OIcon name="cancel" size="sm" />
               </OButton>
               <OButton
                 v-if="props.row.enableEdit && props.row.status != 'pending' && config.isCloud == 'false'"
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="addRoutePush(props)"
                 :data-test="`edit-basic-user-${props.row.email}`"
               >
-                <q-icon name="edit" />
+                <OIcon name="edit" size="sm" />
               </OButton>
             </q-td>
           </template>

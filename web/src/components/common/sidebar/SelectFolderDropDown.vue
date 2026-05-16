@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disableDropdown"
           @click="() => { showAddFolderDialog = true; }"
         >
-          <q-icon name="add" size="xs" />
+          <OIcon name="add" size="xs" />
         </OButton>
       </div>
     </div>
@@ -70,10 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
   export default defineComponent({
     name: "SelectedFolderDropdown",
-    components: { AddFolder, OButton },
+    components: { AddFolder, OButton,
+    OIcon,
+},
     emits: ["folder-selected"],
     props: {
       activeFolderId: {

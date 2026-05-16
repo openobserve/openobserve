@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span class="date-time-label">{{ getDisplayValue }}</span>
       <template #icon-right
-        ><q-icon name="arrow_drop_down" class="date-time-arrow"
+        ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
       /></template>
       <q-menu
         id="date-time-menu"
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <template #append>
-                          <q-icon name="access_time" class="cursor-pointer">
+                          <OIcon name="access-time" size="sm" class="cursor-pointer">
                             <q-popup-proxy
                               transition-show="scale"
                               transition-hide="scale"
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                               </q-time>
                             </q-popup-proxy>
-                          </q-icon>
+                          </OIcon>
                         </template>
                       </q-input>
                     </td>
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <template #append>
-                          <q-icon name="access_time" class="cursor-pointer">
+                          <OIcon name="access-time" size="sm" class="cursor-pointer">
                             <q-popup-proxy
                               transition-show="scale"
                               transition-hide="scale"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                               </q-time>
                             </q-popup-proxy>
-                          </q-icon>
+                          </OIcon>
                         </template>
                       </q-input>
                     </td>
@@ -335,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 // @ts-nocheck
 import {
   ref,
@@ -360,7 +361,9 @@ import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
-  components: { OTabPanels, OTabPanel, OButton },
+  components: { OTabPanels, OTabPanel, OButton,
+    OIcon,
+},
   props: {
     defaultType: {
       type: String,

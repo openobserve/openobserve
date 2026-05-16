@@ -165,8 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div style="width: 130px">
                         {{ t("pipeline.trigger") }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               trigger.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div class="flex justify-start items-center">
                         <div
@@ -331,8 +331,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("alerts.threshold") + " *" }}
 
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               trigger.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div
                         style="width: calc(100% - 190px)"
@@ -551,8 +551,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("alerts.crontitle") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -571,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               expression.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -607,8 +607,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         {{ t("alerts.frequency") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -645,16 +645,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               month, month, and day of week, respectively.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                         <template
                           v-if="
                             triggerData.frequency_type == 'cron' &&
                             showTimezoneWarning
                           "
                         >
-                          <q-icon
-                            :name="outlinedWarning"
-                            size="18px"
+                          <OIcon
+                            name="warning"
+                            size="sm"
                             class="cursor-pointer tw:ml-[8px]"
                             :class="
                               store.state.theme === 'dark'
@@ -671,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               Warning: The displayed timezone is approximate.
                               Verify and select the correct timezone manually.
                             </q-tooltip>
-                          </q-icon>
+                          </OIcon>
                         </template>
                       </div>
                       <div style="max-height: 50px" class="q-mb-sm">
@@ -793,8 +793,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("alerts.period") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -816,7 +816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data from 3:50 PM to 4:00 PM.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -894,8 +894,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("pipeline.delay") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -916,7 +916,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               run 10 minutes after its scheduled time.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -1072,7 +1072,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
+                      <OIcon name="info"
 size="md" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
@@ -1088,7 +1088,7 @@ size="md" />
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
+                      <OIcon name="info"
 size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
@@ -1195,11 +1195,6 @@ import {
 } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedDelete,
-  outlinedInfo,
-  outlinedWarning,
-} from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import {
   getImageURL,
@@ -1219,6 +1214,7 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -2545,7 +2541,7 @@ defineExpose({
     border-radius: 3px 3px 3px 3px;
     padding: 0px 5px;
 
-    .q-icon {
+    .OIcon {
       font-size: 15px;
       color: #ffffff;
     }

@@ -312,8 +312,8 @@ const globalStubs: Record<string, any> = {
   "q-tr": { template: "<tr><slot /></tr>" },
   "q-th": { template: "<th><slot /></th>" },
   "q-td": { template: "<td><slot /></td>" },
-  "q-icon": {
-    template: '<span class="q-icon"><slot /></span>',
+  "OIcon": {
+    template: '<span class="OIcon"><slot /></span>',
     props: ["name", "size", "color"],
   },
   "q-tooltip": { template: "<span><slot /></span>" },

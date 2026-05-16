@@ -153,6 +153,102 @@ import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
 import MenuBook from "~icons/material-symbols/menu-book-outline";
 
+// Batch 2: Additional icons from full codebase audit (2026-05-16)
+import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
+import AdsClickIcon from "~icons/material-symbols/ads-click";
+import AnalyticsIcon from "~icons/material-symbols/analytics";
+import ArrowBackIosIcon from "~icons/material-symbols/arrow-back-ios";
+import ArrowForwardIosIcon from "~icons/material-symbols/arrow-forward-ios";
+import ArrowRightIcon from "~icons/material-symbols/arrow-right";
+import ArrowRightAltIcon from "~icons/material-symbols/arrow-right-alt";
+import AssessmentIcon from "~icons/material-symbols/analytics";
+import AssignmentIcon from "~icons/material-symbols/assignment";
+import AttachFileIcon from "~icons/material-symbols/attach-file";
+import AttachMoneyIcon from "~icons/material-symbols/attach-money";
+import AutorenewIcon from "~icons/material-symbols/autorenew";
+import CardGiftcardIcon from "~icons/material-symbols/redeem";
+import CircleIcon from "~icons/material-symbols/circle";
+import CloudDoneIcon from "~icons/material-symbols/cloud-done";
+import CloudUploadIcon from "~icons/material-symbols/cloud-upload";
+import CodeOffIcon from "~icons/material-symbols/code-off";
+import ColorLensIcon from "~icons/material-symbols/palette";
+import ColorizeIcon from "~icons/material-symbols/colorize";
+import CompareIcon from "~icons/material-symbols/compare";
+import CorporateFareIcon from "~icons/material-symbols/corporate-fare";
+import DashboardCustomizeIcon from "~icons/material-symbols/dashboard-customize";
+import DataUsageIcon from "~icons/material-symbols/data-usage";
+import DeleteSweepIcon from "~icons/material-symbols/delete-sweep";
+import DevicesIcon from "~icons/material-symbols/devices-outline";
+import DragIndicatorIcon from "~icons/material-symbols/drag-indicator";
+import EventNoteIcon from "~icons/material-symbols/event-note";
+import ExitToAppIcon from "~icons/material-symbols/exit-to-app";
+import ExpandAllIcon from "~icons/material-symbols/expand-all";
+import FastForwardIcon from "~icons/material-symbols/fast-forward";
+import FastRewindIcon from "~icons/material-symbols/fast-rewind";
+import FiberManualRecordIcon from "~icons/material-symbols/fiber-manual-record";
+import FileDownloadIcon from "~icons/material-symbols/download";
+import FilterAltIcon from "~icons/material-symbols/filter-alt";
+import FilterListIcon from "~icons/material-symbols/filter-list";
+import FlagIcon from "~icons/material-symbols/flag-outline";
+import FormatListNumberedIcon from "~icons/material-symbols/format-list-numbered";
+import ForumIcon from "~icons/material-symbols/forum-outline";
+import FunctionsIcon from "~icons/material-symbols/functions";
+import GridOnIcon from "~icons/material-symbols/grid-on";
+import HelpIcon from "~icons/material-symbols/help-outline";
+import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
+import HomeIcon from "~icons/material-symbols/home-outline";
+import HubIcon from "~icons/material-symbols/hub";
+import ImageIcon from "~icons/material-symbols/image-outline";
+import InsightsIcon from "~icons/material-symbols/insights";
+import KeyboardArrowRightIcon from "~icons/material-symbols/keyboard-arrow-right";
+import KeyboardArrowUpIcon from "~icons/material-symbols/keyboard-arrow-up";
+import LightbulbIcon from "~icons/material-symbols/lightbulb-outline";
+import LockIcon from "~icons/material-symbols/lock-outline";
+import LoginIcon from "~icons/material-symbols/login";
+import LogoutIcon from "~icons/material-symbols/logout";
+import ManageAccountsIcon from "~icons/material-symbols/manage-accounts";
+import MemoryIcon from "~icons/material-symbols/memory";
+import MonetizationOnIcon from "~icons/material-symbols/attach-money";
+import NoteAddIcon from "~icons/material-symbols/note-add";
+import NotificationsActiveIcon from "~icons/material-symbols/notifications-active-outline";
+import PaletteIcon from "~icons/material-symbols/palette-outline";
+import PaymentsIcon from "~icons/material-symbols/payments-outline";
+import PrintIcon from "~icons/material-symbols/print-outline";
+import PsychologyIcon from "~icons/material-symbols/psychology-outline";
+import RadarIcon from "~icons/material-symbols/radar";
+import RemoveIcon from "~icons/material-symbols/remove";
+import ReportProblemIcon from "~icons/material-symbols/report-outline";
+import RestartAltIcon from "~icons/material-symbols/restart-alt";
+import RocketLaunchIcon from "~icons/material-symbols/rocket-launch";
+import RuleIcon from "~icons/material-symbols/rule";
+import RunningWithErrorsIcon from "~icons/material-symbols/error-outline";
+import SaveIcon from "~icons/material-symbols/save-outline";
+import SavedSearchIcon from "~icons/material-symbols/saved-search";
+import SearchOffIcon from "~icons/material-symbols/search-off";
+import SecurityIcon from "~icons/material-symbols/security";
+import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad";
+import StopIcon from "~icons/material-symbols/stop";
+import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
+import SwapVertIcon from "~icons/material-symbols/swap-vert";
+import SyncIcon from "~icons/material-symbols/sync";
+import SyncProblemIcon from "~icons/material-symbols/sync-problem";
+import TableViewIcon from "~icons/material-symbols/table-view";
+import TagIcon from "~icons/material-symbols/tag";
+import TaskAltIcon from "~icons/material-symbols/task-alt";
+import TextFieldsIcon from "~icons/material-symbols/text-fields";
+import ThumbDownOffAltIcon from "~icons/material-symbols/thumb-down";
+import ThumbUpOffAltIcon from "~icons/material-symbols/thumb-up";
+import ToggleOffIcon from "~icons/material-symbols/toggle-off";
+import TrendingDownIcon from "~icons/material-symbols/trending-down";
+import TroubleshootIcon from "~icons/material-symbols/troubleshoot";
+import UpdateIcon from "~icons/material-symbols/update";
+import VerifiedIcon from "~icons/material-symbols/verified-outline";
+import ViewColumnIcon from "~icons/material-symbols/view-column-outline";
+import VolumeOffIcon from "~icons/material-symbols/volume-off";
+import VolumeUpIcon from "~icons/material-symbols/volume-up";
+import WarningAmberIcon from "~icons/material-symbols/warning-outline";
+import WrapTextIcon from "~icons/material-symbols/wrap-text";
+
 import type { Component } from "vue";
 
 export const iconRegistry = {
@@ -292,6 +388,109 @@ export const iconRegistry = {
   "verified-user": VerifiedUser,
   "webhook": Webhook,
   "menu-book": MenuBook,
+
+  // Batch 2: Additional icons (2026-05-16)
+  "add-circle": AddCircleIcon,
+  "add-circle-outline": AddCircleIcon,
+  "ads-click": AdsClickIcon,
+  "analytics": AnalyticsIcon,
+  "arrow-back-ios": ArrowBackIosIcon,
+  "arrow-forward-ios": ArrowForwardIosIcon,
+  "arrow-right": ArrowRightIcon,
+  "arrow-right-alt": ArrowRightAltIcon,
+  "assessment": AssessmentIcon,
+  "assignment": AssignmentIcon,
+  "attach-file": AttachFileIcon,
+  "attach-money": AttachMoneyIcon,
+  "autorenew": AutorenewIcon,
+  "card-giftcard": CardGiftcardIcon,
+  "check-circle-outline": AddCircleIcon,
+  "circle": CircleIcon,
+  "clear": Close,
+  "cloud-done": CloudDoneIcon,
+  "cloud-upload": CloudUploadIcon,
+  "code-off": CodeOffIcon,
+  "color-lens": ColorLensIcon,
+  "colorize": ColorizeIcon,
+  "compare": CompareIcon,
+  "corporate-fare": CorporateFareIcon,
+  "dashboard-customize": DashboardCustomizeIcon,
+  "data-usage": DataUsageIcon,
+  "delete-outline": Delete,
+  "delete-sweep": DeleteSweepIcon,
+  "devices": DevicesIcon,
+  "drag-indicator": DragIndicatorIcon,
+  "event-note": EventNoteIcon,
+  "exit-to-app": ExitToAppIcon,
+  "expand-all": ExpandAllIcon,
+  "fast-forward": FastForwardIcon,
+  "fast-rewind": FastRewindIcon,
+  "fiber-manual-record": FiberManualRecordIcon,
+  "file-download": FileDownloadIcon,
+  "file-upload": UploadFile,
+  "filter-alt": FilterAltIcon,
+  "filter-list": FilterListIcon,
+  "flag": FlagIcon,
+  "format-list-numbered": FormatListNumberedIcon,
+  "forum": ForumIcon,
+  "functions": FunctionsIcon,
+  "grid-on": GridOnIcon,
+  "help": HelpIcon,
+  "history-toggle-off": HistoryToggleOffIcon,
+  "home": HomeIcon,
+  "hub": HubIcon,
+  "image": ImageIcon,
+  "insights": InsightsIcon,
+  "keyboard-arrow-right": KeyboardArrowRightIcon,
+  "keyboard-arrow-up": KeyboardArrowUpIcon,
+  "lightbulb": LightbulbIcon,
+  "lightbulb-outline": LightbulbIcon,
+  "lock": LockIcon,
+  "login": LoginIcon,
+  "logout": LogoutIcon,
+  "manage-accounts": ManageAccountsIcon,
+  "memory": MemoryIcon,
+  "monetization-on": MonetizationOnIcon,
+  "note-add": NoteAddIcon,
+  "notifications-active": NotificationsActiveIcon,
+  "palette": PaletteIcon,
+  "payments": PaymentsIcon,
+  "print": PrintIcon,
+  "psychology": PsychologyIcon,
+  "radar": RadarIcon,
+  "remove": RemoveIcon,
+  "report-problem": ReportProblemIcon,
+  "restart-alt": RestartAltIcon,
+  "rocket-launch": RocketLaunchIcon,
+  "rule": RuleIcon,
+  "running-with-errors": RunningWithErrorsIcon,
+  "save": SaveIcon,
+  "saved-search": SavedSearchIcon,
+  "search-off": SearchOffIcon,
+  "security": SecurityIcon,
+  "sentiment-very-dissatisfied": SentimentVeryDissatisfiedIcon,
+  "stop": StopIcon,
+  "swap-horiz": SwapHorizIcon,
+  "swap-vert": SwapVertIcon,
+  "sync": SyncIcon,
+  "sync-problem": SyncProblemIcon,
+  "table-view": TableViewIcon,
+  "tag": TagIcon,
+  "task-alt": TaskAltIcon,
+  "text-fields": TextFieldsIcon,
+  "thumb-down-off-alt": ThumbDownOffAltIcon,
+  "thumb-up-off-alt": ThumbUpOffAltIcon,
+  "toggle-off": ToggleOffIcon,
+  "trending-down": TrendingDownIcon,
+  "troubleshoot": TroubleshootIcon,
+  "update": UpdateIcon,
+  "verified": VerifiedIcon,
+  "view-column": ViewColumnIcon,
+  "volume-off": VolumeOffIcon,
+  "volume-up": VolumeUpIcon,
+  "warning-amber": WarningAmberIcon,
+  "wrap-text": WrapTextIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;
+

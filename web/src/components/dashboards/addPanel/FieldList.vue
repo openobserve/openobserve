@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           #icon-left
         >
-          <q-icon
+          <OIcon
             size="xs"
             :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />
@@ -154,9 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @dragstart="onDragStart($event, props.row)"
                 >
-                  <q-icon
-                    name="drag_indicator"
-                    color="grey-13"
+                  <OIcon
+                    name="drag-indicator" size="sm"
                     :class="[
                       'q-mr-xs',
                       !hideAllFieldsSelection &&
@@ -174,14 +173,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-add-data-indicator"
                   />
 
-                  <q-icon
+                  <OIcon
                     :name="
                       props.row.type == 'Utf8'
-                        ? 'text_fields'
+                        ? 'text-fields'
                         : props.row.type == 'Boolean'
-                          ? 'toggle_off'
+                          ? 'toggle-off'
                           : 'tag'
-                    "
+                    " size="sm"
                     color="grey-6"
                     class="q-mr-xs"
                   />
@@ -488,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mx-[0.625rem] tw:mb-2"
           >
             <template #icon-left>
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
             </template>
           </OInput>
         </template>
@@ -517,12 +516,15 @@ import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "FieldList",
-  components: { OButton, OSelect, OInput },
+  components: { OButton, OSelect, OInput,
+    OIcon,
+},
   props: ["editMode", "hideAllFieldsSelection"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey: any = inject(
@@ -1276,7 +1278,7 @@ export default defineComponent({
         opacity: 0;
         right: 0;
 
-        .q-icon {
+        .OIcon {
           cursor: pointer;
         }
 

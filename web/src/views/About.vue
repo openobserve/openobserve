@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 target="_blank"
                 class="link-badge"
               >
-              <OIcon name="backpack" class="tw:mr-1" />
+              <OIcon name="backpack" size="sm" class="tw:mr-1" />
                 package.json
               </a>
               <a href="https://npmjs.com" target="_blank" class="link-badge">

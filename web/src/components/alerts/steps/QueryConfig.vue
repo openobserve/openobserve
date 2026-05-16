@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteLogGroupByColumn(index)"
                       >
-                        <q-icon name="close" />
+                        <OIcon name="close" size="sm" />
                       </OButton>
                     </div>
                   </template>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="addLogGroupByColumn"
                   >
-                    <q-icon name="add" />
+                    <OIcon name="add" size="sm" />
                     <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
                   </OButton>
                 </div>
@@ -417,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteGroupByColumn(index)"
                       >
-                        <q-icon name="close" />
+                        <OIcon name="close" size="sm" />
                       </OButton>
                     </div>
                   </template>
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="addGroupByColumn"
                   >
-                    <q-icon name="add" />
+                    <OIcon name="add" size="sm" />
                     <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
                   </OButton>
                 </div>
@@ -550,9 +550,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
                     @click="toggleFilters"
                   >
-                    <q-icon
-                      name="filter_alt"
-                      size="14px"
+                    <OIcon
+                      name="filter-alt"
+                      size="xs"
                       :class="filterCount > 0
                         ? 'tw:text-[var(--q-primary)]'
                         : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
@@ -568,8 +568,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                       {{ filterCount }}
                     </span>
-                    <q-icon
-                      :name="showFilters ? 'expand_more' : 'chevron_right'"
+                    <OIcon
+                      :name="showFilters ? 'expand-more' : 'chevron-right'"
                       size="14px"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     />
@@ -632,9 +632,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
                 @click="toggleFilters"
               >
-                <q-icon
-                  name="filter_alt"
-                  size="14px"
+                <OIcon
+                  name="filter-alt"
+                  size="xs"
                   :class="filterCount > 0
                     ? 'tw:text-[var(--q-primary)]'
                     : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
@@ -650,8 +650,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                   {{ filterCount }}
                 </span>
-                <q-icon
-                  :name="showFilters ? 'expand_more' : 'chevron_right'"
+                <OIcon
+                  :name="showFilters ? 'expand-more' : 'chevron-right'"
                   size="14px"
                   :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                 />
@@ -812,15 +812,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="sql-status-bar__inner">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
                 <span class="sql-status-bar__msg">{{ sqlQueryErrorMsg }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                <OIcon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
                 <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
-                <q-icon name="check_circle_outline" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                <OIcon name="check-circle-outline" size="xs" style="flex-shrink:0;opacity:0.7;" />
                 <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>

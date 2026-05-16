@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-search-input"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
           </div>
@@ -151,21 +151,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click.stop="acknowledgeIncident(props.row)"
                     data-test="incident-ack-btn"
-                  ><q-icon name="visibility" size="16px" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
+                  ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
                   <OButton
                     v-if="props.row.status !== 'resolved'"
                     variant="ghost-primary"
                     size="icon-circle-sm"
                     @click.stop="resolveIncident(props.row)"
                     data-test="incident-resolve-btn"
-                  ><q-icon name="task_alt" size="16px" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
+                  ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
                   <OButton
                     v-if="props.row.status === 'resolved'"
                     variant="ghost-warning"
                     size="icon-circle-sm"
                     @click.stop="reopenIncident(props.row)"
                     data-test="incident-reopen-btn"
-                  ><q-icon name="restart_alt" size="16px" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
+                  ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
                 </div>
               </template>
             </q-td>
@@ -236,6 +236,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import NoData from "../shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -250,7 +251,8 @@ export default defineComponent({
     OSpinner,
     OInput,
     OTooltip,
-  },
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

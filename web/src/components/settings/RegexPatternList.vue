@@ -12,7 +12,7 @@
             :placeholder="t('regex_patterns.search')"
           >
           <template #prepend>
-            <q-icon class="o2-search-input-icon"  name="search" />
+            <OIcon class="o2-search-input-icon"  name="search" size="sm" />
           </template>
         </OInput>
           <OButton
@@ -203,8 +203,8 @@
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
-    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-    import OButton from "@/lib/core/Button/OButton.vue";
+        import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
     import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     import OInput from "@/lib/forms/Input/OInput.vue";
     import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -222,7 +222,8 @@
             OSpinner,
             OInput,
             OCheckbox,
-        },
+            OIcon,
+},
     setup() {
 
     const regexPatternListTableRef = ref(null);
@@ -562,7 +563,7 @@
         closeAddRegexPatternDialog,
         visibleRows,
         hasVisibleRows,
-        outlinedDelete,
+        "delete": "delete",
         selectedPatterns,
         confirmBulkDelete,
         openBulkDeleteDialog,

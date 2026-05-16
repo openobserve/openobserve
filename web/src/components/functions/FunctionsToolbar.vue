@@ -14,7 +14,7 @@
           title="Go Back"
           @click="redirectToFunctions"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
       <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
@@ -36,11 +36,11 @@
             @update:model-value="onUpdate"
             @blur="onUpdate"
           />
-          <q-icon
+          <OIcon
             :key="functionName"
             v-if="isValidMethodName() !== true && showInputError"
-            name="info_outline"
-            size="20px"
+            name="info-outline"
+            size="md"
             class="q-ml-xs cursor-pointer"
           >
             <OTooltip
@@ -50,7 +50,7 @@
               :side-offset="2"
               :content="isValidMethodName() !== true ? String(isValidMethodName()) : ''"
             />
-          </q-icon>
+          </OIcon>
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="tw:flex tw:items-center tw:gap-4">
@@ -66,8 +66,8 @@
             </div>
           </ORadioGroup>
           <!-- Info icon with tooltip -->
-          <q-icon
-            name="info_outline"
+          <OIcon
+            name="info-outline"
             size="xs"
             class="tw:cursor-pointer"
           >
@@ -77,7 +77,7 @@
                 <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
               </template>
             </OTooltip>
-          </q-icon>
+          </OIcon>
         </div>
       </div>
     </div>
@@ -147,11 +147,11 @@ import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
-import { Maximize, Play } from "lucide-vue-next";
 const { t } = useI18n();
 
 const q = useQuasar();
@@ -268,7 +268,7 @@ defineExpose({
       padding-bottom: 4px !important;
       font-size: 13px;
     }
-    :deep(.q-btn .q-icon) {
+    :deep(.q-btn .OIcon) {
       margin-right: 2px;
     }
 

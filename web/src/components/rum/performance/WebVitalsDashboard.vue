@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-bold q-ml-md q-px-sm rounded q-mt-sm q-py-xs learn-web-vitals-link flex items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
-        <q-icon
+        <OIcon
           name="info"
           size="1rem"
           class="material-symbols-outlined q-mr-xs"
@@ -91,13 +91,15 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import overviewDashboard from "@/utils/rum/web_vitals.json";
 import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "WebVitalsDashboard",
   components: {
     RenderDashboardCharts,
     OSpinner,
-  },
+    OIcon,
+},
   props: {
     dateTime: {
       type: Object,

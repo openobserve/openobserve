@@ -14,11 +14,11 @@
           :label="t('common.query')"
         >
           <template #left>
-            <q-icon
+            <OIcon
               v-if="!!sqlQueryErrorMsg"
-              name="info_outline"
+              name="info-outline"
               class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-              size="16px"
+              size="sm"
             >
               <OTooltip
                 side="right"
@@ -26,7 +26,7 @@
                 :side-offset="10"
                 :content="sqlQueryErrorMsg"
               />
-            </q-icon>
+            </OIcon>
           </template>
           <template #right>
             <OButton
@@ -35,7 +35,7 @@
               :disabled="!selectedStream.name || !inputQuery || loading.events"
               @click="getResults"
             >
-              <Search :size="14" class="tw:mr-1" />
+              <OIcon name="search" size="sm"  class="tw:mr-1" />
               {{ t('search.runQuery') }}
             </OButton>
           </template>
@@ -167,11 +167,11 @@
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
-          <q-icon
+          <OIcon
             v-if="!!eventsErrorMsg"
-            name="info_outline"
+            name="info-outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-            size="16px"
+            size="sm"
           >
             <OTooltip
               side="right"
@@ -179,7 +179,7 @@
               :side-offset="10"
               :content="eventsErrorMsg"
             />
-          </q-icon>
+          </OIcon>
         </template>
         <template #right>
            <!-- o2 ai context add button in the test function -->
@@ -226,11 +226,11 @@
             </div>
           </div>
 
-          <q-icon
+          <OIcon
             v-if="!!outputEventsErrorMsg"
-            name="info_outline"
+            name="info-outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-            size="16px"
+            size="sm"
           >
             <OTooltip
               side="right"
@@ -238,7 +238,7 @@
               :side-offset="10"
               :content="outputEventsErrorMsg"
             />
-          </q-icon>
+          </OIcon>
         </template>
       </FullViewContainer>
 
@@ -251,8 +251,8 @@
           v-if="!outputEvents"
           class="tw:absolute tw:z-10 tw:flex tw:flex-col tw:justify-center tw:items-center tw:w-full tw:h-full tw:opacity-90"
         >
-          <q-icon
-            :name="outlinedLightbulb"
+          <OIcon
+            name="lightbulb"
             size="40px"
             class="tw:text-orange-400"
           />
@@ -296,7 +296,6 @@ import { useI18n } from "vue-i18n";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import useQuery from "@/composables/useQuery";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
@@ -307,9 +306,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { Search, FileText, BarChart2, Activity } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
@@ -764,7 +763,7 @@ defineExpose({
     font-size: 11px !important;
     margin: 1px 2px !important;
 
-    .q-icon {
+    .OIcon {
       margin-right: 4px !important;
       font-size: 13px;
     }
@@ -796,7 +795,7 @@ defineExpose({
   :deep(.date-time-button) {
     width: 100%;
 
-    .q-icon.on-right {
+    .OIcon.on-right {
       margin-left: auto;
     }
   }

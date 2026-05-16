@@ -164,8 +164,8 @@ describe("AddDashboardFromGitHub Component", () => {
           "q-spinner": {
             template: '<div class="q-spinner"></div>',
           },
-          "q-icon": {
-            template: '<span class="q-icon">{{ $attrs.name }}</span>',
+          "OIcon": {
+            template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },
           "q-input": {
             template:

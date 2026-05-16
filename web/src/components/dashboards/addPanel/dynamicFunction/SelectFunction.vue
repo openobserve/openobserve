@@ -63,8 +63,8 @@
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template #icon-left>
-                    <q-icon
-                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
+                    <OIcon
+                      :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm"
                     />
                   </template>
                 </OSelect>
@@ -167,6 +167,7 @@ import {
   symOutlined123,
   symOutlinedList,
 } from "@quasar/extras/material-symbols-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default {
   name: "SelectFunction",
@@ -561,12 +562,12 @@ export default {
     align-items: center !important;
   }
 
-  :deep(.q-field__append .q-icon) {
+  :deep(.q-field__append .OIcon) {
     color: var(--o2-primary-btn-bg) !important;
     font-size: 18px !important;
   }
 
-  :deep(.q-field__prepend .q-icon) {
+  :deep(.q-field__prepend .OIcon) {
     color: var(--o2-primary-btn-bg) !important;
     font-size: 18px !important;
   }

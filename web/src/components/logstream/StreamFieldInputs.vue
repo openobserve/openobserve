@@ -153,10 +153,10 @@
 
 <script lang="ts" setup>
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineProps({
   fields: {
@@ -313,7 +313,7 @@ defineExpose({
 
 <style lang="scss">
 .add-field {
-  .q-icon {
+  .OIcon {
     margin-right: 4px !important;
     font-size: 15px !important;
   }

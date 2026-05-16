@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBack"
               data-test="alert-insights-back-btn"
             >
-              <q-icon name="arrow_back_ios_new" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
             <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
           </div>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-xs el-border"
               data-test="alert-insights-refresh-btn"
             >
-              <q-icon name="refresh" />
+              <OIcon name="refresh" size="sm" />
               <OTooltip :content="t('common.refresh')" />
             </OButton>
           </div>
@@ -147,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <= {{ formatFilterValue(filter.end) }}
               </span>
             </span>
-            <q-icon
-              name="close"
+            <OIcon
+              name="close" size="sm"
               class="chip-close-icon tw:cursor-pointer"
               @click="removeRangeFilter(panelId)"
             />
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
       data-test="action-buttons-row"
     >
-      <q-icon name="campaign" color="primary" size="sm" />
+      <OIcon name="campaign" size="sm" />
       <span class="tw:text-sm tw:font-medium"
         >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
       >
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="selectedAlertForAction = null"
         data-test="close-actions-btn"
       >
-        <q-icon name="close" />
+        <OIcon name="close" size="sm" />
         <OTooltip content="Close actions" />
       </OButton>
     </div>
@@ -299,6 +299,7 @@ import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const router = useRouter();
 const route = useRoute();

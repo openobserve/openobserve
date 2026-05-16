@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
         <template #icon-left>
-          <Maximize2 v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
-          <Minimize2 v-else class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="close-fullscreen" size="sm" v-else class="tw:size-3.5 tw:shrink-0" />
         </template>
       </OButton>
     </template>
@@ -154,7 +154,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
-import { Maximize2, Minimize2 } from "lucide-vue-next";
 import config from "@/aws-exports";
 import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
@@ -163,6 +162,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );

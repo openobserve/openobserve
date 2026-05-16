@@ -236,7 +236,7 @@ const mountUser = () =>
           template: '<div class="q-input-stub"><slot name="prepend" /></div>',
           emits: ["update:modelValue"],
         },
-        "q-icon": { template: "<i />" },
+        "OIcon": { template: "<i />" },
         "q-td": { template: "<div><slot /></div>" },
         "q-th": { template: "<div><slot /></div>" },
         "q-tr": { template: "<div><slot /></div>" },

@@ -83,7 +83,7 @@ const QBannerStub = {
 const QIconStub = {
   name: "QIcon",
   props: ["name", "size"],
-  template: `<i data-test="q-icon" :data-name="name" :class="$attrs.class" />`,
+  template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
 };
 
 function buildWrapper(props: Record<string, any> = {}) {
@@ -99,7 +99,7 @@ function buildWrapper(props: Record<string, any> = {}) {
       stubs: {
         ODialog: ODialogStub,
         "q-banner": QBannerStub,
-        "q-icon": QIconStub,
+        "OIcon": QIconStub,
       },
     },
   });
@@ -241,7 +241,7 @@ describe("ConfirmDialog", () => {
         stubs: {
           ODialog: ODialogStub,
           "q-banner": QBannerStub,
-          "q-icon": QIconStub,
+          "OIcon": QIconStub,
         },
       },
     });

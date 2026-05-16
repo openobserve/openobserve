@@ -199,9 +199,9 @@ describe('ScheduledDashboards', () => {
             props: ['variant', 'size', 'disabled', 'loading', 'active'],
             emits: ['click']
           },
-          'q-icon': {
-            name: 'q-icon',
-            template: '<div class="q-icon-mock"></div>',
+          'OIcon': {
+            name: 'OIcon',
+            template: '<div class="OIcon-mock"></div>',
             props: ['name']
           }
         }

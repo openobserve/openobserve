@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 placeholder="Select series to filter"
               >
                 <template #icon-left>
-                  <q-icon name="filter_list" size="xs" />
+                  <OIcon name="filter-list" size="xs" />
                 </template>
               </OSelect>
             </div>
@@ -79,6 +79,7 @@ import { useStore } from "vuex";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -92,7 +93,9 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect },
+  components: { TableRenderer, TablePaginationControls, OSelect,
+    OIcon,
+},
   setup(props) {
     const store = useStore();
     const filter = ref("");

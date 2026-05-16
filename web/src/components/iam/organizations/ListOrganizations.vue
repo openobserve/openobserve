@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('organization.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
           
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             @click="redirectToInviteMember(props)"
           >
-            <q-icon name="group" />
+            <OIcon name="group" size="sm" />
           </OButton>
         </q-td>
       </template> -->
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="'Edit'"
             @click="renameOrganization(props)"
           >
-            <q-icon name="edit" />
+            <OIcon name="edit" size="sm" />
           </OButton>
         </q-td>
       </template>
@@ -139,6 +139,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -150,7 +151,8 @@ export default defineComponent({
     QTablePagination,
     NoData,
     OButton,
-  },
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();

@@ -19,10 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="setup-card">
       <!-- Header -->
       <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
-        <q-icon
-          name="rocket_launch"
+        <OIcon
+          name="rocket-launch"
           size="2.5rem"
-          color="primary"
           class="tw:flex-shrink-0"
         />
         <div>
@@ -68,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showServices = !showServices"
         >
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon
-              :name="showServices ? 'expand_less' : 'expand_more'"
+            <OIcon
+              :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
             <div class="step-label">Select services to monitor</div>
@@ -145,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showTargetRegions = !showTargetRegions"
           >
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-icon
-                :name="showTargetRegions ? 'expand_less' : 'expand_more'"
+              <OIcon
+                :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
                 color="primary"
               />
               <div class="step-label">
@@ -242,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template #icon-left
-            ><q-icon name="cloud_upload" size="sm"
+            ><OIcon name="cloud-upload" size="sm"
           /></template>
           {{
             deploymentMode === "single"
@@ -291,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-circle-sm"
                 @click="showParamHelper = false"
               >
-                <q-icon name="close" />
+                <OIcon name="close" size="sm" />
               </OButton>
             </div>
             <p class="tw:text-xs tw:mb-3 mode-hint">
@@ -312,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-circle"
                     @click="copyParam(param.value)"
                   >
-                    <q-icon name="content_copy" />
+                    <OIcon name="content-copy" size="sm" />
                     <OTooltip content="Copy" />
                   </OButton>
                 </div>
@@ -354,6 +353,7 @@ import {
   QUICK_SETUP_SERVICES,
 } from "@/utils/awsIntegrations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -364,7 +364,9 @@ const COMPLETE_TEMPLATE_URL =
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox },
+  components: { OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const q = useQuasar();

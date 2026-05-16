@@ -165,8 +165,8 @@ describe("VideoPlayer Component", () => {
             template: '<div data-test="spinner" />',
             props: ["color", "size", "style"],
           },
-          "q-icon": {
-            template: '<i data-test="q-icon" :class="name"></i>',
+          "OIcon": {
+            template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
           },
           "q-toggle": {

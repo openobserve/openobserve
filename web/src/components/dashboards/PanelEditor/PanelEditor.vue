@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
-          <q-icon
-            name="expand_all"
+          <OIcon
+            name="expand-all" size="sm"
             class="field-list-collapsed-icon rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
@@ -107,12 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="collapseFieldList"
             >
               <template #icon-left>
-                <q-icon
+                <OIcon
                   :name="
                     dashboardPanelData.layout.showFieldList
-                      ? 'chevron_left'
-                      : 'chevron_right'
-                  "
+                      ? 'chevron-left'
+                      : 'chevron-right'
+                  " size="sm"
                 />
               </template>
             </OButton>
@@ -421,8 +421,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
         >
-          <q-icon
-            name="expand_all"
+          <OIcon
+            name="expand-all" size="sm"
             class="field-list-collapsed-icon rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
@@ -477,12 +477,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="collapseFieldList"
             >
               <template #icon-left>
-                <q-icon
+                <OIcon
                   :name="
                     dashboardPanelData.layout.showFieldList
-                      ? 'chevron_left'
-                      : 'chevron_right'
-                  "
+                      ? 'chevron-left'
+                      : 'chevron-right'
+                  " size="sm"
                 />
               </template>
             </OButton>
@@ -532,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="custom-chart-type-selector-btn"
                           >
                             <template #icon-left
-                              ><q-icon name="bar_chart"
+                              ><OIcon name="bar-chart" size="sm"
                             /></template>
                             Example Charts
                           </OButton>
@@ -688,6 +688,7 @@ import DashboardErrorsComponent from "@/components/dashboards/addPanel/Dashboard
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 // Async component imports for code splitting

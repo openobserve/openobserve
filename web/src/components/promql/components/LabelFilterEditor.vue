@@ -18,7 +18,7 @@
               :data-test="`promql-label-filter-${index}`"
             >
               {{ computedLabel(label) }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
+              <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               <q-menu class="q-pa-md">
                 <div style="width: 350px">
                   <!-- Label Selection -->
@@ -146,7 +146,7 @@
           class="add-filter-btn"
           data-test="promql-add-label-filter"
         >
-          <q-icon name="add" size="14px" />
+          <OIcon name="add" size="xs" />
           <q-tooltip>Add label filter</q-tooltip>
         </OButton>
       </div>
@@ -158,6 +158,7 @@
 import { ref, watch, computed, inject } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";

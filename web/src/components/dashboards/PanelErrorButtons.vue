@@ -44,7 +44,7 @@
       data-test="panel-limit-number-of-series-warning"
     >
       <template #icon-left
-        ><q-icon :name="symOutlinedDataInfoAlert"
+        ><OIcon :name="symOutlinedDataInfoAlert" size="sm"
       /></template>
       <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
@@ -59,7 +59,7 @@
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
     >
       <template #icon-left
-        ><q-icon :name="outlinedRunningWithErrors"
+        ><OIcon name="running-with-errors" size="sm"
       /></template>
       <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
@@ -75,7 +75,7 @@
       data-test="panel-partial-data-warning"
     >
       <template #icon-left
-        ><q-icon :name="symOutlinedClockLoader20"
+        ><OIcon :name="symOutlinedClockLoader20" size="sm"
       /></template>
       <q-tooltip anchor="bottom right" self="top right">
         <div style="white-space: pre-wrap">
@@ -108,16 +108,16 @@
 import { defineComponent } from "vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  outlinedRunningWithErrors,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   symOutlinedClockLoader20,
   symOutlinedDataInfoAlert,
 } from "@quasar/extras/material-symbols-outlined";
 export default defineComponent({
   name: "PanelErrorButtons",
-  components: { RelativeTime, OButton },
+  components: { RelativeTime, OButton,
+    OIcon,
+},
   props: {
     error: {
       type: String,
@@ -158,7 +158,7 @@ export default defineComponent({
   },
   setup() {
     return {
-      outlinedRunningWithErrors,
+      outlinedRunningWithErrors: "running-with-errors",
       symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
     };

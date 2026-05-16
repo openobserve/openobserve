@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-muted"
               size="icon-sm"
             >
-              <q-icon name="info_outline" />
+              <OIcon name="info-outline" size="sm" />
               <OTooltip content="Variables are used to pass data from the alert to the destination." />
           </OButton>
         </div>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           @click="addVariable"
         >
-        <q-icon name="add" />
+        <OIcon name="add" size="sm" />
         <span>Add Variable</span>
       </OButton>
       </div>
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="addVariable"
           >
-            <q-icon name="add" />
+            <OIcon name="add" size="sm" />
           </OButton>
         </div>
       </div>
@@ -130,7 +130,7 @@ const addVariable = () => {
 
 <style lang="scss">
 .add-variable {
-  .q-icon {
+  .OIcon {
     margin-right: 4px !important;
     font-size: 15px !important;
   }

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </q-input>
         </div>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left
-              ><q-icon name="refresh" size="14px"
+              ><OIcon name="refresh" size="xs"
             /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <OIcon name="error" size="50px" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
-                <q-icon name="more_vert" size="14px" />
+                <OIcon name="more-vert" size="xs" />
                 <q-tooltip>{{ t("regex_patterns.preview") }}</q-tooltip>
               </OButton>
             </q-item-section>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item v-if="filteredPatterns.length === 0">
             <q-item-section class="text-center text-grey-6">
               <div class="q-pa-xl">
-                <q-icon name="search_off" size="50px" />
+                <OIcon name="search-off" size="50px" />
                 <div class="q-mt-md">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
@@ -247,6 +247,7 @@ import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
@@ -268,7 +269,9 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner },
+  components: { OButton, ODialog, OSpinner,
+    OIcon,
+},
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-item-section v-if="icon" avatar>
       <div class="icon-wrapper">
-        <q-icon :name="icon" />
+        <OIcon :name="icon" size="sm" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-item-section>
     <q-item-section v-else-if="iconComponent" avatar>
       <div class="icon-wrapper">
-        <q-icon><component :is="iconComponent" /></q-icon>
+        <OIcon><component :is="iconComponent" /></OIcon>
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -75,9 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "MenuLink",
+  components: { OIcon },
   props: {
     title: {
       type: String,
@@ -194,7 +196,7 @@ export default defineComponent({
     transform: translateZ(0);
     // background-color: rgba(30, 41, 59, 0.6);
 
-    .q-icon {
+    .OIcon {
       color: var(--o2-menu-color);
       // 3D pop-out effect with slight rotation
       transform: translateZ(20px) scale(1.15) rotateY(5deg);
@@ -230,7 +232,7 @@ export default defineComponent({
     position: relative;
     backdrop-filter: blur(8px) !important;
 
-    .q-icon {
+    .OIcon {
       // Minimal icon glow
       filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
       color: var(--o2-menu-color); // Lighter purple for better visibility
@@ -287,7 +289,7 @@ export default defineComponent({
   }
 
   &[aria-label="Billing"] {
-    .q-icon {
+    .OIcon {
       font-size: 1.3rem;
     }
   }
@@ -300,7 +302,7 @@ export default defineComponent({
   min-width: 40px;
   perspective: 1000px; // Enable 3D space
 
-  .q-icon {
+  .OIcon {
     padding: 4px;
     border-radius: 12px;
     // Spring bounce-back effect: overshoots and bounces back
@@ -391,7 +393,7 @@ body.body--light {
       list-style: none;
     }
 
-    .q-icon {
+    .OIcon {
       height: 1.3rem;
       width: 1.3rem;
     }
@@ -406,7 +408,7 @@ body.body--light {
     &.q-router-link--active {
       color: var(--o2-menu-color);
 
-      .q-icon img {
+      .OIcon img {
         filter: brightness(100);
       }
 
@@ -417,7 +419,7 @@ body.body--light {
       body.body--light & {
         color: var(--o2-menu-color) !important;
 
-        .q-icon {
+        .OIcon {
           color: #19191e !important;
         }
 
@@ -429,7 +431,7 @@ body.body--light {
       body.body--dark & {
         color: var(--o2-menu-color) !important;
 
-        .q-icon {
+        .OIcon {
           color: #ffffff !important;
         }
 

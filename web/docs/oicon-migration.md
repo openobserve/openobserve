@@ -7,7 +7,7 @@ Tracks the full replacement of `<q-icon>` with `<OIcon>` across the application.
 
 ---
 
-## O2 Component Library Status (as of 2026-05-15)
+## O2 Component Library Status (as of 2026-05-16)
 
 > Components in `web/src/lib/`. This determines which "blocked" migration items can proceed.
 
@@ -22,9 +22,11 @@ Tracks the full replacement of `<q-icon>` with `<OIcon>` across the application.
 | **ODialog** | overlay | ✅ Built | — |
 | **ODrawer** | overlay | ✅ Built | — |
 | **ODropdown** / ODropdownItem / ODropdownGroup | overlay | ✅ Built | ODropdownItem icon-left slots (logs, dashboards) |
-| **OInput** | form | ❌ Not built | Phase 4 — q-input prepend icons (~10 files) |
-| **OSelect** | form | ❌ Not built | q-select prepend icons |
-| **OTooltip** | overlay | ❌ Not built | Phase 5 — q-icon wrapping q-tooltip (~5 files) |
+| **OInput** | form | ✅ Built | Phase 4 — q-input prepend icons **UNBLOCKED** |
+| **OSelect** | form | ✅ Built | q-select prepend icons **UNBLOCKED** |
+| **OTooltip** | overlay | ✅ Built | Phase 5 — q-icon wrapping q-tooltip **UNBLOCKED** |
+| **OCheckbox** | form | ✅ Built | — |
+| **OSwitch** | form | ✅ Built | q-toggle replacements |
 | **ODatePicker** | form | ❌ Not built | Phase 6 — DateTime picker icons (~3 files) |
 | **OList** / OListItem | navigation | ❌ Not built | MenuLink nav icons |
 

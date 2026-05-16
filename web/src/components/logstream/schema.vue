@@ -300,10 +300,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                    
                     <div v-if="hasUserDefinedSchema" class="q-ml-sm">
-                      <q-icon
+                      <OIcon
                         name="info"
                         class="q-mr-xs"
-                        size="16px"
+                        size="sm"
                         style="color: #f5a623; cursor: pointer"
                       >
                         <q-tooltip style="font-size: 14px; width: 250px">
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           before the stream was configured to use a user-defined
                           schema.
                         </q-tooltip>
-                      </q-icon>
+                      </OIcon>
                     </div>
                   </div>
 
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                     >
                       <template #prepend>
-                        <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                        <OIcon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" size="sm" />
                       </template>
                     </q-input>
                     <OButton
@@ -553,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="val => updateIndexType(props, val)"
                       >
                       <template v-slot:append>
-                        <q-icon 
+                        <OIcon 
                           v-if="props.row.index_type && props.row.index_type.length > 0"
                           name="cancel" 
                           size="14px"
@@ -587,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
                       {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
                       <span>
-                        <q-icon name="arrow_forward" size="xs" />
+                        <OIcon name="arrow-forward" size="xs" />
                       </span>
                     </q-td>
                     <q-td v-else>
@@ -809,7 +809,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: fit-content"
               >
                 <span style="font-weight: 600">
-                  <q-icon name="info" class="q-mr-xs" size="16px" />
+                  <OIcon name="info" class="q-mr-xs" size="sm" />
 
                   Additional
                   {{ store.state.zoConfig.extended_data_retention_days }} days of

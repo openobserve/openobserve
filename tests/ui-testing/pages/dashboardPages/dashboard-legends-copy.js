@@ -34,7 +34,7 @@ export default class DashboardLegendsCopy {
    * @returns {import('@playwright/test').Locator}
    */
   getShowLegendsButton() {
-    // The button renders icon "format_list_bulleted" as text content via Quasar's q-icon
+    // The button renders icon "format_list_bulleted" as text content via Quasar's OIcon
     return this.page.getByRole('button').filter({ hasText: 'format_list_bulleted' }).first();
   }
 
@@ -234,7 +234,7 @@ export default class DashboardLegendsCopy {
   async isTableCellCopied(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
     const copyBtn = cell.locator('.copy-btn');
-    const icon = await copyBtn.locator('.q-icon').textContent();
+    const icon = await copyBtn.locator('.OIcon').textContent();
     return icon.includes('check');
   }
 

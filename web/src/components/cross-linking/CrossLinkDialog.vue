@@ -122,7 +122,6 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Plus } from 'lucide-vue-next';
 
 export interface CrossLink {
   name: string;
@@ -132,7 +131,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, ODialog, Plus },
+  components: { CrossLinkUserGuide, OButton, ODialog, },
   props: {
     modelValue: {
       type: Boolean,
