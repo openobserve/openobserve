@@ -50,41 +50,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mr-md"
         style="width: 400px"
       >
-        <q-input
+        <OInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          borderless
-          dense
           class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
           placeholder="Search User"
         >
           <template #prepend>
             <q-icon name="search" class="cursor-pointer o2-search-input-icon"/>
           </template>
-        </q-input>
+        </OInput>
       </div>
 
       <div
           class="q-mx-sm current-organization"
         >
-        <q-select
+        <OSelect
           v-if="
             store.state.selectedOrganization.identifier ===
               store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
           v-model="selectedOrg"
-          borderless
-          use-input
-          input-debounce="300"
-          :options="orgList"
-          option-label="label"
-          option-value="value"
-          class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
-          @filter="filterOrganizations"
+          :options="orgOptions"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          class="organizationlist"
           @update:model-value="updateOrganization"
           placeholder="Select Organization"
-          virtual-scroll
         />
 
         </div>
@@ -127,17 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${slotProps.column.row.email}`"
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  :offset="[10, 0]"
-                  max-width="300px"
-                >
+                <OTooltip side="right">
                   <div style="font-size: 12px; line-height: 1.5;">
                     <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
                     <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
                   </div>
-                </q-tooltip>
+                </OTooltip>
               </q-icon>
             </div>
           </template>
@@ -158,6 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import AppTable from "@/components/AppTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import { watch, computed } from "vue";

@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex-shrink-0"
                 >
                   <q-icon :name="expandedSections[item.id] ? 'expand_more' : 'chevron_right'" size="14px" />
-                  <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                  <OTooltip :content="expandedSections[item.id] ? 'Collapse' : 'Expand'" data-test="toc-expand-tooltip" side="top" />
                 </OButton>
               </div>
 
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:flex-shrink-0"
                       >
                         <q-icon :name="expandedSections[child.id] ? 'expand_more' : 'chevron_right'" size="14px" />
-                        <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
+                        <OTooltip :content="expandedSections[child.id] ? 'Collapse' : 'Expand'" data-test="toc-expand-tooltip" side="top" />
                       </OButton>
                     </div>
 
@@ -166,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface TocItem {
   id: string;

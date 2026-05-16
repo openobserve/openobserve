@@ -156,14 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: 100%;
                 "
               >
-                <q-checkbox
+                <OCheckbox
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
                   v-model="enabledCategories"
                   :val="cat.value"
                   :label="cat.label"
-                  dense
-                  color="primary"
                 />
               </div>
             </div>
@@ -180,11 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:text-xs tw:mb-1 section-label">
                   Resource Group
                 </div>
-                <q-input
+                <OInput
                   v-model="resourceGroup"
-                  outlined
-                  dense
-                  hide-bottom-space
                   placeholder="rg-openobserve-activity-logs"
                   autocomplete="off"
                   data-test="azure-resource-group-input"
@@ -194,11 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:text-xs tw:mb-1 section-label">
                   Deployment Name
                 </div>
-                <q-input
+                <OInput
                   v-model="deploymentName"
-                  outlined
-                  dense
-                  hide-bottom-space
                   placeholder="o2-activity-20260420"
                   autocomplete="off"
                   data-test="azure-deployment-name-input"
@@ -239,6 +231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -271,7 +265,7 @@ const activityLogsIntegration = azureIntegrations.find(
 
 export default defineComponent({
   name: "AzureConfig",
-  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton },
+  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput },
   setup() {
     const store = useStore();
     const q = useQuasar();

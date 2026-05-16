@@ -26,13 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-circle-sm"
       >
         <q-icon name="info_outline" size="18px" />
-        <q-tooltip
-          :delay="200"
-          anchor="bottom left"
-          self="top right"
-          :offset="[10, 10]"
-          max-width="300px"
-        >
+        <OTooltip side="bottom-start">
           <div style="padding: 8px; font-size: 12px; line-height: 1.6;">
             <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">Graph Legend</div>
 
@@ -49,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span style="color: #a78bfa;">→</span> Purple arrows show temporal flow
             </div>
           </div>
-        </q-tooltip>
+        </OTooltip>
       </OButton>
     </span>
 
@@ -100,6 +94,7 @@ import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({

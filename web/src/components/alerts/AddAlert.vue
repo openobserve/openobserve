@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <!-- Tab Content -->
-        <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
+        <div class="tw:flex-1 tw:overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
           <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
             <div>
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
-        </q-form>
+        </div>
       </div><!-- end TIER 3 card -->
 
       <!-- Footer: Cancel / Save (left column, separate card) -->

@@ -37,9 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scrollToBottomSmooth"
       >
         <q-icon name="arrow_downward" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          Scroll to bottom
-        </q-tooltip>
+        <OTooltip content="Scroll to bottom" side="top" />
       </OButton>
     </div>
   </div>
@@ -49,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, nextTick, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import DOMPurify from 'dompurify';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
 

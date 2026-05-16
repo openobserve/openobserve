@@ -20,31 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="filters-bar q-pa-md">
       <div class="row q-col-gutter-md">
         <div class="col-12 col-md-6">
-          <q-input
+          <OInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
-            borderless
-            dense
-            flat
             clearable
-            class="no-border tw:w-full"
+            class="tw:w-full"
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
               <q-icon class="o2-search-input-icon" name="search" />
             </template>
-          </q-input>
+          </OInput>
         </div>
         <div class="col-12 col-md-4">
-          <q-select
+          <OSelect
             v-model="selectedTags"
             :options="availableTags"
             :label="t('regex_patterns.filter_by_tag')"
-            dense
             multiple
-            use-chips
             clearable
-            borderless
             data-test="built-in-pattern-tag-filter"
           />
         </div>
@@ -102,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`pattern-item-${index}`"
           >
             <q-item-section side>
-              <q-checkbox
+              <OCheckbox
                 v-model="pattern.selected"
                 @update:model-value="updateSelection"
                 :data-test="`pattern-checkbox-${index}`"
@@ -144,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pattern-preview-${index}`"
               >
                 <q-icon name="more_vert" size="14px" />
-                <q-tooltip>{{ t("regex_patterns.preview") }}</q-tooltip>
+                <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
             </q-item-section>
           </q-item>
@@ -186,12 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-mb-md">
           <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.pattern') }}</div>
-          <q-input
+          <OTextarea
             :model-value="previewedPattern?.pattern"
-            type="textarea"
             readonly
-            outlined
-            dense
             rows="3"
           />
         </div>
@@ -249,6 +240,11 @@ import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 
 interface PatternExample {
   Valid: string[];

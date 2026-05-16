@@ -35,26 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
             "
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-            >
-              <span style="font-size: 14px">{{ t('alerts.anomaly.notificationsTooltip') }}</span>
-            </q-tooltip>
+            <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </q-icon>
         </div>
         <div>
-          <q-toggle
+          <OSwitch
             v-model="config.alert_enabled"
             :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
-            size="xs"
-            class="o2-toggle-button-xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
             data-test="anomaly-alert-enabled"
           />
         </div>
@@ -74,67 +61,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:flex-col">
           <div class="tw:flex tw:items-center">
-            <q-select
+            <OSelect
               v-model="config.alert_destination_ids"
-              :options="filteredDestinations"
-              option-label="name"
-              option-value="name"
-              emit-value
-              map-options
+              :options="props.destinations"
+              labelKey="name"
+              valueKey="name"
               multiple
-              use-chips
-              dense
-              borderless
-              use-input
-              input-debounce="300"
-              :max-values="undefined"
-              class="alert-v3-select destination-select"
+              searchable
+              class="destination-select"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
-              @filter="filterDestinations"
             >
-              <template #selected-item="{ index, opt, removeAtIndex }">
-                <q-chip
-                  v-if="index < visibleChipCount"
-                  dense
-                  removable
-                  class="tw:text-[13px]"
-                  @remove="removeAtIndex(index)"
-                >
-                  {{ typeof opt === "object" ? opt.name : opt }}
-                </q-chip>
-                <span
-                  v-if="
-                    index === visibleChipCount &&
-                    config.alert_destination_ids.length > visibleChipCount
-                  "
-                  class="tw:text-[13px] tw:text-gray-500 tw:ml-1 tw:whitespace-nowrap"
-                >
-                  +{{ config.alert_destination_ids.length - visibleChipCount }}
-                </span>
+              <template #empty>
+                <span>{{ t('alerts.anomaly.noDestinationsFound') }}</span>
               </template>
-              <template #option="{ itemProps, opt, selected, toggleOption }">
-                <q-item v-bind="itemProps">
-                  <q-item-section side>
-                    <q-checkbox
-                      :model-value="selected"
-                      dense
-                      @update:model-value="toggleOption(opt)"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ opt.name }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </template>
-              <template #no-option>
-                <q-item>
-                  <q-item-section class="text-grey"
-                    >{{ t('alerts.anomaly.noDestinationsFound') }}</q-item-section
-                  >
-                </q-item>
-              </template>
-            </q-select>
+            </OSelect>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -181,16 +122,19 @@ class="tw:mt-px tw:flex-shrink-0" />
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { defineComponent, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import { RefreshCw } from 'lucide-vue-next';
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, RefreshCw },
+  components: { OButton, OSwitch, OSelect, OTooltip, RefreshCw },
 
   props: {
     config: {
@@ -210,47 +154,6 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
 
-    const filteredDestinations = ref<any[]>(props.destinations);
-
-    // Sync when parent loads destinations asynchronously after component mount.
-    watch(
-      () => props.destinations,
-      (val) => {
-        filteredDestinations.value = val;
-      },
-    );
-
-    const filterDestinations = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredDestinations.value = needle
-          ? props.destinations.filter((d: any) =>
-              d.name.toLowerCase().includes(needle),
-            )
-          : props.destinations;
-      });
-    };
-
-    // Dynamically decide how many chips to show based on text length.
-    // The select has ~420px max-width; each char is roughly 7px + chip padding ~50px.
-    const MAX_CHARS = 42;
-    const visibleChipCount = computed(() => {
-      const ids = props.config.alert_destination_ids;
-      if (!ids || ids.length === 0) return 0;
-      if (ids.length === 1) return 1;
-      // Resolve names from destinations list
-      const getName = (id: string) => {
-        const dest = props.destinations.find((d: any) => d.name === id);
-        return dest ? dest.name : id;
-      };
-      const firstLen = getName(ids[0]).length;
-      if (firstLen > MAX_CHARS) return 1;
-      const secondLen = getName(ids[1]).length;
-      // Show 2 chips if both fit within budget
-      if (firstLen + secondLen <= MAX_CHARS) return 2;
-      return 1;
-    });
-
     const openAddDestination = () => {
       const route = router.resolve({
         name: "alertDestinations",
@@ -262,10 +165,7 @@ export default defineComponent({
     return {
       t,
       store,
-      filteredDestinations,
-      filterDestinations,
       openAddDestination,
-      visibleChipCount,
     };
   },
 });

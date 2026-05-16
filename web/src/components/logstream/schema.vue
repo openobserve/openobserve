@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               {{ indexData.name }}
-              <q-tooltip v-if="indexData.name && indexData.name.length > 35" class="tw:text-xs">
-                {{ indexData.name }}
-              </q-tooltip>
+              <OTooltip v-if="indexData.name && indexData.name.length > 35" :content="indexData.name" side="top" />
             </span>
             <div 
               :class="[
@@ -81,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div v-if="indexData.schema">
-    <q-card-section class="q-ma-none q-pa-none">
-      <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
+      <div class="q-ma-none q-pa-none">
+        <div @submit.prevent="onSubmit">
         <!-- we will show loading state here -->
         <div
           v-if="loadingState"
@@ -306,30 +304,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="16px"
                         style="color: #f5a623; cursor: pointer"
                       >
-                        <q-tooltip style="font-size: 14px; width: 250px">
+                        <OTooltip side="right">
                           Other fields show only the schema fields that existed
                           before the stream was configured to use a user-defined
                           schema.
-                        </q-tooltip>
+                        </OTooltip>
                       </q-icon>
                     </div>
                   </div>
 
                   <div class="flex items-center tw:gap-2">
-                    <q-input
+                    <OInput
                       data-test="schema-field-search-input"
                       v-model="filterField"
                       data-cy="schema-index-field-search-input"
-                      borderless
-                      debounce="1"
                       class="q-ml-auto no-border o2-search-input"
                       :placeholder="t('search.searchField')"
-                      :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                     >
                       <template #prepend>
                         <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
                       </template>
-                    </q-input>
+                    </OInput>
                     <OButton
                       v-if="isSchemaUDSEnabled"
                       data-test="schema-add-fields-title"
@@ -432,9 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
-                          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-                            {{ t('logStream.sdr') }}
-                          </q-tooltip>
+                          <OTooltip :content="t('logStream.sdr')" side="top" />
                         </span>
                         <span v-else>
                           {{ col.label }}
@@ -480,9 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="tw:flex tw:items-center">
                         <span class="field-name-text">
                           {{ props.row.name }}
-                          <q-tooltip v-if="props.row.name.length > 30" class="tw:text-[12px]">
-                            {{ props.row.name }}
-                          </q-tooltip>
+                          <OTooltip v-if="props.row.name.length > 30" :content="props.row.name" side="top" />
                         </span>
                         <span v-if="isEnvQuickModeField(props.row.name)" class="tw:flex tw:items-center tw:ml-1">
                           <img
@@ -490,11 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :alt="t('logStream.envQuickModeMsg')"
                             class="tw:w-[20px] tw:h-[20px]"
                           />
-                          <q-tooltip
-                          class="tw:text-[12px] tw:w-[200px]"
-                        >
-                          {{ t('logStream.envQuickModeMsg') }}
-                        </q-tooltip>
+                          <OTooltip :content="t('logStream.envQuickModeMsg')" side="top" />
                         </span>
                       </div>
                     </q-td>
@@ -570,17 +557,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ scope.opt.label }}
                             </q-item-label>
                           </q-item-section>
-                          <q-tooltip class="tw:text-[12px] tw:w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
-                            This is a predefined environment setting and cannot be changed.
-                          </q-tooltip>
+                          <OTooltip class="tw:text-[12px] tw:w-[200px]" side="top" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true" content="This is a predefined environment setting and cannot be changed." />
                         </q-item>
                       </template>
-                      <q-tooltip 
+                      <OTooltip 
                         v-if="props.row.index_type && props.row.index_type.length > 0" 
-                        class="tw:text-[12px]"
-                      >
-                        {{ streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ') }}
-                      </q-tooltip>
+                        side="top"
+                        :content="streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
+                      />
                       </q-select>
                     </q-td>
                   </template>
@@ -633,20 +617,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         Data Retention (days)
                       </label>
-                      <q-input
+                      <OInput
                         data-test="stream-details-data-retention-input"
                         v-model="dataRetentionDays"
                         type="number"
-                        dense
                         min="1"
-                        borderless
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @change="formDirtyFlag = true"
                         @update:model-value="markFormDirty"
                       />
                       <small 
@@ -677,21 +652,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         Max Query Range (hours)
                       </label>
-                      <q-input
+                      <OInput
                         data-test="stream-details-max-query-range-input"
                         v-model="maxQueryRange"
                         type="number"
-                        dense
-                        borderless
                         min="0"
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @wheel.prevent
-                        @change="formDirtyFlag = true"
                         @update:model-value="markFormDirty"
                       />
                       <small 
@@ -714,20 +679,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("logStream.flattenLevel") }}
                       </label>
-                      <q-input
+                      <OInput
                         data-test="stream-details-flatten-level-input"
                         v-model="flattenLevel"
                         type="number"
-                        dense
-                        borderless
                         min="0"
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @change="formDirtyFlag = true"
                         @update:model-value="markFormDirty"
                       />
                       <small 
@@ -754,13 +710,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         Use Stream Stats for Partitioning
                       </span>
-                      <q-toggle
+                      <OSwitch
                         data-test="log-stream-use_approx-toggle-btn"
                         v-model="approxPartition"
-                        size="lg"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        @click="formDirtyFlag = true"
+                        @update:model-value="formDirtyFlag = true"
                       />
                     </div>
 
@@ -771,14 +724,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <span>Store Original Data</span>
-                      <q-toggle
+                      <OSwitch
                         v-if="showStoreOriginalDataToggle"
                         data-test="log-stream-store-original-data-toggle-btn"
                         v-model="storeOriginalData"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        size="lg"
-                        @click="formDirtyFlag = true"
+                        @update:model-value="formDirtyFlag = true"
                       />
                     </div>
 
@@ -789,13 +739,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <span>Enable Distinct Values</span>
-                      <q-toggle
+                      <OSwitch
                         data-test="log-stream-enabled-distinct-values-toggle-btn"
                         v-model="enableDistinctFields"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        size="lg"
-                        @click="formDirtyFlag = true"
+                        @update:model-value="formDirtyFlag = true"
                       />
                     </div>
                   </div>
@@ -985,9 +932,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t("logStream.removeSchemaField")
                         : t("logStream.addSchemaField")
                     }}
-                    <q-tooltip v-if="hasUDSFieldInSelection">
-                      {{ t("logStream.udsFieldAlreadyInSchema") }}
-                    </q-tooltip>
+                    <OTooltip v-if="hasUDSFieldInSelection" :content="t('logStream.udsFieldAlreadyInSchema')" side="top" />
                   </OButton>
                   <OButton
                     v-if="
@@ -1034,8 +979,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-form>
-    </q-card-section>
+        </div>
+      </div>
     </div>
     <div v-else class="q-pa-md">
       <h5>Wait while loading...</h5>
@@ -1118,6 +1063,10 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1163,6 +1112,10 @@ export default defineComponent({
     Plus,
     Trash2,
     OSpinner,
+    OInput,
+    OSelect,
+    OSwitch,
+    OTooltip,
   },
   setup({ modelValue }) {
     type PatternAssociation = {

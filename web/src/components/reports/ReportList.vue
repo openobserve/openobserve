@@ -41,11 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Search input -->
-            <q-input
+            <OInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
               :placeholder="
                 searchAcrossFolders
@@ -58,28 +56,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
 
             <!-- All Folders toggle -->
             <div class="tw:ml-2">
-              <q-toggle
-                data-test="report-list-search-across-folders-toggle"
-                v-model="searchAcrossFolders"
-                label="All Folders"
-                class="tw:h-[32px] tw:mr-3 o2-toggle-button-lg all-folders-toggle"
-                size="lg"
-              />
-              <q-tooltip
-                class="q-mt-lg"
-                anchor="top middle"
-                self="bottom middle"
-              >
-                {{
-                  searchAcrossFolders
-                    ? t("dashboard.searchSelf")
-                    : t("dashboard.searchAll")
-                }}
-              </q-tooltip>
+              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                <OSwitch
+                  data-test="report-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  :label="t('dashboard.allFolders') || 'All Folders'"
+                />
+              </OTooltip>
             </div>
 
             <OButton
@@ -365,6 +352,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import { Pause, Play, Pencil, Trash2, FolderInput, CalendarClock, Database } from 'lucide-vue-next';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
