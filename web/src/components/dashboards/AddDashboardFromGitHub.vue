@@ -297,6 +297,29 @@ export default defineComponent({
       }
     };
 
+    const S3_BASE = "https://openobserve-datasources-bucket.s3.amazonaws.com";
+    const S3_PREFIX = "dashboards/";
+
+    const parseS3Folders = (xmlText: string): string[] => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, "application/xml");
+      const prefixes = Array.from(doc.querySelectorAll("CommonPrefixes Prefix"));
+      return prefixes.map((el) => {
+        const full = el.textContent || "";
+        return full.replace(S3_PREFIX, "").replace(/\/$/, "");
+      }).filter(Boolean);
+    };
+
+    const parseS3Files = (xmlText: string, folderPath: string): string[] => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, "application/xml");
+      const keys = Array.from(doc.querySelectorAll("Contents Key"));
+      const prefix = `${S3_PREFIX}${folderPath}/`;
+      return keys
+        .map((el) => (el.textContent || "").replace(prefix, ""))
+        .filter((name) => name.endsWith(".json") && !name.includes("/"));
+    };
+
     const loadDashboards = async () => {
       loading.value = true;
       error.value = "";
@@ -307,37 +330,32 @@ export default defineComponent({
         const cacheAge = cache.lastFetched ? now - cache.lastFetched : Infinity;
 
         if (cache.dashboards.length > 0 && cacheAge < cache.cacheExpiry) {
-          // Use cached data
           dashboards.value = cache.dashboards;
           loading.value = false;
           return;
         }
 
-        // Cache miss or expired - fetch from GitHub
+        // Fetch folder list from S3 using List Objects v2 API (requires s3:ListBucket)
         const response = await fetch(
-          "https://api.github.com/repos/openobserve/dashboards/contents",
+          `${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}&delimiter=/`,
         );
         if (!response.ok)
           throw new Error("Failed to fetch dashboards from gallery");
 
-        const folders = await response.json();
-
-        // Filter for directories only
-        const dirFolders = folders.filter(
-          (item: any) => item.type === "dir" && !item.name.startsWith("."),
+        const xmlText = await response.text();
+        const folderNames = parseS3Folders(xmlText).filter(
+          (name) => !name.startsWith("."),
         );
 
-        // Create dashboard entries for all folders - we'll fetch JSON files lazily
-        const dashboardList = dirFolders
-          .map((folder: any) => ({
-            name: folder.name,
-            displayName: folder.name.replace(/_/g, " "),
-            folderPath: folder.name,
-            jsonFiles: [], // Will be populated when selected
+        const dashboardList = folderNames
+          .map((name) => ({
+            name,
+            displayName: name.replace(/_/g, " "),
+            folderPath: name,
+            jsonFiles: [],
           }))
           .sort((a: any, b: any) => a.displayName.localeCompare(b.displayName));
 
-        // Update cache in Vuex store
         store.commit("setGithubDashboardGallery", dashboardList);
         dashboards.value = dashboardList;
       } catch (err) {
@@ -395,16 +413,11 @@ export default defineComponent({
           if (dashboard.jsonFiles.length === 0) {
             try {
               const folderContents = await fetch(
-                `https://api.github.com/repos/openobserve/dashboards/contents/${dashboard.folderPath}`,
+                `${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}${dashboard.folderPath}/&delimiter=/`,
               );
               if (folderContents.ok) {
-                const files = await folderContents.json();
-                dashboard.jsonFiles = files
-                  .filter(
-                    (file: any) =>
-                      file.type === "file" && file.name.endsWith(".json"),
-                  )
-                  .map((file: any) => file.name);
+                const xmlText = await folderContents.text();
+                dashboard.jsonFiles = parseS3Files(xmlText, dashboard.folderPath);
 
                 // Update the cache with the fetched JSON files
                 const cache = store.state.githubDashboardGallery;
@@ -471,8 +484,8 @@ export default defineComponent({
                 // Use cached JSON
                 dashboardJson = jsonCache[cacheKey];
               } else {
-                // Download dashboard JSON from GitHub
-                const rawUrl = `https://raw.githubusercontent.com/openobserve/dashboards/main/${dashboard.folderPath}/${jsonFile}`;
+                // Download dashboard JSON from S3
+                const rawUrl = `${S3_BASE}/${S3_PREFIX}${dashboard.folderPath}/${jsonFile}`;
                 const response = await fetch(rawUrl);
                 if (!response.ok) {
                   throw new Error(
