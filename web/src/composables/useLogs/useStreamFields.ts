@@ -68,7 +68,7 @@ export const useStreamFields = () => {
     schemaRequestToken,
   } = searchState();
 
-  const { fnParsedSQL, getColumnWidth } = logsUtils();
+  const { fnParsedSQL, getColumnWidth, hasAggregation } = logsUtils();
 
   const correlationFilters = useCorrelationFilters({
     orgId: () => store.state.selectedOrganization.identifier,
@@ -1155,20 +1155,60 @@ export const useStreamFields = () => {
         }
 
         if (selectedFields.length == 0) {
-          searchObj.data.resultGrid.columns.push({
-            name: "source",
-            id: "source",
-            accessorFn: (row: any) => JSON.stringify(row),
-            cell: (info: any) => info.getValue(),
-            header: "source",
-            sortable: true,
-            enableResizing: false,
-            meta: {
-              closable: false,
-              showWrap: false,
-              wrapContent: false,
-            },
-          });
+          // For SQL mode aggregate queries, derive columns from the first hit's keys
+          // so aliases like "cnt" in SELECT COUNT(*) as cnt show as proper columns.
+          let aggregateColumnsAdded = false;
+          if (
+            searchObj.meta.sqlMode == true &&
+            parsedSQL.hasOwnProperty("columns") &&
+            hasAggregation(parsedSQL.columns) &&
+            searchObj.data.queryResults?.hits?.length > 0
+          ) {
+            const hitKeys = Object.keys(
+              searchObj.data.queryResults.hits[0],
+            ).filter((key) => key !== store.state.zoConfig.timestamp_column);
+            if (hitKeys.length > 0) {
+              const aggCanvas = document.createElement("canvas");
+              const aggContext = aggCanvas.getContext("2d");
+              for (const field of hitKeys) {
+                searchObj.data.resultGrid.columns.push({
+                  name: field,
+                  id: field,
+                  accessorFn: (row: any) => row[field],
+                  header: field,
+                  sortable: true,
+                  enableResizing: true,
+                  meta: {
+                    closable: false,
+                    showWrap: true,
+                    wrapContent: false,
+                  },
+                  size: aggContext
+                    ? getColumnWidth(aggContext, field)
+                    : 150,
+                  maxSize: window.innerWidth,
+                });
+              }
+              aggregateColumnsAdded = true;
+            }
+          }
+
+          if (!aggregateColumnsAdded) {
+            searchObj.data.resultGrid.columns.push({
+              name: "source",
+              id: "source",
+              accessorFn: (row: any) => JSON.stringify(row),
+              cell: (info: any) => info.getValue(),
+              header: "source",
+              sortable: true,
+              enableResizing: false,
+              meta: {
+                closable: false,
+                showWrap: false,
+                wrapContent: false,
+              },
+            });
+          }
         }
       } else {
         if (
