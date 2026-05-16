@@ -455,7 +455,7 @@ const availableTabs = computed(() => {
         return {
           name: "volume",
           label: t("volumeInsights.tabLabel"),
-          icon: "trending_up",
+          icon: "trending-up",
         };
       case "duration":
         return {
@@ -467,7 +467,7 @@ const availableTabs = computed(() => {
         return {
           name: "error",
           label: t("errorInsights.tabLabel"),
-          icon: "error_outline",
+          icon: "error-outline",
         };
     }
   });

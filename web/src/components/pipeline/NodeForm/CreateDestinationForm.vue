@@ -678,7 +678,7 @@ const destinationTypes = [
   {
     label: "Newrelic",
     value: "newrelic",
-    icon: "monitor_heart",
+    icon: "monitor-heart",
     image: getImageURL("images/pipeline/newrelic.png"),
   },
   {

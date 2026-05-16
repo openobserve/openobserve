@@ -1958,7 +1958,7 @@ const DIM_CARD_THEMES = [
   },
   {
     // teal
-    icon: "folder_open",
+    icon: "folder-open",
     iconClass: "tw:text-teal-5",
     countClass: "tw:text-teal-6",
     borderDark:

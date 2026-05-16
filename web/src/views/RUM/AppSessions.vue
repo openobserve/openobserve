@@ -277,7 +277,7 @@ const columns = ref([
     field: "",
     label: "",
     type: "action",
-    icon: "play_circle_filled",
+    icon: "play-circle-filled",
     class: "session-play-icon",
     style: { width: "3.5rem" },
   },

@@ -1360,7 +1360,7 @@ export default defineComponent({
           status: "healthy",
           text: "Healthy",
           color: "positive",
-          icon: "check_circle",
+          icon: "check-circle",
         };
       }
     });

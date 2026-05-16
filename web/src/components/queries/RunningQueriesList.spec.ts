@@ -601,7 +601,7 @@ describe('RunningQueriesList.vue', () => {
     });
 
     it('should have access to "cancel" icon', () => {
-      expect(wrapper.vm."cancel").toBeDefined();
+      expect(wrapper.vm["cancel"]).toBeDefined();
     });
   });
 

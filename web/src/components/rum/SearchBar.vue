@@ -118,7 +118,6 @@ export default defineComponent({
     ),
     SyntaxGuide,
     OButton,
-    Download,
   },
   emits: ["searchdata", "date-change"],
   props: {
