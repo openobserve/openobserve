@@ -491,6 +491,25 @@
   --color-option-group-label: var(--color-text-primary);
   --color-option-group-label-disabled: var(--color-text-disabled);
   --color-option-group-error-text: var(--color-error-600);
+
+  /* OTable */
+  --color-table-header-bg: var(--color-surface-subtle);
+  --color-table-header-text: var(--color-text-secondary);
+  --color-table-header-border: var(--color-border-default);
+  --color-table-row-hover-bg: var(--color-primary-50);
+  --color-table-row-selected-bg: var(--color-primary-100);
+  --color-table-row-striped-bg: var(--color-surface-subtle);
+  --color-table-border: var(--color-border-default);
+  --color-table-cell-bg: var(--color-surface-base);
+  --color-table-cell-text: var(--color-text-primary);
+  --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-400) 35%, transparent);
+  --color-table-highlight-text: var(--color-text-primary);
+  --color-table-pagination-text: var(--color-text-secondary);
+  --color-table-resize-handle: var(--color-primary-400);
+  --color-table-sort-icon-active: var(--color-primary-600);
+  --color-table-sort-icon-inactive: var(--color-text-disabled);
+  --color-table-streaming-bar: var(--color-primary-500);
+  --color-table-row-expanded-bg: var(--color-surface-subtle);
 }
 
 
@@ -947,4 +966,23 @@
   --color-progress-bar-danger: var(--color-progress-bar-danger);
   --color-progress-bar-track: var(--color-progress-bar-track);
   --color-progress-bar-label: var(--color-progress-bar-label);
+
+  /* OTable */
+  --color-table-header-bg: var(--color-table-header-bg);
+  --color-table-header-text: var(--color-table-header-text);
+  --color-table-header-border: var(--color-table-header-border);
+  --color-table-row-hover-bg: var(--color-table-row-hover-bg);
+  --color-table-row-selected-bg: var(--color-table-row-selected-bg);
+  --color-table-row-striped-bg: var(--color-table-row-striped-bg);
+  --color-table-border: var(--color-table-border);
+  --color-table-cell-bg: var(--color-table-cell-bg);
+  --color-table-cell-text: var(--color-table-cell-text);
+  --color-table-highlight-bg: var(--color-table-highlight-bg);
+  --color-table-highlight-text: var(--color-table-highlight-text);
+  --color-table-pagination-text: var(--color-table-pagination-text);
+  --color-table-resize-handle: var(--color-table-resize-handle);
+  --color-table-sort-icon-active: var(--color-table-sort-icon-active);
+  --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
+  --color-table-streaming-bar: var(--color-table-streaming-bar);
+  --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
 }
