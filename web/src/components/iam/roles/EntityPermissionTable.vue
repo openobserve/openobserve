@@ -30,11 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <template v-slot:permission="slotProps: any">
-      <q-checkbox
+      <OCheckbox
         v-show="slotProps.column.row.permission[slotProps.columnName].show"
-        size="xs"
         v-model="slotProps.column.row.permission[slotProps.columnName].value"
-        :val="slotProps.columnName"
+        :value="slotProps.columnName"
         class="filter-check-box cursor-pointer"
         @click="
           handlePermissionChange(slotProps.column.row, slotProps.columnName)
@@ -51,6 +50,7 @@ import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const props = defineProps({
   resource: {

@@ -6,17 +6,15 @@
       <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
             {{ t("regex_patterns.title") }}
           </div>
-          <q-input
+          <OInput
             v-model="filterQuery"
-            borderless
-            dense
             class="q-ml-auto no-border o2-search-input"
             :placeholder="t('regex_patterns.search')"
           >
           <template #prepend>
             <q-icon class="o2-search-input-icon"  name="search" />
           </template>
-        </q-input>
+        </OInput>
           <OButton
             class="q-ml-sm"
             variant="outline"
@@ -60,15 +58,14 @@
           </div>
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
         </template>
         <template v-slot:header="props">
          <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                   class="o2-table-checkbox"
                 />
@@ -90,7 +87,7 @@
           <q-tr :props="props">
           <!-- render checkbox column -->
           <q-td auto-width>
-            <q-checkbox v-model="props.selected" size="sm" class="o2-table-checkbox" />
+            <OCheckbox v-model="props.selected" class="o2-table-checkbox" />
           </q-td>
 
           <!-- render the body of the columns -->
@@ -209,6 +206,8 @@
     import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
     import OButton from "@/lib/core/Button/OButton.vue";
     import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+    import OInput from "@/lib/forms/Input/OInput.vue";
+    import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
     export default defineComponent({
         name: "RegexPatternList",
@@ -221,6 +220,8 @@
             NoData,
             OButton,
             OSpinner,
+            OInput,
+            OCheckbox,
         },
     setup() {
 

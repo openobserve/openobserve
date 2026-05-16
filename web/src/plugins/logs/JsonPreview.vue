@@ -17,7 +17,7 @@
         class="tw:mb-[0.375rem] q-mr-sm"
         @click="copyLogToClipboard"
       ><q-icon name="content_copy" size="14px" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
-      <OButton
+        <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
         variant="outline"
@@ -26,9 +26,7 @@
         data-test="log-correlation-btn"
       >
         <q-icon name="link" size="14px" class="tw:mr-1" />{{ t('search.viewRelated') }}
-        <q-tooltip>
-          {{ t("search.viewRelatedTooltip") }}
-        </q-tooltip>
+        <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
         v-if="
@@ -36,66 +34,15 @@
         "
         class="o2-input flex items-center logs-trace-selector"
       >
-        <q-select
+        <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
-          :options="filteredTracesStreamOptions"
-          input-debounce="0"
-          filled
-          size="xs"
-          borderless
-          dense
-          fill-input
-          behavior="menu"
-          :title="searchObj.meta.selectedTraceStream"
+          :options="tracesStreams"
+          class="tw:w-[auto] tw:flex-shrink-0"
           :loading="isTracesStreamsLoading"
-        >
-          <template #no-option>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                filled
-                debounce="500"
-                autofocus
-                dense
-                size="xs"
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-            <q-item>
-              <q-item-section> {{ t("search.noResult") }}</q-item-section>
-            </q-item>
-          </template>
-          <template #before-options>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                debounce="500"
-                filled
-                dense
-                size="xs"
-                autofocus
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-          </template>
-        </q-select>
+          :disabled="isTracesStreamsLoading"
+          size="sm"
+        />
         <OButton
           data-test="trace-view-logs-btn"
           class="traces-view-logs-btn"
@@ -273,18 +220,10 @@
       @click:secondary="typeOfRegexPattern = false"
       @click:primary="confirmRegexPatternType"
     >
-      <q-input
-        type="text"
+      <OInput
         data-test="regex-pattern-type-input"
         v-model="regexPatternType"
-        color="input-border"
         label="Type of regex pattern (e.g. email, phone number, etc.)"
-        bg-color="input-bg"
-        class="showLabelOnTop"
-        stack-label
-        outlined
-        filled
-        dense
       />
     </ODialog>
   </div>
@@ -325,6 +264,9 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default {
   name: "JsonPreview",
@@ -381,6 +323,9 @@ export default {
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   emits: [
     "copy",

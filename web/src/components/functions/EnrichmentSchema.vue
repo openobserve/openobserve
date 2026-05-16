@@ -77,20 +77,17 @@
             <div class="tw:text-sm display-total-fields">
                 All Fields ({{ schemaData.schema.length }})
             </div>
-                <q-input
+                <OInput
                   data-test="schema-field-search-input"
                   v-model="filterField"
                   data-cy="schema-index-field-search-input"
-                  filled
-                  borderless
-                  dense
                   debounce="1"
                   :placeholder="t('search.searchField')"
                 >
                   <template #prepend>
                     <q-icon name="search" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
           <div>
 
@@ -170,6 +167,8 @@
     import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+    import OInput from "@/lib/forms/Input/OInput.vue";
+    import { X } from "lucide-vue-next";
     import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     const defaultStreamData = {
         name: '',
@@ -201,6 +200,9 @@
         AppTabs,
         QTablePagination,
         ODrawer,
+        OButton,
+        OInput,
+        X,
         OSpinner,
     },
     emits: ['update:open'],

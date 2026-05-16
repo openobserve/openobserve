@@ -57,69 +57,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-px-lg q-pb-md"
           style="width: 1024px"
         >
-          <q-form
+          <div
             class="create-report-form"
-            ref="addActionScriptFormRef"
-            @submit="onSubmit"
           >
             <div
               data-test="add-action-script-name-input"
               class="report-name-input"
               style="padding-top: 12px"
             >
-              <q-input
+              <OInput
                 v-model.trim="formData.name"
                 :label="t('alerts.name') + ' *'"
                 class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
-                :rules="[
-                  (val: any) =>
-                    !!val
-                      ? isValidResourceName(val) ||
-                        `Characters like :, ?, /, #, and spaces are not allowed.`
-                      : t('common.nameRequired'),
-                ]"
+                :error="!!nameError"
+                :error-message="nameError"
                 tabindex="0"
                 style="width: 400px"
+                @update:model-value="(v: string) => {
+                  if (!v) { nameError = t('common.nameRequired'); }
+                  else if (!isValidResourceName(v)) { nameError = 'Characters like :, ?, /, #, and spaces are not allowed.'; }
+                  else { nameError = ''; }
+                }"
               >
-                <template v-slot:hint>
+                <template #hint>
                   Characters like :, ?, /, #, and spaces are not allowed.
                 </template>
-              </q-input>
+              </OInput>
             </div>
-            <div
-              data-test="add-action-script-description-input"
-              class="report-name-input q-pb-sm"
-            >
-              <q-input
+            <div data-test="add-action-script-description-input" class="report-name-input q-pb-sm">
+              <OInput
                 v-model="formData.description"
                 :label="t('reports.description')"
                 class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
                 tabindex="0"
                 style="width: 800px"
               />
             </div>
 
             <div data-test="add-action-script-type" class="report-name-input">
-              <q-select
+              <OSelect
                 data-test="add-action-script-type-select"
                 v-model="formData.type"
                 :label="t('common.type') + ' *'"
                 :options="actionTypes"
+                labelKey="label"
+                valueKey="value"
                 class="showLabelOnTop no-case tw:w-[400px]"
-                stack-label
-                map-options
-                emit-value
-                borderless
-                dense
-                :rules="[(val: any) => !!val || 'Field is required!']"
-                :disable="isEditingActionScript"
-                :readonly="isEditingActionScript"
+                :error="!!typeError"
+                :error-message="typeError"
+                :disabled="isEditingActionScript"
+                @update:model-value="(v: any) => { typeError = v ? '' : 'Field is required!'; }"
               />
             </div>
 
@@ -286,70 +273,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'text-grey-7'
                             "
                           >
-                            <q-tooltip anchor="center right" self="center left">
-                              <span style="font-size: 14px">
-                                Pattern: * * * * * means every minute .
-                                <br />
-                                Format: [Minute 0-59] [Hour 0-23] [Day of Month
-                                1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
-                                '1L-7L', 0 and 7 for Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday. <br />
-                                Example: 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies minute, hour, day of month,
-                                month, and day of week, respectively.</span
-                              >
-                            </q-tooltip>
+                            <OTooltip side="right" align="center">
+                              <template #content>
+                                <span style="font-size: 14px">
+                                  Pattern: * * * * * means every minute .
+                                  <br />
+                                  Format: [Minute 0-59] [Hour 0-23] [Day of Month
+                                  1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
+                                  '1L-7L', 0 and 7 for Sunday].
+                                  <br />
+                                  Use '*' to represent any value, 'L' for the last
+                                  day/weekday. <br />
+                                  Example: 0 12 * * ? - Triggers at 12:00 PM
+                                  daily. It specifies minute, hour, day of month,
+                                  month, and day of week, respectively.
+                                </span>
+                              </template>
+                            </OTooltip>
                           </q-icon>
                         </div>
 
-                        <q-input
+                        <OInput
                           v-model="frequency.cron"
                           class="showLabelOnTop"
                           type="text"
-                          borderless
-                          :rules="[
-                            (val: any) =>
-                              !!val.length
-                                ? cronError.length
-                                  ? cronError
-                                  : true
-                                : 'Field is required!',
-                          ]"
-                          dense
+                          :error="!!cronFieldError"
+                          :error-message="cronFieldError"
                           debounce="300"
                           style="width: 100%"
-                          @update:model-value="
-                            validateFrequency(frequency.cron)
-                          "
-                          :disable="isEditingActionScript"
+                          @update:model-value="(v: string) => {
+                            cronFieldError = !v?.length ? 'Field is required!' : (cronError.length ? cronError : '');
+                            validateFrequency(frequency.cron);
+                          }"
+                          :disabled="isEditingActionScript"
                           :readonly="isEditingActionScript"
                         />
                       </div>
                       <div class="flex">
-                        <q-select
+                        <OSelect
                           data-test="add-action-script-timezone-select"
                           v-model="formData.timezone"
                           :options="['UTC']"
                           :label="t('actions.timezone') + ' *'"
                           :loading="isFetchingServiceAccounts"
-                          :popup-content-style="{ textTransform: 'lowercase' }"
                           class="showLabelOnTop no-case tw:mb-[2.4rem]"
-                          borderless
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
-                          behavior="menu"
-                          disable
-                          :rules="[(val: any) => !!val || 'Field is required!']"
-                          style="
-                            min-width: 250px !important;
-                            width: 250px !important;
-                          "
+                          disabled
+                          style="min-width: 250px !important; width: 250px !important;"
                         />
                       </div>
                     </div>
@@ -401,34 +370,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'text-grey-7'
                         "
                       >
-                        <q-tooltip anchor="center right" self="center left">
-                          <span style="font-size: 14px">
-                            Make sure service account has permissions to access
-                            Actions.
-                          </span>
-                        </q-tooltip>
+                        <OTooltip side="right" align="center">
+                          <template #content>
+                            <span style="font-size: 14px">
+                              Make sure service account has permissions to access
+                              Actions.
+                            </span>
+                          </template>
+                        </OTooltip>
                       </q-icon>
                     </div>
-                    <q-select
+                    <OSelect
                       data-test="add-action-script-service-account-select"
                       v-model="formData.service_account"
                       :options="filteredServiceAccounts"
                       :loading="isFetchingServiceAccounts"
-                      :popup-content-style="{ textTransform: 'lowercase' }"
                       class="q-py-sm no-case"
-                      borderless
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      @filter="filterServiceAccounts"
-                      behavior="menu"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      style="
-                        min-width: 250px !important;
-                        width: 250px !important;
-                      "
+                      labelKey="label"
+                      valueKey="value"
+                      :error="!!serviceAccountError"
+                      :error-message="serviceAccountError"
+                      @update:model-value="(v: any) => { serviceAccountError = v ? '' : 'Field is required!'; }"
+                      @search="(val: string) => {
+                        filteredServiceAccounts.value = val
+                          ? serviceAccountsOptions.filter((s: any) => s.label.toLowerCase().includes(val.toLowerCase()))
+                          : [...serviceAccountsOptions];
+                      }"
+                      style="min-width: 250px !important; width: 250px !important;"
                     />
                   </div>
                 </div>
@@ -467,25 +435,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-action-script-env-variable"
                 >
                   <div class="col-5 q-ml-none">
-                    <q-input
+                    <OInput
                       :data-test="`add-action-script-header-${header['key']}-key-input`"
                       v-model="header.key"
-                      stack-label
-                      borderless
                       :placeholder="'Key'"
-                      dense
                       tabindex="0"
                     />
                   </div>
                   <div class="col-5 q-ml-none q-mb-sm">
-                    <q-input
+                    <OInput
                       :data-test="`add-action-script-header-${header['key']}-value-input`"
                       v-model="header.value"
                       :placeholder="t('alert_destinations.api_header_value')"
-                      stack-label
-                      borderless
-                      dense
-                      isUpdatingDestination
                       tabindex="0"
                     />
                   </div>
@@ -520,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-stepper-navigation>
               </q-step>
             </q-stepper>
-          </q-form>
+          </div>
         </div>
       </div>
     </div>
@@ -584,6 +545,9 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 defineProps({
   report: {
@@ -626,8 +590,6 @@ const router = useRouter();
 const fileInput = ref(null);
 
 const originalActionScriptData: Ref<string> = ref("");
-
-const addActionScriptFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
@@ -699,6 +661,10 @@ const isFetchingActionScript = ref(false);
 
 const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
 const cronError = ref("");
+const nameError = ref("");
+const typeError = ref("");
+const cronFieldError = ref("");
+const serviceAccountError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -719,8 +685,6 @@ watch(
 onBeforeMount(async () => {
   await handleActionScript();
 });
-
-const onSubmit = () => {};
 
 const scheduling = ref({
   date: "",
@@ -882,9 +846,18 @@ const saveActionScript = async () => {
   try {
     validateActionScriptData();
     await nextTick();
-    await nextTick();
-    const isValidForm = await addActionScriptFormRef.value.validate();
-    if (!isValidForm) return;
+    // Inline validation for migrated O2 fields
+    nameError.value = !formData.value.name
+      ? t('common.nameRequired')
+      : !isValidResourceName(formData.value.name)
+        ? 'Characters like :, ?, /, #, and spaces are not allowed.'
+        : '';
+    typeError.value = formData.value.type ? '' : 'Field is required!';
+    serviceAccountError.value = formData.value.service_account ? '' : 'Field is required!';
+    if (formData.value.execution_details === 'repeat') {
+      cronFieldError.value = !frequency.value.cron?.length ? 'Field is required!' : (cronError.value.length ? cronError.value : '');
+    }
+    if (nameError.value || typeError.value || serviceAccountError.value || cronFieldError.value) return;
   } catch (err) {
     console.log(err);
   }

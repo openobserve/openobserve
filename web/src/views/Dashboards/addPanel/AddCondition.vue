@@ -1,12 +1,8 @@
 <template>
   <div class="condition">
-    <q-select
+    <OSelect
       v-if="conditionIndex !== 0"
       v-model="condition.logicalOperator"
-      dense
-      options-dense
-      borderless
-      hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
@@ -165,6 +161,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -187,6 +184,7 @@ export default defineComponent({
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     StreamFieldSelect,
+    OSelect,
   },
   props: [
     "condition",
@@ -259,7 +257,10 @@ export default defineComponent({
       "Is Not Null",
     ];
 
-    const filterOptions = ["AND", "OR"];
+    const filterOptions = [
+      { label: "AND", value: "AND" },
+      { label: "OR", value: "OR" },
+    ];
 
     const computedLabel = (condition: any) => {
       const builtCondition = buildCondition(condition, dashboardPanelData);

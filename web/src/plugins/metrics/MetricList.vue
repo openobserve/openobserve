@@ -245,21 +245,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tr>
           </template>
           <template #top-right>
-            <q-input
+            <OInput
               data-test="log-search-index-list-field-search-input"
               v-model="searchMetricLabel"
               data-cy="index-field-search-input"
-              filled
-              borderless
-              dense
               clearable
-              debounce="1"
+              :debounce="1"
               :placeholder="t('search.searchField')"
             >
-              <template #prepend>
+              <template #icon-left>
                 <q-icon name="search" />
               </template>
-            </q-input>
+            </OInput>
           </template>
         </q-table>
       </div>
@@ -292,13 +289,14 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import { Plus } from 'lucide-vue-next';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton },
-  components: { EqualIcon, NotEqualIcon, OButton, Plus, OInnerLoading },
+  components: { EqualIcon, NotEqualIcon, OButton, Plus, OInput, OInnerLoading },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();

@@ -2342,11 +2342,21 @@ defineExpose({
   }
 }
 
-// Copy button — only visible on cell hover
+// Copy button — only visible on cell hover, sized to match text so it
+// doesn't inflate the row height.
 .copy-cell-td {
   .copy-btn {
     opacity: 0;
     transition: opacity 0.15s;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+
+    :deep(button) {
+      height: 16px !important;
+      width: 16px !important;
+      min-height: unset !important;
+    }
   }
 
   &:hover .copy-btn {

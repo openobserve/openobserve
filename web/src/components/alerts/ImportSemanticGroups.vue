@@ -134,12 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="compact-item"
                 >
                   <q-item-section side top>
-                    <q-checkbox
-                      dense
+                    <OCheckbox
                       :model-value="selectedAdditions.includes(group.id)"
                       @update:model-value="toggleAddition(group.id)"
-                      color="positive"
-                      size="xs"
                     />
                   </q-item-section>
                   <q-item-section>
@@ -178,12 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="compact-item"
                 >
                   <q-item-section side top>
-                    <q-checkbox
-                      dense
+                    <OCheckbox
                       :model-value="selectedModifications.includes(mod.proposed.id)"
                       @update:model-value="toggleModification(mod.proposed.id)"
-                      color="warning"
-                      size="xs"
                     />
                   </q-item-section>
                   <q-item-section>
@@ -329,6 +323,7 @@ import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface SemanticGroup {
   id: string;

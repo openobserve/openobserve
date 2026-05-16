@@ -76,9 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
-        <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
-          <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
-        </q-tooltip>
+        <OTooltip :content="anomalyExplanationText" max-width="22rem" />
       </span>
     </div>
 
@@ -133,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
         <q-icon name="notifications" size="15px" />
-        <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        <OTooltip :content="t('search.createAlertFromPattern')" />
       </OButton>
     </div>
   </div>
@@ -146,6 +144,7 @@ import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,

@@ -34,21 +34,17 @@
             <div class="tw:flex tw:flex-col tw:px-2 tw:py-2">
 
                 <div>
-                    <q-input
+                    <OInput
                     data-test="associated-regex-patterns-search-input"
                     v-model="filterPattern"
                     data-cy="schema-index-field-search-input"
-                    filled
-                    borderless
-                    dense
-                    debounce="1"
                     placeholder="Search"
                     clearable
                 >
                   <template #prepend>
                     <q-icon name="search" />
                   </template>
-                </q-input>
+                </OInput>
                 </div>
                 <div style="height: calc(100vh - 130px); overflow-y: auto;">
                   <div
@@ -180,29 +176,31 @@
                     <span class="individual-section-title tw:text-[12px] tw:font-[700]">
                       When value matches
                     </span>
-                    <div class="tw:flex tw:flex-col tw:gap-0.5">
+                    <ORadioGroup v-model="policy">
+                  <div class="tw:flex tw:flex-col tw:gap-0.5">
                       <div class="tw:flex tw:items-center">
-                        <q-radio v-model="policy" val="Redact" data-test="associated-regex-patterns-redact-radio" size="xs" />
+                        <ORadio value="Redact" data-test="associated-regex-patterns-redact-radio" size="xs" />
                         <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                           <span class="tw:font-[600] tw:text-[12px]">Redact</span>
                           <span class="tw:font-[400] tw:text-[10px] tw:opacity-60">Replace with [REDACTED]</span>
                         </div>
                       </div>
                       <div class="tw:flex tw:items-center">
-                        <q-radio v-model="policy" val="DropField" data-test="associated-regex-patterns-drop-field-radio" size="xs" />
+                        <ORadio value="DropField" data-test="associated-regex-patterns-drop-field-radio" size="xs" />
                         <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                           <span class="tw:font-[600] tw:text-[12px]">Drop</span>
                           <span class="tw:font-[400] tw:text-[10px] tw:opacity-60">Drop the field completely</span>
                         </div>
                       </div>
                       <div class="tw:flex tw:items-center">
-                        <q-radio v-model="policy" val="Hash" data-test="associated-regex-patterns-hash-radio" size="xs" />
+                        <ORadio value="Hash" data-test="associated-regex-patterns-hash-radio" size="xs" />
                         <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                           <span class="tw:font-[600] tw:text-[12px]">Hash</span>
                           <span class="tw:font-[400] tw:text-[10px] tw:opacity-60">Replace with searchable hash</span>
                         </div>
                       </div>
                     </div>
+                  </ORadioGroup>
                   </div>
 
                   <q-separator vertical :class="store.state.theme === 'dark' ? 'tw:bg-[#3A3A3A]' : 'tw:bg-[#E5E7EB]'" />
@@ -213,12 +211,12 @@
                       Detect at
                     </span>
                     <div class="tw:flex tw:flex-col tw:gap-1.5">
-                      <q-checkbox size="xs" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
+                      <OCheckbox size="xs" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
                         <span class="individual-section-sub-title tw:font-[600] tw:text-[12px]">Ingestion</span>
-                      </q-checkbox>
-                      <q-checkbox size="xs" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
+                      </OCheckbox>
+                      <OCheckbox size="xs" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
                         <span class="individual-section-sub-title tw:font-[600] tw:text-[12px]">Query</span>
-                      </q-checkbox>
+                      </OCheckbox>
                     </div>
                   </div>
                 </div>
@@ -266,22 +264,15 @@
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                       />
                       <div v-if="expandState.regexTestString" class="regex-pattern-input tw:mt-2">
-                        <q-input
+                        <OInput
                           data-test="add-regex-test-string-input"
                           v-model="testString"
-                          color="input-border"
-                          bg-color="input-bg"
                           class="regex-test-string-input"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                          stack-label
-                          outlined
-                          filled
-                          dense
-                          tabindex="0"
-                          style="width: 100%; resize: none;"
                           type="textarea"
                           placeholder="Eg. 1234567890"
-                          rows="5"
+                          :rows="5"
+                          style="width: 100%;"
                         />
                       </div>
                     </div>
@@ -295,23 +286,16 @@
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                       />
                       <div v-if="expandState.outputString" class="regex-pattern-input tw:mt-2">
-                        <q-input
+                        <OInput
                           v-if="outputString.length > 0"
                           data-test="add-regex-test-string-input"
                           v-model="outputString"
-                          color="input-border"
-                          bg-color="input-bg"
                           class="regex-test-string-input"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                          stack-label
-                          outlined
-                          filled
-                          dense
-                          tabindex="0"
-                          style="width: 100%; resize: none;"
                           type="textarea"
                           placeholder="Output String"
-                          rows="5"
+                          :rows="5"
+                          style="width: 100%;"
                         />
                         <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'">
@@ -415,6 +399,10 @@ import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from '../ConfirmDialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from '@/lib/forms/Input/OInput.vue';
+import ORadioGroup from '@/lib/forms/Radio/ORadioGroup.vue';
+import ORadio from '@/lib/forms/Radio/ORadio.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 export interface PatternAssociation {
     field: string;
@@ -430,6 +418,10 @@ export default defineComponent({
         ConfirmDialog,
         OButton,
         OSpinner,
+        OInput,
+        ORadioGroup,
+        ORadio,
+        OCheckbox,
     },
     props: {
         data: {

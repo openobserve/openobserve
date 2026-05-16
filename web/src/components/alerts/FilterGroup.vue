@@ -103,9 +103,7 @@
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
             <span class="tw:text-[0.75rem] text-bold">Condition</span>
-            <q-tooltip :delay="300">
-              {{ t('alerts.conditions.addConditionTooltip') }}
-            </q-tooltip>
+            <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-add-condition-group-btn"
@@ -117,12 +115,8 @@
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
             <span class="tw:text-[0.75rem] text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
-            <q-tooltip v-if="depth < 2" :delay="300">
-              {{ t('alerts.conditions.addConditionGroupTooltip') }}
-            </q-tooltip>
-            <q-tooltip v-else :delay="300">
-              {{ t('alerts.conditions.maxDepthReachedTooltip') }}
-            </q-tooltip>
+            <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
+            <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-reorder-btn"
@@ -133,9 +127,7 @@
             >
             <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" name="swap_vert" />
             <span class="tw:text-[0.75rem] text-bold">Reorder</span>
-            <q-tooltip :delay="300">
-              Reorder items: Conditions first, then Groups
-            </q-tooltip>
+            <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
         </OButton>
      </div>
         </div>
@@ -155,6 +147,7 @@
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
     import OButton from '@/lib/core/Button/OButton.vue';
+    import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
     import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
     import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
     import OIcon from '@/lib/core/Icon/OIcon.vue';

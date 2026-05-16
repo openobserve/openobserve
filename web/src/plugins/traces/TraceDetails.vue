@@ -44,11 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleBackOrClose"
             >
               <q-icon name="arrow_back" size="16px" />
-              <q-tooltip>{{
-                areFiltersAdded
-                  ? t("traces.applyPendingFilters")
-                  : t("traces.backToTraces")
-              }}</q-tooltip>
+              <OTooltip :content="areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')" />
             </OButton>
 
             <div
@@ -61,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-                <q-tooltip>{{ traceTree[0]?.operationName }}</q-tooltip>
+                <OTooltip :content="traceTree[0]?.operationName" />
               </div>
 
               <!-- Service, Timestamp, and Trace ID -->
@@ -151,10 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span data-test="span-count-text">
                   {{ formatLargeNumber(effectiveSpanList.length) }}
                   {{ t("traces.spansLabel") }}
-                  <q-tooltip
-                    >{{ effectiveSpanList.length }}
-                    {{ t("traces.spansLabel") }}</q-tooltip
-                  >
+                  <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
                 </span>
               </div>
 
@@ -171,10 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ formatLargeNumber(errorSpansCount) }}
                   {{ t("traces.errorsLabel") }}</span
                 >
-                <q-tooltip
-                  >{{ errorSpansCount }}
-                  {{ t("traces.errorsLabel") }}</q-tooltip
-                >
+                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
               </div>
             </div>
           </div>
@@ -195,10 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ><q-icon name="filter_alt"
 size="14px"
               /></template>
-              <span class="tw:text-[0.75rem]">{{
-                t("traces.viewFilters")
-              }}</span>
-              <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
+              <span class="tw:text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
             <!-- Expand button (embedded mode) -->
@@ -211,7 +199,7 @@ size="14px"
               @click="handleExpandToFullView"
             >
               <q-icon name="open_in_new" size="14px" />
-              <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
+              <OTooltip :content="t('traces.openInTraces')" />
             </OButton>
 
             <!-- Share button (standalone mode) -->
@@ -233,7 +221,7 @@ size="14px"
               @click="handleBackOrClose"
             >
               <q-icon name="close" size="14px" />
-              <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
+              <OTooltip :content="t('common.cancel')" />
             </OButton>
           </div>
         </header>
@@ -321,11 +309,9 @@ size="sm">
               class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
-                <q-input
+                <OInput
                   v-model="searchQuery"
                   data-test="trace-details-search-input"
-                  outlined
-                  dense
                   :placeholder="t('traces.searchInSpans')"
                   clearable
                   class="tw:text-[12px]!"
@@ -334,7 +320,7 @@ size="sm">
                   <template v-slot:prepend>
                     <q-icon name="search" size="1rem" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <!-- Search Results Navigation -->
               <div class="search-navigation-container">
@@ -357,7 +343,7 @@ size="sm">
                     @click="prevMatch"
                   >
                     <q-icon name="keyboard_arrow_up" size="16px" />
-                    <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
+                    <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
                   <div class="button-separator"></div>
                   <OButton
@@ -370,7 +356,7 @@ size="sm">
                     @click="nextMatch"
                   >
                     <q-icon name="keyboard_arrow_down" size="16px" />
-                    <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
+                    <OTooltip :content="t('traces.nextMatch')" />
                   </OButton>
                 </div>
               </div>
@@ -380,7 +366,7 @@ size="sm">
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
-              <q-select
+              <OSelect
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
                 :label="
@@ -389,61 +375,9 @@ size="sm">
                     : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
-                data-cy="stream-selection"
-                input-debounce="0"
-                behavior="menu"
-                filled
                 multiple
-                borderless
-                dense
-                fill-input
                 :title="selectedStreamsString"
-              >
-                <template #no-option>
-                  <div class="log-stream-search-input">
-                    <q-input
-                      data-test="trace-details-stream-search-input"
-                      v-model="streamSearchValue"
-                      borderless
-                      filled
-                      debounce="500"
-                      autofocus
-                      dense
-                      size="xs"
-                      @update:model-value="filterStreamFn"
-                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                      :placeholder="t('search.searchStream')"
-                    >
-                      <template #prepend>
-                        <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                    </q-input>
-                  </div>
-                  <q-item>
-                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                  </q-item>
-                </template>
-                <template #before-options>
-                  <div class="log-stream-search-input">
-                    <q-input
-                      data-test="trace-details-stream-search-input-options"
-                      v-model="streamSearchValue"
-                      borderless
-                      debounce="500"
-                      filled
-                      dense
-                      autofocus
-                      @update:model-value="filterStreamFn"
-                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                      :placeholder="t('search.searchStream')"
-                    >
-                      <template #prepend>
-                        <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                    </q-input>
-                  </div>
-                </template>
-              </q-select>
+              />
               <span class="traces-view-logs-btn">
                 <OButton
                   data-test="trace-details-view-logs-btn"
@@ -934,6 +868,9 @@ import {
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -1044,6 +981,9 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],

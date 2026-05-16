@@ -205,9 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
       </q-card>
     </q-menu>
-    <q-tooltip>
-      {{ t('search.syntaxGuideLabel') }}
-    </q-tooltip>
+    <OTooltip :content="t('search.syntaxGuideLabel')" />
   </OButton>
 </template>
 
@@ -216,6 +214,7 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { HelpCircle } from "lucide-vue-next";
 
 export default defineComponent({
@@ -234,7 +233,7 @@ export default defineComponent({
       default: '',
     },
   },
-  components: { OButton, HelpCircle },
+  components: { OButton, OTooltip, HelpCircle },
   setup() {
     const { t } = useI18n();
     const store = useStore();

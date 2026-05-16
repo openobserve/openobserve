@@ -17,13 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="padding: 3px 16px 16px 16px; display: flex; gap: 16px">
     <div>
-      <q-input
-        dense
-        filled
+      <OInput
         data-test="dashboard-x-item-input"
         :label="t('common.label')"
         v-model="modelValue.label"
-        :rules="[(val: any) => val.length > 0 || 'Required']"
       />
       <div v-if="!customQuery && modelValue.isDerived">
         <SortByBtnGrp :fieldObj="modelValue" />
@@ -48,12 +45,14 @@ import { defineComponent, inject } from "vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { useI18n } from "vue-i18n";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "BuildFieldPopUp",
   components: {
     SortByBtnGrp,
     DynamicFunctionPopUp,
+    OInput,
   },
   props: {
     modelValue: {

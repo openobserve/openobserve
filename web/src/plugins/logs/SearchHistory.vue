@@ -25,17 +25,11 @@
         </div>
         <div class="tw:flex tw:items-center q-pr-md">
           <div>
-            <q-toggle
+            <OSwitch
               v-model="wrapText"
               :label="t('search_history.wrapText')"
-              class="o2-toggle-button-xs q-mr-md"
-              size="xs"
-              flat
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
+              size="sm"
+              class="q-mr-md"
             />
           </div>
           <div
@@ -302,6 +296,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -319,6 +314,7 @@ export default defineComponent({
     AppTabs,
     QueryEditor,
     OButton,
+    OSwitch,
     OSpinner,
   },
   props: {

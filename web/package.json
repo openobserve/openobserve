@@ -34,6 +34,7 @@
     "@openobserve/rrweb-player": "^0.2.1",
     "@quasar/extras": "^1.17.0",
     "@rudderstack/analytics-js": "3.6.0",
+    "@tanstack/vue-form": "^1.29.1",
     "@tanstack/vue-table": "^8.21.3",
     "@tanstack/vue-virtual": "^3.13.16",
     "@vue-flow/background": "^1.3.2",

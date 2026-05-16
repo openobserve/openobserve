@@ -59,15 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-banner>
       </div>
       <div v-if="hasQuery" class="tw:mt-4">
-        <q-checkbox
+        <OCheckbox
           v-model="replaceQuery"
           label="Also replace query with example query"
           data-test="replace-query-checkbox"
-          :class="
-            store.state.theme === 'dark'
-              ? 'tw:text-gray-300'
-              : 'tw:text-gray-700'
-          "
         />
         <div
           class="tw:text-xs tw:mt-1 tw:ml-7"
@@ -90,10 +85,11 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "CustomChartConfirmDialog",
-  components: { ODialog },
+  components: { ODialog, OCheckbox },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: {

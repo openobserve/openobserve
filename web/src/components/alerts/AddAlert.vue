@@ -47,13 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!isAnomalyMode">
               <span class="q-table__title tw:truncate tw:max-w-[200px]">
                 {{ formData.name }}
-                <q-tooltip v-if="formData.name?.length > 24" class="tw:text-sm">{{ formData.name }}</q-tooltip>
+                <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
               </span>
             </template>
             <template v-else>
               <span class="q-table__title tw:truncate tw:max-w-[200px]">
                 {{ anomalyConfig.name }}
-                <q-tooltip v-if="anomalyConfig.name?.length > 24" class="tw:text-sm">{{ anomalyConfig.name }}</q-tooltip>
+                <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
               <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
               <span
@@ -73,29 +73,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
               <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-red-500">*</span></label>
-              <q-input
+              <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 v-model="formData.name"
                 data-test="add-alert-name-input"
-                dense
-                borderless
-                no-error-icon
                 :placeholder="t('alerts.alertNamePlaceholder')"
                 class="alert-v3-field topbar-name-input tw:text-sm"
                 :class="alertNameError ? 'field-error' : ''"
-                hide-bottom-space
                 @update:model-value="alertNameError = false"
               />
-              <q-input
+              <OInput
                 v-else
                 ref="anomalyNameRef"
                 v-model="anomalyConfig.name"
-                dense
-                borderless
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
                 class="alert-v3-field topbar-name-input tw:text-sm"
-                hide-bottom-space
               />
             </div>
 
@@ -131,69 +124,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Stream Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
-          <q-select
+          <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
             v-model="formData.stream_type"
             :options="streamTypes"
-            :popup-content-style="{ textTransform: 'lowercase' }"
             class="no-case alert-v3-field stream-type-select"
             :class="streamTypeError ? 'field-error' : ''"
-            dense
-            borderless
-            use-input
-            fill-input
-            hide-selected
-            hide-bottom-space
-            :input-debounce="200"
-            :readonly="beingUpdated || anomalyEditMode"
-            :disable="beingUpdated || anomalyEditMode"
-            @filter="(val, update) => update(() => {})"
+            :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="streamTypeError = false; updateStreams()"
-            behavior="menu"
           />
         </div>
 
         <!-- Stream Name -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
-          <q-select
+          <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
             v-model="formData.stream_name"
             :options="filteredStreams"
             :loading="isFetchingStreams"
-            color="input-border"
             class="no-case alert-v3-field stream-name-select"
             :class="streamNameError ? 'field-error' : ''"
-            dense
-            borderless
-            use-input
-            hide-selected
-            hide-bottom-space
-            fill-input
-            :input-debounce="400"
-            :readonly="beingUpdated || anomalyEditMode"
-            :disable="beingUpdated || anomalyEditMode || !formData.stream_type"
-            @filter="filterStreams"
+            :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="streamNameError = false; updateStreamFields($event)"
-            behavior="menu"
           />
-          <q-tooltip v-if="!formData.stream_type">{{ t('alerts.selectStreamTypeFirst') }}</q-tooltip>
+          <OTooltip v-if="!formData.stream_type" :content="t('alerts.selectStreamTypeFirst')" />
         </div>
 
         <!-- Alert Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
           <label class="alert-v3-inline-label">{{ t("alerts.alertType") || 'Alert Type' }}</label>
-          <q-select
+          <OSelect
             v-model="formData.is_real_time"
             :options="alertTypeOptions"
-            emit-value
-            map-options
-            dense
-            borderless
-            hide-bottom-space
-            :disable="beingUpdated || anomalyEditMode"
+            :disabled="beingUpdated || anomalyEditMode"
             class="alert-v3-field alert-type-select"
           />
         </div>
@@ -485,6 +451,9 @@ import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -513,6 +482,7 @@ export default defineComponent({
     "refresh:templates",
   ],
   components: {
+    OIcon,
     JsonEditor,
     QueryConfig,
     AlertSettings,
@@ -530,7 +500,10 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
-    OIcon,
+    Shield,
+    SlidersHorizontal,
+    TrendingUp,
+    Bell,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);

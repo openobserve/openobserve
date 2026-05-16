@@ -29,9 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
             >
               <q-icon name="info_outline" />
-              <q-tooltip>
-              Variables are used to pass data from the alert to the destination.
-            </q-tooltip>
+              <OTooltip content="Variables are used to pass data from the alert to the destination." />
           </OButton>
         </div>
     <template v-if="!variables.length">
@@ -56,25 +54,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`alert-variables-${index + 1}`"
       >
         <div class="q-ml-none">
-          <q-input
+          <OInput
             data-test="alert-variables-key-input"
             v-model="variable.key"
-            stack-label
-            borderless
             :placeholder="t('common.name')"
-            dense
             tabindex="0"
           />
         </div>
         <div class="q-ml-none">
-          <q-input
+          <OInput
             data-test="alert-variables-value-input"
             v-model="variable.value"
             :placeholder="t('common.value')"
-            stack-label
-            borderless
-            dense
-            isUpdatingDestination
             tabindex="0"
             style="min-width: 250px"
           />
@@ -111,6 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps({
   variables: {

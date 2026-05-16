@@ -55,16 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @on:date-change="updateDateTime"
               />
             </div>
-            <q-select
+            <OSelect
               v-model="selectedAlert"
-              dense
-              borderless
-              use-input
-              input-debounce="0"
               :options="filteredAlertOptions"
-              option-label="label"
-              option-value="value"
-              @filter="filterAlertOptions"
+              labelKey="label"
+              valueKey="value"
               @update:model-value="onAlertSelected"
               :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
               data-test="alert-history-search-select"
@@ -73,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clearable
               @clear="clearSearch"
             >
-              <template v-slot:prepend>
+              <template #prepend>
                 <q-icon
                   class="o2-search-input-icon"
                   :class="
@@ -84,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="search"
                 />
               </template>
-              <template v-slot:no-option>
+              <template #empty>
                 <q-item>
                   <q-item-section class="text-grey">
                     No alerts found
                   </q-item-section>
                 </q-item>
               </template>
-            </q-select>
+            </OSelect>
             <OButton
               variant="ghost"
               icon-left="search"
@@ -101,7 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="loading"
               class="q-mr-sm"
             >
-              <q-tooltip>{{ t("common.search") || "Search" }}</q-tooltip>
+              <q-icon name="search" />
+              <OTooltip :content="t('common.search') || 'Search'" />
             </OButton>
             <OButton
               variant="ghost"
@@ -111,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-history-refresh-btn"
               :loading="loading"
             >
-              <q-tooltip>{{ t("common.refresh") || "Refresh" }}</q-tooltip>
+              <q-icon name="refresh" />
+              <OTooltip :content="t('common.refresh') || 'Refresh'" />
             </OButton>
           </div>
         </div>
@@ -178,9 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="props.row.is_realtime ? 'positive' : 'grey'"
                 size="xs"
               >
-                <q-tooltip>
-                  {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
-                </q-tooltip>
+                <OTooltip :content="props.row.is_realtime ? 'Real-time' : 'Scheduled'" />
               </q-icon>
             </q-td>
           </template>
@@ -192,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="props.row.is_silenced ? 'grey' : 'positive'"
                 size="20px"
               >
-                <q-tooltip>{{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}</q-tooltip>
+                <OTooltip :content="props.row.is_silenced ? 'Silenced' : 'Not Silenced'" />
               </q-icon>
             </q-td>
           </template>
@@ -227,25 +222,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Suppressed by deduplication -->
               <div v-else-if="props.row.dedup_suppressed" class="text-negative">
-                <OIcon name="block" size="md" />
-                <q-tooltip class="bg-grey-8">
-                  Suppressed by deduplication
-                  <div v-if="props.row.dedup_count" class="text-caption">
-                    {{ props.row.dedup_count }} occurrence{{ props.row.dedup_count > 1 ? 's' : '' }}
-                  </div>
-                </q-tooltip>
+                <q-icon name="block" size="sm" />
+                <OTooltip>
+                  <template #content>
+                    Suppressed by deduplication
+                    <div v-if="props.row.dedup_count">
+                      {{ props.row.dedup_count }} occurrence{{ props.row.dedup_count > 1 ? 's' : '' }}
+                    </div>
+                  </template>
+                </OTooltip>
               </div>
 
               <!-- Grouped notification -->
               <div v-else-if="props.row.grouped" class="text-primary flex items-center justify-center">
                 <OIcon name="group-work" size="md" />
                 <span class="text-caption q-ml-xs">×{{ props.row.group_size || 1 }}</span>
-                <q-tooltip class="bg-grey-8">
-                  Grouped notification
-                  <div class="text-caption">
-                    {{ props.row.group_size }} alerts batched together
-                  </div>
-                </q-tooltip>
+                <OTooltip>
+                  <template #content>
+                    Grouped notification
+                    <div>
+                      {{ props.row.group_size }} alerts batched together
+                    </div>
+                  </template>
+                </OTooltip>
               </div>
 
               <!-- Sent (passed dedup) -->
@@ -254,12 +253,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption q-ml-xs">
                   ×{{ props.row.dedup_count }}
                 </span>
-                <q-tooltip class="bg-grey-8">
-                  Notification sent
-                  <div v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption">
-                    {{ props.row.dedup_count }} occurrences deduplicated
-                  </div>
-                </q-tooltip>
+                <OTooltip>
+                  <template #content>
+                    Notification sent
+                    <div v-if="props.row.dedup_count && props.row.dedup_count > 1">
+                      {{ props.row.dedup_count }} occurrences deduplicated
+                    </div>
+                  </template>
+                </OTooltip>
               </div>
             </q-td>
           </template>
@@ -273,7 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="showDetailsDialog(props.row)"
                 data-test="alert-history-view-details"
               >
-                <q-tooltip>View Details</q-tooltip>
+                <q-icon name="visibility" />
+                <OTooltip content="View Details" />
               </OButton>
               <OButton
                 v-if="props.row.error"
@@ -283,9 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="error"
                 @click.stop="showErrorDialog(props.row)"
               >
-                <q-tooltip>
-                  Last error: {{ new Date(props.row.timestamp / 1000).toLocaleString() }}
-                </q-tooltip>
+                <q-icon name="error" />
+                <OTooltip :content="`Last error: ${new Date(props.row.timestamp / 1000).toLocaleString()}`" />
               </OButton>
             </q-td>
           </template>
@@ -549,9 +550,11 @@ import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const { t } = useI18n();
 const store = useStore();

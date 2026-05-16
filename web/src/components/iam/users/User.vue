@@ -29,17 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.basicUsers") }}
         </div>
         <div class="full-width tw:flex tw:justify-end tw:gap-3">
-          <q-input
+          <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('user.search')"
             >
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
           <div class="col-6" v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
@@ -79,11 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-slot:body-selection="scope">
             <q-td auto-width>
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 class="o2-table-checkbox"
-                :disable="!scope.row.enableDelete"
+                :disabled="!scope.row.enableDelete"
               />
             </q-td>
           </template>
@@ -92,11 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Adding this block to render the select-all checkbox -->
                <q-th v-if="columns.length > 0" auto-width>
                 
-                <q-checkbox
+                <OCheckbox
                   v-model="headerCheckboxValue"
-                  size="sm"
                   toggle-indeterminate
-                  :disable="selectableRows.length === 0"
+                  :disabled="selectableRows.length === 0"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-table-checkbox-dark'
@@ -245,6 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -281,6 +279,8 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
+    OInput,
+    OCheckbox,
   },
   emits: [
     "updated:fields",

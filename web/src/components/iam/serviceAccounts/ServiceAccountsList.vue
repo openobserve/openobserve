@@ -32,17 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("serviceAccounts.header") }}
           </div>
           <div class="full-width tw:flex tw:justify-end tw:gap-3">
-            <q-input
+            <OInput
                 v-model="filterQuery"
-                borderless
-                dense
                 class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('serviceAccounts.search')"
               >
                 <template #prepend>
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
-              </q-input>
+              </OInput>
               <OButton
                 variant="primary"
                 size="sm"
@@ -73,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template v-slot:body-selection="scope">
               <q-td auto-width>
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" :disable="scope.row.is_system" />
+                <OCheckbox v-model="scope.selected" class="o2-table-checkbox" :disabled="scope.row.is_system" />
               </q-td>
             </template>
 
@@ -103,8 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #body-cell-actions="props">
               <q-td :props="props" side>
                 <template v-if="props.row.is_system">
-                  <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
-                    <q-tooltip v-if="props.row.description">{{ props.row.description }}</q-tooltip>
+                <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
+                    <OTooltip v-if="props.row.description" :content="props.row.description" />
                   </q-badge>
                 </template>
                 <template v-else>
@@ -168,9 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
-                        size="sm"
                         :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                         class="o2-table-checkbox"
                       />
@@ -283,6 +280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -310,7 +310,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton, OIcon, ODialog },
+  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OCheckbox },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

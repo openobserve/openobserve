@@ -43,33 +43,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-tab-delete-tab-panels-container"
       >
         <div class="radio-group">
-          <div style="display: flex; flex-direction: row">
-            <q-radio
-              v-model="action"
-              val="move"
-              :disable="moveTabOptions.length === 0"
-              data-test="dashboard-tab-delete-tab-panels-move"
-            >
-              Move panels to another tab
-            </q-radio>
-            <div v-if="action === 'move'" class="select-container">
-              <q-select
-                dense
-                v-model="selectedTabToMovePanels"
-                :options="moveTabOptions"
-                data-test="dashboard-tab-delete-tab-panels-move-select"
-                borderless
-                hide-bottom-space
-              />
+          <ORadioGroup v-model="action" orientation="vertical" class="tw:gap-4">
+            <div style="display: flex; flex-direction: row">
+              <ORadio
+                val="move"
+                :disabled="moveTabOptions.length === 0"
+                data-test="dashboard-tab-delete-tab-panels-move"
+              >
+                Move panels to another tab
+              </ORadio>
+              <div v-if="action === 'move'" class="select-container">
+                <OSelect
+                  v-model="selectedTabToMovePanels"
+                  :options="moveTabOptions"
+                  data-test="dashboard-tab-delete-tab-panels-move-select"
+                />
+              </div>
             </div>
-          </div>
-          <q-radio
-            v-model="action"
-            val="delete"
-            data-test="dashboard-tab-delete-tab-panels-delete"
-          >
-            Delete all the panels of this tab
-          </q-radio>
+            <ORadio
+              val="delete"
+              data-test="dashboard-tab-delete-tab-panels-delete"
+            >
+              Delete all the panels of this tab
+            </ORadio>
+          </ORadioGroup>
         </div>
       </div>
     </div>
@@ -82,10 +79,13 @@ import { onMounted } from "vue";
 import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "TabsDeletePopUp",
-  components: { ODialog },
+  components: { ODialog, ORadio, ORadioGroup, OSelect },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     tabId: { type: String },
@@ -95,7 +95,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const action = ref("move");
-    const selectedTabToMovePanels = ref({ label: "Default", value: "default" });
+    const selectedTabToMovePanels = ref<string | undefined>(undefined);
     const moveTabOptions = ref([]);
 
     const open = computed({
@@ -119,7 +119,7 @@ export default defineComponent({
       // if there are no other tabs to move panels to, force delete action
       action.value = newMoveTabOptions.length > 0 ? "move" : "delete";
       // set selectedTabToMovePanels to [0]th value (may be undefined if no options)
-      selectedTabToMovePanels.value = newMoveTabOptions[0];
+      selectedTabToMovePanels.value = newMoveTabOptions[0]?.value;
 
       moveTabOptions.value = newMoveTabOptions;
     });
@@ -140,7 +140,7 @@ export default defineComponent({
         return;
       }
       open.value = false;
-      emit("update:ok", selectedTabToMovePanels.value.value);
+      emit("update:ok", selectedTabToMovePanels.value);
     };
     return {
       t,

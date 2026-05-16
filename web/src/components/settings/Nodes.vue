@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rows-per-page-options="[0]"
                       hide-header
                       hide-bottom
-                      dense
                       selection="multiple"
                       v-model:selected="selectedRegions"
                       id="nodesRegionFilter"
@@ -70,13 +69,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterRegionData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
+                        <OCheckbox v-model="scope.selected" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox
+                        <OCheckbox
                           :model-value="scope.selected"
-                          size="xs"
                           @update:model-value="
                             (val, evt) => {
                               if (Object.hasOwn(scope, 'selected')) {
@@ -90,12 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <template #top-right>
-                        <q-input
+                        <OInput
                           data-test="nodes-region-filter-search-input"
                           v-model="filterRegionQuery"
-                          filled
-                          borderless
-                          dense
                           clearable
                           debounce="1"
                           :placeholder="t('nodes.searchRegion')"
@@ -104,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template #prepend>
                             <q-icon name="search" />
                           </template>
-                        </q-input>
+                        </OInput>
                       </template>
                       <template v-slot:no-data>
                         <div class="full-width text-center q-pa-md">
@@ -137,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rows-per-page-options="[0]"
                       hide-header
                       hide-bottom
-                      dense
                       selection="multiple"
                       v-model:selected="selectedClusters"
                       id="nodesClusterFilter"
@@ -146,13 +140,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :filter-method="filterClusterData"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
+                        <OCheckbox v-model="scope.selected" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox
+                        <OCheckbox
                           :model-value="scope.selected"
-                          size="xs"
                           @update:model-value="
                             (val, evt) => {
                               if (Object.hasOwn(scope, 'selected')) {
@@ -166,12 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       <template #top-right>
-                        <q-input
+                        <OInput
                           data-test="nodes-cluster-filter-search-input"
                           v-model="filterClusterQuery"
-                          filled
-                          borderless
-                          dense
                           clearable
                           debounce="1"
                           :placeholder="t('nodes.searchCluster')"
@@ -180,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template #prepend>
                             <q-icon name="search" />
                           </template>
-                        </q-input>
+                        </OInput>
                       </template>
                       <template v-slot:no-data>
                         <div class="full-width text-center q-pa-md">
@@ -210,20 +200,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rows-per-page-options="[0]"
                       hide-header
                       hide-bottom
-                      dense
                       selection="multiple"
                       v-model:selected="selectedNodetypes"
                       id="nodesNodetypeFilter"
                       class="q-pa-none q-ma-none node-list-filter-table"
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
+                        <OCheckbox v-model="scope.selected" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox
+                        <OCheckbox
                           :model-value="scope.selected"
-                          size="xs"
                           @update:model-value="
                             (val, evt) => {
                               if (Object.hasOwn(scope, 'selected')) {
@@ -258,7 +246,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :rows-per-page-options="[0]"
                       hide-header
                       hide-bottom
-                      dense
                       selection="multiple"
                       v-model:selected="selectedStatuses"
                       id="nodesStatusFilter"
@@ -270,13 +257,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
+                        <OCheckbox v-model="scope.selected" />
                       </template>
 
                       <template v-slot:body-selection="scope">
-                        <q-checkbox
+                        <OCheckbox
                           :model-value="scope.selected"
-                          size="xs"
                           @update:model-value="
                             (val, evt) => {
                               if (Object.hasOwn(scope, 'selected')) {
@@ -311,20 +297,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                      <OInput
                         data-test="nodes-filter-cpuusage-min"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         max="100"
                         v-model="cpuUsage.min"
                       />
                       <span class="q-px-sm">to</span>
-                      <q-input
+                      <OInput
                         data-test="nodes-filter-cpuusage-max"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         max="100"
@@ -357,20 +341,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                      <OInput
                         data-test="nodes-filter-memoryusage-min"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         max="100"
                         v-model="memoryUsage.min"
                       />
                       <span class="q-px-sm">to</span>
-                      <q-input
+                      <OInput
                         data-test="nodes-filter-memoryusage-max"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         max="100"
@@ -402,29 +384,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <q-card>
                   <q-card-section class="q-pa-none q-ma-none">
-                    <q-checkbox
+                    <OCheckbox
                       type="checkbox"
-                      size="xs"
                       v-model="establishedToggle"
                       :label="t('nodes.establishedLabel')"
                     />
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                      <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-min"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.min"
                       />
                       <span class="q-px-sm">to</span>
-                      <q-input
+                      <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-max"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         :max="maxEstablished"
@@ -447,30 +426,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
 
-                    <q-checkbox
+                    <OCheckbox
                       type="checkbox"
                       class="q-mt-sm"
-                      size="xs"
                       v-model="closewaitToggle"
                       :label="t('nodes.closewaitLabel')"
                     />
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                      <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-min"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.min"
                       />
                       <span class="q-px-sm">to</span>
-                      <q-input
+                      <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-max"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         :max="maxClosewait"
@@ -493,30 +469,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
 
-                    <q-checkbox
+                    <OCheckbox
                       type="checkbox"
                       class="q-mt-sm"
-                      size="xs"
                       v-model="waittimeToggle"
                       :label="t('nodes.waittimeLabel')"
                     />
                     <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                      <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-min"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.min"
                       />
                       <span class="q-px-sm">to</span>
-                      <q-input
+                      <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-max"
                         type="number"
-                        dense
                         class="tw:w-[35%]"
                         min="0"
                         :max="maxWaittime"
@@ -564,18 +537,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("nodes.header") }}
           </div>
           <div class="tw:flex tw:h-[36px] tw:mb-2">
-            <q-input
+            <OInput
               v-model="filterQuery"
-              dense
               class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
-              borderless
               style="width: 400px"
               :placeholder="t('nodes.search')"
             >
               <template #prepend>
                 <q-icon name="search" class="o2-search-input-icon" />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               variant="outline"
               size="sm-action"
@@ -595,7 +566,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :filter-method="filterData"
           :loading="loading"
           class="nodes-list-table tw:border-l tw:border-solid tw:border-gray-1200 tw:rounded-none"
-          dense
           style="width: 100%; height: calc(100vh - 104px); overflow-y: auto"
           hide-top
         >
@@ -617,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? props.row.name.substring(0, 40) + "..."
                   : props.row.name
               }}
-              <q-tooltip>{{ props.row.name }}</q-tooltip>
+              <OTooltip :content="props.row.name" />
             </q-td>
           </template>
 
@@ -628,11 +598,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-td :props="props">
               <q-badge class="badge-region q-mr-xs"
                 >{{ props.row.region }}
-                <q-tooltip>{{ t("nodes.region") }}</q-tooltip>
+                <OTooltip :content="t('nodes.region')" />
               </q-badge>
               <q-badge class="badge-cluster"
                 >{{ props.row.cluster }}
-                <q-tooltip>{{ t("nodes.cluster") }}</q-tooltip>
+                <OTooltip :content="t('nodes.cluster')" />
               </q-badge>
             </q-td>
           </template>
@@ -704,6 +674,9 @@ import { useI18n } from "vue-i18n";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -715,6 +688,9 @@ export default defineComponent({
     NoData,
     OButton,
     OProgressBar,
+    OInput,
+    OCheckbox,
+    OTooltip,
   },
   setup() {
     const store = useStore();

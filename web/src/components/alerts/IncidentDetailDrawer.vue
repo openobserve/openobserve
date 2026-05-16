@@ -61,9 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="incident-detail-title"
         >
           {{ incidentDetails.title }}
-          <q-tooltip v-if="incidentDetails && incidentDetails.title.length > 35" class="tw:text-sm">
-            {{ incidentDetails.title }}
-          </q-tooltip>
+          <OTooltip v-if="incidentDetails && incidentDetails.title.length > 35" :content="incidentDetails.title" />
         </span>
       </div>
 
@@ -80,9 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="info" size="14px" />
             <span>{{ getStatusLabel(incidentDetails.status) }}</span>
           </div>
-          <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.status") }}: {{ getStatusLabel(incidentDetails.status) }}
-          </q-tooltip>
+          <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
         </q-badge>
 
         <!-- Severity Badge -->
@@ -95,9 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="warning" size="14px" />
             <span>{{ incidentDetails.severity }}</span>
           </div>
-          <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.severity") }}: {{ incidentDetails.severity }}
-          </q-tooltip>
+          <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
         </q-badge>
 
         <!-- Alert Count Badge -->
@@ -111,9 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-icon name="notifications_active" size="14px" />
             <span>{{ triggers.length }} Alerts</span>
           </div>
-          <q-tooltip :delay="200" class="tw:text-sm">
-            {{ t("alerts.incidents.alertCount") }}: {{ triggers.length }} correlated alerts
-          </q-tooltip>
+          <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
         </q-badge>
       </div>
 
@@ -148,28 +140,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :loading="updating"
           @click="acknowledgeIncident"
-        >{{ t("alerts.incidents.acknowledge") }}<q-tooltip :delay="500">{{ t("alerts.incidents.markAsAcknowledgedTooltip") }}</q-tooltip></OButton>
+        >{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status !== 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="resolveIncident"
-        >{{ t("alerts.incidents.resolve") }}<q-tooltip :delay="500">{{ t("alerts.incidents.markAsResolvedTooltip") }}</q-tooltip></OButton>
+        >{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
         <OButton
           v-if="incidentDetails.status === 'resolved'"
           variant="outline"
           size="sm"
           :loading="updating"
           @click="reopenIncident"
-        ><q-icon name="refresh" size="16px" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<q-tooltip :delay="500">{{ t("alerts.incidents.reopenIncidentTooltip") }}</q-tooltip></OButton>
+        ><q-icon name="refresh" size="16px" class="tw:mr-1" />{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
 
         <!-- Edit Title Button -->
         <OButton
           variant="outline"
           size="sm"
           @click="startTitleEdit"
-        >{{ t("alerts.edit") }}<q-tooltip :delay="500">{{ t("alerts.incidents.editIncidentTitleTooltip") }}</q-tooltip></OButton>
+        >{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
       </div>
     </div>
 
@@ -804,9 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ index + 1 }}.
                         </span>
                         <div class="tw:flex-1 tw:min-w-0">
-                          <q-tooltip v-if="alert.name.length > 30">
-                            {{ alert.name }}
-                          </q-tooltip>
+                          <OTooltip v-if="alert.name.length > 30" :content="alert.name" />
                           <span class="tw:font-medium tw:truncate tw:block">
                             {{ alert.name.length > 30 ? alert.name.substring(0, 30) + '...' : alert.name }}
                           </span>
@@ -1123,7 +1113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               :disabled="correlationLoading"
               @click="refreshCorrelation"
-            ><q-icon name="refresh" size="16px" /><q-tooltip>{{ t('alerts.incidents.refreshCorrelatedData') }}</q-tooltip></OButton>
+            ><q-icon name="refresh" size="16px" /><OTooltip :content="t('alerts.incidents.refreshCorrelatedData')" /></OButton>
           </div>
 
           <!-- Loading State -->
@@ -1215,6 +1205,7 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
 import { contextRegistry, createIncidentsContextProvider } from '@/composables/contextProviders';
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1231,6 +1222,7 @@ export default defineComponent({
     CustomChartRenderer,
     OButton,
     OSpinner,
+    OTooltip,
   },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {

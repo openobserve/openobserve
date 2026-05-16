@@ -24,10 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_destinations.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               data-test="destination-list-search-input"
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('alert_destinations.search')"
@@ -35,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <q-icon class="o2-search-input-icon" name="search" />
               </template>
-            </q-input>
+            </OInput>
           <OButton
             variant="outline"
             size="sm"
@@ -162,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+          <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
         </template>
 
         <template #bottom="scope">
@@ -194,9 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-tr :props="props">
               <!-- Adding this block to render the select-all checkbox -->
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                   class="o2-table-checkbox"
                 />
@@ -282,6 +279,8 @@ import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 interface ConformDelete {
   visible: boolean;
@@ -290,13 +289,15 @@ interface ConformDelete {
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    OIcon,
     AddDestination,
     NoData,
     ConfirmDialog,
     QTablePagination,
     ImportDestination,
     OButton,
-    OIcon,
+    OInput,
+    OCheckbox,
   },
   setup() {
     const qTable = ref();

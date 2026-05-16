@@ -7,8 +7,7 @@
       data-test="test-function-query-section"
       class="test-function-query-container tw:w-[100%] tw:mt-2"
     >
-      <q-form ref="querySelectionRef" @submit="getResults">
-        <FullViewContainer
+      <FullViewContainer
           data-test="test-function-query-title-section"
           name="function"
           v-model:is-expanded="expandState.query"
@@ -17,28 +16,26 @@
           <template #left>
             <q-icon
               v-if="!!sqlQueryErrorMsg"
-              name="info"
+              name="info_outline"
               class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
               size="16px"
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                :offset="[10, 10]"
-                class="tw:text-[12px]"
-              >
-                {{ sqlQueryErrorMsg }}
-              </q-tooltip>
+              <OTooltip
+                side="right"
+                align="center"
+                :side-offset="10"
+                :content="sqlQueryErrorMsg"
+              />
             </q-icon>
           </template>
           <template #right>
             <OButton
               variant="primary"
               size="sm-action"
-              type="submit"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
-            icon-left="search"
-          >
+              @click="getResults"
+            >
+              <Search :size="14" class="tw:mr-1" />
               {{ t('search.runQuery') }}
             </OButton>
           </template>
@@ -63,18 +60,11 @@
               {{ t("alerts.streamType") + " *" }}
             </div>
 
-            <q-select
+            <OSelect
               v-model="selectedStream.type"
               :options="streamTypes"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-xs showLabelOnTop no-case"
-              emit-value
-              stack-label
-              outlined
-              filled
-              dense
+              labelKey="label"
+              valueKey="value"
               @update:model-value="updateStreams()"
               style="width: 100px"
             />
@@ -90,25 +80,14 @@
             >
               {{ t("alerts.stream_name") + " *" }}
             </div>
-            <q-select
+            <OSelect
               v-model="selectedStream.name"
               :options="filteredStreams"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-xs showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              hide-selected
-              fill-input
               :loading="isFetchingStreams"
+              searchable
               style="min-width: 120px"
-              @filter="filterStreams"
+              @search="filterStreams"
               @update:model-value="updateQuery"
-              :rules="[(val: any) => !!val || '']"
             />
           </div>
           <div class="functions-duration-input tw:w-[330px]">
@@ -168,7 +147,6 @@
             </div>
           </div>
         </div>
-      </q-form>
     </div>
   </div>
   <div>
@@ -191,18 +169,16 @@
           </div>
           <q-icon
             v-if="!!eventsErrorMsg"
-            name="info"
+            name="info_outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
             size="16px"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              :offset="[10, 10]"
-              class="tw:text-[12px]"
-            >
-              {{ eventsErrorMsg }}
-            </q-tooltip>
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="eventsErrorMsg"
+            />
           </q-icon>
         </template>
         <template #right>
@@ -252,18 +228,16 @@
 
           <q-icon
             v-if="!!outputEventsErrorMsg"
-            name="info"
+            name="info_outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
             size="16px"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              :offset="[10, 10]"
-              class="tw:text-[12px]"
-            >
-              {{ outputEventsErrorMsg }}
-            </q-tooltip>
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="outputEventsErrorMsg"
+            />
           </q-icon>
         </template>
       </FullViewContainer>
@@ -333,6 +307,9 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { Search, FileText, BarChart2, Activity } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
@@ -386,8 +363,6 @@ const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
-
-const querySelectionRef = ref<any>();
 
 const outputEventsErrorMsg = ref<string>("");
 
@@ -486,25 +461,16 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(streams.value, val, update);
+const filterStreams = (val: string) => {
+  filteredStreams.value = filterColumns(streams.value, val);
 };
 
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
+const filterColumns = (options: any[], val: string) => {
+  if (val === "") return [...options];
+  const value = val.toLowerCase();
+  return options.filter(
+    (column: any) => column.toLowerCase().indexOf(value) > -1,
+  );
 };
 
 const updateQuery = () => {

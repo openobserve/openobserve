@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -121,12 +121,13 @@ import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 // TODO OK : Define types and interfaces for data properties.
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, ODrawer },
+  components: { QueryList, QTablePagination, NoData, OButton, List, X, ODrawer, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,

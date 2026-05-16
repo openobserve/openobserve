@@ -135,9 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-if="col.field === 'permission'">
                   <div class="tw:flex tw:items-center tw:justify-center tw:gap-0.5">
-                    <q-checkbox
+                    <OCheckbox
                       :data-test="`edit-role-permissions-table-header-column-${col.name}-select-all`"
-                      size="xs"
                       :model-value="getHeaderCheckboxState(col.name)"
                       :indeterminate-value="'indeterminate'"
                       class="filter-check-box cursor-pointer"
@@ -199,12 +198,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template v-else-if="col.field === 'permission'">
-                <q-checkbox
+                <OCheckbox
                   :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-checkbox`"
                   v-if="row.permission?.[col.name]?.show"
-                  size="xs"
                   v-model="row.permission[col.name].value"
-                  :val="col.name"
+                  :value="col.name"
                   class="filter-check-box cursor-pointer"
                   @update:model-value="handlePermissionChange(row, col.name)"
                 />
@@ -258,6 +256,7 @@ import { computed, ref } from "vue";
 import { defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const props = defineProps({
   selectedPermissionsHash: {

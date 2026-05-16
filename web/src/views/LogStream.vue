@@ -63,18 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
             </div>
             <div data-test="streams-search-stream-input">
-              <q-input
+              <OInput
                 v-model="filterQuery"
-                borderless
-                dense
                 class="q-ml-auto no-border o2-search-input tw:h-[36px]"
                 :placeholder="t('logStream.search')"
-                debounce="300"
+                :debounce="300"
               >
                 <template #prepend>
                   <q-icon class="o2-search-input-icon" name="search" />
                 </template>
-              </q-input>
+              </OInput>
             </div>
             <OButton
               data-test="log-stream-refresh-stats-btn"
@@ -136,9 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #body-selection="scope">
-              <q-checkbox
+              <OCheckbox
                 v-model="scope.selected"
-                size="sm"
                 :class="
                   store.state.theme === 'dark'
                     ? 'o2-table-checkbox-dark'
@@ -200,9 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tr :props="props">
                 <!-- Adding this block to render the select-all checkbox -->
                 <q-th auto-width>
-                  <q-checkbox
+                  <OCheckbox
                     v-model="props.selected"
-                    size="sm"
                     :class="
                       store.state.theme === 'dark'
                         ? 'o2-table-checkbox-dark'
@@ -283,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
       >
-        <q-checkbox
+        <OCheckbox
           class="checkbox-delete-associated-alerts-pipelines"
           v-model="deleteAssociatedAlertsPipelines"
         />
@@ -307,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:w-full tw:flex tw:items-center tw:text-sm tw:text-gray-500"
       >
-        <q-checkbox
+        <OCheckbox
           class="checkbox-delete-associated-alerts-pipelines"
           v-model="deleteAssociatedAlertsPipelines"
         />
@@ -355,6 +351,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -368,6 +366,17 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OSpinner,
+    ScrollText,
+    BarChart2,
+    GitFork,
+    Info,
+    Search,
+    FileText,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
+    OInput,
+    OCheckbox,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup(props, { emit }) {

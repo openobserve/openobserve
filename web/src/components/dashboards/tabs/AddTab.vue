@@ -27,20 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="submit()"
   >
     <div class="tw:p-4">
-      <q-form ref="addTabForm" @submit.stop="onSubmit.execute">
-        <q-input
-          v-model="tabData.name"
+      <OForm ref="addTabForm" :default-values="{ name: '' }" @submit="onSubmit.execute">
+        <OFormInput
+          name="name"
           label="Name*"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
           data-test="dashboard-add-tab-name"
         />
-      </q-form>
+      </OForm>
     </div>
   </ODrawer>
 </template>
@@ -55,6 +49,8 @@ import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 const defaultValue = () => {
   return {
@@ -65,7 +61,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddTab",
-  components: { ODrawer },
+  components: { ODrawer, OForm, OFormInput },
   props: {
     open: {
       type: Boolean,
@@ -133,13 +129,19 @@ export default defineComponent({
       },
     );
 
-    const onSubmit = useLoading(async () => {
-      await addTabForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
+    watch(
+      () => tabData.value.name,
+      (name) => {
+        addTabForm.value?.form.setFieldValue("name", name ?? "");
+      },
+    );
 
-        try {
+    const onSubmit = useLoading(async () => {
+      const valid = await addTabForm.value.validate();
+      if (!valid) return;
+      // Sync form values back to local state
+      tabData.value.name = (addTabForm.value.form.state.values.name as string) ?? tabData.value.name;
+      try {
           //if edit mode
           if (props.editMode) {
             // only allowed to edit name
@@ -181,7 +183,7 @@ export default defineComponent({
             panels: [],
           };
           await addTabForm.value?.resetValidation();
-        } catch (error: any) {
+      } catch (error: any) {
           if (error?.response?.status === 409) {
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
@@ -199,7 +201,6 @@ export default defineComponent({
           }
         } finally {
         }
-      });
     });
 
     const submit = () => onSubmit.execute();
