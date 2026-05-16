@@ -72,12 +72,18 @@ const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
     thumb: "tw:size-3",
     thumbTranslate: "tw:translate-x-3",
   },
+  xl: {
+    track: "tw:w-11.5 tw:h-6",
+    thumb: "tw:size-4.5",
+    thumbTranslate: "tw:translate-x-5",
+  },
 };
 
 const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
   sm: "tw:text-xs",
   md: "tw:text-sm",
   lg: "tw:text-sm",
+  xl: "tw:text-lg",
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);

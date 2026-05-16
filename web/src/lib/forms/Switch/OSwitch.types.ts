@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-export type SwitchSize = "sm" | "md" | "lg";
+export type SwitchSize = "sm" | "md" | "lg" | "xl";
 export type SwitchValue = boolean | string | number;
 /**
  * Custom value type for `checkedValue`/`uncheckedValue`. Excludes `boolean` on

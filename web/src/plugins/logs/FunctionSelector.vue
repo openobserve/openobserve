@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="q-pa-none float-left q-mr-xs function-selector element-box-shadow tw:border tw:border-button-outline-border"
   >
-    <div class="tw:flex tw:items-center">
+    <div class="tw:flex tw:items-center tw:mx-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
-        size="sm"
+        size="lg"
       >
         <template #tooltip>
           <OTooltip :content="t('search.toggleFunctionEditor')" :side-offset="2" />
