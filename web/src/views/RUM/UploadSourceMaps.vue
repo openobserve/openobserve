@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               v-model="formData.service"
               placeholder="Enter service name"
+              :error="!!serviceError"
+              :error-message="serviceError"
+              @update:model-value="serviceError = ''"
             />
           </div>
 
@@ -59,6 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               v-model="formData.version"
               placeholder="Enter version (e.g., 1.0.0)"
+              :error="!!versionError"
+              :error-message="versionError"
+              @update:model-value="versionError = ''"
             />
           </div>
 
@@ -166,6 +172,8 @@ const formData = ref({
 const isUploading = ref(false);
 const isDragging = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const serviceError = ref("");
+const versionError = ref("");
 
 // Pre-fill form data from query parameters on mount
 onMounted(() => {
@@ -253,10 +261,8 @@ const uploadSourceMaps = async () => {
   }
 
   if (!formData.value.service || !formData.value.version) {
-    $q.notify({
-      type: "negative",
-      message: "Please fill in all required fields",
-    });
+    serviceError.value = formData.value.service ? "" : "Service is required";
+    versionError.value = formData.value.version ? "" : "Version is required";
     return;
   }
 

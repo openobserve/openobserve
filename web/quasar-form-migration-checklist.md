@@ -933,7 +933,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/iam/roles/EditRole.vue
 - ✅ src/components/iam/serviceAccounts/AddServiceAccount.vue
 - ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
-- [ ] src/components/iam/users/AddUser.vue
+- ✅ src/components/iam/users/AddUser.vue
 - [ ] src/components/iam/users/MemberInvitation.vue
 - ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/iam/users/User.vue
@@ -1015,7 +1015,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 - [ ] src/views/LogStream.vue
-- [ ] src/views/RUM/UploadSourceMaps.vue
+- ✅ src/views/RUM/UploadSourceMaps.vue
 
 ---
 
@@ -1110,7 +1110,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/iam/groups/GroupUsers.vue
 - [ ] src/components/iam/quota/Quota.vue
 - ✅ src/components/iam/roles/EditRole.vue
-- [ ] src/components/iam/users/AddUser.vue
+- ✅ src/components/iam/users/AddUser.vue
 - [ ] src/components/iam/users/MemberInvitation.vue
 - ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
@@ -1126,8 +1126,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - ✅ src/components/pipeline/NodeForm/Stream.vue
 - ✅ src/components/pipeline/StreamSelection.vue
-- [ ] src/components/pipelines/BackfillJobsList.vue
-- [ ] src/components/pipelines/PipelineHistory.vue
+- ✅ src/components/pipelines/BackfillJobsList.vue
+- ✅ src/components/pipelines/PipelineHistory.vue
 - ✅ src/components/promql/components/LabelFilterEditor.vue
 - [ ] src/components/promql/components/MetricSelector.vue
 - ✅ src/components/promql/components/OperationsList.vue
@@ -1191,7 +1191,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/AddSettingVariable.vue
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
 - ✅ src/components/functions/AssociatedStreamFunction.vue
-- [ ] src/components/iam/users/AddUser.vue
+- ✅ src/components/iam/users/AddUser.vue
 - [ ] src/components/logstream/LlmEvaluationSettings.vue
 - ✅ src/components/logstream/schema.vue
 - ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
@@ -1245,7 +1245,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/functions/TestFunction.vue
 - ✅ src/components/iam/organizations/AddUpdateOrganization.vue
 - ✅ src/components/iam/serviceAccounts/AddServiceAccount.vue
-- [ ] src/components/iam/users/AddUser.vue
+- ✅ src/components/iam/users/AddUser.vue
 - ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/login/Login.vue
 - ✅ src/components/login/SsoLogin.vue
@@ -1266,7 +1266,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/plugins/metrics/AddToDashboard.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
 - ✅ src/views/Dashboards/PanelLayoutSettings.vue
-- [ ] src/views/RUM/UploadSourceMaps.vue
+- ✅ src/views/RUM/UploadSourceMaps.vue
 
 ---
 
@@ -1426,10 +1426,10 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/pipeline/NodeSidebar.vue
 - [ ] src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
-- [ ] src/components/pipelines/BackfillJobsList.vue
+- ✅ src/components/pipelines/BackfillJobsList.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - ✅ src/components/pipelines/EditBackfillJobDialog.vue
-- [ ] src/components/pipelines/PipelineHistory.vue
+- ✅ src/components/pipelines/PipelineHistory.vue
 - ✅ src/components/promql/components/LabelFilterEditor.vue
 - ✅ src/components/promql/components/OperationsList.vue
 - [ ] src/components/promql/components/PromQLBuilderOptions.vue

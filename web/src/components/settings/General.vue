@@ -602,6 +602,31 @@ export default defineComponent({
     );
 
     const onSubmit = useLoading(async () => {
+      // Validate scrape interval
+      if (!scrapeIntereval.value && scrapeIntereval.value !== 0) {
+        scrapeIntervalError.value = t("settings.scrapeIntervalRequired") || "Scrape interval is required";
+        return;
+      }
+      if (scrapeIntereval.value < 0) {
+        scrapeIntervalError.value = t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number";
+        return;
+      }
+      // Validate max series per query (optional field — only validate when provided)
+      if (
+        maxSeriesPerQuery.value !== null &&
+        maxSeriesPerQuery.value !== undefined &&
+        maxSeriesPerQuery.value !== ""
+      ) {
+        if (maxSeriesPerQuery.value < 1000) {
+          maxSeriesError.value = t("settings.maxSeriesMinError") || "Minimum value is 1000";
+          return;
+        }
+        if (maxSeriesPerQuery.value > 1000000) {
+          maxSeriesError.value = t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
+          return;
+        }
+      }
+
       try {
         //set organizations settings in store
         //scrape interval will be in number

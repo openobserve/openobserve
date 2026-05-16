@@ -500,7 +500,14 @@ const isValidEmail = (email: any, domain: any): boolean => {
 };
 
 const addDomain = () => {
-  if (!newDomain.value || !isValidDomain(newDomain.value)) return;
+  if (!newDomain.value) {
+    domainError.value = t("settings.domainRequired") || "Domain is required";
+    return;
+  }
+  if (!isValidDomain(newDomain.value)) {
+    domainError.value = t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)";
+    return;
+  }
   
   // Check if domain already exists
   if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {

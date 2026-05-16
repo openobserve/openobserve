@@ -161,9 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="props.row.is_realtime ? 'positive' : 'grey'"
                 size="xs"
               >
-                <q-tooltip>
-                  {{ props.row.is_realtime ? "Real-time" : "Scheduled" }}
-                </q-tooltip>
+                <OTooltip :content="props.row.is_realtime ? 'Real-time' : 'Scheduled'" side="top" />
               </q-icon>
             </q-td>
           </template>
@@ -175,9 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :color="props.row.is_silenced ? 'grey' : 'positive'"
                 size="20px"
               >
-                <q-tooltip>
-                  {{ props.row.is_silenced ? "Silenced" : "Not Silenced" }}
-                </q-tooltip>
+                <OTooltip :content="props.row.is_silenced ? 'Silenced' : 'Not Silenced'" side="top" />
               </q-icon>
             </q-td>
           </template>
