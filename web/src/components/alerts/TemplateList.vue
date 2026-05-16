@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none"
+  <div class="tw:rounded-md q-pa-none"
     style="height: calc(100vh - 88px); min-height: inherit"
   >
     <div v-if="!showImportTemplate && !showTemplateEditor">
@@ -27,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alert_templates.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input"
               :placeholder="t('template.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           <OButton
             variant="outline"
             size="sm-action"
@@ -78,9 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </template>
         <template v-slot:body-selection="scope">
-          <q-checkbox
+          <OCheckbox
             v-model="scope.selected"
-            size="sm"
             class="o2-table-checkbox"
           />
         </template>
@@ -88,9 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-tr :props="props">
             <!-- Adding this block to render the select-all checkbox -->
             <q-th v-if="columns.length > 0" auto-width>
-              <q-checkbox
+              <OCheckbox
                 v-model="props.selected"
-                size="sm"
                 :class="
                   store.state.theme === 'dark'
                     ? 'o2-table-checkbox-dark'
@@ -122,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="exportTemplate(props.row)"
               data-test="destination-export"
             >
-              <q-icon name="download" />
+              <OIcon name="download" size="sm" />
             </OButton>
             <OButton
               :data-test="`alert-template-list-${props.row.name}-update-template`"
@@ -132,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alert_templates.edit')"
               @click="editTemplate(props.row)"
             >
-              <q-icon name="edit" />
+              <OIcon name="edit" size="sm" />
             </OButton>
             <OButton
               :data-test="`alert-template-list-${props.row.name}-delete-template`"
@@ -142,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alert_templates.delete')"
               @click="conformDeleteDestination(props.row)"
             >
-              <q-icon :name="outlinedDelete" />
+              <OIcon name="delete" size="sm" />
             </OButton>
           </q-td>
         </template>
@@ -163,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
+              <OIcon name="delete" size="sm" />
               <span class="tw:ml-2">Delete</span>
             </OButton>
             <QTablePagination
@@ -203,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts" setup>
 import {
@@ -223,8 +218,10 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";

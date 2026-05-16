@@ -15,20 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose" maximized>
-    <q-card class="query-plan-dialog full-height">
-      <q-card-section class="row items-center q-pb-sm q-pt-sm">
-        <div class="text-h6">{{ t("search.queryPlan") }}</div>
-        <q-space />
-        <OButton variant="ghost" size="icon" @click="onClose">
-          <q-icon name="close" size="14px" />
-          <q-tooltip>Close (ESC)</q-tooltip>
-        </OButton>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="query-plan-content full-height q-pa-none">
+  <ODialog v-model:open="showDialog" data-test="query-plan-dialog" size="full" :title="t('search.queryPlan')" @update:open="(v) => !v && onClose()">
+    <div class="query-plan-content full-height q-pa-none">
         <q-splitter v-model="splitterPosition" class="full-height">
           <!-- Left Pane: SQL Query -->
           <template #before>
@@ -41,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'pane-header-light'
                 "
               >
-                <q-icon name="code" size="20px" class="q-mr-sm" />
+                <OIcon name="code" size="md" class="q-mr-sm" />
                 <div class="text-subtitle1 text-weight-medium">SQL Query</div>
               </div>
               <q-separator />
@@ -94,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div v-if="loading" class="flex flex-center q-pa-xl full-height">
                 <div class="text-center">
-                  <q-spinner-dots color="primary" size="50px" />
+                  <OSpinner variant="dots" size="lg" />
                   <div class="q-mt-md">
                     {{
                       isAnalyzing
@@ -108,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else-if="error" class="q-pa-md">
                 <q-banner class="bg-negative text-white">
                   <template v-slot:avatar>
-                    <q-icon name="error" />
+                    <OIcon name="error" size="sm" />
                   </template>
                   {{ error }}
                 </q-banner>
@@ -190,9 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-splitter>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -201,6 +188,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -218,6 +207,7 @@ import {
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "QueryPlanDialog",
@@ -229,7 +219,10 @@ export default defineComponent({
     MetricsSummaryCard,
     QueryPlanTree,
     OButton,
-  },
+    ODialog,
+    OSpinner,
+    OIcon,
+},
   props: {
     modelValue: {
       type: Boolean,

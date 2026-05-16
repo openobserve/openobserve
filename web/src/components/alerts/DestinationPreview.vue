@@ -14,26 +14,16 @@ limitations under the License.
 -->
 
 <template>
-  <q-dialog v-model="isOpen" data-test="destination-preview-dialog">
-    <q-card data-test="destination-preview-card" class="preview-card">
-      <q-card-section class="row items-center no-wrap">
-        <div class="text-h6" data-test="preview-title">
-          {{ t('alerts.destinationPreview') }} - {{ getDestinationTypeName(type) }}
-        </div>
-        <q-space />
-        <OButton
-          variant="ghost"
-          size="icon-circle-sm"
-          data-test="preview-close-button"
-          @click="isOpen = false"
-        >
-          <q-icon name="close" />
-        </OButton>
-      </q-card-section>
+  <ODialog
+    v-model:open="isOpen"
+    :width="55"
+    :title="`${t('alerts.destinationPreview')} - ${getDestinationTypeName(type)}`"
+    data-test="destination-preview-dialog"
+    primary-button-label="Close"
+    @click:primary="isOpen = false"
+  >
 
-      <q-separator />
-
-      <q-card-section class="preview-container">
+    <div data-test="destination-preview-card" class="preview-card">
         <!-- Slack Preview -->
         <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message">
           <div class="slack-message-container">
@@ -252,27 +242,19 @@ limitations under the License.
             </div>
           </div>
         </div>
-      </q-card-section>
-
-      <q-card-actions align="center">
+      <div class="tw:flex tw:justify-center tw:pt-3">
         <OButton
           data-test="preview-copy-button"
           variant="outline"
-          size="sm"
+          size="sm-action"
           @click="copyTemplate"
+          icon-left="content-copy"
         >
-          <template #icon-left><q-icon name="content_copy" /></template>
           Copy Template
         </OButton>
-        <OButton
-          data-test="preview-close-button"
-          variant="ghost"
-          size="sm"
-          @click="isOpen = false"
-        >Close</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
@@ -280,6 +262,7 @@ import { computed } from 'vue';
 import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 
 const props = defineProps({
   modelValue: {

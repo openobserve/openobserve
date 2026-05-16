@@ -90,7 +90,7 @@ export class MetricsQueryEditorPage {
     async clearStreamSelection() {
         // Try to clear stream selection if there's a clear/X button
         const clearButtons = [
-            '[data-test="index-dropdown-stream"] .q-icon[name="cancel"]',
+            '[data-test="index-dropdown-stream"] .OIcon[name="cancel"]',
             '[data-test="index-dropdown-stream"] button[aria-label="Clear"]',
             '[data-test="index-dropdown-stream"] .q-field__append button'
         ];

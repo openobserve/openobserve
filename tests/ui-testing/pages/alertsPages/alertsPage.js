@@ -47,8 +47,8 @@ export class AlertsPage {
             newFolderButton: '[data-test="dashboard-new-folder-btn"]',
             folderNameInput: '[data-test="dashboard-folder-add-name"]',
             folderDescriptionInput: '[data-test="dashboard-folder-add-description"]',
-            folderSaveButton: '[data-test="dashboard-folder-add-save"]',
-            folderCancelButton: '[data-test="dashboard-folder-add-cancel"]',
+            folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]',
+            folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]',
             noDataAvailableText: 'No data available',
             folderExistsError: 'Folder with this name already exists in this organization',
             folderMoreOptionsButton: '[data-test="dashboard-more-icon"]',
@@ -150,21 +150,21 @@ export class AlertsPage {
             cloneAlertName: '[data-test="to-be-clone-alert-name"]',
             cloneStreamType: '[data-test="to-be-clone-stream-type"]',
             cloneStreamName: '[data-test="to-be-clone-stream-name"]',
-            cloneSubmitButton: '[data-test="clone-alert-submit-btn"]',
-            cloneCancelButton: '[data-test="clone-alert-cancel-btn"]',
+            cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
+            cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
             pauseStartAlert: '[data-test="alert-list-{alertName}-pause-start-alert"]',
 
             // Alert management locators
             alertUpdateButton: '[data-test="alert-list-{alertName}-update-alert"]',
             alertCloneButton: '[data-test="alert-list-{alertName}-clone-alert"]',
             alertMoreOptions: '[data-test="alert-list-{alertName}-more-options"]',
-            confirmButton: '[data-test="confirm-button"]',
+            confirmButton: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
 
             // Alert movement locators
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
             moveAcrossFoldersButton: '[data-test="alert-list-move-across-folders-btn"]',
             folderDropdown: '[data-test="alerts-index-dropdown-stream_type"]',
-            moveButton: '[data-test="alerts-folder-move"]',
+            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]',
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators
@@ -454,7 +454,7 @@ export class AlertsPage {
     async expectAlertDetailsHistorySectionVisible() {
         // The history section shows either a q-table (when history exists) or an empty state
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
-        const emptyState = this.page.locator('text=No history available').or(this.page.locator('.q-icon:has-text("history")'));
+        const emptyState = this.page.locator('text=No history available').or(this.page.locator('.OIcon:has-text("history")'));
 
         // Wait for either to appear — use .first() because .or() can match multiple elements
         // (e.g. the history icon may appear in the dialog AND in navigation)
@@ -1779,7 +1779,7 @@ export class AlertsPage {
     /**
      * Get severity badge text from incident detail header.
      * Header has 3 badges: Status (icon=info), Severity (icon=warning), Alert Count (icon=notifications_active).
-     * Quasar renders q-icon name as <i> text content, NOT as an HTML attribute.
+     * Quasar renders OIcon name as <i> text content, NOT as an HTML attribute.
      * We match the badge that contains a P1/P2/P3/P4 span.
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
@@ -1916,8 +1916,8 @@ export class AlertsPage {
         }
 
         // Check for error icon (also acceptable — just means no correlation data)
-        // Note: Quasar renders q-icon name as text content, not HTML attribute
-        const errorIcon = this.page.locator('.q-icon:has-text("error_outline"), .q-icon:has-text("info_outline")');
+        // Note: Quasar renders OIcon name as text content, not HTML attribute
+        const errorIcon = this.page.locator('.OIcon:has-text("error_outline"), .OIcon:has-text("info_outline")');
         if (await errorIcon.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info(`Telemetry tab ${tabName}: info/error state`);
             return 'noData';

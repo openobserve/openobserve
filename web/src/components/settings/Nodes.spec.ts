@@ -150,8 +150,7 @@ function mountComponent() {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-        "q-page": { template: "<div><slot /></div>" },
-        "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue", "limits", "unit", "style"] },
+                "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue", "limits", "unit", "style"] },
         "q-spinner-hourglass": true,
         "q-table": { template: '<div class="q-table"><slot name="bottom" :scope="{}" /><slot name="no-data" /></div>', props: ["rows", "columns", "rowKey", "pagination", "filter", "filterMethod", "loading", "dense", "style", "hideTop"] },
         "q-expansion-item": { template: '<div><slot /></div>', props: ["expandSeparator", "label", "class"] },
@@ -410,8 +409,7 @@ describe("Nodes", () => {
           plugins: [mockI18n],
           provide: { store: storeWithoutSuperCluster },
           stubs: {
-            "q-page": { template: "<div><slot /></div>" },
-            "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue"] },
+                        "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue"] },
             "q-table": { template: "<div />", props: ["rows", "columns", "rowKey", "pagination", "filter", "filterMethod", "loading"] },
             "q-expansion-item": { template: "<div><slot /></div>", props: ["label"] },
             "q-card": { template: "<div><slot /></div>" },

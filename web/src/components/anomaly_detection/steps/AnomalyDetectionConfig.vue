@@ -108,9 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 @click="removeFilter(idx)"
-              >
-                <X class="tw:size-4" />
-              </OButton>
+                icon-left="close"
+              />
             </div>
             <OButton
               variant="outline"
@@ -255,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.detectionResolution") }}
               <span class="text-negative tw:ml-1">*</span>
-              <q-icon
+              <OIcon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
@@ -272,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("alerts.anomaly.detectionResolutionTooltip")
                   }}</span>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
@@ -321,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 190px; height: 36px"
           >
             Detection Resolution <span class="text-negative tw:ml-1">*</span>
-            <q-icon
+            <OIcon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
@@ -338,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("alerts.anomaly.detectionResolutionTooltip")
                 }}</span>
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div>
             <div class="tw:flex tw:items-center tw:gap-0">
@@ -386,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.checkEvery") }}
               <span class="text-negative tw:ml-1">*</span>
-              <q-icon
+              <OIcon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
@@ -403,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("alerts.anomaly.checkEveryTooltip")
                   }}</span>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
@@ -448,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.lookBackWindow") }}
               <span class="text-negative tw:ml-1">*</span>
-              <q-icon
+              <OIcon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
@@ -465,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("alerts.anomaly.lookBackWindowTooltip")
                   }}</span>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
@@ -515,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.trainingWindow") }}
               <span class="text-negative tw:ml-1">*</span>
-              <q-icon
+              <OIcon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
@@ -534,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ≥7 days → hour-of-day + day-of-week.
                   </span>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
             <div class="tw:flex tw:flex-col">
               <q-input
@@ -568,7 +567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.retrainEvery") }}
-              <q-icon
+              <OIcon
                 name="info"
                 size="17px"
                 class="q-ml-xs cursor-pointer"
@@ -585,7 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("alerts.anomaly.retrainEveryTooltip")
                   }}</span>
                 </q-tooltip>
-              </q-icon>
+              </OIcon>
             </div>
             <q-select
               v-model="config.retrain_interval_days"
@@ -610,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 190px; padding-top: 4px"
           >
             {{ t("alerts.sensitivity") }}
-            <q-icon
+            <OIcon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
@@ -627,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("alerts.anomaly.sensitivityTooltip")
                 }}</span>
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div style="width: calc(100% - 190px)">
             <!-- Chart + Slider container -->
@@ -682,8 +681,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     data-test="anomaly-sensitivity-empty"
                   >
-                    <q-icon
-                      name="bar_chart"
+                    <OIcon
+                      name="bar-chart"
                       size="2rem"
                       class="tw:mb-2 tw:opacity-40"
                     />
@@ -763,9 +762,9 @@ import {
 import QueryEditor from "@/components/QueryEditor.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { X } from "lucide-vue-next";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -776,8 +775,8 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
-    X,
-  },
+    OIcon,
+},
 
   props: {
     config: {

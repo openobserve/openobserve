@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:pb-4">
         <div class="tw:flex tw:items-start tw:gap-4">
           <div class="tw:flex-shrink-0">
-            <q-icon name="cloud" size="2.5rem" color="primary" />
+            <OIcon name="cloud" size="2.5rem" />
           </div>
           <div class="tw:flex-1">
             <h5 class="tw:text-lg tw:font-bold tw:m-0 tw:mb-2 title">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-deploy-btn"
               >
                 <template #icon-left
-                  ><q-icon name="open_in_new" size="sm"
+                  ><OIcon name="open-in-new" size="sm"
                 /></template>
                 View Setup Guide
               </OButton>
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-add-dashboard-btn"
               >
                 <template #icon-left
-                  ><q-icon name="dashboard" size="sm"
+                  ><OIcon name="dashboard" size="sm"
                 /></template>
                 Add Dashboard
               </OButton>
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="azure-quick-setup-details-btn"
               >
                 <template #icon-left
-                  ><q-icon
-                    :name="showDetails ? 'expand_less' : 'expand_more'"
+                  ><OIcon
+                    :name="showDetails ? 'expand-less' : 'expand-more'"
                     size="sm"
                 /></template>
                 {{ showDetails ? "Hide" : "View" }} Details
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div class="service-item tw:p-2 tw:rounded tw:border">
                       <div class="tw:flex tw:items-start tw:gap-2">
-                        <q-icon
+                        <OIcon
                           :name="getCategoryIcon(service.category)"
                           size="sm"
                           class="tw:mt-0.5"
@@ -180,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { azureIntegrations } from "@/utils/azureIntegrations";
@@ -188,7 +189,9 @@ import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "AzureQuickSetup",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const q = useQuasar();

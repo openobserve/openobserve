@@ -24,11 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="add-pipeline-section-title" style="font-size: 18px">
           {{ t("pipeline.addPipeline") }}
         </div>
-        <q-icon
+        <OIcon
           data-test="add-pipeline-close-dialog-btn"
           name="cancel"
           class="cursor-pointer"
-          size="20px"
+          size="md"
           v-close-popup="true"
         />
       </div>
@@ -162,6 +162,7 @@ import { ref, computed, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   isUpdating: {

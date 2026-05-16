@@ -114,7 +114,6 @@ describe("IncidentDetailDrawer.vue", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          QPage: true,
           IncidentServiceGraph: true,
           SREChat: true,
           // Use custom stubs that accept props so we can test them

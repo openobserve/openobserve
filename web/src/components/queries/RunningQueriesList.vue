@@ -31,35 +31,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </div>
         <div v-else class="text-center full-width full-height q-mt-lg">
-          <q-spinner-hourglass color="primary" size="lg" />
+          <OSpinner size="md" />
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected" size="xs" color="secondary" />
+        <OCheckbox v-model="scope.selected" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
           <OButton
+            icon-left="format-list-bulleted"
             variant="ghost"
             size="icon-sm"
             :title="t('queries.queryList')"
             data-test="queryList-btn"
             @click="listSchema(props)"
-          >
-            <List class="tw:size-4" />
-          </OButton>
+          />
           <OButton
+            icon-left="close"
             variant="ghost-destructive"
             size="icon-sm"
             :title="t('queries.cancelQuery')"
             data-test="cancelQuery-btn"
             @click="confirmDeleteAction(props)"
-          >
-            <X class="tw:size-4" />
-          </OButton>
+          />
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -97,15 +95,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </q-table>
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      v-model:open="showListSchemaDialog"
+      size="lg"
       data-test="list-schema-dialog"
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
-    </q-dialog>
+    </ODrawer>
   </div>
 </template>
 
@@ -116,19 +112,21 @@ import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { List, X } from 'lucide-vue-next';
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+
 import { getDuration, durationFormatter } from "@/utils/zincutils";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 // TODO OK : Define types and interfaces for data properties.
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X },
+  components: { QueryList, QTablePagination, NoData, OButton, ODrawer, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -290,7 +288,7 @@ export default defineComponent({
       listSchema,
       showListSchemaDialog,
       changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       schemaData,
       loadingState,
       lastRefreshed,

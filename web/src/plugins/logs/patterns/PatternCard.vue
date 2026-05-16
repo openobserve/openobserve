@@ -76,9 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`pattern-card-${index}-anomaly-badge`"
       >
         ⚠️ {{ t("search.anomalyLabel") }}
-        <q-tooltip anchor="bottom middle" self="top middle" class="anomaly-tooltip">
-          <div class="tw:text-xs tw:max-w-[22rem]">{{ anomalyExplanationText }}</div>
-        </q-tooltip>
+        <OTooltip :content="anomalyExplanationText" max-width="22rem" />
       </span>
     </div>
 
@@ -111,9 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.includePatternInSearch')"
         :data-test="`pattern-card-${index}-include-btn`"
       >
-        <q-icon style="height: 8px; width: 8px">
+        <OIcon style="height: 8px; width: 8px">
           <EqualIcon />
-        </q-icon>
+        </OIcon>
       </OButton>
       <OButton
         variant="ghost"
@@ -122,9 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.excludePatternFromSearch')"
         :data-test="`pattern-card-${index}-exclude-btn`"
       >
-        <q-icon style="height: 8px; width: 8px">
+        <OIcon style="height: 8px; width: 8px">
           <NotEqualIcon />
-        </q-icon>
+        </OIcon>
       </OButton>
       <OButton
         variant="ghost"
@@ -132,8 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="$emit('create-alert', pattern)"
         :data-test="`pattern-card-${index}-create-alert-btn`"
       >
-        <q-icon name="notifications" size="15px" />
-        <q-tooltip>{{ t("search.createAlertFromPattern") }}</q-tooltip>
+        <OIcon name="notifications" size="15px" />
+        <OTooltip :content="t('search.createAlertFromPattern')" />
       </OButton>
     </div>
   </div>
@@ -146,6 +144,8 @@ import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   tokenizeTemplate,
   wildcardChipColor,

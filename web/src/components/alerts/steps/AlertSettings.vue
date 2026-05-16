@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-start items-start tw:pb-3 tw:mb-4">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
+            <OIcon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.alertSettings.cooldownTooltip') }}
                 </span>
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div>
             <div class="flex items-center q-mr-sm" style="width: fit-content">
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alerts.alertSettings.refreshDestinations')"
                 @click="$emit('refresh:destinations')"
               >
-                <q-icon name="refresh" />
+                <OIcon name="refresh" size="sm" />
               </OButton>
               <OButton
                 data-test="create-destination-btn"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.period") + " *" }}
-            <q-icon
+            <OIcon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.alertSettings.periodTooltip') }}
                 </span>
               </q-tooltip>
-          </q-icon>
+          </OIcon>
           </div>
           <div>
             <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.silenceNotification") + " *" }}
-            <q-icon
+            <OIcon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.alertSettings.cooldownTooltip') }}
                 </span>
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div>
             <div ref="silenceFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start q-mr-sm alert-settings-row">
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.destination") + " *" }}
-            <q-icon
+            <OIcon
               name="info"
               size="17px"
               class="q-ml-xs cursor-pointer"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-tooltip anchor="center right" self="center left" max-width="300px">
                 <span style="font-size: 14px">{{ t('alerts.alertSettings.destinationsTooltip') }}</span>
               </q-tooltip>
-            </q-icon>
+            </OIcon>
           </div>
           <div>
             <div class="flex items-center">
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alerts.alertSettings.refreshDestinations')"
                 @click="$emit('refresh:destinations')"
               >
-                <q-icon name="refresh" />
+                <OIcon name="refresh" size="sm" />
               </OButton>
               <OButton
                 data-test="create-destination-btn"
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 190px; height: 28px"
         >
           {{ t("alerts.alertSettings.createsIncident") }}
-          <q-icon
+          <OIcon
             name="info"
             size="17px"
             class="q-ml-xs cursor-pointer"
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alerts.alertSettings.createsIncidentTooltip") }}
               </span>
             </q-tooltip>
-          </q-icon>
+          </OIcon>
         </div>
         <q-toggle
           v-model="formData.creates_incident"
@@ -421,10 +421,13 @@ import {
   isAboveMinRefreshInterval,
   convertMinutesToCron,
 } from "@/utils/zincutils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   props: {
     formData: {
       type: Object as PropType<any>,

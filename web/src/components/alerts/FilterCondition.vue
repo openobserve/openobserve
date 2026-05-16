@@ -26,10 +26,8 @@
             class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
             @click="toggleOperator"
           >
-            <q-icon name="restart_alt" />
-            <q-tooltip>
-              Toggle between and/or
-            </q-tooltip>
+            <OIcon name="restart-alt" size="sm" />
+            <OTooltip content="Toggle between and/or" />
           </OButton>
         </template>
       </div>
@@ -37,87 +35,64 @@
           data-test="alert-conditions-select-column"
           class="q-ml-none"
         >
-          <q-select
+          <OSelect
             v-model="condition.column"
             :options="filteredFields"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            borderless
-            emit-value
-            dense
-            use-input
-            hide-selected
-            class="alert-v3-select"
-            fill-input
-            lazy-rules
-            hide-bottom-space
-            no-error-icon
-            :input-debounce="400"
+            :dropdownStyle="{ textTransform: 'lowercase' }"
+            searchable
+            :searchDebounce="400"
+            labelKey="label"
+            valueKey="value"
             :placeholder="t('alerts.column')"
-            @filter="filterColumns"
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :creatable="props.allowCustomColumns"
             :class="[inputWidth ? inputWidth : '']"
-            @update:model-value="emits('input:update', 'conditions', condition)"
-            :new-value-mode="props.allowCustomColumns ? 'add-unique' : undefined"
-          >
-          <q-tooltip v-if="condition.column && store.state.isAiChatEnabled">
-            {{ condition.column }}
-          </q-tooltip>
-        </q-select>
+            :error="!!columnError"
+            :error-message="columnError"
+            @search="filterColumns"
+            @update:model-value="() => { columnError = ''; emits('input:update', 'conditions', condition) }"
+            @blur="validateColumn"
+          />
+          <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
         </div>
         <div
           data-test="alert-conditions-operator-select"
           class="q-ml-none"
         >
-          <q-select
+          <OSelect
             v-model="condition.operator"
             :options="triggerOperators"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            stack-label
-            borderless
-            dense
-            lazy-rules
-            hide-bottom-space
-            no-error-icon
-            class="alert-v3-select"
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :dropdownStyle="{ textTransform: 'capitalize' }"
             :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
-            @update:model-value="emits('input:update', 'conditions', condition)"
-          >
-          <q-tooltip v-if="condition.operator && store.state.isAiChatEnabled">
-            {{ condition.operator }}
-          </q-tooltip>
-        </q-select>
+            :error="!!operatorError"
+            :error-message="operatorError"
+            @update:model-value="() => { operatorError = ''; emits('input:update', 'conditions', condition) }"
+            @blur="validateOperator"
+          />
+          <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
         </div>
         <div
           data-test="alert-conditions-value-input"
           class="q-ml-none"
         >
-          <q-input
+          <OInput
             v-model="condition.value"
-            :options="streamFields"
-            :popup-content-style="{ textTransform: 'capitalize' }"
             :placeholder="t('common.value')"
-            stack-label
-            borderless
-            dense
-            lazy-rules
-            hide-bottom-space
-            no-error-icon
-            :rules="[(val: any) => !!val || 'Field is required!']"
             :class="['alert-v3-input', inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
-            @update:model-value="emits('input:update', 'conditions', condition)"
-          >
-          <q-tooltip v-if="condition.value && store.state.isAiChatEnabled">
-            {{ condition.value }}
-          </q-tooltip>
-        </q-input>
+            :error="!!valueError"
+            :error-message="valueError"
+            @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
+            @blur="validateValue"
+          />
+          <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
         </div>
     </div>
   </template>
   
   <script setup lang="ts">
   import OButton from '@/lib/core/Button/OButton.vue';
+  import OSelect from '@/lib/forms/Select/OSelect.vue';
+  import OInput from '@/lib/forms/Input/OInput.vue';
+  import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
   const props = defineProps({
         condition: {
         type: Object,
@@ -169,8 +144,8 @@
 
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
   var triggerOperators: any = ref([
   "=",
@@ -189,6 +164,30 @@ const filteredFields = ref(props.streamFields);
 const store = useStore();
 
 const { t } = useI18n();
+
+// Inline error state (replaces Quasar :rules)
+const columnError = ref('');
+const operatorError = ref('');
+const valueError = ref('');
+
+const validateColumn = () => {
+  columnError.value = !props.condition.column ? 'Field is required!' : '';
+};
+const validateOperator = () => {
+  operatorError.value = !props.condition.operator ? 'Field is required!' : '';
+};
+const validateValue = () => {
+  valueError.value = !props.condition.value ? 'Field is required!' : '';
+};
+
+defineExpose({
+  validate: () => {
+    validateColumn();
+    validateOperator();
+    validateValue();
+    return !columnError.value && !operatorError.value && !valueError.value;
+  },
+});
 
 const deleteApiHeader = (field: any) => {
   emits("remove", field);
@@ -235,18 +234,15 @@ const computedValueWidth = computed(() => {
 });
 
 
-const filterColumns = (val: string, update: Function) => {
+const filterColumns = (val: string) => {
   if (val === "") {
-    update(() => {
-      filteredFields.value = [...props.streamFields];
-    });
-  }
-  update(() => {
+    filteredFields.value = [...props.streamFields as any[]];
+  } else {
     const value = val.toLowerCase();
-    filteredFields.value = props.streamFields.filter(
+    filteredFields.value = (props.streamFields as any[]).filter(
       (column: any) => column.value.toLowerCase().indexOf(value) > -1
     );
-  });
+  }
 };
 
   </script>

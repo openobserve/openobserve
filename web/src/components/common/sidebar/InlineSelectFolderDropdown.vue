@@ -37,21 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title="Add Folder"
       @click="showDialog = true"
     >
-      <q-icon name="add" />
+      <OIcon name="add" size="sm" />
     </OButton>
-    <q-dialog
-      v-model="showDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <AddFolder
-      style="width: 30vw;"
-        :type="type"
-        :edit-mode="false"
-        @update:modelValue="onFolderAdded"
-      />
-    </q-dialog>
+    <AddFolder
+      v-if="!disable"
+      data-test="inline-select-folder-dropdown-dialog"
+      v-model:open="showDialog"
+      :type="type"
+      :edit-mode="false"
+      @update:modelValue="onFolderAdded"
+    />
   </div>
 </template>
 
@@ -61,10 +56,13 @@ import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder, OButton },
+  components: { AddFolder, OButton,
+    OIcon,
+},
   emits: ["update:modelValue"],
   props: {
     modelValue: {

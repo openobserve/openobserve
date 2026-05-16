@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
     <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('iam.searchGroup')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </q-input>
         </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('common.edit')"
               @click="editGroup(slotProps.column.row)"
             >
-              <q-icon name="edit" />
+              <OIcon name="edit" size="sm" />
             </OButton>
             <OButton
               :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('common.delete')"
               @click="showConfirmDialog(slotProps.column.row)"
             >
-              <q-icon :name="outlinedDelete" />
+              <OIcon name="delete" size="sm" />
             </OButton>
           </div>
         </template>
@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="tw:mr-2"
             @click="openBulkDeleteDialog"
+            icon-left="delete"
           >
-            <template #icon-left><q-icon name="delete" /></template>
             {{ t('common.delete') }}
           </OButton>
         </template>
@@ -113,14 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div>
     </div>
-    <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-      <AddGroup
-        style="width: 30vw"
-        :org_identifier="store.state.selectedOrganization.identifier"
-        @cancel:hideform="hideAddGroup"
-        @added:group="setupGroups"
-      />
-    </q-dialog>
+    <AddGroup
+      v-model:open="showAddGroup"
+      :org_identifier="store.state.selectedOrganization.identifier"
+      @added:group="setupGroups"
+    />
     <ConfirmDialog
       title="Delete Group"
       :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
@@ -135,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -152,7 +149,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const showAddGroup = ref(false);
 

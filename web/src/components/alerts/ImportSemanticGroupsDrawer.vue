@@ -15,33 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="import-drawer-container tw:w-[45rem]">
-    <!-- Header -->
-    <div class="drawer-header q-pa-md">
-      <div class="row items-center">
-        <div class="col">
-          <div class="text-h6">Import Semantic Groups</div>
-          <div class="text-caption text-grey-7">
-            Upload JSON file to import semantic field groups
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            round
-            dense
-            variant="ghost"
-            size="icon-circle-sm"
-            @click="handleClose"
-            data-test="import-drawer-close-btn"
-          >
-            <q-icon name="close" />
-          </OButton>
-        </div>
-      </div>
-    </div>
-
-    <q-separator />
-
+  <div class="import-drawer-container">
     <!-- Content -->
     <div class="drawer-content q-pa-md">
       <!-- File Upload -->
@@ -56,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="semantic-groups-import-file-drawer"
         >
           <template v-slot:prepend>
-            <q-icon name="cloud_upload" />
+            <OIcon name="cloud-upload" size="sm" />
           </template>
           <template v-slot:append>
-            <q-icon
+            <OIcon
               v-if="jsonFile"
-              name="close"
+              name="close" size="sm"
               @click.stop="clearFile"
               class="cursor-pointer"
             />
@@ -71,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Loading State -->
       <div v-if="isLoading" class="text-center q-pa-lg">
-        <q-spinner-dots size="50px" color="primary" />
+        <OSpinner variant="dots" size="lg" />
         <div class="text-body2 text-grey-7 q-mt-md">Analyzing file...</div>
       </div>
 
@@ -126,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="q-mb-md">
             <div class="section-header text-positive q-pa-sm">
-              <q-icon name="add_circle" size="sm" />
+              <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
@@ -139,10 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleAddition(group.id)"
               >
                 <q-item-section side>
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
-                    color="positive"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -159,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click.stop="viewGroup(group)"
                   >
-                    <q-icon name="visibility" />
+                    <OIcon name="visibility" size="sm" />
                   </OButton>
                 </q-item-section>
               </q-item>
@@ -169,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="q-mb-md">
             <div class="section-header text-warning q-pa-sm">
-              <q-icon name="edit" size="sm" />
+              <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
@@ -182,12 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleModification(mod.proposed.id)"
               >
                 <q-item-section side>
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="
                       selectedModifications.includes(mod.proposed.id)
                     "
                     @update:model-value="toggleModification(mod.proposed.id)"
-                    color="warning"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -205,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click.stop="viewModification(mod)"
                   >
-                    <q-icon name="compare" />
+                    <OIcon name="compare" size="sm" />
                   </OButton>
                 </q-item-section>
               </q-item>
@@ -237,10 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty State -->
       <div v-else class="empty-state text-center q-pa-lg">
-        <q-icon
-          name="cloud_upload"
+        <OIcon
+          name="cloud-upload"
           size="64px"
-          color="grey-5"
           class="q-mb-md"
         />
         <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
@@ -277,105 +248,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Group Details Dialog -->
-  <q-dialog v-model="showGroupDialog">
-    <q-card style="min-width: 500px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedGroup?.display }}</div>
-        <div class="text-caption text-grey-7">ID: {{ selectedGroup?.id }}</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="text-subtitle2 q-mb-sm">
-          Fields ({{ selectedGroup?.fields.length }})
-        </div>
-        <q-chip
-          v-for="field in selectedGroup?.fields"
-          :key="field"
-          color="primary"
-          text-color="white"
-          class="q-ma-xs"
-        >
-          {{ field }}
-        </q-chip>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog data-test="import-semantic-groups-drawer-group-dialog"
+    v-model:open="showGroupDialog"
+    size="md"
+    :title="selectedGroup?.display"
+    :sub-title="`ID: ${selectedGroup?.id}`"
+    primary-button-label="Close"
+    @click:primary="showGroupDialog = false"
+  >
+    <div>
+      <div class="text-subtitle2 q-mb-sm">
+        Fields ({{ selectedGroup?.fields.length }})
+      </div>
+      <q-chip
+        v-for="field in selectedGroup?.fields"
+        :key="field"
+        color="primary"
+        text-color="white"
+        class="q-ma-xs"
+      >
+        {{ field }}
+      </q-chip>
+    </div>
+  </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <q-dialog v-model="showModificationDialog">
-    <q-card style="min-width: 700px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedModification?.proposed.display }}</div>
-        <div class="text-caption text-grey-7">Compare Changes</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <div class="col-6">
-            <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-            <div class="text-caption q-mb-xs">
-              {{ selectedModification?.current.fields.length }} fields
-            </div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.current.fields"
-                :key="`current-${field}`"
-                color="grey-4"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-              </q-chip>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-            <div class="text-caption q-mb-xs">
-              {{ selectedModification?.proposed.fields.length }} fields
-            </div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.proposed.fields"
-                :key="`proposed-${field}`"
-                :color="isNewField(field) ? 'positive' : 'grey-4'"
-                :text-color="isNewField(field) ? 'white' : 'black'"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-                <q-icon
-                  v-if="isNewField(field)"
-                  name="add"
-                  size="xs"
-                  class="q-ml-xs"
-                />
-              </q-chip>
-            </div>
-          </div>
+  <ODialog data-test="import-semantic-groups-drawer-modification-dialog"
+    v-model:open="showModificationDialog"
+    size="lg"
+    :title="selectedModification?.proposed.display"
+    sub-title="Compare Changes"
+    primary-button-label="Close"
+    @click:primary="showModificationDialog = false"
+  >
+    <div class="row q-col-gutter-md">
+      <div class="col-6">
+        <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
+        <div class="text-caption q-mb-xs">
+          {{ selectedModification?.current.fields.length }} fields
         </div>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <OButton variant="ghost-primary" size="sm" v-close-popup>Close</OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+        <div class="field-chips-container">
+          <q-chip
+            v-for="field in selectedModification?.current.fields"
+            :key="`current-${field}`"
+            color="grey-4"
+            size="sm"
+            class="q-ma-xs"
+          >
+            {{ field }}
+          </q-chip>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
+        <div class="text-caption q-mb-xs">
+          {{ selectedModification?.proposed.fields.length }} fields
+        </div>
+        <div class="field-chips-container">
+          <q-chip
+            v-for="field in selectedModification?.proposed.fields"
+            :key="`proposed-${field}`"
+            :color="isNewField(field) ? 'positive' : 'grey-4'"
+            :text-color="isNewField(field) ? 'white' : 'black'"
+            size="sm"
+            class="q-ma-xs"
+          >
+            {{ field }}
+            <OIcon
+              v-if="isNewField(field)"
+              name="add"
+              size="xs"
+              class="q-ml-xs"
+            />
+          </q-chip>
+        </div>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface SemanticGroup {
   id: string;

@@ -21,20 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
         <div class="tw:flex tw:gap-3">
-          <q-input
+          <OInput
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
-            borderless
-            dense
-            flat
             clearable
             class="no-border tw:w-[220px]"
             data-test="built-in-model-pricing-search"
           >
             <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <!-- Refresh -->
@@ -54,13 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Loading State -->
     <div v-if="loading && models.length === 0" class="text-center q-pa-xl">
-      <q-spinner-hourglass color="primary" size="50px" />
+      <OSpinner size="lg" />
       <div class="q-mt-md">{{ t("modelPricing.loadingModels") }}</div>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <OIcon name="error" size="50px" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
@@ -84,10 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Checkbox -->
         <template #body-cell-select="props">
           <q-td :props="props">
-            <q-checkbox
+            <OCheckbox
               v-model="props.row.selected"
-              dense
-              size="xs"
               :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
             />
           </q-td>
@@ -160,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #no-data>
           <div class="full-width column flex-center q-pa-xl">
-            <q-icon name="search_off" size="50px" color="grey-5" />
+            <OIcon name="search-off" size="50px" />
             <div class="q-mt-md text-grey-6">
               {{ t("modelPricing.noModelsFound") }}
             </div>
@@ -197,6 +192,10 @@ import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface ModelTier {
   name: string;
@@ -216,7 +215,9 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton },
+  components: { OButton, OSpinner, OInput, OCheckbox,
+    OIcon,
+},
   emits: ["import-models"],
   setup(props, { emit }) {
     const { t } = useI18n();

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
-          <q-icon name="tune" size="18px" class="q-mr-sm" />
+          <OIcon name="tune" size="sm" class="q-mr-sm" />
           <span>Configure Dedup</span>
         </div>
         <div
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
-          <q-icon name="edit" size="18px" class="q-mr-sm" />
+          <OIcon name="edit" size="sm" class="q-mr-sm" />
           <span>Edit Alert</span>
         </div>
         <div
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
-          <q-icon name="history" size="18px" class="q-mr-sm" />
+          <OIcon name="history" size="sm" class="q-mr-sm" />
           <span>View Alert History</span>
         </div>
       </div>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >
-          <q-icon name="close" size="18px" class="q-mr-sm" />
+          <OIcon name="close" size="sm" class="q-mr-sm" />
           <span>Cancel</span>
         </div>
       </div>
@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps<{
   x: number;

@@ -81,6 +81,15 @@ const sampleDestinations = [
   { name: "dest2", url: "http://dest2.example.com", destination_type_name: "splunk" },
 ];
 
+// ODrawer stub — renders slot content and the title prop so inner elements
+// and title text are accessible in tests.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "width", "persistent"],
+  emits: ["update:open"],
+  template: '<div class="o-drawer-stub"><div class="o-drawer-title">{{ title }}</div><slot /></div>',
+};
+
 // --------------------------------------------------------------------------
 // Factory helper
 // --------------------------------------------------------------------------
@@ -113,6 +122,7 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
         QItemSection: true,
         QItemLabel: true,
         ConfirmDialog: true,
+        ODrawer: ODrawerStub,
         CreateDestinationForm: {
           name: "CreateDestinationForm",
           template: '<div data-test="create-destination-form" />',
@@ -653,6 +663,27 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-destination-delete-btn"]').exists()).toBe(true);
     });
+
+    it("11.9 emits 'cancel:hideform' when the ODrawer close event fires", async () => {
+      // The close button is inside ODrawer's header (showClose prop).
+      // Simulate it by emitting update:open=false on the ODrawer component.
+      vi.useFakeTimers();
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      drawer.vm.$emit("update:open", false);
+      vi.advanceTimersByTime(400);
+      await nextTick();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+      expect(wrapper.emitted("cancel:hideform")).toHaveLength(1);
+      vi.useRealTimers();
+    });
+
+    it("11.10 does NOT emit 'close' on cancel button click (cancel emits cancel:hideform)", async () => {
+      const cancelBtn = wrapper.find('[data-test="add-destination-cancel-btn"]');
+      await cancelBtn.trigger("click");
+      expect(wrapper.emitted("close")).toBeFalsy();
+      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -665,10 +696,9 @@ describe("ExternalDestination.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       const rootDiv = wrapper.find(
-        '[data-test="add-stream-input-stream-routing-section"]',
+        '[data-test="add-destination-title"]',
       );
       expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.classes()).toContain("bg-dark");
     });
 
     it("12.2 renders correctly in light theme", async () => {
@@ -676,10 +706,9 @@ describe("ExternalDestination.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       const rootDiv = wrapper.find(
-        '[data-test="add-stream-input-stream-routing-section"]',
+        '[data-test="add-destination-title"]',
       );
       expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.classes()).toContain("bg-white");
     });
 
     afterEach(() => {

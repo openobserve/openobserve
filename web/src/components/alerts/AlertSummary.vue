@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="summary-content" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
       <p v-if="summaryText" class="summary-text" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
       <div v-else class="summary-empty-state">
-        <q-icon name="article" size="36px" class="summary-empty-icon" />
+        <OIcon name="article" size="36px" class="summary-empty-icon" />
         <span class="summary-empty-text">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
       </div>
     </div>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="scroll-to-bottom-btn"
         @click="scrollToBottomSmooth"
       >
-        <q-icon name="arrow_downward" />
+        <OIcon name="arrow-downward" size="sm" />
         <q-tooltip anchor="top middle" self="bottom middle">
           Scroll to bottom
         </q-tooltip>
@@ -51,6 +51,7 @@ import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import DOMPurify from 'dompurify';
 import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 
@@ -299,7 +300,7 @@ onMounted(async () => {
     transform: scale(1);
   }
 
-  .q-icon {
+  .OIcon {
     font-size: 18px;
     font-weight: bold;
   }

@@ -4,7 +4,7 @@
     <div class="text-h6 q-mb-md">{{ t("about.license_management") }}</div>
 
     <div v-if="loading" class="q-pa-md text-center">
-      <q-spinner size="40px" />
+      <OSpinner size="md" />
       <div class="q-mt-md">{{ t("about.loading_license_info") }}</div>
     </div>
     <div
@@ -52,10 +52,10 @@
               />
               <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
                 <div class="modern-info-banner">
-                  <q-icon
-                    name="check_circle"
+                  <OIcon
+                    name="check-circle"
                     class="text-green-6 q-mr-sm"
-                    size="20px"
+                    size="md"
                   />
                   <span class="text-body2">{{
                     t("about.license_auto_filled")
@@ -138,7 +138,7 @@
                           data-test="show-license-key-btn"
                           @click="showLicenseKeyModal = true"
                         >
-                          <q-icon name="visibility" size="14px" />
+                          <OIcon name="visibility" size="xs" />
                         </OButton>
                       </div>
                     </td>
@@ -200,10 +200,10 @@
               />
               <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
                 <div class="modern-info-banner">
-                  <q-icon
-                    name="check_circle"
+                  <OIcon
+                    name="check-circle"
                     class="text-green-6 q-mr-sm"
-                    size="20px"
+                    size="md"
                   />
                   <span class="text-body2">{{
                     t("about.license_auto_filled")
@@ -254,7 +254,7 @@
                 <div class="summary-text-compact text-body2">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                    <q-icon name="info" size="18px" class="tw:flex-shrink-0" />
+                    <OIcon name="info" size="sm" class="tw:flex-shrink-0" />
                     <span
                       v-html="
                         DOMPurify.sanitize(
@@ -272,7 +272,7 @@
 
                   <!-- Line 2: Exceeded Status -->
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon
+                    <OIcon
                       v-if="
                         licenseData?.ingestion_exceeded &&
                         licenseData?.ingestion_exceeded >
@@ -282,7 +282,7 @@
                       size="18px"
                       class="text-negative tw:flex-shrink-0"
                     />
-                    <q-icon
+                    <OIcon
                       v-else-if="
                         licenseData?.ingestion_exceeded &&
                         licenseData?.ingestion_exceeded > 0
@@ -291,10 +291,10 @@
                       size="18px"
                       class="text-warning tw:flex-shrink-0"
                     />
-                    <q-icon
+                    <OIcon
                       v-else
-                      name="check_circle"
-                      size="18px"
+                      name="check-circle"
+                      size="sm"
                       class="text-positive tw:flex-shrink-0"
                     />
                     <span>
@@ -400,53 +400,30 @@
     </div>
 
     <!-- License Key Modal -->
-    <q-dialog v-model="showLicenseKeyModal" persistent>
-      <q-card style="min-width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ t("about.license_key") }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div class="text-body2 q-mb-md">
-            {{ t("about.your_complete_license_key") }}
-          </div>
-          <q-input
-            data-test="modal-license-key-display"
-            v-model="licenseData.key"
-            outlined
-            readonly
-            type="textarea"
-            rows="8"
-            class="q-mb-md"
-            style="font-family: monospace; font-size: 12px"
-          />
-        </q-card-section>
-
-          <q-card-actions align="right" class="q-pt-none">
-          <OButton
-            data-test="license-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-          >
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            data-test="license-copy-key-btn"
-            variant="primary"
-            size="sm-action"
-            :disabled="!licenseData.key"
-            @click="copyLicenseKey"
-          >
-            {{ t("about.copy_key") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="license-key-modal-dialog"
+      v-model:open="showLicenseKeyModal"
+      persistent
+      size="md"
+      :title="t('about.license_key')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('about.copy_key')"
+      :primary-button-disabled="!licenseData.key"
+      @click:secondary="showLicenseKeyModal = false"
+      @click:primary="copyLicenseKey"
+    >
+      <div class="text-body2 q-mb-md">
+        {{ t('about.your_complete_license_key') }}
+      </div>
+      <q-input
+        data-test="modal-license-key-display"
+        v-model="licenseData.key"
+        outlined
+        readonly
+        type="textarea"
+        rows="8"
+        style="font-family: monospace; font-size: 12px"
+      />
+    </ODialog>
   </div>
 </template>
 
@@ -465,6 +442,9 @@ import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -476,7 +456,10 @@ export default defineComponent({
     LicensePeriod,
     RenderDashboardCharts,
     OButton,
-  },
+    ODialog,
+    OSpinner,
+    OIcon,
+},
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();

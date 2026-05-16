@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sidebar" :class="{ open: isOpen }">
     <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
       <!-- <div class="collapsed-icon">+</div> -->
-      <q-icon
-        name="expand_all"
+      <OIcon
+        name="expand-all" size="sm"
         class="collapsed-icon rotate-90"
         data-test="dashboard-sidebar"
       />
@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
+        icon-left="unfold-less"
       >
-        <template #icon-left><q-icon name="unfold_less" /></template>
       </OButton>
     </div>
     <q-separator style="margin-top: -1px; flex-shrink: 0" />
@@ -47,9 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   props: {
     title: {
       type: String,

@@ -53,7 +53,22 @@ export class CreateOrgPage {
 
 
     async clickAddOrg() {
+        // The parent ListOrganizations.vue toggles the drawer via the router query
+        // ?action=add. Its watcher only fires when the value CHANGES, so if the
+        // drawer was closed via Cancel (which leaves the query alone), a second
+        // click on "Add Organization" pushes the same query and the watcher does
+        // not re-open the drawer. Guard against that by waiting for the org-name
+        // input to be visible, and if it never appears, re-navigate to clear the
+        // route query and try once more.
         await this.page.locator('[data-test="Add Organization"]').click();
+        try {
+            await this.page.locator('[data-test="org-name"]').waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            await this.navigateToOrg();
+            await this.page.waitForTimeout(500);
+            await this.page.locator('[data-test="Add Organization"]').click();
+            await this.page.locator('[data-test="org-name"]').waitFor({ state: 'visible', timeout: 10000 });
+        }
     }
 
     async fillOrgName(orgName) {
@@ -63,31 +78,41 @@ export class CreateOrgPage {
         await orgNameField.fill(orgName);
     }
 
+    async clearOrgName() {
+        const orgNameField = this.page.locator('[data-test="org-name"]');
+        await orgNameField.waitFor({ state: 'visible' });
+        await orgNameField.fill('');
+    }
+
+    async isDrawerOpen() {
+        return await this.page.locator('[data-test="org-name"]').isVisible({ timeout: 2000 }).catch(() => false);
+    }
+
     async clickSaveOrg() {
-        await this.page.locator('[data-test="add-org"]').click();
+        await this.page.locator('[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]').click();
     }
 
     async checkSaveEnabled() {
-        const saveButton = this.page.locator('[data-test="add-org"]');
-        
+        const saveButton = this.page.locator('[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]');
+
         // Check if the button is enabled
         const isEnabled = await saveButton.isEnabled();
-        
+
         if (!isEnabled) {
             console.error('The "Add Organization" button is not enabled.');
             return false; // Return false to indicate the button is not enabled
         }
-        
+
         return true; // Return true if the button is enabled
     }
-    
+
     async clickCancelButton() {
-        const cancelButton = this.page.locator('[data-test="cancel-organizations-modal"]');
-        
+        const cancelButton = this.page.locator('[data-test="add-update-organization-dialog"] [data-test="o-drawer-secondary-btn"]');
+
         // Check if the button is visible and enabled before clicking
         const isVisible = await cancelButton.isVisible();
         const isEnabled = await cancelButton.isEnabled();
-        
+
         if (isVisible && isEnabled) {
             await cancelButton.click();
         } else {
@@ -104,7 +129,7 @@ export class CreateOrgPage {
     }
     
     async verifyOrgNotExists() {
-        const mainSection = this.page.locator('[data-test="iam-page"]').getByRole('main');
+        const mainSection = this.page.locator('[data-test="iam-page"]');
         const textContent = await mainSection.textContent();
         console.log('Main section text:', textContent); // Debugging line
         await expect(mainSection).toContainText('No data available');

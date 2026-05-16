@@ -4,7 +4,7 @@
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
-        <q-icon name="rocket_launch" size="md" color="primary" />
+        <OIcon name="rocket-launch" size="md" />
         <div class="tw:flex-1">
           <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
           <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
@@ -22,7 +22,7 @@
               data-test="kubernetes-cluster-name-input"
             >
               <template #prepend>
-                <q-icon name="dns" />
+                <OIcon name="dns" size="sm" />
               </template>
             </q-input>
           </div>
@@ -39,7 +39,7 @@
           <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
 
           <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <q-icon name="info" size="xs" class="tw:mr-1" />
+            <OIcon name="info" size="xs" class="tw:mr-1" />
             This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
           </div>
         </div>
@@ -213,6 +213,7 @@ import { useStore } from "vuex";
 import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 

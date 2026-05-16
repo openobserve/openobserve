@@ -7,43 +7,31 @@
         data-test="service-graph-stream-selector"
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
-        <q-select
+        <OSelect
           v-model="streamFilter"
-          :options="
-            availableStreams.length > 0
-              ? availableStreams.map((s) => ({ label: s, value: s }))
-              : []
-          "
-          dense
-          borderless
-          emit-value
-          map-options
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          labelKey="label"
+          valueKey="value"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
-          :disable="availableStreams.length === 0"
-        >
-          <q-tooltip v-if="availableStreams.length === 0">
-            No streams detected. Ensure service graph metrics include
-            stream_name labels.
-          </q-tooltip>
-        </q-select>
+        />
+        <OTooltip v-if="availableStreams.length === 0" content="No streams detected. Ensure service graph metrics include stream_name labels." />
       </div>
       <!-- Search input -->
       <div data-test="service-graph-search-input">
-        <q-input
+        <OInput
           v-model="searchFilter"
-          borderless
-          dense
-          class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+          class="tw:w-[14rem]!"
           placeholder="Search Services"
-          debounce="300"
+          :debounce="300"
           @update:model-value="applyFilters"
           clearable
         >
           <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
+            <OIcon class="o2-search-input-icon" size="1rem" name="search" />
           </template>
-        </q-input>
+        </OInput>
       </div>
       <!-- Spacer -->
       <div class="tw:flex-1" />
@@ -176,7 +164,7 @@
           >
             <div v-if="loading" class="flex flex-center tw:h-full">
               <div class="text-center tw:flex tw:flex-col tw:items-center">
-                <q-spinner-hourglass color="primary" size="4em" />
+                <OSpinner size="xl" />
                 <div class="text-subtitle1 q-mt-md text-grey-7">
                   Loading service graph...
                 </div>
@@ -187,7 +175,7 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="error_outline" size="4em" color="negative" />
+                <OIcon name="error-outline" size="4em" />
                 <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
@@ -196,8 +184,8 @@
                   size="sm-action"
                   @click="loadServiceGraph"
                   class="tw:mt-4"
+                  icon-left="refresh"
                 >
-                  <template #icon-left><q-icon name="refresh" size="14px" /></template>
                   Retry
                 </OButton>
               </div>
@@ -207,7 +195,7 @@
               class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="hub" size="5em" color="grey-4" />
+                <OIcon name="hub" size="5em" />
                 <div class="text-h6 q-mt-md text-grey-7">
                   No Service Graph Data
                 </div>
@@ -239,6 +227,7 @@
                 :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
+                :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
               />
@@ -250,36 +239,22 @@
   </q-card>
 
   <!-- Enhanced Settings Dialog -->
-  <q-dialog v-model="showSettings">
-    <q-card style="min-width: 450px">
-      <q-card-section>
-        <div class="text-h6">Service Graph Settings</div>
-      </q-card-section>
-      <q-separator />
-      <q-card-section>
-        <div class="q-gutter-md">
-          <div class="text-caption text-grey-7">
-            Stream-based topology - all data persisted to storage
-            <q-tooltip
-              >Service graph uses stream-only architecture with zero in-memory
-              state</q-tooltip
-            >
-          </div>
-        </div>
-      </q-card-section>
-      <q-separator />
-      <q-card-actions align="right">
-        <div class="tw:flex tw:gap-2">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-          <OButton variant="primary" size="sm-action" @click="resetSettings">
-            Reset
-          </OButton>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog data-test="service-graph-settings-dialog"
+    v-model:open="showSettings"
+    size="sm"
+    title="Service Graph Settings"
+    secondary-button-label="Close"
+    primary-button-label="Reset"
+    @click:secondary="showSettings = false"
+    @click:primary="resetSettings"
+  >
+    <div class="q-gutter-md">
+      <div class="text-caption text-grey-7">
+        Stream-based topology - all data persisted to storage
+        <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -315,6 +290,12 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
@@ -322,7 +303,13 @@ export default defineComponent({
     ChartRenderer,
     ServiceGraphSidePanel,
     OButton,
-  },
+    ODialog,
+    OSpinner,
+    OTooltip,
+    OSelect,
+    OInput,
+    OIcon,
+},
   emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();
@@ -1700,7 +1687,7 @@ export default defineComponent({
 
 .graph-with-panel-container {
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 code {

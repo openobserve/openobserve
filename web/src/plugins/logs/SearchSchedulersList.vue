@@ -17,7 +17,7 @@
             title="Go Back"
             @click="closeSearchHistory"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
           <div class="text-h6 tw:font-[600]" data-test="search-scheduler-title">
             {{ t('search_scheduler_job.title') }}
@@ -66,12 +66,12 @@
                     variant="ghost"
                     size="icon"
                   >
-                    <q-icon
+                    <OIcon
                       :name="
                         expandedRow != props.row.trace_id
-                          ? 'expand_more'
-                          : 'expand_less'
-                      "
+                          ? 'expand-more'
+                          : 'expand-less'
+                      " size="sm"
                     />
                   </OButton>
                 </q-td>
@@ -92,7 +92,7 @@
                   </template>
                   <template v-else-if="col.field === 'status'">
                     <div class="status-cell">
-                      <q-icon
+                      <OIcon
                         :name="getStatusIcon(props.row[col.field])"
                         size="xs"
                         class="q-mr-xs"
@@ -113,7 +113,7 @@
                       "
                       @click="confirmCancelJob(props.row)"
                     >
-                      <q-icon name="cancel" size="14px" />
+                      <OIcon name="cancel" size="xs" />
                     </OButton>
 
                     <OButton
@@ -123,7 +123,7 @@
                       :title="t('search_scheduler_job.delete')"
                       @click="confirmDeleteJob(props.row)"
                     >
-                      <q-icon name="delete" size="14px" />
+                      <OIcon name="delete" size="xs" />
                     </OButton>
                     <OButton
                       data-test="search-scheduler-restart-btn"
@@ -136,7 +136,7 @@
                       "
                       @click="retrySearchJob(props.row)"
                     >
-                      <q-icon name="refresh" size="14px" />
+                      <OIcon name="refresh" size="xs" />
                     </OButton>
                     <OButton
                       data-test="search-scheduler-explore-btn"
@@ -148,7 +148,7 @@
                       "
                       @click="fetchSearchResults(props.row)"
                     >
-                      <q-icon name="search" size="14px" />
+                      <OIcon name="search" size="xs" />
                     </OButton>
                   </template>
                 </q-td>
@@ -177,7 +177,7 @@
                               data-test="search-scheduler-copy-sql-btn"
                               @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
                             >
-                              <q-icon name="content_copy" />
+                              <OIcon name="content-copy" size="sm" />
                             </OButton></span
                         ></strong>
                         <OButton
@@ -190,8 +190,8 @@
                             props.row.status_code == 3
                           "
                           @click.stop="fetchSearchResults(props.row)"
+                          icon-left="search"
                         >
-                          <template #icon-left><q-icon name="search" /></template>
                           {{ t('search_scheduler_job.logs') }}
                         </OButton>
                       </div>
@@ -217,7 +217,7 @@
                               class="copy-btn-function tw:ml-2"
                               @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
                             >
-                              <q-icon name="content_copy" />
+                              <OIcon name="content-copy" size="sm" />
                             </OButton></span
                         ></strong>
                       </div>
@@ -283,7 +283,7 @@
                 v-if="isLoading"
                 class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
               >
-                <q-spinner-hourglass color="primary" size="lg" />
+                <OSpinner size="md" />
               </div>
             </template>
             <template v-slot:header="props">
@@ -355,10 +355,12 @@ import type { Ref } from "vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Code2, Info } from "lucide-vue-next";
+
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -371,10 +373,12 @@ export default defineComponent({
     AppTabs,
     JsonPreview,
     OButton,
+    OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
-  },
+    OIcon,
+},
   props: {
     isClicked: {
       type: Boolean,
@@ -431,12 +435,12 @@ export default defineComponent({
       {
         label: t('search_scheduler_job.query_function'),
         value: "query",
-        icon: Code2,
+        icon: "code",
       },
       {
         label: t('search_scheduler_job.more_details'),
         value: "more_details",
-        icon: Info,
+        icon: "info",
       },
     ]);
 

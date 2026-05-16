@@ -29,6 +29,7 @@ import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import Icons from "unplugin-icons/vite";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -125,6 +126,10 @@ export default defineConfig({
         forceBuildInstrument: true,
       }),
     enterpriseResolverPlugin,
+    Icons({
+      compiler: "vue3",
+      autoInstall: false,
+    }),
     vueJsx(),
     (monacoEditorPlugin as any).default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
@@ -191,15 +196,15 @@ export default defineConfig({
           }
 
           if (name.includes("editor.api")) {
-            return `assets/${name}.v1.js`;
+            return `assets/${name}.[hash].js`;
           }
 
           if (name.includes("monaco-editor")) {
-            return `assets/${name}.v1.js`;
+            return `assets/${name}.[hash].js`;
           }
 
           if (name.includes("moment")) {
-            return `assets/${name}.v1.js`;
+            return `assets/${name}.[hash].js`;
           }
 
           return `assets/${name}.[hash].js`;

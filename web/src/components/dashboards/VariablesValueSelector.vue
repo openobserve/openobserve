@@ -37,34 +37,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div v-else-if="item.type == 'constant'">
-        <q-input
+        <OInput
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
           style="max-width: 150px !important"
           v-model="item.value"
           :label="item.label || item.name"
-          dense
           readonly
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
+        />
       </div>
       <div v-else-if="item.type == 'textbox'">
-        <q-input
+        <OInput
           v-show="!item.hideOnDashboard"
           class="q-mr-lg q-mt-xs"
           style="max-width: 150px !important"
-          debounce="1000"
+          :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"
-          dense
           :data-test="`variable-selector-${item.name}`"
           @update:model-value="onVariablesValueUpdated(index)"
-          borderless
-          hide-bottom-space
-        ></q-input>
+        />
       </div>
       <div v-else-if="item.type == 'custom'">
         <VariableCustomValueSelector
@@ -93,8 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="openAddVariable"
         data-test="dashboard-add-variable-btn"
+        icon-left="add"
       >
-        <template #icon-left><q-icon name="add" /></template>
         Add Variable
       </OButton>
     </div>
@@ -119,6 +113,7 @@ import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vu
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import {
@@ -188,6 +183,7 @@ export default defineComponent({
     VariableAdHocValueSelector,
     VariableCustomValueSelector,
     OButton,
+    OInput,
   },
   setup(props: any, { emit }) {
     const store = useStore();

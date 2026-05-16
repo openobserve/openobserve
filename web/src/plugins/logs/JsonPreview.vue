@@ -16,8 +16,8 @@
         variant="outline"
         class="tw:mb-[0.375rem] q-mr-sm"
         @click="copyLogToClipboard"
-      ><q-icon name="content_copy" size="14px" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
-      <OButton
+      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+        <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
         variant="outline"
@@ -25,10 +25,8 @@
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <q-icon name="link" size="14px" class="tw:mr-1" />{{ t('search.viewRelated') }}
-        <q-tooltip>
-          {{ t("search.viewRelatedTooltip") }}
-        </q-tooltip>
+        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
         v-if="
@@ -36,78 +34,26 @@
         "
         class="o2-input flex items-center logs-trace-selector"
       >
-        <q-select
+        <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
-          :options="filteredTracesStreamOptions"
-          input-debounce="0"
-          filled
-          size="xs"
-          borderless
-          dense
-          fill-input
-          behavior="menu"
-          :title="searchObj.meta.selectedTraceStream"
+          :options="tracesStreams"
+          class="tw:w-[auto] tw:flex-shrink-0"
           :loading="isTracesStreamsLoading"
-        >
-          <template #no-option>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                filled
-                debounce="500"
-                autofocus
-                dense
-                size="xs"
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-            <q-item>
-              <q-item-section> {{ t("search.noResult") }}</q-item-section>
-            </q-item>
-          </template>
-          <template #before-options>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                debounce="500"
-                filled
-                dense
-                size="xs"
-                autofocus
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-          </template>
-        </q-select>
+          :disabled="isTracesStreamsLoading"
+          size="sm"
+        />
         <OButton
           data-test="trace-view-logs-btn"
-          v-close-popup="true"
           class="traces-view-logs-btn"
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><q-icon :name="outlinedAccountTree" size="14px" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><OIcon name="account-tree" size="xs" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading" size="lg" color="primary" />
+      <OSpinner size="md" />
       <div v-if="!loading">
         <code-query-editor
           v-model:query="unflattendData"
@@ -140,7 +86,7 @@
               class="q-ml-sm log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
-              <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
             </OButton>
           </template>
           <ODropdownItem
@@ -174,8 +120,8 @@
           <ODropdownItem
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
+            icon-left="visibility"
           >
-            <template #icon-left><q-icon name="visibility" size="16px" /></template>
             {{ addOrRemoveLabel(key) }}
           </ODropdownItem>
           <!-- Cross-link options -->
@@ -186,8 +132,8 @@
               :key="crossLink.name"
               :data-test="`log-details-cross-link-${crossLink.name}`"
               @select.stop="openCrossLink(crossLink.resolvedUrl)"
+              icon-left="open-in-new"
             >
-              <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
@@ -251,7 +197,7 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <OIcon name="content-copy" size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
@@ -264,49 +210,22 @@
         </div>
       </div>
     </div>
-    <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">
-            What is the type of regex pattern you want to create?
-          </div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <q-input
-              type="text"
-              data-test="regex-pattern-type-input"
-              v-model="regexPatternType"
-              color="input-border"
-              label="Type of regex pattern (e.g. email, phone number, etc.)"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton
-            data-test="search-scheduler-max-records-cancel-btn"
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-          >{{ t('confirmDialog.cancel') }}</OButton>
-          <OButton
-            data-test="search-scheduler-max-records-submit-btn"
-            variant="primary"
-            size="sm-action"
-            @click="confirmRegexPatternType"
-            v-close-popup
-          >{{ t('confirmDialog.ok') }}</OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog data-test="json-preview-regex-pattern-dialog"
+      v-if="config.isEnterprise == 'true'"
+      v-model:open="typeOfRegexPattern"
+      size="lg"
+      title="What is the type of regex pattern you want to create?"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="typeOfRegexPattern = false"
+      @click:primary="confirmRegexPatternType"
+    >
+      <OInput
+        data-test="regex-pattern-type-input"
+        v-model="regexPatternType"
+        label="Type of regex pattern (e.g. email, phone number, etc.)"
+      />
+    </ODialog>
   </div>
 </template>
 
@@ -326,7 +245,7 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -340,10 +259,14 @@ import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { AlignLeft, FileJson } from "lucide-vue-next";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default {
   name: "JsonPreview",
@@ -391,12 +314,18 @@ export default {
     LogsHighLighting,
     ChunkedContent,
     OButton,
+    ODialog,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   emits: [
     "copy",
@@ -446,12 +375,12 @@ export default {
       {
         value: "flattened",
         label: t("search.flattened"),
-        icon: AlignLeft,
+        icon: "align-left",
       },
       {
         value: "unflattened",
         label: t("search.original"),
-        icon: FileJson,
+        icon: "description",
       },
     ];
 
@@ -972,7 +901,6 @@ export default {
       getImageURL,
       addSearchTerm,
       addFieldToTable,
-      outlinedAccountTree,
       dropdownOpenMap,
       store,
       searchObj,

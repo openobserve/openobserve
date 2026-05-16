@@ -33,18 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex q-ml-auto tw:ps-2 items-center">
           <!-- Search input -->
-          <q-input
+          <OInput
             data-test="eval-template-list-search-input"
             v-model="filterQuery"
-            borderless
-            dense
             class="no-border o2-search-input"
             :placeholder="t('evalTemplate.search')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
 
           <!-- Refresh button -->
           <OButton
@@ -96,9 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:header="props">
             <q-tr :props="props">
               <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
+                <OCheckbox
                   v-model="props.selected"
-                  size="sm"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-table-checkbox-dark'
@@ -121,9 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Row selection checkbox -->
           <template v-slot:body-selection="scope">
-            <q-checkbox
+            <OCheckbox
               v-model="scope.selected"
-              size="sm"
               class="o2-table-checkbox"
             />
           </template>
@@ -141,22 +137,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:justify-center actions-container">
                 <OButton
                   :data-test="`eval-template-list-${props.row.name}-edit-btn`"
+                  icon-left="edit"
                   variant="ghost"
                   size="icon-sm"
                   :title="t('common.edit')"
                   @click="goToEdit(props.row)"
-                >
-                  <Pencil class="tw:size-4" />
-                </OButton>
+                />
                 <OButton
                   :data-test="`eval-template-list-${props.row.name}-delete-btn`"
+                  icon-left="delete"
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('common.delete')"
                   @click="confirmDelete(props.row)"
-                >
-                  <Trash2 class="tw:size-4" />
-                </OButton>
+                />
               </div>
             </q-td>
           </template>
@@ -164,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading state -->
           <template #loading>
             <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
-              <q-spinner-hourglass color="primary" size="3rem" />
+              <OSpinner size="lg" />
             </div>
           </template>
 
@@ -192,11 +186,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="selectedItems.length > 0"
                   data-test="eval-template-list-bulk-delete-btn"
+                  icon-left="delete"
                   variant="outline"
                   size="sm-action"
                   @click="openBulkDeleteDialog"
                 >
-                  <Trash2 class="tw:size-4 tw:mr-1" />
                   {{ t("common.delete") }}
                 </OButton>
               </div>
@@ -239,13 +233,15 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Template {
   id: string;

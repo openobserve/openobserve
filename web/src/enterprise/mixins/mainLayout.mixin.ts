@@ -1,4 +1,4 @@
-import { ref, markRaw, Ref } from "vue";
+import { ref, markRaw, Ref, h } from "vue";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
@@ -8,7 +8,6 @@ import organizationService from "@/services/organizations";
 import billingService from "@/services/billings";
 import userService from "@/services/users";
 import PipelineIcon from "@/components/icons/PipelineIcon.vue";
-import { Network } from "lucide-vue-next";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -25,7 +24,7 @@ const MainLayoutCloudMixin = {
     const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.pipeline"),
-        iconComponent: markRaw(Network),
+        iconComponent: markRaw(PipelineIcon),
         link: "/pipeline",
         name: "pipeline",
       });

@@ -110,18 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <q-dialog
-      v-model="showAddToDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-to-dashboard
-        @save="addPanelToDashboard"
-        @cancel="showAddToDashboardDialog = false"
-        :dashboardPanelData="dashboardPanelData"
-      />
-    </q-dialog>
+    <add-to-dashboard
+      v-model:open="showAddToDashboardDialog"
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
   </div>
 </template>
 
@@ -163,6 +156,7 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+
 
 export default defineComponent({
   name: "Metrics",
@@ -651,7 +645,7 @@ export default defineComponent({
       background-color: var(--o2-hover-accent);
     }
 
-    .q-icon {
+    .OIcon {
       font-size: 1.125rem; // 18px
     }
   }

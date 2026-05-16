@@ -119,12 +119,7 @@ describe("ApiDashboard", () => {
       },
       global: {
         stubs: {
-          "q-page": {
-            name: "q-page",
-            template: '<div class="q-page"><slot /></div>',
-            props: ["class", "key"],
-          },
-          "q-spinner-hourglass": {
+                    "q-spinner-hourglass": {
             name: "q-spinner-hourglass",
             template: '<div class="q-spinner-hourglass"></div>',
             props: ["color", "size", "style"],

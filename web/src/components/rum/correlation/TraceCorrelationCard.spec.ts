@@ -157,7 +157,7 @@ function findButtonByText(wrapper: VueWrapper, text: string) {
  */
 function findButtonByIcon(wrapper: VueWrapper, icon: string) {
   const buttons = wrapper.findAll("button");
-  // First try to find by icon name in html (legacy q-icon approach)
+  // First try to find by icon name in html (legacy OIcon approach)
   const byName = buttons.find((btn: any) => btn.html().includes(icon));
   if (byName) return byName;
   // Fallback: find the first icon-only button (no visible text) when looking for "content_copy"

@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page
-    class="tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -157,12 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @click="collapseFieldList"
                   ><template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
                         searchObj.meta.showFields
-                          ? 'chevron_left'
-                          : 'chevron_right'
-                      "
+                          ? 'chevron-left'
+                          : 'chevron-right'
+                      " size="sm"
                     /> </template
                 ></OButton>
               </template>
@@ -258,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                     >
-                      <q-icon name="info" color="primary" size="md" />
+                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </div>
                   </div>
@@ -271,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <q-icon name="info" color="primary" size="md" />
+                    <OIcon name="info" size="md" />
                     {{ t("search.applySearch") }}
                   </div>
                   <div
@@ -296,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -362,7 +361,7 @@ import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronLeft, ChevronRight } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
@@ -1740,7 +1739,15 @@ const onMetricsFiltersUpdated = (filters: string[]) => {
     allFilters.push("span_status = 'ERROR'");
   }
   // Apply each filter term independently so replace-or-append works per field
-  searchBarRef.value?.applyFilters(allFilters);
+  // Skip search only when live mode is ON (datetime trigger will handle it)
+  // Don't skip when live mode is OFF (datetime trigger won't fire)
+  const skipSearch = !!(searchObj.meta.liveMode && store.state.zoConfig?.auto_query_enabled);
+
+  if (searchBarRef.value?.applyFilters) {
+    searchBarRef.value.applyFilters(allFilters, skipSearch);
+  } else {
+    console.warn("SearchBar not ready for filter application");
+  }
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,

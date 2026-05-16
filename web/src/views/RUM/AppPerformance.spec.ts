@@ -158,10 +158,7 @@ describe("AppPerformance.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          QPage: {
-            template: '<div class="q-page" v-bind="$attrs"><slot /></div>',
-          },
-          QSeparator: {
+                    QSeparator: {
             template: '<hr class="q-separator" />',
           },
           OButton: {
@@ -232,14 +229,8 @@ describe("AppPerformance.vue", () => {
       const componentInstance = wrapper.vm;
       expect(componentInstance.store.state.selectedOrganization.identifier).toBe("test-org-123");
       
-      // Alternative: check if the QPage component receives the key prop
-      const qPageComponent = wrapper.findComponent({ name: 'q-page' });
-      if (qPageComponent.exists()) {
-        expect(qPageComponent.attributes('key')).toBe("test-org-123");
-      } else {
-        // Fallback: just verify the store state is accessible
-        expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org-123");
-      }
+      // Verify the store state is accessible
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org-123");
     });
   });
 
@@ -278,8 +269,7 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QPage: { template: '<div class="q-page"><slot /></div>' },
-            QSeparator: { template: '<hr />' },
+                        QSeparator: { template: '<hr />' },
             QBtn: { template: '<button></button>' },
             AutoRefreshInterval: { template: '<div></div>' },
             AppTabs: { template: '<div></div>' },
@@ -303,8 +293,7 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QPage: { template: '<div class="q-page"><slot /></div>' },
-            QSeparator: { template: '<hr />' },
+                        QSeparator: { template: '<hr />' },
             QBtn: { template: '<button></button>' },
             AutoRefreshInterval: { template: '<div></div>' },
             AppTabs: { template: '<div></div>' },

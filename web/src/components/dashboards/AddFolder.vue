@@ -15,79 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-sm">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="editMode" class="text-body1 text-bold">
-            {{ t("dashboard.updateFolder") }}
-          </div>
-          <div v-else class="text-body1 text-bold">
-            {{ t("dashboard.newFolder") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-folder-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section>
-      <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
-        <q-input
-          v-model="folderData.name"
+  <div class="q-px-md q-py-sm">
+      <OForm ref="addFolderForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
+        <OFormInput
+          name="name"
           :label="t('dashboard.nameOfVariable') + '*'"
-          class="q-py-none showLabelOnTop"
           data-test="dashboard-folder-add-name"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
         />
         <span>&nbsp;</span>
-        <q-input
-          v-model="folderData.description"
+        <OFormInput
+          name="description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
           data-test="dashboard-folder-add-description"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
         />
-
-        <div class="flex justify-start q-mt-sm tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-folder-add-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            data-test="dashboard-folder-add-save"
-            :disabled="folderData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+      </OForm>
+  </div>
 </template>
 
 <script lang="ts">
@@ -99,7 +42,8 @@ import { getImageURL } from "../../utils/zincutils";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import { useReo } from "@/services/reodotdev_analytics";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 const defaultValue = () => {
   return {
@@ -111,7 +55,7 @@ const defaultValue = () => {
 
 export default defineComponent({
   name: "AddFolder",
-  components: { OButton },
+  components: { OForm, OFormInput },
   props: {
     folderId: {
       type: String,
@@ -122,7 +66,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["update:modelValue"],
+  emits: ["update:modelValue", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const addFolderForm: any = ref(null);
@@ -145,12 +89,14 @@ export default defineComponent({
     const { track } = useReo();
 
     const onSubmit = useLoading(async () => {
-      await addFolderForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
+      const valid = await addFolderForm.value.validate();
+      if (!valid) return;
+      // Sync form values back to local state
+      const vals = addFolderForm.value.form.state.values as { name: string; description: string };
+      folderData.value.name = vals.name ?? folderData.value.name;
+      folderData.value.description = vals.description ?? folderData.value.description;
 
-        try {
+      try {
           //if edit mode
           if (props.editMode) {
             await updateFolder(
@@ -191,7 +137,8 @@ export default defineComponent({
           page: "Dashboards",
         });
       });
-    });
+
+    const submit = () => onSubmit.execute();
 
     return {
       t,
@@ -204,6 +151,7 @@ export default defineComponent({
       isValidIdentifier,
       getImageURL,
       onSubmit,
+      submit,
     };
   },
 });

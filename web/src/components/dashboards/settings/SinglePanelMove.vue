@@ -17,45 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-dialog>
-    <q-card style="width: 300px" data-test="dialog-box">
-      <q-card-section class="confirmBody">
-        <div class="head" data-test="dashboard-tab-move-title">{{ title }}</div>
-        <div class="para" data-test="dashboard-tab-move-message">
-          {{ message }}
-        </div>
-      </q-card-section>
-
-      <div
-        style="
-          display: flex;
-          flex-direction: row;
-          width: 100%;
-          height: 40px;
-          padding-left: 10px;
-          padding-right: 10px;
-          padding-top: 5px;
-        "
-      >
-        <q-select
-          dense
+  <ODialog data-test="single-panel-move-dialog" v-model:open="open" size="sm" :title="title"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    primary-button-label="Move"
+    :primary-button-disabled="selectedMoveTabId === null"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
+    <div>
+      <p class="text-body2">{{ message }}</p>
+      <div class="tw:flex tw:items-center tw:gap-2">
+        <OSelect
           label="Select Tab"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="select-container o2-custom-select-dashboard"
+          class="tw:flex-1"
           data-test="dashboard-tab-move-select"
-          borderless
-          hide-bottom-space
-        >
-          <!-- template when on options -->
-          <template v-slot:no-option>
-            <q-item data-test="dashboard-tab-move-select-no-option">
-              <q-item-section class="text-italic text-grey">
-                No Other Tabs Available
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
 
         <OButton
           variant="outline"
@@ -67,77 +45,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-tab-move-add-tab-btn"
+          icon-left="add"
         >
-          <template #icon-left><q-icon name="add" /></template>
-          <q-tooltip>Add Tab</q-tooltip>
+          <template #icon-left><OIcon name="add" size="sm" /></template>
+          <OTooltip content="Add Tab" />
         </OButton>
-        <q-dialog
-          v-model="showAddTabDialog"
-          position="right"
-          full-height
-          maximized
-        >
-          <AddTab
-            :edit-mode="isTabEditMode"
-            :tabId="selectedTabIdToEdit"
-            :dashboard-id="currentDashboardData.data.dashboardId"
-            @refresh="refreshRequired"
-            data-test="dashboard-tab-move-add-tab-dialog"
-          />
-        </q-dialog>
+        <AddTab
+          v-model:open="showAddTabDialog"
+          :edit-mode="isTabEditMode"
+          :tabId="selectedTabIdToEdit"
+          :dashboard-id="currentDashboardData.data.dashboardId"
+          @refresh="refreshRequired"
+          data-test="dashboard-tab-move-add-tab-dialog"
+        />
       </div>
-      <q-card-actions class="confirmActions">
-        <div class="button-container tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="onConfirm"
-            data-test="confirm-button"
-            :disabled="selectedMoveTabId === null"
-          >
-            Move
-          </OButton>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { getDashboard } from "@/utils/commons";
 import { reactive } from "vue";
 import { onMounted } from "vue";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab, OButton },
+  components: { AddTab, OButton, OSelect, ODialog, OTooltip,
+    OIcon,
+},
   emits: ["update:ok", "update:cancel", "refresh"],
-  props: ["title", "message"],
+  props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");
-    const selectedMoveTabId: any = ref(null);
+    const selectedMoveTabId = ref<string | null>(null);
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit = ref(null);
+
+    const open = computed({
+      get: () => !!props.modelValue,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     const moveTabOptions = ref([]);
 
@@ -177,7 +138,7 @@ export default defineComponent({
       await getTabOptions();
 
       // set selectedMoveTabId to newly created tab
-      selectedMoveTabId.value = { label: tabData.name, value: tabData.tabId };
+      selectedMoveTabId.value = tabData.tabId;
 
       // close add tab dialog
       showAddTabDialog.value = false;
@@ -195,10 +156,11 @@ export default defineComponent({
     };
 
     const onConfirm = () => {
-      emit("update:ok", selectedMoveTabId.value.value);
+      emit("update:ok", selectedMoveTabId.value);
     };
     return {
       t,
+      open,
       onCancel,
       onConfirm,
       action,

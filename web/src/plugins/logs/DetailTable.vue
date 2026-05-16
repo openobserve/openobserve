@@ -15,29 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="column full-height no-wrap searchdetaildialog"
+  <div
+    class="column no-wrap searchdetaildialog"
     data-test="dialog-box"
-    :style="{ borderTop: `4px solid ${statusColor}` }"
   >
-    <q-card-section class="q-px-md q-pb-sm">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold" data-test="log-detail-title-text">
-            {{ t("search.rowDetail") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-sm"
-            data-test="close-dialog"
-          ><q-icon name="cancel" size="16px" /></OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
     <!-- Single Tab Row -->
     <div class="row justify-between q-pt-sm items-center">
       <div class="col tw:flex tw:items-center tw:gap-2">
@@ -78,18 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-show="tab === 'table'"
         class="col-auto flex justify-end align-center q-pr-md"
       >
-        <q-toggle
+        <OSwitch
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
-          class="o2-toggle-button-xs"
-          size="xs"
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
+          size="sm"
           @update:model-value="toggleWrapLogDetails"
         />
       </div>
@@ -97,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <q-separator />
 
-    <div :class="['tab-panels-container tw:flex-1 tw:min-h-0 tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
+    <div :class="['tab-panels-container tw:h-screen tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
@@ -176,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="log-json-field-dropdown-btn"
                         aria-label="Add icon"
                       >
-                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+                        <OIcon :name="tableDropdownOpenMap[props.row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
                       </OButton>
                     </template>
                     <ODropdownItem
@@ -209,16 +183,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!searchObj.data.stream.selectedFields.includes(props.row.field.toString())"
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
+                      icon-left="visibility"
                     >
-                      <template #icon-left><q-icon name="visibility" size="16px" /></template>
                       {{ t("common.addFieldToTable") }}
                     </ODropdownItem>
                     <ODropdownItem
                       v-else
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
+                      icon-left="visibility-off"
                     >
-                      <template #icon-left><q-icon name="visibility_off" size="16px" /></template>
                       {{ t("common.removeFieldFromTable") }}
                     </ODropdownItem>
                     <!-- Cross-link options -->
@@ -229,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="crossLink.name"
                         :data-test="`log-details-cross-link-${crossLink.name}`"
                         @select.stop="openCrossLink(crossLink.resolvedUrl)"
+                        icon-left="open-in-new"
                       >
-                        <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
                         {{ crossLink.name }}
                       </ODropdownItem>
                     </template>
@@ -288,12 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
           <div class="tw:text-center">
-            <q-spinner-hourglass
-              v-if="correlationLoading"
-              color="primary"
-              size="3rem"
-              class="tw:mb-4"
-            />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
             <div
               v-else-if="correlationError"
               class="tw:text-base tw:text-red-500"
@@ -330,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
@@ -360,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <q-spinner-hourglass v-if="correlationLoading" color="primary" size="3rem" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
@@ -371,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <q-separator v-if="tab === 'json' || tab === 'table'" />
-    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:flex-shrink-0">
+    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
           <OButton
@@ -380,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><q-icon name="navigate_before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+          ><OIcon name="navigate-before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -417,11 +386,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<q-icon name="navigate_next" size="14px" class="tw:ml-1" /></OButton>
+          >{{ t('common.next') }}<OIcon name="navigate-next" size="14px" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </q-card-section>
-  </q-card>
+  </div>
 </template>
 
 <script lang="ts">
@@ -448,10 +417,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -461,7 +433,9 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
+    OIcon,
+},
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -473,7 +447,7 @@ export default defineComponent({
     "sendToAiChat",
     "closeTable",
     "show-correlation",
-    "load-correlation" // New event for lazy loading correlation data
+    "load-correlation", // New event for lazy loading correlation data
   ],
   props: {
     modelValue: {

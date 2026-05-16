@@ -411,8 +411,8 @@ limitations under the License.
           variant="outline"
           size="sm"
           @click="$emit('preview')"
+          icon-left="preview"
         >
-          <template #icon-left><q-icon name="preview" /></template>
           Preview
         </OButton>
         <OButton
@@ -421,8 +421,8 @@ limitations under the License.
           variant="outline"
           size="sm"
           @click="$emit('test')"
+          icon-left="send"
         >
-          <template #icon-left><q-icon name="send" /></template>
           Test
         </OButton>
       </div>

@@ -15,28 +15,18 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div
-    class="scroll"
+  <ODialog
+    :open="open"
+    @update:open="(v) => { if (!v) cancelEdit() }"
+    :title="t('dashboard.valueMappingsTitle')"
+    :width="70"
+    :neutral-button-label="t('dashboard.valueMappingAddNew')"
+    neutral-button-variant="outline"
+    :primary-button-label="t('dashboard.valueMappingApply')"
+    @click:neutral="addValueMapping"
+    @click:primary="applyValueMapping"
     data-test="dashboard-value-mapping-popup"
-    style="padding: 0px 10px; min-width: min(1200px, 90vw)"
   >
-    <div
-      class="flex justify-between items-center q-pa-md header"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>{{ t("dashboard.valueMappingsTitle") }}</span>
-      </div>
-      <OButton
-        variant="ghost"
-        size="icon"
-        :title="t('dashboard.cancel')"
-        @click.stop="cancelEdit"
-        data-test="dashboard-tab-settings-tab-name-edit-cancel"
-      >
-        <template #icon-left><q-icon name="close" /></template>
-      </OButton>
-    </div>
     <div class="tw:mb-4">
       <draggable
         v-model="editedValueMapping"
@@ -50,113 +40,74 @@
           class="draggable-row"
         >
           <div class="draggable-handle tw:self-center">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
+            <OIcon
+              name="drag-indicator" size="sm"
               class="q-mr-xs"
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
           <div class="draggable-content tw:flex tw:gap-x-6">
-            <q-select
+            <OSelect
               v-model="mapping.type"
               :label="t('dashboard.valueMappingType')"
               :options="mappingTypes"
               :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
-              emit-value
-              map-options
-              input-debounce="0"
-              behavior="menu"
-              borderless
-              dense
-              class="q-mb-xs tw:flex-1 o2-custom-select-dashboard"
-              hide-bottom-space
-            ></q-select>
+              class="tw:flex-1"
+            />
             <div
               v-if="mapping.type === 'value'"
               class="input-container tw:flex-1"
             >
-              <q-input
+              <OInput
                 v-model="mapping.value"
                 :label="t('dashboard.valueMappingValue')"
-                class="input-spacing"
-                dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
-                borderless
-                hide-bottom-space
               />
             </div>
             <div
               v-if="mapping.type === 'regex'"
               class="input-container tw:flex-1"
             >
-              <q-input
+              <OInput
                 v-model="mapping.pattern"
                 :label="t('dashboard.valueMappingRegex')"
-                class="input-spacing"
-                dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
-                borderless
-                hide-bottom-space
               />
             </div>
             <div
               v-if="mapping.type === 'range'"
               class="input-container tw:flex-1"
             >
-              <q-input
+              <OInput
                 v-model="mapping.from"
                 :label="t('dashboard.valueMappingFrom')"
-                class="input-spacing"
-                dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
-                borderless
-                hide-bottom-space
               />
-              <q-input
+              <OInput
                 v-model="mapping.to"
                 :label="t('dashboard.valueMappingTo')"
-                class="input-spacing tw:flex-1"
-                dense
+                class="tw:flex-1"
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
-                borderless
-                hide-bottom-space
               />
             </div>
-            <q-input
+            <OInput
               v-model="mapping.text"
               :label="t('dashboard.valueMappingDisplayValue')"
-              class="input-spacing tw:flex-1"
-              dense
+              class="tw:flex-1"
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
-              borderless
-              hide-bottom-space
             />
             <div class="color-section tw:flex-1">
               <div
                 v-if="mapping.color !== null"
-                class="tw:items-center tw:flex"
+                class="tw:items-center tw:flex tw:gap-1"
               >
-                <q-input
+                <OColor
                   v-model="mapping.color"
-                  style="width: 90%"
-                  class="input-spacing"
-                  dense
-                  borderless
-                  hide-bottom-space
-                >
-                  <template v-slot:append>
-                    <q-icon name="colorize" class="cursor-pointer">
-                      <q-popup-proxy cover transition-show="scale">
-                        <q-color v-model="mapping.color" />
-                      </q-popup-proxy>
-                    </q-icon>
-                  </template>
-                </q-input>
-                <q-icon
-                  :name="outlinedCancel"
-                  style="width: 10%"
-                  class="cursor-pointer tw:align-middle"
+                  class="tw:flex-1"
+                />
+                <OIcon
+                  name="cancel"
+                  class="cursor-pointer"
                   size="xs"
                   :title="t('dashboard.valueMappingRemoveColor')"
                   @click="removeColorByIndex(index)"
@@ -177,44 +128,38 @@
               size="icon"
               @click="removeValueMappingByIndex(index)"
               :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </div>
         </div>
       </draggable>
-      <div class="flex justify-between">
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="addValueMapping"
-          data-test="dashboard-addpanel-config-value-mapping-add-btn"
-          >{{ t("dashboard.valueMappingAddNew") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm"
-          @click="applyValueMapping"
-          data-test="dashboard-addpanel-config-value-mapping-apply-btn"
-          >{{ t("dashboard.valueMappingApply") }}</OButton
-        >
-      </div>
     </div>
-  </div>
+  </ODialog>
 </template>
 <script lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any, OButton },
+  components: { draggable: VueDraggableNext as any, OButton, OInput, OSelect, OColor, ODialog,
+    OIcon,
+},
   props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
     valueMapping: {
       type: Array,
       default: () => [],
@@ -224,7 +169,21 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const { t } = useI18n();
 
-    const editedValueMapping = ref(props.valueMapping);
+    // editedValueMapping is populated by the watch below (on every open)
+    const editedValueMapping = ref<any[]>([]);
+
+    // Deep-clone prop on every open so edits never leak back to the chart
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          editedValueMapping.value = props.valueMapping?.length
+            ? JSON.parse(JSON.stringify(props.valueMapping))
+            : [{ type: "value", value: "", text: "", color: null }];
+        }
+      },
+      { immediate: true },
+    );
 
     const dragOptions = ref({
       animation: 200,
@@ -277,7 +236,20 @@ export default defineComponent({
       emit("save", editedValueMapping.value);
     };
 
+    const resetValueMapping = () => {
+      if (props.valueMapping && props.valueMapping.length > 0) {
+        editedValueMapping.value = props.valueMapping.map((m: any) => ({ ...m }));
+      } else {
+        editedValueMapping.value = [];
+        addValueMapping();
+      }
+    };
+
     const cancelEdit = () => {
+      // Reset to last saved state so unsaved edits are discarded
+      editedValueMapping.value = props.valueMapping?.length
+        ? JSON.parse(JSON.stringify(props.valueMapping))
+        : [{ type: "value", value: "", text: "", color: null }];
       emit("close");
     };
 
@@ -292,7 +264,7 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
-      outlinedCancel,
+      "cancel": "cancel",
     };
   },
 });
@@ -305,6 +277,10 @@ export default defineComponent({
   justify-content: space-between;
   border-bottom: 1px solid #cccccc70;
   margin-bottom: 8px;
+
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .draggable-handle {

@@ -15,31 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="dialogOpen"
-    position="right"
-    maximized
+  <ODrawer data-test="predefined-themes-drawer"
+    v-model:open="dialogOpen"
+    size="sm"
     seamless
-    transition-show="slide-left"
-    transition-hide="slide-right"
+    title="Predefined Themes"
   >
-    <q-card class="predefined-theme-card" style="width: 400px; max-width: 90vw">
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">Predefined Themes</div>
-        <q-space />
-        <OButton
-          variant="ghost-destructive"
-          size="xs"
-          class="q-mr-sm"
-          @click="resetToDefaultTheme"
-        >
-          <template #icon-left><q-icon name="refresh" size="14px" /></template>
-          Reset
-        </OButton>
-        <OButton variant="ghost" size="icon" v-close-popup data-test="predefined-themes-close-btn">
-          <q-icon name="close" size="14px" />
-        </OButton>
-      </q-card-section>
+    <template #header-right>
+      <OButton
+        variant="ghost-destructive"
+        size="xs"
+        @click="resetToDefaultTheme"
+      >
+        <template #icon-left><OIcon name="refresh" size="xs" /></template>
+        Reset
+      </OButton>
+    </template>
 
       <q-card-section class="q-pt-none">
         <OTabs v-model="activeTab" dense class="text-grey" align="justify">
@@ -91,10 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :style="{ backgroundColor: customLightColor }"
                   @click="openColorPicker('light')"
                 >
-                  <q-icon
+                  <OIcon
                     name="colorize"
-                    size="16px"
-                    color="white"
+                    size="sm"
                     style="
                       position: absolute;
                       top: 50%;
@@ -166,10 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :style="{ backgroundColor: customDarkColor }"
                   @click="openColorPicker('dark')"
                 >
-                  <q-icon
+                  <OIcon
                     name="colorize"
-                    size="16px"
-                    color="white"
+                    size="sm"
                     style="
                       position: absolute;
                       top: 50%;
@@ -208,35 +197,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
         >
-          <q-icon name="info_outline" size="14px" class="q-mt-xs" />
+          <OIcon name="info-outline" size="xs" class="q-mt-xs" />
           <span
             >Theme preferences are stored locally on this device and will not
             sync across different browsers or devices.</span
           >
         </div>
       </q-card-section>
-    </q-card>
 
     <!-- Color Picker Dialog -->
-    <q-dialog v-model="showColorPicker">
-      <q-card style="min-width: 300px">
-        <q-card-section>
-          <div class="text-h6">Pick Custom Color</div>
-        </q-card-section>
-        <q-card-section>
-          <q-color
-            v-model="tempColor"
-            @update:model-value="updateCustomColor"
-          />
-        </q-card-section>
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup data-test="color-picker-close-btn">
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-dialog>
+    <ODialog data-test="predefined-themes-color-picker-dialog"
+      v-model:open="showColorPicker"
+      size="sm"
+      title="Pick Custom Color"
+      primary-button-label="Close"
+      @click:primary="showColorPicker = false"
+    >
+      <q-color
+        v-model="tempColor"
+        @update:model-value="updateCustomColor"
+      />
+    </ODialog>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
@@ -247,6 +229,9 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";

@@ -127,6 +127,12 @@
   --color-dropdown-item-destructive-text: var(--color-error-600);
   --color-dropdown-item-destructive-hover-bg: var(--color-error-50);
 
+  /* Tooltip */
+  --color-tooltip-bg: var(--color-primary-100);
+  --color-tooltip-text: var(--color-text-primary);
+  --color-tooltip-border: var(--color-border-strong);
+  --color-tooltip-arrow: var(--color-primary-100);
+
   /* Icon sizes */
   --text-icon-xs: var(--spacing-3);
   /* 12px */
@@ -157,6 +163,69 @@
   --color-tabs-focus-ring: var(--color-primary-400);
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
+
+  /* Card */
+  --color-card-bg: var(--color-surface-panel);
+  --color-card-text: var(--color-text-primary);
+
+  /* Collapsible */
+  --color-collapsible-label: var(--color-text-primary);
+  --color-collapsible-caption: var(--color-text-secondary);
+  --color-collapsible-icon: var(--color-text-secondary);
+  --color-collapsible-trigger-hover-bg: var(--color-primary-50);
+  --color-collapsible-trigger-active-bg: var(--color-primary-100);
+  --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+
+  /* Stepper */
+  --color-stepper-indicator-default: var(--color-border-strong);
+  --color-stepper-indicator-default-text: var(--color-text-primary);
+  --color-stepper-indicator-active: var(--color-primary-600);
+  --color-stepper-indicator-done: var(--color-primary-600);
+  --color-stepper-indicator-error: var(--color-error-600);
+  --color-stepper-indicator-fg: var(--color-white);
+  --color-stepper-connector: var(--color-border-default);
+  --color-stepper-connector-done: var(--color-primary-300);
+  --color-stepper-title-default: var(--color-text-secondary);
+  --color-stepper-title-active: var(--color-text-primary);
+  --color-stepper-title-done: var(--color-text-primary);
+  --color-stepper-trigger-hover: var(--color-surface-subtle);
+  --color-stepper-trigger-focus-ring: var(--color-primary-400);
+
+  /* ── Dialog ──────────────────────────────────────────────── */
+
+  /* Overlay */
+  --color-dialog-overlay: var(--color-overlay-scrim);
+
+  /* Panel */
+  --color-dialog-bg:            var(--color-surface-overlay);
+  --color-dialog-border:        var(--color-border-default);
+  --shadow-dialog:              var(--shadow-lg);
+
+  /* Header */
+  --color-dialog-header-bg:     var(--color-surface-panel);
+  --color-dialog-header-text:   var(--color-text-primary);
+  --color-dialog-header-border: var(--color-border-default);
+
+  /* Content */
+  --color-dialog-content-text:  var(--color-text-primary);
+
+  /* Footer */
+  --color-dialog-footer-bg:     var(--color-surface-panel);
+  --color-dialog-footer-border: var(--color-border-default);
+
+  /* Close button */
+  --color-dialog-close-text:      var(--color-text-secondary);
+  --color-dialog-close-hover-bg:  var(--color-surface-subtle);
+  --color-dialog-close-active-bg: var(--color-surface-subtle-hover);
+  --color-dialog-focus-ring:      var(--color-primary-400);
+
+  /* Spacing */
+  --spacing-dialog-header-px: var(--spacing-5);
+  --spacing-dialog-header-py: var(--spacing-3);
+  --spacing-dialog-content-px: var(--spacing-5);
+  --spacing-dialog-content-py: var(--spacing-3);
+  --spacing-dialog-footer-px: var(--spacing-5);
+  --spacing-dialog-footer-py: var(--spacing-3);
 
   /* Badge — default (neutral grey) */
   --color-badge-default-solid-bg: var(--color-grey-200);
@@ -200,7 +269,260 @@
 
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-primary-400);
+
+  /* ── Toast ─────────────────────────────────────────────── */
+  /* success */
+  --color-toast-success-bg:     var(--color-success-50);
+  --color-toast-success-border: var(--color-success-500);
+  --color-toast-success-icon:   var(--color-success-700);
+
+  /* error */
+  --color-toast-error-bg:       var(--color-error-50);
+  --color-toast-error-border:   var(--color-error-400);
+  --color-toast-error-icon:     var(--color-error-600);
+
+  /* warning */
+  --color-toast-warning-bg:     var(--color-warning-50);
+  --color-toast-warning-border: var(--color-warning-400);
+  --color-toast-warning-icon:   var(--color-warning-600);
+
+  /* info */
+  --color-toast-info-bg:        var(--color-primary-50);
+  --color-toast-info-border:    var(--color-primary-300);
+  --color-toast-info-icon:      var(--color-primary-600);
+
+  /* loading / default */
+  --color-toast-loading-bg:     var(--color-surface-overlay);
+  --color-toast-loading-border: var(--color-border-default);
+  --color-toast-loading-icon:   var(--color-primary-600);
+  --color-toast-default-bg:     var(--color-surface-overlay);
+  --color-toast-default-border: var(--color-border-default);
+
+  /* shared foreground */
+  --color-toast-fg:             var(--color-text-primary);
+  --color-toast-fg-secondary:   var(--color-text-secondary);
+  --color-toast-action-text:    var(--color-primary-600);
+  --color-toast-action-hover:   var(--color-primary-700);
+  --shadow-toast:               var(--shadow-lg);
+
+  /* Spinner */
+  --color-spinner: var(--color-primary-600);
+  --color-spinner-track: var(--color-primary-200);
+
+  /* InnerLoading */
+  --color-inner-loading-overlay: color-mix(in srgb, var(--color-surface-base) 70%, transparent);
+  --color-inner-loading-label: var(--color-text-secondary);
+
+  /* Skeleton */
+  --color-skeleton-base: var(--color-grey-200);
+  --color-skeleton-highlight: var(--color-grey-100);
+
+  /* ProgressBar */
+  --color-progress-bar-default: var(--color-primary-600);
+  --color-progress-bar-warning: var(--color-warning-500);
+  --color-progress-bar-danger: var(--color-error-600);
+  --color-progress-bar-track: var(--color-grey-200);
+  --color-progress-bar-label: var(--color-white);
+
+  /* Field semantic widths (OInput, OTextarea, OSelect) */
+  /* xs  ~120px — zip codes, CVV, short numbers          */
+  /* sm  ~200px — dates, narrow labels                   */
+  /* md  ~280px — names, phone numbers (default narrow)  */
+  /* lg  ~400px — emails, full addresses                 */
+  /* full is 100% — no token needed, handled in CSS var  */
+  --spacing-field-width-xs: 7.5rem;
+  --spacing-field-width-sm: 12.5rem;
+  --spacing-field-width-md: 17.5rem;
+  --spacing-field-width-lg: 25rem;
+
+  /* Input (OInput, OTextarea) */
+  --color-input-bg: var(--color-surface-base);
+  --color-input-border: var(--color-border-strong);
+  --color-input-border-hover: var(--color-primary-400);
+  --color-input-border-error: var(--color-error-500);
+  --color-input-disabled-bg: var(--color-surface-subtle);
+  --color-input-disabled-border: var(--color-border-default);
+  --color-input-disabled-text: var(--color-text-secondary);
+  --color-input-focus-ring: var(--color-primary-400);
+  --color-input-text: var(--color-text-primary);
+  --color-input-placeholder: var(--color-text-disabled);
+  --color-input-label: var(--color-text-secondary);
+  --color-input-hint: var(--color-text-secondary);
+  --color-input-help-text: var(--color-text-secondary);
+  --color-input-error-text: var(--color-error-600);
+  --color-input-addon-text: var(--color-text-secondary);
+  --color-input-clear-btn: var(--color-text-secondary);
+  --color-input-clear-btn-hover: var(--color-text-primary);
+
+  /* Select (OSelect) */
+  --color-select-bg: var(--color-surface-base);
+  --color-select-border: var(--color-border-strong);
+  --color-select-border-hover: var(--color-primary-400);
+  --color-select-border-focus: var(--color-primary-500);
+  --color-select-border-error: var(--color-error-500);
+  --color-select-disabled-bg: var(--color-surface-subtle);
+  --color-select-disabled-text: var(--color-text-secondary);
+  --color-select-focus-ring: var(--color-primary-400);
+  --color-select-text: var(--color-text-primary);
+  --color-select-placeholder: var(--color-text-disabled);
+  --color-select-label: var(--color-text-secondary);
+  --color-select-icon: var(--color-text-secondary);
+  --color-select-error-text: var(--color-error-600);
+  --color-select-content-bg: var(--color-surface-overlay);
+  --color-select-content-border: var(--color-border-default);
+  --color-select-item-text: var(--color-text-primary);
+  --color-select-item-hover-bg: var(--color-primary-50);
+  --color-select-item-selected-bg: var(--color-primary-100);
+  --color-select-item-selected-text: var(--color-primary-700);
+  --color-select-item-disabled: var(--color-text-disabled);
+
+  /* Switch (OSwitch) */
+  --color-switch-focus-ring: var(--color-primary-400);
+  --color-switch-label: var(--color-text-primary);
+  --color-switch-label-disabled: var(--color-text-secondary);
+  --color-switch-border: var(--color-primary-600);
+  --color-switch-border-off: var(--color-grey-400);
+  --color-switch-thumb-off: var(--color-grey-400);
+  --color-switch-thumb-on: var(--color-primary-600);
+  --color-switch-disabled-border: var(--color-grey-400);
+  --color-switch-disabled-thumb: var(--color-grey-400);
+
+  /* Checkbox (OCheckbox) */
+  --color-checkbox-bg: var(--color-surface-base);
+  --color-checkbox-border: var(--color-border-strong);
+  --color-checkbox-hover-border: var(--color-primary-400);
+  --color-checkbox-checked-bg: var(--color-primary-600);
+  --color-checkbox-checked-border: var(--color-primary-600);
+  --color-checkbox-checked-fg: var(--color-white);
+  --color-checkbox-disabled-bg: var(--color-surface-subtle);
+  --color-checkbox-disabled-border: var(--color-border-default);
+  --color-checkbox-focus-ring: var(--color-primary-400);
+  --color-checkbox-label: var(--color-text-primary);
+  --color-checkbox-label-disabled: var(--color-text-disabled);
+
+  /* Radio (ORadio) */
+  --color-radio-bg: var(--color-surface-base);
+  --color-radio-border: var(--color-border-strong);
+  --color-radio-hover-border: var(--color-primary-400);
+  --color-radio-checked-border: var(--color-primary-600);
+  --color-radio-checked-dot: var(--color-primary-600);
+  --color-radio-disabled-bg: var(--color-surface-subtle);
+  --color-radio-disabled-border: var(--color-border-default);
+  --color-radio-focus-ring: var(--color-primary-400);
+  --color-radio-label: var(--color-text-primary);
+  --color-radio-label-disabled: var(--color-text-disabled);
+
+  /* Slider (OSlider) */
+  --color-slider-track: var(--color-grey-200);
+  --color-slider-track-fill: var(--color-primary-600);
+  --color-slider-thumb: var(--color-primary-600);
+  --color-slider-thumb-border: var(--color-white);
+  --color-slider-disabled-track: var(--color-grey-100);
+  --color-slider-disabled-track-fill: var(--color-grey-300);
+  --color-slider-disabled-thumb: var(--color-grey-400);
+  --color-slider-focus-ring: var(--color-primary-400);
+  --color-slider-label: var(--color-text-primary);
+  --color-slider-value: var(--color-text-secondary);
+  --color-slider-error-text: var(--color-error-600);
+
+  /* File (OFile) */
+  --color-file-bg: var(--color-surface-base);
+  --color-file-border: var(--color-border-strong);
+  --color-file-hover-border: var(--color-primary-400);
+  --color-file-focus-border: var(--color-primary-500);
+  --color-file-focus-ring: var(--color-primary-400);
+  --color-file-disabled-bg: var(--color-surface-subtle);
+  --color-file-disabled-border: var(--color-border-default);
+  --color-file-text: var(--color-text-primary);
+  --color-file-placeholder: var(--color-text-disabled);
+  --color-file-label: var(--color-text-secondary);
+  --color-file-icon: var(--color-text-secondary);
+  --color-file-error-text: var(--color-error-600);
+  --color-file-error-border: var(--color-error-500);
+  --color-file-chip-bg: var(--color-primary-100);
+  --color-file-chip-text: var(--color-primary-700);
+  --color-file-chip-remove: var(--color-primary-700);
+  --color-file-drag-bg: var(--color-primary-50);
+  --color-file-drag-border: var(--color-primary-500);
+
+  /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
+  --color-datepicker-bg: var(--color-surface-base);
+  --color-datepicker-border: var(--color-border-strong);
+  --color-datepicker-hover-border: var(--color-primary-400);
+  --color-datepicker-focus-border: var(--color-primary-500);
+  --color-datepicker-focus-ring: var(--color-primary-400);
+  --color-datepicker-disabled-bg: var(--color-surface-subtle);
+  --color-datepicker-disabled-border: var(--color-border-default);
+  --color-datepicker-text: var(--color-text-primary);
+  --color-datepicker-placeholder: var(--color-text-disabled);
+  --color-datepicker-label: var(--color-text-secondary);
+  --color-datepicker-icon: var(--color-text-secondary);
+  --color-datepicker-error-text: var(--color-error-600);
+  --color-datepicker-error-border: var(--color-error-500);
+  --color-datepicker-segment-focus-bg: var(--color-primary-600);
+  --color-datepicker-segment-focus-text: var(--color-white);
+  /* DatePicker calendar popup */
+  --color-datepicker-popup-bg: var(--color-surface-overlay);
+  --color-datepicker-popup-border: var(--color-border-default);
+  --color-datepicker-day-text: var(--color-text-primary);
+  --color-datepicker-day-hover-bg: var(--color-primary-50);
+  --color-datepicker-day-selected-bg: var(--color-primary-600);
+  --color-datepicker-day-selected-text: var(--color-white);
+  --color-datepicker-day-today-border: var(--color-primary-400);
+  --color-datepicker-day-outside-text: var(--color-text-disabled);
+  --color-datepicker-day-disabled-text: var(--color-text-disabled);
+  --color-datepicker-nav-hover-bg: var(--color-primary-50);
+  --color-datepicker-heading-text: var(--color-text-primary);
+  --color-datepicker-weekday-text: var(--color-text-secondary);
+  --color-datepicker-day-range-bg: var(--color-primary-100);
+  --color-datepicker-day-range-text: var(--color-primary-700);
+  /* Analog clock face (OTime popup) */
+  --color-datepicker-clock-face-bg: var(--color-surface-subtle);
+  --color-datepicker-clock-header-bg: var(--color-primary-700);
+  --color-datepicker-clock-header-text: var(--color-white);
+  --color-datepicker-clock-hand: var(--color-primary-600);
+  --color-datepicker-clock-selected-bg: var(--color-primary-600);
+  --color-datepicker-clock-selected-text: var(--color-white);
+  --color-datepicker-clock-hover-bg: var(--color-primary-50);
+  /* DateTimeRange relative quick-select buttons */
+  --color-datepicker-relative-btn-bg: var(--color-surface-subtle);
+  --color-datepicker-relative-btn-text: var(--color-text-primary);
+  --color-datepicker-relative-btn-selected-bg: var(--color-primary-600);
+  --color-datepicker-relative-btn-selected-text: var(--color-white);
+  --color-datepicker-relative-btn-hover-bg: var(--color-primary-50);
+  --color-datepicker-relative-label: var(--color-text-secondary);
+
+  /* Color picker (OColor) */
+  --color-colorpicker-popup-bg: var(--color-surface-overlay);
+  --color-colorpicker-popup-border: var(--color-border-default);
+  --color-colorpicker-thumb: var(--color-white);
+
+  /* Option Group (OOptionGroup) */
+  --color-option-group-label: var(--color-text-primary);
+  --color-option-group-label-disabled: var(--color-text-disabled);
+  --color-option-group-error-text: var(--color-error-600);
+
+  /* OTable */
+  --color-table-header-bg: var(--color-surface-subtle);
+  --color-table-header-text: var(--color-text-secondary);
+  --color-table-header-border: var(--color-border-default);
+  --color-table-row-hover-bg: var(--color-primary-50);
+  --color-table-row-selected-bg: var(--color-primary-100);
+  --color-table-row-striped-bg: var(--color-surface-subtle);
+  --color-table-row-divider: var(--color-border-default);
+  --color-table-border: var(--color-border-default);
+  --color-table-cell-bg: var(--color-surface-base);
+  --color-table-cell-text: var(--color-text-primary);
+  --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-400) 35%, transparent);
+  --color-table-highlight-text: var(--color-text-primary);
+  --color-table-pagination-text: var(--color-text-secondary);
+  --color-table-resize-handle: var(--color-primary-400);
+  --color-table-sort-icon-active: var(--color-primary-600);
+  --color-table-sort-icon-inactive: var(--color-text-disabled);
+  --color-table-streaming-bar: var(--color-primary-500);
+  --color-table-row-expanded-bg: var(--color-surface-subtle);
 }
+
 
 /* ToggleGroup — primary variant (colored tray) */
 [data-variant="primary"] {
@@ -328,6 +650,12 @@
   --color-dropdown-item-destructive-text: var(--color-dropdown-item-destructive-text);
   --color-dropdown-item-destructive-hover-bg: var(--color-dropdown-item-destructive-hover-bg);
 
+  /* Tooltip */
+  --color-tooltip-bg: var(--color-tooltip-bg);
+  --color-tooltip-text: var(--color-tooltip-text);
+  --color-tooltip-border: var(--color-tooltip-border);
+  --color-tooltip-arrow: var(--color-tooltip-arrow);
+
   /* Icon sizes */
   --text-icon-xs: var(--text-icon-xs);
   --text-icon-sm: var(--text-icon-sm);
@@ -353,6 +681,211 @@
   --color-tabs-focus-ring: var(--color-tabs-focus-ring);
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
+
+  /* Field semantic widths (used by OInput, OTextarea, OSelect) */
+  --spacing-field-width-xs: var(--spacing-field-width-xs);
+  --spacing-field-width-sm: var(--spacing-field-width-sm);
+  --spacing-field-width-md: var(--spacing-field-width-md);
+  --spacing-field-width-lg: var(--spacing-field-width-lg);
+
+  /* Input (OInput, OTextarea) */
+  --color-input-bg: var(--color-input-bg);
+  --color-input-border: var(--color-input-border);
+  --color-input-border-hover: var(--color-input-border-hover);
+  --color-input-border-error: var(--color-input-border-error);
+  --color-input-disabled-bg: var(--color-input-disabled-bg);
+  --color-input-disabled-border: var(--color-input-disabled-border);
+  --color-input-disabled-text: var(--color-input-disabled-text);
+  --color-input-focus-ring: var(--color-input-focus-ring);
+  --color-input-text: var(--color-input-text);
+  --color-input-placeholder: var(--color-input-placeholder);
+  --color-input-label: var(--color-input-label);
+  --color-input-hint: var(--color-input-hint);
+  --color-input-help-text: var(--color-input-help-text);
+  --color-input-error-text: var(--color-input-error-text);
+  --color-input-addon-text: var(--color-input-addon-text);
+  --color-input-clear-btn: var(--color-input-clear-btn);
+  --color-input-clear-btn-hover: var(--color-input-clear-btn-hover);
+
+  /* Select (OSelect) */
+  --color-select-bg: var(--color-select-bg);
+  --color-select-border: var(--color-select-border);
+  --color-select-border-hover: var(--color-select-border-hover);
+  --color-select-border-focus: var(--color-select-border-focus);
+  --color-select-border-error: var(--color-select-border-error);
+  --color-select-disabled-bg: var(--color-select-disabled-bg);
+  --color-select-disabled-text: var(--color-select-disabled-text);
+  --color-select-focus-ring: var(--color-select-focus-ring);
+  --color-select-text: var(--color-select-text);
+  --color-select-placeholder: var(--color-select-placeholder);
+  --color-select-label: var(--color-select-label);
+  --color-select-icon: var(--color-select-icon);
+  --color-select-error-text: var(--color-select-error-text);
+  --color-select-content-bg: var(--color-select-content-bg);
+  --color-select-content-border: var(--color-select-content-border);
+  --color-select-item-text: var(--color-select-item-text);
+  --color-select-item-hover-bg: var(--color-select-item-hover-bg);
+  --color-select-item-selected-bg: var(--color-select-item-selected-bg);
+  --color-select-item-selected-text: var(--color-select-item-selected-text);
+  --color-select-item-disabled: var(--color-select-item-disabled);
+
+  /* Switch (OSwitch) */
+  --color-switch-focus-ring: var(--color-switch-focus-ring);
+  --color-switch-label: var(--color-switch-label);
+  --color-switch-label-disabled: var(--color-switch-label-disabled);
+  --color-switch-border: var(--color-switch-border);
+  --color-switch-border-off: var(--color-switch-border-off);
+  --color-switch-thumb-off: var(--color-switch-thumb-off);
+  --color-switch-thumb-on: var(--color-switch-thumb-on);
+  --color-switch-disabled-border: var(--color-switch-disabled-border);
+  --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
+
+  /* Checkbox (OCheckbox) */
+  --color-checkbox-bg: var(--color-checkbox-bg);
+  --color-checkbox-border: var(--color-checkbox-border);
+  --color-checkbox-hover-border: var(--color-checkbox-hover-border);
+  --color-checkbox-checked-bg: var(--color-checkbox-checked-bg);
+  --color-checkbox-checked-border: var(--color-checkbox-checked-border);
+  --color-checkbox-checked-fg: var(--color-checkbox-checked-fg);
+  --color-checkbox-disabled-bg: var(--color-checkbox-disabled-bg);
+  --color-checkbox-disabled-border: var(--color-checkbox-disabled-border);
+  --color-checkbox-focus-ring: var(--color-checkbox-focus-ring);
+  --color-checkbox-label: var(--color-checkbox-label);
+  --color-checkbox-label-disabled: var(--color-checkbox-label-disabled);
+
+  /* Radio (ORadio) */
+  --color-radio-bg: var(--color-radio-bg);
+  --color-radio-border: var(--color-radio-border);
+  --color-radio-hover-border: var(--color-radio-hover-border);
+  --color-radio-checked-border: var(--color-radio-checked-border);
+  --color-radio-checked-dot: var(--color-radio-checked-dot);
+  --color-radio-disabled-bg: var(--color-radio-disabled-bg);
+  --color-radio-disabled-border: var(--color-radio-disabled-border);
+  --color-radio-focus-ring: var(--color-radio-focus-ring);
+  --color-radio-label: var(--color-radio-label);
+  --color-radio-label-disabled: var(--color-radio-label-disabled);
+
+  /* Slider (OSlider) */
+  --color-slider-track: var(--color-slider-track);
+  --color-slider-track-fill: var(--color-slider-track-fill);
+  --color-slider-thumb: var(--color-slider-thumb);
+  --color-slider-thumb-border: var(--color-slider-thumb-border);
+  --color-slider-disabled-track: var(--color-slider-disabled-track);
+  --color-slider-disabled-track-fill: var(--color-slider-disabled-track-fill);
+  --color-slider-disabled-thumb: var(--color-slider-disabled-thumb);
+  --color-slider-focus-ring: var(--color-slider-focus-ring);
+  --color-slider-label: var(--color-slider-label);
+  --color-slider-value: var(--color-slider-value);
+  --color-slider-error-text: var(--color-slider-error-text);
+
+  /* File (OFile) */
+  --color-file-bg: var(--color-file-bg);
+  --color-file-border: var(--color-file-border);
+  --color-file-hover-border: var(--color-file-hover-border);
+  --color-file-focus-border: var(--color-file-focus-border);
+  --color-file-focus-ring: var(--color-file-focus-ring);
+  --color-file-disabled-bg: var(--color-file-disabled-bg);
+  --color-file-disabled-border: var(--color-file-disabled-border);
+  --color-file-text: var(--color-file-text);
+  --color-file-placeholder: var(--color-file-placeholder);
+  --color-file-label: var(--color-file-label);
+  --color-file-icon: var(--color-file-icon);
+  --color-file-error-text: var(--color-file-error-text);
+  --color-file-error-border: var(--color-file-error-border);
+  --color-file-chip-bg: var(--color-file-chip-bg);
+  --color-file-chip-text: var(--color-file-chip-text);
+  --color-file-chip-remove: var(--color-file-chip-remove);
+  --color-file-drag-bg: var(--color-file-drag-bg);
+  --color-file-drag-border: var(--color-file-drag-border);
+
+  /* Date / Time / Color (ODate, OTime, OColor) */
+  --color-datepicker-bg: var(--color-datepicker-bg);
+  --color-datepicker-border: var(--color-datepicker-border);
+  --color-datepicker-hover-border: var(--color-datepicker-hover-border);
+  --color-datepicker-focus-border: var(--color-datepicker-focus-border);
+  --color-datepicker-focus-ring: var(--color-datepicker-focus-ring);
+  --color-datepicker-disabled-bg: var(--color-datepicker-disabled-bg);
+  --color-datepicker-disabled-border: var(--color-datepicker-disabled-border);
+  --color-datepicker-text: var(--color-datepicker-text);
+  --color-datepicker-placeholder: var(--color-datepicker-placeholder);
+  --color-datepicker-label: var(--color-datepicker-label);
+  --color-datepicker-icon: var(--color-datepicker-icon);
+  --color-datepicker-error-text: var(--color-datepicker-error-text);
+  --color-datepicker-error-border: var(--color-datepicker-error-border);
+  --color-datepicker-segment-focus-bg: var(--color-datepicker-segment-focus-bg);
+  --color-datepicker-segment-focus-text: var(--color-datepicker-segment-focus-text);
+  /* DatePicker calendar popup */
+  --color-datepicker-popup-bg: var(--color-datepicker-popup-bg);
+  --color-datepicker-popup-border: var(--color-datepicker-popup-border);
+  --color-datepicker-day-text: var(--color-datepicker-day-text);
+  --color-datepicker-day-hover-bg: var(--color-datepicker-day-hover-bg);
+  --color-datepicker-day-selected-bg: var(--color-datepicker-day-selected-bg);
+  --color-datepicker-day-selected-text: var(--color-datepicker-day-selected-text);
+  --color-datepicker-day-today-border: var(--color-datepicker-day-today-border);
+  --color-datepicker-day-outside-text: var(--color-datepicker-day-outside-text);
+  --color-datepicker-day-disabled-text: var(--color-datepicker-day-disabled-text);
+  --color-datepicker-nav-hover-bg: var(--color-datepicker-nav-hover-bg);
+  --color-datepicker-heading-text: var(--color-datepicker-heading-text);
+  --color-datepicker-weekday-text: var(--color-datepicker-weekday-text);
+  --color-datepicker-day-range-bg: var(--color-datepicker-day-range-bg);
+  --color-datepicker-day-range-text: var(--color-datepicker-day-range-text);
+  --color-datepicker-clock-face-bg: var(--color-datepicker-clock-face-bg);
+  --color-datepicker-clock-header-bg: var(--color-datepicker-clock-header-bg);
+  --color-datepicker-clock-header-text: var(--color-datepicker-clock-header-text);
+  --color-datepicker-clock-hand: var(--color-datepicker-clock-hand);
+  --color-datepicker-clock-selected-bg: var(--color-datepicker-clock-selected-bg);
+  --color-datepicker-clock-selected-text: var(--color-datepicker-clock-selected-text);
+  --color-datepicker-clock-hover-bg: var(--color-datepicker-clock-hover-bg);
+  --color-datepicker-relative-btn-bg: var(--color-datepicker-relative-btn-bg);
+  --color-datepicker-relative-btn-text: var(--color-datepicker-relative-btn-text);
+  --color-datepicker-relative-btn-selected-bg: var(--color-datepicker-relative-btn-selected-bg);
+  --color-datepicker-relative-btn-selected-text: var(--color-datepicker-relative-btn-selected-text);
+  --color-datepicker-relative-btn-hover-bg: var(--color-datepicker-relative-btn-hover-bg);
+  --color-datepicker-relative-label: var(--color-datepicker-relative-label);
+
+  /* Color picker (OColor) */
+  --color-colorpicker-popup-bg: var(--color-colorpicker-popup-bg);
+  --color-colorpicker-popup-border: var(--color-colorpicker-popup-border);
+  --color-colorpicker-thumb: var(--color-colorpicker-thumb);
+
+  /* Option Group (OOptionGroup) */
+  --color-option-group-label: var(--color-option-group-label);
+  --color-option-group-label-disabled: var(--color-option-group-label-disabled);
+  --color-option-group-error-text: var(--color-option-group-error-text);
+
+  /* Card */
+  --color-card-bg: var(--color-card-bg);
+  --color-card-text: var(--color-card-text);
+
+  /* Collapsible */
+  --color-collapsible-label: var(--color-collapsible-label);
+  --color-collapsible-caption: var(--color-collapsible-caption);
+  --color-collapsible-icon: var(--color-collapsible-icon);
+  --color-collapsible-trigger-hover-bg: var(--color-collapsible-trigger-hover-bg);
+  --color-collapsible-trigger-active-bg: var(--color-collapsible-trigger-active-bg);
+  --color-collapsible-trigger-focus-ring: var(--color-collapsible-trigger-focus-ring);
+
+  /* Dialog */
+  --color-dialog-overlay: var(--color-dialog-overlay);
+  --color-dialog-bg: var(--color-dialog-bg);
+  --color-dialog-border: var(--color-dialog-border);
+  --shadow-dialog: var(--shadow-dialog);
+  --color-dialog-header-bg: var(--color-dialog-header-bg);
+  --color-dialog-header-text: var(--color-dialog-header-text);
+  --color-dialog-header-border: var(--color-dialog-header-border);
+  --color-dialog-content-text: var(--color-dialog-content-text);
+  --color-dialog-footer-bg: var(--color-dialog-footer-bg);
+  --color-dialog-footer-border: var(--color-dialog-footer-border);
+  --color-dialog-close-text: var(--color-dialog-close-text);
+  --color-dialog-close-hover-bg: var(--color-dialog-close-hover-bg);
+  --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
+  --color-dialog-focus-ring: var(--color-dialog-focus-ring);
+  --spacing-dialog-header-px: var(--spacing-dialog-header-px);
+  --spacing-dialog-header-py: var(--spacing-dialog-header-py);
+  --spacing-dialog-content-px: var(--spacing-dialog-content-px);
+  --spacing-dialog-content-py: var(--spacing-dialog-content-py);
+  --spacing-dialog-footer-px: var(--spacing-dialog-footer-px);
+  --spacing-dialog-footer-py: var(--spacing-dialog-footer-py);
 
   /* Badge — default */
   --color-badge-default-solid-bg: var(--color-badge-default-solid-bg);
@@ -396,4 +929,82 @@
 
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-badge-focus-ring);
+
+  /* Toast */
+  --color-toast-success-bg: var(--color-toast-success-bg);
+  --color-toast-success-border: var(--color-toast-success-border);
+  --color-toast-success-icon: var(--color-toast-success-icon);
+  --color-toast-error-bg: var(--color-toast-error-bg);
+  --color-toast-error-border: var(--color-toast-error-border);
+  --color-toast-error-icon: var(--color-toast-error-icon);
+  --color-toast-warning-bg: var(--color-toast-warning-bg);
+  --color-toast-warning-border: var(--color-toast-warning-border);
+  --color-toast-warning-icon: var(--color-toast-warning-icon);
+  --color-toast-info-bg: var(--color-toast-info-bg);
+  --color-toast-info-border: var(--color-toast-info-border);
+  --color-toast-info-icon: var(--color-toast-info-icon);
+  --color-toast-loading-bg: var(--color-toast-loading-bg);
+  --color-toast-loading-border: var(--color-toast-loading-border);
+  --color-toast-loading-icon: var(--color-toast-loading-icon);
+  --color-toast-default-bg: var(--color-toast-default-bg);
+  --color-toast-default-border: var(--color-toast-default-border);
+  --color-toast-fg: var(--color-toast-fg);
+  --color-toast-fg-secondary: var(--color-toast-fg-secondary);
+  --color-toast-action-text: var(--color-toast-action-text);
+  --color-toast-action-hover: var(--color-toast-action-hover);
+  --shadow-toast: var(--shadow-toast);
+
+  /* Stepper */
+  --color-stepper-indicator-default: var(--color-stepper-indicator-default);
+  --color-stepper-indicator-default-text: var(--color-stepper-indicator-default-text);
+  --color-stepper-indicator-active: var(--color-stepper-indicator-active);
+  --color-stepper-indicator-done: var(--color-stepper-indicator-done);
+  --color-stepper-indicator-error: var(--color-stepper-indicator-error);
+  --color-stepper-indicator-fg: var(--color-stepper-indicator-fg);
+  --color-stepper-connector: var(--color-stepper-connector);
+  --color-stepper-connector-done: var(--color-stepper-connector-done);
+  --color-stepper-title-default: var(--color-stepper-title-default);
+  --color-stepper-title-active: var(--color-stepper-title-active);
+  --color-stepper-title-done: var(--color-stepper-title-done);
+  --color-stepper-trigger-hover: var(--color-stepper-trigger-hover);
+  --color-stepper-trigger-focus-ring: var(--color-stepper-trigger-focus-ring);
+
+  /* Spinner */
+  --color-spinner: var(--color-spinner);
+  --color-spinner-track: var(--color-spinner-track);
+
+  /* InnerLoading */
+  --color-inner-loading-overlay: var(--color-inner-loading-overlay);
+  --color-inner-loading-label: var(--color-inner-loading-label);
+
+  /* Skeleton */
+  --color-skeleton-base: var(--color-skeleton-base);
+  --color-skeleton-highlight: var(--color-skeleton-highlight);
+
+  /* ProgressBar */
+  --color-progress-bar-default: var(--color-progress-bar-default);
+  --color-progress-bar-warning: var(--color-progress-bar-warning);
+  --color-progress-bar-danger: var(--color-progress-bar-danger);
+  --color-progress-bar-track: var(--color-progress-bar-track);
+  --color-progress-bar-label: var(--color-progress-bar-label);
+
+  /* OTable */
+  --color-table-header-bg: var(--color-table-header-bg);
+  --color-table-header-text: var(--color-table-header-text);
+  --color-table-header-border: var(--color-table-header-border);
+  --color-table-row-hover-bg: var(--color-table-row-hover-bg);
+  --color-table-row-selected-bg: var(--color-table-row-selected-bg);
+  --color-table-row-striped-bg: var(--color-table-row-striped-bg);
+  --color-table-row-divider: var(--color-table-row-divider);
+  --color-table-border: var(--color-table-border);
+  --color-table-cell-bg: var(--color-table-cell-bg);
+  --color-table-cell-text: var(--color-table-cell-text);
+  --color-table-highlight-bg: var(--color-table-highlight-bg);
+  --color-table-highlight-text: var(--color-table-highlight-text);
+  --color-table-pagination-text: var(--color-table-pagination-text);
+  --color-table-resize-handle: var(--color-table-resize-handle);
+  --color-table-sort-icon-active: var(--color-table-sort-icon-active);
+  --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
+  --color-table-streaming-bar: var(--color-table-streaming-bar);
+  --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
 }

@@ -1,10 +1,11 @@
 <template>
-  <q-page data-test="iam-page" class="q-pa-none tw:overflow-hidden">
+  <div class="tw:rounded-md q-pa-none tw:overflow-hidden" data-test="iam-page">
     <q-splitter
       v-model="splitterModel"
       unit="px"
       :limits="[0, 300]"
       class="tw:overflow-hidden logs-splitter-smooth"
+      style="height: 100%;"
     >
       <template v-slot:before>
         <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
@@ -28,18 +29,18 @@
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
             @click="collapseSidebar"
           >
-            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="12px" />
           </OButton>
       </template>
       <template v-slot:after>
         <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-          <div class="tw:overflow-hidden">
+          <div class="tw:overflow-hidden tw:h-full">
             <RouterView />
           </div>
         </div>
       </template>
     </q-splitter>
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -54,6 +55,7 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { resolveTab } from "@/utils/routeTabMaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
 

@@ -31,9 +31,10 @@ const baseClasses = computed<string>(() => [
     : 'tw:inline-flex tw:justify-center',
   'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap',
   isVertical.value ? 'tw:rounded-md' : 'tw:rounded-t-md',
-  'tw:outline-none tw:transition-colors tw:duration-150',
+  'tw:outline-none tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150',
   'tw:select-none',
-  'tw:focus-visible:outline-none',
+  'tw:ring-offset-1 tw:ring-offset-surface-base',
+  'tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-tabs-indicator',
 ].join(' '))
 
 const stateClasses = computed<string>(() => {
@@ -95,10 +96,10 @@ const heightClasses = computed<string>(() => {
           aria-hidden="true"
           alt=""
         />
-        <!-- Regular Material icon name → render as icon font glyph -->
+        <!-- Regular Material icon name → render as outlined icon font glyph -->
         <span
           v-else-if="icon"
-          class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons"
+          class="o-tab__icon tw:text-base tw:leading-none tw:shrink-0 material-icons-outlined"
         >{{ icon }}</span>
       </slot>
       <span v-if="label" class="o-tab__label tw:truncate">{{ label }}</span>

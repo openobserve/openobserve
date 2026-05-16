@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toolbar>
+  <q-toolbar class="tw:min-h-10">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
@@ -91,10 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container"
+        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
       >
         <img
-          class="openobserve-logo cursor-pointer"
+          class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
           :src="
             getImageURL(
               store.state.theme === 'dark'
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Default OpenObserve logo (when no custom logo) -->
     <div v-else class="flex relative-position q-mr-sm logo-container">
       <img
-        class="openobserve-logo cursor-pointer"
+        class="openobserve-logo cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
         :src="
           getImageURL(
             store.state.theme === 'dark'
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="headerMenu float-left"
+      class="headerMenu float-left tw:mr-4"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="warning-msg"
         style="display: inline"
       >
-        <q-icon name="warning"
+        <OIcon name="warning"
 size="xs" class="warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
@@ -163,7 +163,7 @@ size="xs" class="warning" />{{
         @click="openEnterpriseDialog"
       >
         <template #icon-left>
-          <q-icon name="card_giftcard" size="16px" />
+          <OIcon name="card-giftcard" size="sm" />
         </template>
         {{ enterpriseButtonText }}
       </OButton>
@@ -178,10 +178,10 @@ size="xs" class="warning" />{{
         size="icon-circle-sm"
         data-test="ingestion-quota-warning-icon"
       >
-        <q-icon
+        <OIcon
           name="warning"
-          size="24px"
-          class="header-icon"
+          size="md"
+          class="header-icon tw:opacity-70"
           :style="{ color: ingestionQuotaColor }"
         />
         <q-tooltip anchor="top middle" self="bottom middle">
@@ -216,7 +216,7 @@ size="xs" class="warning" />{{
             <div class="col tw:truncate">
               {{ userClickedOrg?.label || "" }}
             </div>
-            <q-icon name="arrow_drop_down" class="q-ml-xs" />
+            <OIcon name="arrow-drop-down" size="sm" class="q-ml-xs" />
           </div>
 
           <!-- Organization selection menu -->
@@ -270,7 +270,7 @@ size="xs" class="warning" />{{
                           :placeholder="'Search Organization'"
                         >
                           <template #prepend>
-                            <q-icon name="search" />
+                            <OIcon name="search" size="sm" />
                           </template>
                         </q-input>
                       </div>
@@ -338,7 +338,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" size="20px" class="header-icon" />
+        <component :is="slackIcon" size="20px" class="header-icon tw:opacity-70" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.slack") }}
         </q-tooltip>
@@ -346,7 +346,7 @@ size="xs" class="warning" />{{
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <q-icon name="help_outline" size="20px" class="header-icon" />
+        <OIcon name="help-outline" size="md" class="header-icon tw:opacity-70" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.help") }}
         </q-tooltip>
@@ -412,7 +412,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <q-icon :name="outlinedSettings" size="20px" class="header-icon" />
+        <OIcon name="settings" size="sm" class="header-icon" />
         <q-tooltip anchor="top middle" self="bottom middle">
           {{ t("menu.settings") }}
         </q-tooltip>
@@ -424,10 +424,10 @@ size="xs" class="warning" />{{
         size="icon-circle-sm"
         data-test="header-my-account-profile-icon"
       >
-        <q-icon
+        <OIcon
           :name="user.picture ? user.picture : 'person'"
           size="20px"
-          class="header-icon"
+          class="header-icon tw:opacity-70"
         />
         <q-tooltip
           anchor="top middle"
@@ -453,10 +453,10 @@ size="xs" class="warning" />{{
             <!-- User information -->
             <q-item>
               <q-item-section avatar>
-                <q-icon
+                <OIcon
                   :name="user.picture ? user.picture : 'person'"
                   size="xs"
-                ></q-icon>
+                ></OIcon>
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{
@@ -471,7 +471,7 @@ size="xs" class="warning" />{{
             <!-- Language selector -->
             <q-item clickable>
               <q-item-section avatar>
-                <q-icon size="xs"
+                <OIcon size="xs"
 name="language" class="padding-none" />
               </q-item-section>
               <q-item-section>
@@ -482,7 +482,7 @@ name="language" class="padding-none" />
               <q-item-section></q-item-section>
               <q-item-section side>
                 <div class="q-gutter-xs">
-                  <q-icon
+                  <OIcon
                     size="xs"
                     :name="selectedLanguage.icon"
                     class="padding-none"
@@ -494,9 +494,9 @@ name="language" class="padding-none" />
                 </div>
               </q-item-section>
               <q-item-section side style="padding-left: 0px">
-                <q-icon
+                <OIcon
                   class="icon-ley-arrow-right"
-                  name="keyboard_arrow_right"
+                  name="keyboard-arrow-right" size="sm"
                 />
               </q-item-section>
 
@@ -518,7 +518,7 @@ name="language" class="padding-none" />
                     @click="changeLanguage(lang)"
                   >
                     <q-item-section avatar>
-                      <q-icon
+                      <OIcon
                         size="xs"
                         :name="lang.icon"
                         class="padding-none"
@@ -545,8 +545,8 @@ name="language" class="padding-none" />
               @click="openPredefinedThemes"
             >
               <q-item-section avatar>
-                <q-icon size="xs"
-name="color_lens" class="padding-none" />
+                <OIcon size="xs"
+name="color-lens" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
@@ -563,8 +563,8 @@ name="color_lens" class="padding-none" />
               @click="signout"
             >
               <q-item-section avatar>
-                <q-icon size="xs"
-name="exit_to_app" class="padding-none" />
+                <OIcon size="xs"
+name="exit-to-app" class="padding-none" />
               </q-item-section>
               <q-item-section>
                 <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -586,8 +586,8 @@ import { defineComponent, PropType, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -596,6 +596,7 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OButton,
+    OIcon,
   },
   props: {
     // Store instance
@@ -787,7 +788,6 @@ export default defineComponent({
 
     return {
       t,
-      outlinedSettings,
       getImageURL,
       enterpriseButtonText,
       ingestionQuotaPercentage,
@@ -817,5 +817,34 @@ export default defineComponent({
   width: auto;
   max-width: none;
   white-space: nowrap;
+}
+
+.logo-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  min-width: 9.375rem;
+}
+
+.openobserve-logo {
+  height: 2rem;
+  width: auto;
+  max-width: 9.375rem;
+  display: block;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.headerMenu {
+  margin-right: 1rem;
+
+  .block {
+    font-weight: 700;
+    color: var(--o2-text-primary);
+  }
 }
 </style>

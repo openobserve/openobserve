@@ -14,6 +14,7 @@
               variant="primary"
               size="chip-12"
               :data-test="`dashboard-join-item-${index}`"
+              icon-right="arrow-drop-down"
             >
               <div class="join-btn-content">
                 <LeftJoinTypeSvg
@@ -44,16 +45,15 @@
                   :mainStream="mainStreamName"
                 />
               </q-menu>
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
-            </OButton>
+          </OButton>
             <OButton
               variant="outline"
               size="icon-chip"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
               <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
             </OButton>
           </OButtonGroup>
@@ -64,8 +64,8 @@
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
+          icon-left="add"
         >
-          <template #icon-left><q-icon name="add" /></template>
           <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
         </OButton>
       </div>

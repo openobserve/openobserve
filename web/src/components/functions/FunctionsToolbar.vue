@@ -14,86 +14,72 @@
           title="Go Back"
           @click="redirectToFunctions"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
       <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
         {{ t('function.addFunction') }}
       </div>
-      <q-form ref="addFunctionForm" class="o2-input tw:flex tw:items-center tw:gap-6">
+      <div class="o2-input tw:flex tw:items-center tw:gap-6">
         <div class="tw:flex tw:items-center">
-          <q-input
+          <OInput
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
             class="q-pa-none tw:w-full"
-            stack-label
-            borderless
-            dense
             v-bind:readonly="disableName"
-            v-bind:disable="disableName"
-            :rules="[
-              (val: any) => !!val || 'Field is required!',
-              isValidMethodName,
-            ]"
-            no-error-icon
+            v-bind:disabled="disableName"
+            :error="showInputError && !!nameError"
+            :error-message="nameError"
             tabindex="0"
             style="min-width: 300px"
             @update:model-value="onUpdate"
             @blur="onUpdate"
           />
-          <q-icon
+          <OIcon
             :key="functionName"
             v-if="isValidMethodName() !== true && showInputError"
-            :name="outlinedInfo"
-            size="20px"
+            name="info-outline"
+            size="md"
             class="q-ml-xs cursor-pointer"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
+            <OTooltip
+              side="right"
+              align="center"
               max-width="300px"
-              :offset="[2, 0]"
-              class="tw:text-[12px]"
-            >
-              {{ isValidMethodName() }}
-            </q-tooltip>
-          </q-icon>
+              :side-offset="2"
+              :content="isValidMethodName() !== true ? String(isValidMethodName()) : ''"
+            />
+          </OIcon>
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="tw:flex tw:items-center tw:gap-4">
-          <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
-            <q-radio
-              v-model="selectedTransType"
-              val="0"
-              size="xs"
-              class="tw:mb-0"
-            />
-            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
-          </div>
-          <!-- JavaScript option only shown in _meta organization -->
-          <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
-            <q-radio
-              v-model="selectedTransType"
-              val="1"
-              size="xs"
-              class="tw:mb-0"
-            />
-            <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
-          </div>
+          <ORadioGroup v-model="selectedTransType" class="tw:flex tw:items-center tw:gap-4">
+            <div class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-vrl-radio">
+              <ORadio value="0" />
+              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[0]?.label }}</span>
+            </div>
+            <!-- JavaScript option only shown in _meta organization -->
+            <div v-if="transformTypeOptions[1]" class="tw:flex tw:items-center tw:gap-1" data-test="function-transform-type-js-radio">
+              <ORadio value="1" />
+              <span class="tw:text-[13px] tw:font-medium tw:leading-none">{{ transformTypeOptions[1]?.label }}</span>
+            </div>
+          </ORadioGroup>
           <!-- Info icon with tooltip -->
-          <q-icon
-            name="info_outline"
+          <OIcon
+            name="info-outline"
             size="xs"
             class="tw:cursor-pointer"
           >
-            <q-tooltip class="bg-grey-8">
-              <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
-              <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
-            </q-tooltip>
-          </q-icon>
+            <OTooltip>
+              <template #content>
+                <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+              </template>
+            </OTooltip>
+          </OIcon>
         </div>
-      </q-form>
+      </div>
     </div>
     <div class="add-function-actions flex justify-center tw:gap-2">
       <OButton
@@ -102,6 +88,7 @@
             size="icon-sm"
             @click="emit('open:chat',!store.state.isAiChatEnabled)"
             data-test="menu-link-ai-item"
+            class="ai-hover-btn"
             :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
             style="border-radius: 6px;"
             @mouseenter="isHovered = true"
@@ -115,8 +102,8 @@
         variant="outline"
         size="sm-action"
         @click="handleFullScreen"
+        icon-left="fullscreen"
       >
-        <Maximize :size="14" class="tw:mr-1" />
         {{ t('common.fullscreen') }}
       </OButton>
       <OButton
@@ -124,8 +111,8 @@
         variant="outline"
         size="sm-action"
         @click="emit('test')"
+        icon-left="play-arrow"
       >
-        <Play :size="14" class="tw:mr-1" />
         {{ t('function.testFunction') }}
       </OButton>
       <OButton
@@ -159,9 +146,12 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Maximize, Play } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 const { t } = useI18n();
 
 const q = useQuasar();
@@ -209,6 +199,13 @@ const isValidMethodName = () => {
   );
 };
 
+const nameError = computed(() => {
+  if (!showInputError.value) return '';
+  if (!functionName.value) return 'Field is required!';
+  const check = isValidMethodName();
+  return check === true ? '' : String(check);
+});
+
 const onUpdate = () => {
   showInputError.value = true;
 };
@@ -250,7 +247,14 @@ const getBtnLogo = computed(() => {
         : getImageURL('images/common/ai_icon_gradient.svg')
     })
 
-defineExpose({ addFunctionForm });
+defineExpose({
+  addFunctionForm: {
+    validate: async () => {
+      showInputError.value = true;
+      return !!functionName.value && isValidMethodName() === true;
+    },
+  },
+});
 </script>
 <style scoped lang="scss">
 .functions-toolbar {
@@ -264,7 +268,7 @@ defineExpose({ addFunctionForm });
       padding-bottom: 4px !important;
       font-size: 13px;
     }
-    :deep(.q-btn .q-icon) {
+    :deep(.q-btn .OIcon) {
       margin-right: 2px;
     }
 
@@ -276,5 +280,49 @@ defineExpose({ addFunctionForm });
       border: 1px solid var(--q-negative) !important;
     }
   }
+}
+
+/* ── AI button — mirrors MainLayout.vue ─────────────────────────── */
+.ai-hover-btn {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ai-hover-btn:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+}
+
+.ai-btn-active {
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  ) !important;
+
+  .header-icon {
+    opacity: 1 !important;
+  }
+}
+
+.ai-btn-active:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
+}
+
+.header-icon {
+  opacity: 0.7;
+}
+
+.ai-icon {
+  transition: transform 0.6s ease;
+}
+
+.ai-hover-btn:hover .ai-icon {
+  transform: rotate(180deg);
+  filter: brightness(0) invert(1);
 }
 </style>

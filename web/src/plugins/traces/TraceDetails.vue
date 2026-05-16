@@ -43,12 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mr-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon name="arrow_back" size="16px" />
-              <q-tooltip>{{
-                areFiltersAdded
-                  ? t("traces.applyPendingFilters")
-                  : t("traces.backToTraces")
-              }}</q-tooltip>
+              <OIcon name="arrow-back" size="sm" />
+              <OTooltip :content="areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')" />
             </OButton>
 
             <div
@@ -61,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-                <q-tooltip>{{ traceTree[0]?.operationName }}</q-tooltip>
+                <OTooltip :content="traceTree[0]?.operationName" />
               </div>
 
               <!-- Service, Timestamp, and Trace ID -->
@@ -94,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
 
                 <!-- Copy Trace ID Button -->
-                <q-icon
+                <OIcon
                   data-test="trace-details-copy-trace-id-btn"
-                  name="content_copy"
-                  size="12px"
+                  name="content-copy"
+                  size="xs"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
@@ -118,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ sessionId }}
                     </span>
                   </span>
-                  <q-icon
+                  <OIcon
                     data-test="trace-details-copy-session-id-btn"
-                    name="content_copy"
-                    size="12px"
+                    name="content-copy"
+                    size="xs"
                     class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
                     title="Copy Session ID"
                     @click="copySessionId"
@@ -129,12 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
-                <q-icon
+                <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
-                  size="14px"
-                  name="open_in_new"
+                  size="xs"
+                  name="open-in-new"
                   :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />
@@ -151,10 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span data-test="span-count-text">
                   {{ formatLargeNumber(effectiveSpanList.length) }}
                   {{ t("traces.spansLabel") }}
-                  <q-tooltip
-                    >{{ effectiveSpanList.length }}
-                    {{ t("traces.spansLabel") }}</q-tooltip
-                  >
+                  <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
                 </span>
               </div>
 
@@ -171,10 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ formatLargeNumber(errorSpansCount) }}
                   {{ t("traces.errorsLabel") }}</span
                 >
-                <q-tooltip
-                  >{{ errorSpansCount }}
-                  {{ t("traces.errorsLabel") }}</q-tooltip
-                >
+                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
               </div>
             </div>
           </div>
@@ -192,13 +182,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><q-icon name="filter_alt"
-size="14px"
+                ><OIcon name="filter-alt"
+size="xs"
               /></template>
-              <span class="tw:text-[0.75rem]">{{
-                t("traces.viewFilters")
-              }}</span>
-              <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
+              <span class="tw:text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
             <!-- Expand button (embedded mode) -->
@@ -210,8 +198,8 @@ size="14px"
               class="tw:ml-1.5"
               @click="handleExpandToFullView"
             >
-              <q-icon name="open_in_new" size="14px" />
-              <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
+              <OIcon name="open-in-new" size="xs" />
+              <OTooltip :content="t('traces.openInTraces')" />
             </OButton>
 
             <!-- Share button (standalone mode) -->
@@ -232,8 +220,8 @@ size="14px"
               class="tw:mx-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon name="close" size="14px" />
-              <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
+              <OIcon name="close" size="xs" />
+              <OTooltip :content="t('common.cancel')" />
             </OButton>
           </div>
         </header>
@@ -255,28 +243,27 @@ size="14px"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
-                  ><AlignLeft class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="align-left" size="xs" class="tw:shrink-0"
                 /></template>
-                Waterfall
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left
-                  ><Flame class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="flame" size="sm" />
+                </template>
                 Flame Graph
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
-                  ><Network class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
 size="sm">
-                <template #icon-left
-                  ><GitBranch class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
                 DAG
               </OToggleGroupItem>
               <!--
@@ -294,7 +281,7 @@ size="sm">
                 data-test="trace-details-thread-tab"
               >
                 <template #icon-left
-                  ><MessageSquare class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="chat" size="xs" class="tw:shrink-0"
                 /></template>
                 Thread
               </OToggleGroupItem>
@@ -304,7 +291,7 @@ size="sm">
                 size="sm"
               >
                 <template #icon-left
-                  ><ClipboardCheck class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="assignment-turned-in" size="xs" class="tw:shrink-0"
                 /></template>
                 Evaluations
               </OToggleGroupItem>
@@ -322,20 +309,18 @@ size="sm">
               class="unified-search-group tw:mr-0!"
             >
               <div class="log-stream-search-input">
-                <q-input
+                <OInput
                   v-model="searchQuery"
                   data-test="trace-details-search-input"
-                  outlined
-                  dense
                   :placeholder="t('traces.searchInSpans')"
                   clearable
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
                 >
                   <template v-slot:prepend>
-                    <q-icon name="search" size="1rem" />
+                    <OIcon name="search" size="1rem" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <!-- Search Results Navigation -->
               <div class="search-navigation-container">
@@ -357,8 +342,8 @@ size="sm">
                     size="icon"
                     @click="prevMatch"
                   >
-                    <q-icon name="keyboard_arrow_up" size="16px" />
-                    <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
+                    <OIcon name="keyboard-arrow-up" size="sm" />
+                    <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
                   <div class="button-separator"></div>
                   <OButton
@@ -370,8 +355,8 @@ size="sm">
                     size="icon"
                     @click="nextMatch"
                   >
-                    <q-icon name="keyboard_arrow_down" size="16px" />
-                    <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
+                    <OIcon name="keyboard-arrow-down" size="sm" />
+                    <OTooltip :content="t('traces.nextMatch')" />
                   </OButton>
                 </div>
               </div>
@@ -381,7 +366,7 @@ size="sm">
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
-              <q-select
+              <OSelect
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
                 :label="
@@ -390,61 +375,9 @@ size="sm">
                     : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
-                data-cy="stream-selection"
-                input-debounce="0"
-                behavior="menu"
-                filled
                 multiple
-                borderless
-                dense
-                fill-input
                 :title="selectedStreamsString"
-              >
-                <template #no-option>
-                  <div class="log-stream-search-input">
-                    <q-input
-                      data-test="trace-details-stream-search-input"
-                      v-model="streamSearchValue"
-                      borderless
-                      filled
-                      debounce="500"
-                      autofocus
-                      dense
-                      size="xs"
-                      @update:model-value="filterStreamFn"
-                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                      :placeholder="t('search.searchStream')"
-                    >
-                      <template #prepend>
-                        <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                    </q-input>
-                  </div>
-                  <q-item>
-                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                  </q-item>
-                </template>
-                <template #before-options>
-                  <div class="log-stream-search-input">
-                    <q-input
-                      data-test="trace-details-stream-search-input-options"
-                      v-model="streamSearchValue"
-                      borderless
-                      debounce="500"
-                      filled
-                      dense
-                      autofocus
-                      @update:model-value="filterStreamFn"
-                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                      :placeholder="t('search.searchStream')"
-                    >
-                      <template #prepend>
-                        <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                    </q-input>
-                  </div>
-                </template>
-              </q-select>
+              />
               <span class="traces-view-logs-btn">
                 <OButton
                   data-test="trace-details-view-logs-btn"
@@ -455,8 +388,8 @@ size="sm">
                   @click="redirectToLogs"
                 >
                   <template #icon-left
-                    ><q-icon name="search"
-size="14px"
+                    ><OIcon name="search"
+size="xs"
                   /></template>
                   {{
                     searchObj.meta.redirectedFromLogs
@@ -474,7 +407,7 @@ size="14px"
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle"
+                  ><OIcon name="play-circle"
 size="14px"
                 /></template>
                 {{ t("rum.playSessionReplay") }}
@@ -763,8 +696,8 @@ size="14px"
                   padding: 40px;
                 "
               >
-                <q-icon
-                  name="table_chart"
+                <OIcon
+                  name="table-chart"
                   size="48px"
                   style="margin-bottom: 16px"
                 />
@@ -828,11 +761,9 @@ size="14px"
       class="flex column items-center justify-center"
       :style="{ height: '100%' }"
     >
-      <q-spinner-hourglass
+      <OSpinner
         data-test="trace-details-loading-spinner"
-        color="primary"
-        size="3em"
-        :thickness="2"
+        size="lg"
       />
       <div data-test="trace-details-loading-text" class="q-pt-sm">
         {{ t("traces.fetchingTrace") }}
@@ -840,64 +771,23 @@ size="14px"
     </div>
 
     <!-- Filters Sidebar -->
-    <q-dialog
-      v-model="showFilterPopover"
-      position="right"
-      maximized
-      transition-show="slide-left"
-      transition-hide="slide-right"
+    <ODrawer data-test="trace-details-filter-popover-drawer"
+      v-model:open="showFilterPopover"
+      :width="30"
+      :title="t('traces.traceFilters')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('traces.showTraces')"
+      @click:secondary="showFilterPopover = false"
+      @click:primary="applyAndViewTraces"
     >
-      <q-card
-        class="tw:w-[30vw]! tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-surface)]"
-      >
-        <q-card-section
-          class="tw:flex tw:items-center tw:justify-between tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:pt-3 tw:px-4"
-        >
-          <div
-            class="tw:text-lg tw:font-semibold tw:text-[var(--o2-text-primary)]"
-          >
-            {{ t("traces.traceFilters") }}
-          </div>
-          <OButton variant="ghost-muted"
-size="icon"
-v-close-popup>
-            <q-icon name="close" size="16px" />
-          </OButton>
-        </q-card-section>
-
-        <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
-          <div
-            class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded"
-          >
-            <CodeQueryEditor
-              v-model:query="localEditorValue"
-              language="sql"
-              class="tw:h-full tw:w-full"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions
-          align="right"
-          class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
-        >
-          <div class="tw:flex tw:gap-2">
-            <OButton variant="outline"
-size="sm-action"
-v-close-popup>
-              {{ t("common.cancel") }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="applyAndViewTraces"
-            >
-              {{ t("traces.showTraces") }}
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      <div class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded">
+        <CodeQueryEditor
+          v-model:query="localEditorValue"
+          language="sql"
+          class="tw:h-full tw:w-full"
+        />
+      </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -947,10 +837,6 @@ import {
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedInfo,
-  outlinedPlayCircle,
-} from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -970,15 +856,13 @@ import {
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  AlignLeft,
-  Flame,
-  Network,
-  GitBranch,
-  ClipboardCheck,
-  MessageSquare,
-} from "lucide-vue-next";
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -1077,12 +961,8 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
-    AlignLeft,
-    Flame,
-    Network,
-    GitBranch,
-    ClipboardCheck,
-    MessageSquare,
+    ODrawer,
+    OIcon,
     ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -1090,6 +970,10 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -2544,6 +2428,10 @@ export default defineComponent({
       if (customFrom) queryParams.from = customFrom;
       if (customTo) queryParams.to = customTo;
 
+      if(effectiveStreamName.value){
+        queryParams.stream = effectiveStreamName.value as string;
+      }
+
       const searchParams = new URLSearchParams();
       for (const [key, value] of Object.entries(queryParams)) {
         searchParams.append(key, String(value));
@@ -2926,8 +2814,8 @@ export default defineComponent({
       sessionId,
       copySessionId,
       traceDetailsShareURL,
-      outlinedInfo,
-      outlinedPlayCircle,
+      "info": "info",
+      outlinedPlayCircle: "play-circle",
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
@@ -3100,7 +2988,7 @@ $traceChartCollapseHeight: 42px;
     background-color: var(--o2-primary-btn-bg);
     color: #ffffff;
 
-    .q-icon {
+    .OIcon {
       color: #ffffff !important;
     }
   }
@@ -3228,7 +3116,7 @@ html:has(.trace-details) {
   }
 
   .visual-selection-btn {
-    .q-icon {
+    .OIcon {
       padding-right: 5px;
       font-size: 15px;
     }
@@ -3270,7 +3158,7 @@ html:has(.trace-details) {
 
 .trace-copy-icon {
   &:hover {
-    &.q-icon {
+    &.OIcon {
       text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
     }
   }
@@ -3352,7 +3240,7 @@ html:has(.trace-details) {
       .q-field__marginal {
         height: 1.875rem !important;
 
-        .q-icon {
+        .OIcon {
           font-size: 1.125rem;
         }
       }
@@ -3454,7 +3342,7 @@ html:has(.trace-details) {
       border-radius: 0.125rem;
       transition: all 0.2s ease;
 
-      .q-icon {
+      .OIcon {
         font-size: 1.125rem;
       }
 

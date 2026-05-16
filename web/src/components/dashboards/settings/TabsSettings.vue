@@ -56,9 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-tab-settings-draggable-row"
         >
           <div class="draggable-handle">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
+            <OIcon
+              name="drag-indicator" size="sm"
               class="'q-mr-xs"
               data-test="dashboard-tab-settings-drag-handle"
             />
@@ -84,8 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="saveEdit"
                 :disabled="!editTabObj.data.name.trim()"
                 data-test="dashboard-tab-settings-tab-name-edit-save"
+                icon-left="check"
               >
-                <template #icon-left><q-icon name="check" /></template>
               </OButton>
               <OButton
                 variant="ghost"
@@ -93,8 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.cancel')"
                 @click.stop="cancelEdit"
                 data-test="dashboard-tab-settings-tab-name-edit-cancel"
+                icon-left="close"
               >
-                <template #icon-left><q-icon name="close" /></template>
               </OButton>
             </div>
             <div class="actions">
@@ -105,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('dashboard.edit')"
                 @click.stop="editItem(tab.tabId)"
                 data-test="dashboard-tab-settings-tab-edit-btn"
+                icon-left="edit"
               >
-                <template #icon-left><q-icon name="edit" /></template>
               </OButton>
               <OButton
                 v-if="currentDashboardData.data.tabs.length !== 1"
@@ -117,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-settings-tab-delete-btn"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedDelete"
+                  ><OIcon name="delete" size="sm"
                 /></template>
               </OButton>
             </div>
@@ -126,20 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </draggable>
     </div>
 
-    <q-dialog
-      v-model="showAddTabDialog"
-      position="right"
-      full-height
-      maximized
+    <AddTab
+      v-model:open="showAddTabDialog"
+      :edit-mode="isTabEditMode"
+      :tabId="selectedTabIdToEdit"
+      :dashboard-id="currentDashboardData.data.dashboardId"
       data-test="dashboard-tab-settings-add-tab-dialog"
-    >
-      <AddTab
-        :edit-mode="isTabEditMode"
-        :tabId="selectedTabIdToEdit"
-        :dashboard-id="currentDashboardData.data.dashboardId"
-        @refresh="refreshRequired"
-      />
-    </q-dialog>
+      @refresh="refreshRequired"
+    />
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
@@ -160,14 +153,12 @@ import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
 import { deleteTab, editTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { reactive } from "vue";
 import { onMounted } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
-import { updateDashboard } from "../../../utils/commons";
-import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -177,8 +168,8 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
+    OIcon,
   },
-  emits: ["refresh"],
   setup(props, { emit }) {
     const store = useStore();
     const route = useRoute();
@@ -377,7 +368,6 @@ export default defineComponent({
       deletePopupVisible,
       tabIdToBeDeleted,
       handleDragEnd,
-      outlinedDelete,
       addNewItem,
       showAddTabDialog,
       isTabEditMode,

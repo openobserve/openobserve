@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="relative-position full-height">
+  <div data-test="edit-group-section" class="tw:flex tw:flex-col full-height">
     <div
       data-test="edit-group-section-title"
-      class="tw:pb-[0.625rem]"
+      class="tw:pb-[0.625rem] tw:flex-shrink-0"
     >
     <div class="card-container q-py-sm">
       <span style="font-size: 18px" class="q-px-md ">
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     </div>
     </div>
-    <div style="min-height: calc(100% - (39px + 55px + 43px + 6px))">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div
-    class="flex justify-end tw:w-full"
-      style="position: sticky; bottom: 0.45rem; z-index: 2"
+    class="flex justify-end tw:w-full tw:flex-shrink-0"
+      style="z-index: 2"
     >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
       <OButton
@@ -90,7 +90,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Shield, Users, Bot } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
@@ -132,12 +131,12 @@ const tabs = [
   {
     value: "roles",
     label: "Roles",
-    icon: Shield,
+    icon: "shield",
   },
   {
     value: "users",
     label: "Users",
-    icon: Users,
+    icon: "group",
   },
 ];
 
@@ -145,7 +144,7 @@ if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
-    icon: Bot,
+    icon: "smart-toy",
   });
 }
 

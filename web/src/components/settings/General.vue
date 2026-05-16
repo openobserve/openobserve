@@ -91,11 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 180px"
             >
               <template v-slot:append>
-                <q-icon name="info" size="xs" class="cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <q-tooltip max-width="300px">
                     {{ t("settings.maxSeriesPerQueryTooltip") }}
                   </q-tooltip>
-                </q-icon>
+                </OIcon>
               </template>
             </q-input>
             <span class="individual-setting-description">
@@ -122,10 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customLightColor }"
                 >
-                  <q-icon
+                  <OIcon
                     name="palette"
-                    size="14px"
-                    color="white"
+                    size="xs"
                     class="palette-icon"
                   />
                 </div>
@@ -143,10 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customDarkColor }"
                 >
-                  <q-icon
+                  <OIcon
                     name="palette"
-                    size="14px"
-                    color="white"
+                    size="xs"
                     class="palette-icon"
                   />
                 </div>
@@ -160,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <q-icon name="refresh" size="16px" />
+                <OIcon name="refresh" size="sm" />
                 <q-tooltip>{{ t("settings.resetToDefaultColors") }}</q-tooltip>
               </div>
             </div>
@@ -223,20 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="editingText = !editingText"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
-              <OButton
-                data-test="settings_ent_logo_custom_text_save_btn"
-                :loading="onSubmit.isLoading.value"
-                variant="primary"
-                size="icon-xs-sq"
-                class="q-mr-sm"
-                type="submit"
-                @click="updateCustomText"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="close"
+              />
             </div>
           </div>
           <div v-else class="flex items-center">
@@ -260,9 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ml-sm"
               type="submit"
               @click="editingText = !editingText"
-            >
-              <Pencil class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="edit"
+            />
           </div>
           <span class="individual-setting-description">
             {{ t("settings.customLogoTextDescription") }}
@@ -295,9 +280,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               class="q-mx-md"
               @click="confirmDeleteLogo('light')"
-            >
-              <Trash2 class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="delete"
+            />
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -313,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mx-none o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
-                <q-icon name="attach_file" />
+                <OIcon name="attach-file" size="sm" />
               </template>
             </q-file>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
@@ -323,9 +307,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="filesLight = null"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+              icon-left="close"
+            />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
@@ -334,9 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm"
                 type="submit"
                 @click="uploadImage(filesLight, 'light')"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -374,9 +356,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               class="q-mx-md"
               @click="confirmDeleteLogo('dark')"
-            >
-              <Trash2 class="tw:size-3.5 tw:shrink-0" />
-            </OButton>
+              icon-left="delete"
+            />
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
             <q-file
@@ -392,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mx-none o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
-                <q-icon name="attach_file" />
+                <OIcon name="attach-file" size="sm" />
               </template>
             </q-file>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
@@ -402,9 +383,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="filesDark = null"
-              >
-                <X class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+              icon-left="close"
+            />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
@@ -413,9 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mr-sm"
                 type="submit"
                 @click="uploadImage(filesDark, 'dark')"
-              >
-                <Check class="tw:size-3.5 tw:shrink-0" />
-              </OButton>
+                icon-left="check"
+              />
             </div>
           </div>
           <div class="tw:flex tw:flex-col tw:mb-5">
@@ -427,55 +406,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <q-spinner-hourglass
+  <OSpinner
     v-if="loadingState"
-    class="fixed-center"
-    size="lg"
-    color="primary"
-  ></q-spinner-hourglass>
-  <q-dialog v-model="confirmDeleteImage">
-    <q-card>
-      <q-card-section>
-        {{ t("settings.deleteLogoMessage") }}
-      </q-card-section>
+    size="md"
+    class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+  />
+  <ODialog data-test="general-delete-image-dialog"
+    v-model:open="confirmDeleteImage"
+    size="xs"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="cancelConfirmDialog"
+    @click:primary="confirmDialogOK"
+  >
+    <p>{{ t('settings.deleteLogoMessage') }}</p>
+  </ODialog>
 
-      <q-card-actions align="right" class="tw:flex tw:gap-1">
-        <OButton
-          data-test="logs-search-bar-confirm-dialog-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="cancelConfirmDialog"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </OButton>
-        <OButton
-          data-test="logs-search-bar-confirm-dialog-ok-btn"
-          variant="primary"
-          size="sm-action"
-          @click="confirmDialogOK"
-        >
-          {{ t("confirmDialog.ok") }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
-
-  <!-- Color Picker Dialog -->
-  <q-dialog v-model="showColorPicker" @hide="onColorPickerClose">
-    <q-card style="min-width: 300px">
-      <q-card-section>
-        <div class="text-h6">{{ t("settings.pickCustomColor") }}</div>
-      </q-card-section>
-      <q-card-section>
-        <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
-      </q-card-section>
-      <q-card-actions align="right">
-        <OButton variant="outline" size="sm-action" v-close-popup>
-          {{ t("settings.close") }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog data-test="general-color-picker-dialog"
+    v-model:open="showColorPicker"
+    @update:open="(v) => !v && onColorPickerClose()"
+    size="xs"
+    :title="t('settings.pickCustomColor')"
+    primary-button-label="Close"
+    @click:primary="showColorPicker = false"
+  >
+    <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -495,7 +451,9 @@ import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Check, Pencil, Trash2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -515,7 +473,10 @@ export default defineComponent({
   components: {
     GroupHeader,
     OButton,
-  },
+    ODialog,
+    OSpinner,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const q = useQuasar();
@@ -1205,7 +1166,7 @@ body.body--dark .theme-color-chip:hover {
   transform: translateY(-1px) rotate(180deg);
 }
 
-.theme-reset-chip:hover .q-icon {
+.theme-reset-chip:hover .OIcon {
   color: rgb(239, 68, 68);
 }
 
@@ -1218,7 +1179,7 @@ body.body--dark .theme-reset-chip:hover {
   border-color: rgba(239, 68, 68, 0.5);
 }
 
-body.body--dark .theme-reset-chip:hover .q-icon {
+body.body--dark .theme-reset-chip:hover .OIcon {
   color: rgb(248, 113, 113);
 }
 </style>

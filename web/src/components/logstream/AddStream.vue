@@ -15,29 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white', !isInPipeline ? 'q-pt-md' : '']"
+  <ODrawer
+    v-if="!isInPipeline"
+    data-test="add-stream-dialog"
+    :open="open"
+    size="md"
+    :title="t('logStream.add')"
+    :secondary-button-label="t('logStream.cancel')"
+    :primary-button-label="t('common.save')"
+    @update:open="emits('update:open', $event)"
+    @click:secondary="emits('update:open', false)"
+    @click:primary="submitForm()"
   >
-    <div class="add-stream-header row items-center no-wrap q-px-md">
-      <div class="col">
-        <div style="font-size: 18px" data-test="add-stream-title">
-          {{ t("logStream.add") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <OButton
-          data-test="add-stream-close-btn"
-          v-close-popup="true"
-          variant="ghost"
-          size="icon-sm"
-        >
-          <X :size="14" />
-        </OButton>
-      </div>
-    </div>
-    <q-separator />
-    <div class="q-px-md  add-stream-inputs">
-      <q-form @submit="saveStream">
+    <div class="q-px-md q-py-md add-stream-inputs">
+      <q-form ref="addStreamFormRef" @submit="saveStream">
         <div data-test="add-stream-name-input">
           <q-input
             v-model="streamInputs.name"
@@ -48,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
-            style="min-width: 480px"
           />
         </div>
 
@@ -65,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             borderless
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
           />
         </div>
 
@@ -79,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
             type="number"
             :rules="[(val: any) => val > 0 || 'Field is required!']"
-            style="min-width: 480px"
           />
         </div>
 
@@ -88,27 +76,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add="addField"
           @remove="removeField"
         />
-
-        <div class="flex justify-start q-mt-md tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            data-test="add-stream-cancel-btn"
-            variant="outline"
-            size="sm-action"
-          >
-            {{ t('logStream.cancel') }}
-          </OButton>
-          <OButton
-            data-test="save-stream-btn"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-          >
-            {{ t('common.save') }}
-          </OButton>
-        </div>
       </q-form>
     </div>
+  </ODrawer>
+
+  <!-- Inline form for pipeline usage (no drawer wrapper) -->
+  <div v-else class="q-px-md q-py-md add-stream-inputs">
+    <q-form ref="addStreamFormRef" @submit="saveStream">
+      <div data-test="add-stream-name-input">
+        <q-input
+          v-model="streamInputs.name"
+          :label="t('common.name') + ' *'"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+          tabindex="0"
+        />
+      </div>
+
+      <div data-test="add-stream-type-input">
+        <q-select
+          v-model="streamInputs.stream_type"
+          :options="filteredStreamTypes"
+          :label="t('alerts.streamType') + ' *'"
+          :popup-content-style="{ textTransform: 'capitalize' }"
+          class="showLabelOnTop no-case"
+          map-options
+          stack-label
+          emit-value
+          borderless
+          dense
+          :rules="[(val: any) => !!val || 'Field is required!']"
+        />
+      </div>
+
+      <div data-test="add-stream-data-retention-input">
+        <q-input
+          v-model="streamInputs.dataRetentionDays"
+          :label="t('logStream.dataRetention') + ' *'"
+          class="showLabelOnTop"
+          stack-label
+          borderless
+          dense
+          type="number"
+          :rules="[(val: any) => val > 0 || 'Field is required!']"
+        />
+      </div>
+
+      <StreamFieldInputs
+        :fields="fields"
+        @add="addField"
+        @remove="removeField"
+      />
+
+      <div class="tw:flex tw:gap-2 q-mt-sm">
+        <OButton
+          data-test="add-stream-cancel-btn"
+          variant="outline"
+          size="sm-action"
+          @click="emits('close')"
+        >{{ t('logStream.cancel') }}</OButton>
+        <OButton
+          data-test="add-stream-save-btn"
+          variant="primary"
+          size="sm-action"
+          type="submit"
+        >{{ t('common.save') }}</OButton>
+      </div>
+    </q-form>
   </div>
 </template>
 
@@ -122,8 +159,8 @@ import { useStore } from "vuex";
 import { computed } from "vue";
 import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X } from "lucide-vue-next";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const { t } = useI18n();
@@ -135,15 +172,21 @@ const streamTypes = [
   { label: "Traces", value: "traces" },
 ];
 
-const emits = defineEmits(["streamAdded", "close","added:stream-added"]);
+const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);
 const props = defineProps<{
   isInPipeline: boolean;
+  open?: boolean;
 }>();
 
 
 const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
+const addStreamFormRef = ref<any>(null);
+
+const submitForm = () => {
+  addStreamFormRef.value?.submit();
+};
 
 const store = useStore();
 

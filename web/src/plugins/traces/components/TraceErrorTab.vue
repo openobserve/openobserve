@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
-      <q-icon
+      <OIcon
         name="error"
         size="1rem"
         class="tw:text-[var(--o2-status-error-text)]"
@@ -171,9 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
                 @click.capture.stop="expandEvent(props.rowIndex)"
               >
-                  <q-icon
+                  <OIcon
                     :name="
-                      expandedEvents[props.rowIndex.toString()] ? 'expand_more' : 'chevron_right'
+                      expandedEvents[props.rowIndex.toString()] ? 'expand-more' : 'chevron-right'
                     "
                     size="14px"
                   /> 
@@ -239,8 +239,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="copy-btn"
                     @click="copyStackTrace(props.row['exception.stacktrace'])"
                   >
-                    <q-icon name="content_copy" />
-                    <q-tooltip>{{ t("traces.copyStacktrace") }}</q-tooltip>
+                    <OIcon name="content-copy" size="sm" />
+                    <OTooltip :content="t('traces.copyStacktrace')" />
                   </OButton>
                 </div>
                 <div
@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ></pre>
                 </div>
                 <div v-else class="stacktrace-empty">
-                  <q-icon name="info" size="16px" class="q-mr-xs" />
+                  <OIcon name="info" size="sm" class="q-mr-xs" />
                   <span>{{ t("traces.noStacktraceAvailable") }}</span>
                 </div>
               </div>
@@ -282,6 +282,8 @@ import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
   span: object;

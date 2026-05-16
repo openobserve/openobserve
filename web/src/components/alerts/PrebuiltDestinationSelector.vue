@@ -35,7 +35,7 @@ limitations under the License. -->
               :alt="type.name"
               class="destination-logo"
             />
-            <q-icon
+            <OIcon
               v-else
               :name="getIconName(type.icon)"
               size="1.5rem"
@@ -57,7 +57,7 @@ limitations under the License. -->
             v-if="selectedType === type.id"
             class="check-icon"
           >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
+            <OIcon name="check-circle" size="1.25rem" />
           </div>
         </div>
       </div>
@@ -72,7 +72,7 @@ limitations under the License. -->
       >
         <div class="card-content">
           <div class="card-icon">
-            <q-icon name="settings" size="1.5rem" />
+            <OIcon name="settings" size="1.5rem" />
           </div>
           <h3 data-test="destination-type-name" class="card-title">
             {{ t('alerts.customDestination') }}
@@ -84,7 +84,7 @@ limitations under the License. -->
             v-if="selectedType === 'custom'"
             class="check-icon"
           >
-            <q-icon name="check_circle" size="1.25rem" color="positive" />
+            <OIcon name="check-circle" size="1.25rem" />
           </div>
         </div>
       </div>
@@ -97,6 +97,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { PREBUILT_DESTINATION_TYPES } from '@/utils/prebuilt-templates';
 import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Define component props
 interface Props {

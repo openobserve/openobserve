@@ -219,9 +219,9 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.t).toBeInstanceOf(Function);
     });
 
-    it('should have outlinedSettings icon available', () => {
+    it('should have "settings" icon available', () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.outlinedSettings).toBeDefined();
+      expect(wrapper.vm."settings").toBeDefined();
     });
 
     it('should expose handleSettingsRouting method', () => {

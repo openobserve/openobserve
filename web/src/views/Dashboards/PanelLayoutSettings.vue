@@ -15,97 +15,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <ODrawer data-test="panel-layout-settings-drawer"
+    :open="open"
+    size="sm"
+    :title="t('panel.layout')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="submitForm()"
+  >
+    <div
     class="q-pa-none tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("panel.layout") }}
+    <div class="q-mx-md">
+      <div
+        data-test="panel-layout-settings-height"
+        class="o2-input"
+        style="padding-top: 12px"
+      >
+        <OInput
+          v-model.number="updatedLayout.h"
+          :label="t('dashboard.panelHeight') + ' *'"
+          type="number"
+          style="min-width: 220px"
+          :error-message="heightError"
+          :error="!!heightError"
+          @update:model-value="heightError = ''"
+          data-test="panel-layout-settings-height-input"
+        />
+
+        <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
+          <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+          <OIcon
+            name="info-outline"
+            class="cursor-pointer tw:shrink-0"
+            size="xs"
+          >
+            <OTooltip content="1 unit = 30px" />
+          </OIcon>
         </div>
-      </div>
-      <div class="col-auto">
-        <OButton variant="ghost" size="icon-circle" v-close-popup="true">
-          <template #icon-left
-            ><img
-              :src="getImageURL('images/common/close_icon.svg')"
-              style="width: 20px; height: 20px"
-          /></template>
-        </OButton>
+
+     
       </div>
     </div>
-    <q-separator></q-separator>
-    <q-form @submit="savePanelLayout">
-      <div class="q-mx-md">
-        <div
-          data-test="panel-layout-settings-height"
-          class="o2-input tw:relative"
-          style="padding-top: 12px"
-        >
-          <q-input
-            v-model.number="updatedLayout.h"
-            :label="t('dashboard.panelHeight') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless
-            hide-bottom-space
-            dense
-            type="number"
-            :rules="[
-              (val: any) => {
-                if (val === null || val === undefined || val === '') {
-                  return t('common.required'); // If value is empty or null
-                }
-                return val > 0 ? true : t('common.valueMustBeGreaterThanZero'); // Ensure value is greater than 0
-              },
-            ]"
-            style="min-width: 220px"
-            data-test="panel-layout-settings-height-input"
-          />
-
-          <div class="tw:text-[12px]">
-            Approximately
-            <span class="tw:font-bold">{{ getRowCount }}</span> table rows will
-            be displayed
-          </div>
-
-          <q-icon
-            name="info_outline"
-            class="cursor-pointer q-ml-sm tw:absolute tw:top-[14px] tw:left-[94px]"
-            size="16px"
-          >
-            <q-tooltip
-              anchor="center end"
-              self="center left"
-              class="tw:text-[12px]"
-            >
-              1 unit = 30px
-            </q-tooltip>
-          </q-icon>
-        </div>
-      </div>
-      <div class="flex justify-center q-mt-lg tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          v-close-popup="true"
-          data-test="panel-layout-settings-cancel"
-          >{{ t("dashboard.cancel") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          type="submit"
-          data-test="panel-layout-settings-save"
-          >{{ t("dashboard.save") }}</OButton
-        >
-      </div>
-    </q-form>
   </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
@@ -114,28 +71,49 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
-import OButton from "@/lib/core/Button/OButton.vue";
-
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { OButton },
+  components: { ODrawer, OInput, OTooltip,
+    OIcon,
+},
   props: {
     layout: {
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["save:layout"],
+  emits: ["save:layout", "close", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
 
     const updatedLayout = ref({ ...props.layout });
+    const heightError = ref("");
 
     const savePanelLayout = () => {
       emit("save:layout", { ...updatedLayout.value });
     };
+
+    const submitForm = () => {
+      if (!updatedLayout.value.h || updatedLayout.value.h <= 0) {
+        heightError.value = !updatedLayout.value.h
+          ? t("common.required")
+          : t("common.valueMustBeGreaterThanZero");
+        return;
+      }
+      heightError.value = "";
+      savePanelLayout();
+    };
+
 
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
@@ -153,8 +131,10 @@ export default defineComponent({
       router,
       getImageURL,
       savePanelLayout,
+      submitForm,
       getRowCount,
       updatedLayout,
+      heightError,
     };
   },
 });

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton variant="ghost" size="icon-circle-sm" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" size="20px" class="header-icon"></q-icon>
+    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="header-icon" />
     <q-tooltip anchor="top middle" self="bottom middle">
       {{ tooltipText }}
     </q-tooltip>
@@ -28,24 +28,16 @@ import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedDarkMode,
-  outlinedLightMode,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
-  components: { OButton },
+  components: { OButton, OIcon },
   setup() {
     const store = useStore();
     const $q = useQuasar();
     const { t } = useI18n();
     const darkMode = ref(false);
-
-    const DarkModeIcons = {
-      light: outlinedLightMode,
-      dark: outlinedDarkMode,
-    };
 
     onMounted(() => {
       try {
@@ -63,10 +55,6 @@ export default defineComponent({
         darkMode.value = false;
         setTheme("light");
       }
-    });
-
-    const DarkModeIcon = computed(() => {
-      return darkMode.value ? DarkModeIcons.dark : DarkModeIcons.light;
     });
 
     const tooltipText = computed(() => {
@@ -110,11 +98,8 @@ export default defineComponent({
     return {
       store,
       darkMode,
-      DarkModeIcon,
       tooltipText,
       toggleDarkMode,
-      outlinedDarkMode,
-      outlinedLightMode,
     };
   },
 });

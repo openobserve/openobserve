@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-new-folder-btn"
               title="Add Folder"
             >
-              <q-icon name="add" />
+              <OIcon name="add" size="sm" />
             </OButton>
           </div>
         </div>
@@ -37,21 +37,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Search Input -->
         <div style="width: 100%;" class="flex folder-item q-py-xs">
-          <q-input
+          <OInput
             v-model="searchQuery"
-            dense
-            borderless
             data-test="folder-search"
             :placeholder="t('dashboard.searchFolder')"
-            style="width: 100%;"
             clearable
             class="tw:mx-2 q-px-xs"
-            :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
       </div>
       <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
@@ -79,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="cursor: pointer; justify-self: end; height: 0.5rem"
                   data-test="dashboard-more-icon"
               >
-                  <q-icon name="more_vert" />
+                  <OIcon name="more-vert" size="sm" />
                   <q-menu>
                   <q-list dense>
                       <q-item
@@ -89,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-edit-folder-icon"
                       >
                       <q-item-section avatar>
-                          <q-icon :name="outlinedEdit" size="xs" />
+                          <OIcon name="edit" size="xs" />
                       </q-item-section>
                       <q-item-section>
                           <q-item-label>{{ t('common.edit') }}</q-item-label>
@@ -102,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-delete-folder-icon"
                       >
                       <q-item-section avatar>
-                          <q-icon :name="outlinedDelete" size="xs" />
+                          <OIcon name="delete" size="xs" />
                       </q-item-section>
                       <q-item-section>
                           <q-item-label>{{ t('common.delete') }}</q-item-label>
@@ -117,21 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
       </div>
     </div>
-      <q-dialog
-          v-model="showAddFolderDialog"
-          position="right"
-          full-height
-          maximized
-          data-test="dashboard-folder-dialog"
-        >
-        <AddFolder  
-        style="width: 30vw;"
-        @update:modelValue="updateFolderList"
-        :edit-mode="isFolderEditMode"
-        :folder-id="selectedFolderToEdit ?? 'default'"
-        :type="type"
+      <AddFolder
+          v-model:open="showAddFolderDialog"
+          @update:modelValue="updateFolderList"
+          :edit-mode="isFolderEditMode"
+          :folder-id="selectedFolderToEdit ?? 'default'"
+          :type="type"
         />
-      </q-dialog>
     <ConfirmDialog
     :title="t('dashboard.deleteFolder')"
     data-test="dashboard-confirm-delete-folder-dialog"
@@ -145,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
   <script lang="ts">
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -180,11 +169,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
     getFoldersList,
     getFoldersListByType
   } from "@/utils/commons";
-  import {
-    outlinedDelete,
-    outlinedDriveFileMove,
-    outlinedEdit,
-  } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
   import { filter, forIn } from "lodash-es";
@@ -203,6 +188,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 export default defineComponent({  
     name: "FolderList",
     components: {
+      OIcon,
       AddDashboard,
       QTablePagination,
       NoData,
@@ -212,6 +198,7 @@ export default defineComponent({
       OTabs,
       OTab,
       OButton,
+      OInput,
     },
     props: {
       type: {
@@ -331,8 +318,6 @@ export default defineComponent({
         addFolder,
         updateFolderList,
         store,
-        outlinedDelete,
-        outlinedEdit,
         deleteFolder,
         selectedFolderDelete,
         confirmDeleteFolderDialog,

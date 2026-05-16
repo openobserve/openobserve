@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <div v-if="!showAddJSTransformDialog">
       <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:mb-[0.625rem]">
@@ -34,19 +34,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:active-tab="updateActiveTab"
               />
 
-              <q-input
+              <OInput
                 data-test="enrichment-tables-search-input"
                 v-model="filterQuery"
-                borderless
-                dense
-                flat
                 class="no-border o2-search-input"
                 :placeholder="t('function.searchEnrichmentTable')"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
-              </q-input>
+              </OInput>
               <OButton
                 class="q-ml-sm"
                 variant="primary"
@@ -79,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <NoData />
               </template>
               <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
               </template>
               <template v-slot:body-cell-type="props">
                 <q-td :props="props">
@@ -94,69 +91,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Url
                         <span v-if="props.row.urlJobs.length > 1" class="text-grey-7"> ({{ props.row.urlJobs.length }})</span>
                       </span>
-                      <q-icon
+                      <OIcon
                         v-if="props.row.aggregateStatus === 'completed'"
-                        name="check_circle"
-                        color="positive"
-                        size="18px"
+                        name="check-circle"
+                        size="sm"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: All Completed</strong><br/>
-                            {{ props.row.urlJobs.length }} URL job(s) completed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" to see details</em>
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                      <q-icon
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: All Completed</strong><br/>
+                              {{ props.row.urlJobs.length }} URL job(s) completed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" to see details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                      <OIcon
                         v-else-if="props.row.aggregateStatus === 'processing'"
                         name="sync"
-                        color="primary"
-                        size="18px"
+                        size="sm"
                         class="rotate-animation"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Processing</strong><br/>
-                            One or more jobs are currently processing<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                      <q-icon
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Processing</strong><br/>
+                              One or more jobs are currently processing<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                      <OIcon
                         v-else-if="props.row.aggregateStatus === 'failed'"
                         name="warning"
-                        color="negative"
-                        size="18px"
+                        size="sm"
                         class="cursor-pointer"
                         @click="showUrlJobsDialog(props.row)"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 350px;">
-                            <strong>Status: Failed</strong><br/>
-                            One or more jobs have failed<br/>
-                            <br/>
-                            Click to see details and retry failed jobs
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                      <q-icon
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 350px;">
+                              <strong>Status: Failed</strong><br/>
+                              One or more jobs have failed<br/>
+                              <br/>
+                              Click to see details and retry failed jobs
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                      <OIcon
                         v-else-if="props.row.aggregateStatus === 'pending'"
                         name="schedule"
-                        color="grey-7"
-                        size="18px"
+                        size="sm"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Pending</strong><br/>
-                            Job(s) waiting to be processed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" for details</em>
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Pending</strong><br/>
+                              Job(s) waiting to be processed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
                     </template>
                   </div>
                 </q-td>
@@ -170,9 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="exploreEnrichmentTable(props)"
-                  >
-                    <Search :size="14" />
-                  </OButton>
+                    icon-left="search"
+                  />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
                   <OButton
@@ -181,9 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="listSchema(props)"
-                  >
-                    <List :size="14" />
-                  </OButton>
+                    icon-left="format-list-bulleted"
+                  />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
                   <OButton
@@ -192,9 +191,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    icon-left="edit"
+                  />
 
                   <!-- Delete button - always visible -->
                   <OButton
@@ -202,17 +200,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost-destructive"
                     size="icon-sm"
                     @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
+                    icon-left="delete"
+                  />
                 </q-td>
               </template>
 
               <template v-slot:body-cell-function="props">
                 <q-td :props="props">
-                  <q-tooltip>
-                    <pre>{{ props.row.function }}</pre>
-                  </q-tooltip>
+                  <OTooltip>
+                    <template #content><pre>{{ props.row.function }}</pre></template>
+                  </OTooltip>
                   <pre style="white-space: break-spaces">{{
                     props.row.function
                   }}</pre>
@@ -231,9 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm-action"
                       class="q-mr-sm"
-                      @click="openBulkDeleteDialog"
+                      icon-left="delete"
                     >
-                      <Trash2 :size="14" class="tw:mr-1" />
                       Delete
                     </OButton>
                   </div>
@@ -250,9 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
-                        size="sm"
                         :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
                         class="o2-table-checkbox"
                       />
@@ -298,31 +293,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-    <q-dialog
-      v-model="showEnrichmentSchema"
-      position="right"
-      full-height
-      maximized
-    >
-      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
-    </q-dialog>
+    <EnrichmentSchema
+      v-model:open="showEnrichmentSchema"
+      :selectedEnrichmentTable="selectedEnrichmentTable"
+    />
 
     <!-- URL Jobs Dialog -->
-    <q-dialog
-      v-model="showUrlJobsDialogState"
-      position="right"
-      full-height
-      maximized
+    <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
+      v-model:open="showUrlJobsDialogState"
+      size="lg"
     >
-      <q-card style="width: 600px; max-width: 80vw;">
-        <q-card-section class="row items-center q-pb-none">
+      <div class="tw:p-4">
+        <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="14" /></OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
+        </div>
+        <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
             <q-list separator>
               <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="q-pa-md">
                 <q-item-section>
@@ -347,10 +332,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="text-center q-pa-md text-grey-7">
             No URL jobs found
           </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+      </div>
+    </ODrawer>
+  </div>
 </template>
 
 <script lang="ts">
@@ -373,13 +357,16 @@ import {
   verifyOrganizationStatus,
 } from "../../utils/zincutils";
 import streamService from "@/services/stream";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -391,12 +378,12 @@ export default defineComponent({
     EnrichmentSchema,
     AppTabs,
     OButton,
-    Search,
-    List,
-    Pencil,
-    Trash2,
-    X,
-  },
+    ODrawer,
+    OInput,
+    OTooltip,
+    OCheckbox,
+    OIcon,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -654,17 +641,17 @@ export default defineComponent({
       {
         label: t("function.filterAll"),
         value: "all",
-        icon: LayoutList,
+        icon: "format-list-bulleted",
       },
       {
         label: t("function.filterFile"),
         value: "uploaded",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: t("function.filterUrl"),
         value: "file_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
 
@@ -990,7 +977,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
-      outlinedDelete,
+      "delete": "delete",
       filterQuery,
       filterData,
       getImageURL,

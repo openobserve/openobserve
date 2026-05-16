@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:inline-flex tw:items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
-          <q-icon
+          <OIcon
             name="error"
             size="1rem"
             class="q-mr-xs tw:text-[var(--o2-status-error-text)]!"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="closeSidebar"
         data-test="trace-details-sidebar-header-close-btn"
       >
-        <q-icon name="cancel" size="14px" />
+        <OIcon name="cancel" size="xs" />
       </OButton>
     </div>
     <div
@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <q-icon name="schedule"
-size="12px"
+            <OIcon name="schedule"
+size="xs"
 class="q-mr-xs" />
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
@@ -120,8 +120,8 @@ class="q-mr-xs" />
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <q-icon name="speed"
-size="12px"
+            <OIcon name="speed"
+size="xs"
 class="q-mr-xs" />
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
@@ -135,8 +135,8 @@ class="q-mr-xs" />
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <q-icon name="access_time"
-size="12px"
+            <OIcon name="access-time"
+size="xs"
 class="q-mr-xs" />
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
@@ -151,8 +151,8 @@ class="q-mr-xs" />
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
-            <q-icon name="replay"
-size="12px"
+            <OIcon name="replay"
+size="xs"
 class="q-mr-xs" />
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
@@ -170,12 +170,12 @@ class="q-mr-xs" />
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <q-icon name="tag"
-size="12px"
+            <OIcon name="tag"
+size="xs"
 class="q-mr-xs" />
             <span class="chip-value">{{ span.span_id }}</span>
-            <q-icon
-              name="content_copy"
+            <OIcon
+              name="content-copy"
               size="10px"
               class="q-ml-xs copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
@@ -229,7 +229,7 @@ class="q-mr-xs" />
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <q-icon name="arrow_upward"
+              <OIcon name="arrow-upward"
 size="10px"
 class="q-mr-xs" />
               <span class="chip-label">In</span>
@@ -243,7 +243,7 @@ class="q-mr-xs" />
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <q-icon name="arrow_downward"
+              <OIcon name="arrow-downward"
 size="10px"
 class="q-mr-xs" />
               <span class="chip-label">Out</span>
@@ -371,15 +371,15 @@ class="tw:h-full tw:overflow-y-auto">
           name="preview"
           class="llm-preview-panel q-pa-md"
         >
-          <div class="llm-preview-container tw:overflow-x-auto tw:w-full">
+          <div class="llm-preview-container tw:overflow-x-auto tw:w-full tw:h-full!">
             <!-- Input and Output Side by Side -->
             <div
-              class="flex io-container tw:w-full!"
+              class="flex io-container tw:w-full! tw:h-full!"
               :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section tw:pr-[0.5rem]">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -393,8 +393,8 @@ class="tw:h-full tw:overflow-y-auto">
                       "
                       @click="toggleFullscreen"
                     >
-                      <q-icon
-                        :name="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                      <OIcon
+                        :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
                         size="14px"
                       />
                     </OButton>
@@ -405,7 +405,7 @@ class="tw:h-full tw:overflow-y-auto">
                       @click="copyContent(span.gen_ai_input_messages, 'input')"
                       :disabled="!hasContent(span.gen_ai_input_messages)"
                     >
-                      <q-icon name="content_copy" size="14px" />
+                      <OIcon name="content-copy" size="xs" />
                     </OButton>
                   </div>
                 </div>
@@ -446,7 +446,7 @@ class="tw:h-full tw:overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="col-6 io-section">
+              <div class="tw:w-1/2 io-section">
                 <div
                   class="section-label text-bold q-mb-xs flex items-center justify-between"
                 >
@@ -460,8 +460,8 @@ class="tw:h-full tw:overflow-y-auto">
                       "
                       @click="toggleFullscreen"
                     >
-                      <q-icon
-                        :name="isFullscreen ? 'fullscreen_exit' : 'fullscreen'"
+                      <OIcon
+                        :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
                         size="14px"
                       />
                     </OButton>
@@ -472,7 +472,7 @@ class="tw:h-full tw:overflow-y-auto">
                       @click="copyContent(span.gen_ai_output_messages, 'output')"
                       :disabled="!hasContent(span.gen_ai_output_messages)"
                     >
-                      <q-icon name="content_copy" size="14px" />
+                      <OIcon name="content-copy" size="xs" />
                     </OButton>
                   </div>
                 </div>
@@ -520,7 +520,7 @@ class="tw:h-full tw:overflow-y-auto">
 size="xs"
 class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
-                  ><Braces class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="data-object" size="xs" class="tw:shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
@@ -528,7 +528,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
 size="xs"
 class="tw:h-5! tw:text-[0.75rem]!">
                 <template #icon-left
-                  ><Table2 class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="table-chart" size="xs" class="tw:shrink-0"
                 /></template>
                 Table
               </OToggleGroupItem>
@@ -562,12 +562,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
                     <q-item-label>
                       <span class="tw:mr-1 tw:inline-flex">
                         <OButton variant="ghost" size="icon-xs-circle">
-                          <q-icon
+                          <OIcon
                             color="currentColor"
                             class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
                           >
                             <component :is="action.iconComponent" />
-                          </q-icon>
+                          </OIcon>
                         </OButton>
                       </span>
                       <span class="tw:text-[0.85rem]!">{{
@@ -621,12 +621,12 @@ class="tw:h-5! tw:text-[0.75rem]!">
                         <q-item-label>
                           <span class="tw:mr-1 tw:inline-flex">
                             <OButton variant="ghost" size="icon-xs-circle">
-                              <q-icon
+                              <OIcon
                                 color="currentColor"
                                 class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
                               >
                                 <component :is="action.iconComponent" />
-                              </q-icon>
+                              </OIcon>
                             </OButton>
                           </span>
                           <span class="tw:text-[0.85rem]!">{{
@@ -648,17 +648,10 @@ class="tw:h-5! tw:text-[0.75rem]!">
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
             <div class="tw:flex tw:items-center tw:gap-2 tw:pb-[0.325rem]">
-              <q-toggle
-                class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:py-0!"
-                size="xs"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-toggle-button-xs-dark'
-                    : 'o2-toggle-button-xs-light'
-                "
+              <OSwitch
                 v-model="eventsWrap"
                 label="Wrap"
+                size="sm"
               />
             </div>
             <!-- TenstackTable for events -->
@@ -821,10 +814,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             "
           >
             <div class="tw:text-center">
-              <q-spinner-hourglass
+              <OSpinner
                 v-if="correlationLoading"
-                color="primary"
-                size="3rem"
+                size="lg"
                 class="tw:mb-4"
               />
               <div
@@ -877,10 +869,9 @@ class="tw:h-5! tw:text-[0.75rem]!">
             "
           >
             <div class="tw:text-center">
-              <q-spinner-hourglass
+              <OSpinner
                 v-if="correlationLoading"
-                color="primary"
-                size="3rem"
+                size="lg"
                 class="tw:mb-4"
               />
               <div
@@ -908,7 +899,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Braces, Table2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -956,6 +947,8 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -997,8 +990,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
-    Braces,
-    Table2,
+    OIcon,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1012,7 +1004,9 @@ export default defineComponent({
     AttributeValueCell,
     DeployedCode,
     DbSpanDetails,
-    TraceErrorTab
+    TraceErrorTab,
+    OSpinner,
+    OSwitch,
   },
   emits: [
     "close",
@@ -2076,6 +2070,10 @@ export default defineComponent({
   }
 }
 
+:deep(.span_details_tab-panels .o-tab-panel) {
+  height: 100%;
+}
+
 :deep(.traces-correlated-metrics-container) {
   .q-splitter--vertical .q-splitter__separator {
     height: 100% !important;
@@ -2368,28 +2366,28 @@ export default defineComponent({
 
     &.service-chip {
       border-left: 3px solid #0d6efd;
-      .q-icon {
+      .OIcon {
         color: #0d6efd;
       }
     }
 
     &.duration-chip {
       border-left: 3px solid #6610f2;
-      .q-icon {
+      .OIcon {
         color: #6610f2;
       }
     }
 
     &.ttft-chip {
       border-left: 3px solid #6f42c1;
-      .q-icon {
+      .OIcon {
         color: #6f42c1;
       }
     }
 
     &.time-chip {
       border-left: 3px solid #d63384;
-      .q-icon {
+      .OIcon {
         color: #d63384;
       }
     }
@@ -2398,7 +2396,7 @@ export default defineComponent({
       border-left: 3px solid #20c997;
       cursor: pointer;
 
-      .q-icon {
+      .OIcon {
         color: #20c997;
       }
 
@@ -2466,7 +2464,7 @@ export default defineComponent({
     &.model-chip {
       border-left: 3px solid #ab47bc;
 
-      .q-icon {
+      .OIcon {
         color: #7b1fa2;
       }
 
@@ -2489,7 +2487,7 @@ export default defineComponent({
       &.input-token-chip {
         border-left: 3px solid #42a5f5;
 
-        .q-icon,
+        .OIcon,
         .chip-label,
         .chip-value {
           color: #1565c0;
@@ -2499,7 +2497,7 @@ export default defineComponent({
       &.output-token-chip {
         border-left: 3px solid #66bb6a;
 
-        .q-icon,
+        .OIcon,
         .chip-label,
         .chip-value {
           color: #2e7d32;
@@ -2510,7 +2508,7 @@ export default defineComponent({
     &.cost-chip {
       border-left: 3px solid #ef6c00;
 
-      .q-icon {
+      .OIcon {
         color: #ef6c00;
       }
 
@@ -2600,7 +2598,7 @@ body.body--dark {
       &.model-chip {
         border-left: 3px solid #ab47bc;
 
-        .q-icon {
+        .OIcon {
           color: #ce93d8;
         }
 
@@ -2613,7 +2611,7 @@ body.body--dark {
         &.input-token-chip {
           border-left: 3px solid #42a5f5;
 
-          .q-icon,
+          .OIcon,
           .chip-label,
           .chip-value {
             color: #90cdf4;
@@ -2623,7 +2621,7 @@ body.body--dark {
         &.output-token-chip {
           border-left: 3px solid #66bb6a;
 
-          .q-icon,
+          .OIcon,
           .chip-label,
           .chip-value {
             color: #9ae6b4;
@@ -2634,7 +2632,7 @@ body.body--dark {
       &.cost-chip {
         border-left: 3px solid #ef6c00;
 
-        .q-icon {
+        .OIcon {
           color: #ffcc80;
         }
 
@@ -2650,25 +2648,13 @@ body.body--dark {
   }
 }
 
-.llm-preview-panel {
+.llm-preview-container {
   overflow: hidden; // Prevent scroll at panel level
 
   .section-label {
     color: var(--o2-text-primary);
     font-size: 14px;
     margin-bottom: 0.5rem;
-  }
-
-  .io-container {
-    display: flex;
-    gap: 0.5rem;
-    width: calc(100vw - 350px);
-    height: calc(
-      100vh - 17.2rem
-    ); // Fixed height for the container (with 2-row toolbar for LLM spans)
-    max-height: calc(100vh - 17.2rem);
-    align-items: stretch; // Ensure equal heights
-    overflow: hidden; // Prevent scroll at outer level
   }
 
   .io-section {
@@ -2814,7 +2800,7 @@ body.body--dark {
     align-items: center;
     font-size: 12px;
 
-    .q-icon {
+    .OIcon {
       margin-right: 2px !important;
       font-size: 14px;
       margin-bottom: 1px;

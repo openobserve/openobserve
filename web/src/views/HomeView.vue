@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
+  <div class="tw:rounded-md tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
 
     <div class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto" style="max-height: calc(100vh - var(--navbar-height) - 18px)">
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dragend="onTabDragEnd"
           @dragenter.prevent="onTabDragEnter(tab.id)"
         >
-          <q-icon
-          name="drag_indicator"
+          <OIcon
+          name="drag-indicator"
           class="home-tab-drag-handle"
           size="0.875em"
         />
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <UsageTab />
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -89,6 +89,7 @@ import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -222,7 +223,8 @@ export default defineComponent({
     O2AIChat,
     HomeChatHistory,
     OButton,
-  },
+    OIcon,
+},
 });
 </script>
 

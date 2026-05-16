@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page>
+  <div class="tw:rounded-md">
     <div
       style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
     >
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
       <OButton variant="primary" class="q-mt-md" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">

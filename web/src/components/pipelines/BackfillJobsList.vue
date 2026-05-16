@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="backfill-jobs-list-page">
+  <div class="tw:rounded-md" data-test="backfill-jobs-list-page">
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header -->
       <div class="card-container tw:mb-[0.625rem]">
@@ -28,11 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-sq"
               @click="goBack"
               data-test="backfill-jobs-back-btn"
-            >
-              <template #icon-left>
-                <ChevronLeft class="tw:size-3.5 tw:shrink-0" />
-              </template>
-            </OButton>
+              icon-left="chevron-left"
+            />
             <div class="q-table__title tw:font-[600] q-ml-sm">
               Backfill Jobs
             </div>
@@ -93,10 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="refreshJobs"
               :disabled="loading"
               data-test="refresh-btn"
+              icon-left="refresh"
             >
-              <template #icon-left>
-                <RefreshCw class="tw:size-3.5 tw:shrink-0" />
-              </template>
               <q-tooltip>Refresh</q-tooltip>
             </OButton>
           </div>
@@ -152,23 +147,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td :props="props">
                 <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
                   <div class="tw:flex-1 tw:relative">
-                    <q-linear-progress
+                    <OProgressBar
                       :value="props.row.progress_percent / 100"
-                      :color="getProgressColor(props.row.deletion_status)"
-                      size="20px"
-                      rounded
+                      variant="default"
+                      size="lg"
                       data-test="progress-bar"
                     >
-                      <div
-                        class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center"
-                      >
-                        <div
-                          class="text-caption tw:font-semibold tw:text-white tw:drop-shadow-sm"
-                        >
-                          {{ props.row.progress_percent }}%
-                        </div>
-                      </div>
-                    </q-linear-progress>
+                      <template #label>
+                        <span class="text-caption tw:font-semibold">{{ props.row.progress_percent }}%</span>
+                      </template>
+                    </OProgressBar>
                   </div>
                   <div
                     v-if="props.row.chunks_total"
@@ -211,11 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="confirmPauseJob(props.row)"
                     data-test="pause-job-btn"
+                    icon-left="pause"
                   >
-                    <template #icon-left>
-                      <Pause class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                    <q-tooltip>Pause Job</q-tooltip>
+                    <q-tooltip>Job</q-tooltip>
                   </OButton>
                   <OButton
                     v-if="canResumeJob(props.row)"
@@ -223,10 +209,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="confirmResumeJob(props.row)"
                     data-test="resume-job-btn"
+                    icon-left="play-arrow"
                   >
-                    <template #icon-left>
-                      <Play class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Resume Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -235,10 +219,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="editJob(props.row)"
                     data-test="edit-job-btn"
+                    icon-left="edit"
                   >
-                    <template #icon-left>
-                      <Pencil class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Edit Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -246,10 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="viewJob(props.row)"
                     data-test="view-job-btn"
+                    icon-left="visibility"
                   >
-                    <template #icon-left>
-                      <Eye class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>View Details</q-tooltip>
                   </OButton>
                   <OButton
@@ -258,10 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="confirmDeleteJob(props.row)"
                     data-test="delete-job-btn"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Delete Job</q-tooltip>
                   </OButton>
                   <OButton
@@ -270,10 +248,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     @click="showErrorDialog(props.row)"
                     data-test="error-indicator-btn"
+                    icon-left="error"
                   >
-                    <template #icon-left>
-                      <AlertCircle class="tw:size-3.5 tw:shrink-0" />
-                    </template>
                     <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
                   </OButton>
                 </div>
@@ -326,51 +302,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Error Dialog -->
-    <q-dialog v-model="errorDialogVisible" @hide="closeErrorDialog">
-      <q-card class="backfill-error-dialog" style="min-width: 500px">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">
-            <q-icon name="error" color="negative" size="24px" class="q-mr-sm" />
-            Backfill Job Error
+    <ODialog data-test="backfill-jobs-list-error-dialog"
+      v-model:open="errorDialogVisible"
+      size="md"
+      title="Backfill Job Error"
+      primary-button-label="Close"
+      @update:open="(v) => !v && closeErrorDialog()"
+      @click:primary="errorDialogVisible = false; closeErrorDialog()"
+    >
+      <template #header-left>
+        <OIcon name="error" size="sm" />
+      </template>
+
+      <div v-if="errorDialogData">
+        <div class="q-mb-md">
+          <div class="text-caption text-grey-6">Job ID</div>
+          <div class="text-body2 text-weight-medium">
+            {{ errorDialogData.job_id }}
           </div>
-          <q-space />
-          <OButton variant="ghost" size="icon" v-close-popup>
-            <q-icon name="close" size="14px" />
-          </OButton>
-        </q-card-section>
+        </div>
 
-        <q-separator />
-
-        <q-card-section v-if="errorDialogData">
-          <div class="q-mb-md">
-            <div class="text-caption text-grey-6">Job ID</div>
-            <div class="text-body2 text-weight-medium">
-              {{ errorDialogData.job_id }}
-            </div>
+        <div class="q-mb-md">
+          <div class="text-caption text-grey-6">Pipeline</div>
+          <div class="text-body2">
+            {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-caption text-grey-6">Pipeline</div>
-            <div class="text-body2">
-              {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
-            </div>
+        <div>
+          <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
+          <div class="error-message-box">
+            {{ errorDialogData.error }}
           </div>
+        </div>
+      </div>
 
-          <div>
-            <div class="text-caption text-grey-6 q-mb-sm">Error Message</div>
-            <div class="error-message-box">
-              {{ errorDialogData.error }}
-            </div>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    </ODialog>
 
     <!-- Confirm Dialog -->
     <ConfirmDialog
@@ -380,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="confirmDialog.onConfirm"
       @update:cancel="resetConfirmDialog"
     />
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -390,19 +357,15 @@ import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronLeft, RefreshCw, Pause, Play, Pencil, Eye, Trash2, AlertCircle } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import NoData from "../shared/grid/NoData.vue";
 import QTablePagination from "../shared/grid/Pagination.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedVisibility,
-} from "@quasar/extras/material-icons-outlined";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 
 const router = useRouter();
 const $q = useQuasar();
@@ -653,7 +616,7 @@ const resetConfirmDialog = () => {
 const confirmPauseJob = (job: BackfillJob) => {
   confirmDialog.value = {
     show: true,
-    title: "Pause Backfill Job",
+    title: "Backfill Job",
     message: `Are you sure you want to pause the backfill job for "${job.pipeline_name || job.pipeline_id}"? You can resume it later.`,
     onConfirm: () => pauseJob(job.pipeline_id, job.job_id),
   };

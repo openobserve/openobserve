@@ -9,7 +9,7 @@
       data-test="dashboard-sort-by-item-clear"
     >
       <template #icon-left
-        ><q-icon name="block" style="font-size: 16px"
+        ><OIcon name="block" size="sm" style="font-size: 16px"
       /></template>
     </OButton>
     <OButton
@@ -41,10 +41,13 @@ import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
 import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "SortByBtnGrp",
-  components: { OButtonGroup, AscSort, DescSort, OButton },
+  components: { OButtonGroup, AscSort, DescSort, OButton,
+    OIcon,
+},
   props: {
     fieldObj: {
       type: Object,

@@ -58,7 +58,7 @@ function mountTable() {
           props: ["modelValue", "placeholder", "filled", "borderless", "dense"],
           emits: ["update:modelValue"],
         },
-        "q-icon": true,
+        "OIcon": true,
         "q-btn": {
           template:
             "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",

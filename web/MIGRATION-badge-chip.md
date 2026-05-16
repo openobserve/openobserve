@@ -330,7 +330,6 @@ The vast majority of usages map cleanly:
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
 | `src/components/cross-linking/CrossLinkManager.vue` | 49 | 1 | label chip | ⬜ |
-| `src/components/cross-linking/CrossLinkDialog.vue` | 53 | 1 | label chip | ⬜ |
 
 ### pipelines/
 
@@ -343,12 +342,6 @@ The vast majority of usages map cleanly:
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
 | `src/components/ingestion/recommended/AWSQuickSetup.vue` | 76, 168, 338 | 3 | `primary` label chips | ⬜ |
-
-### anomaly_detection/
-
-| File | Lines | Usages | Notes | Status |
-|------|-------|--------|-------|--------|
-| `src/components/anomaly_detection/steps/AnomalyAlerting.vue` | 97 | 1 | label chip | ⬜ |
 
 ### ai_toolsets/
 
@@ -389,6 +382,18 @@ The vast majority of usages map cleanly:
 |------|-------|--------|-------|--------|
 | `src/enterprise/components/billings/proPlan.vue` | 24, 75, 87, 103 | 4 | pricing plan chips | ⬜ |
 | `src/enterprise/components/billings/enterprisePlan.vue` | 24 | 1 | pricing plan chip | ⬜ |
+
+---
+
+## Deferred — needs `OTag` (NOT `OBadge`)
+
+These chips use `removable` + `@remove` and are form-input style, not display badges. Migrate when the `OTag` component is built.
+
+| File | Lines | Usages | Notes | Status |
+|------|-------|--------|-------|--------|
+| `src/components/alerts/TagInput.vue` | — | 1 | `q-chip removable @remove` inside form input | ⛔ Excluded |
+| `src/components/anomaly_detection/steps/AnomalyAlerting.vue` | 97 | 1 | `q-chip removable @remove` inside `OSelect` selected-item slot | ⛔ Excluded |
+| `src/components/cross-linking/CrossLinkDialog.vue` | 53 | 1 | `q-chip removable @remove` for field tags | ⛔ Excluded |
 
 ---
 
@@ -492,8 +497,17 @@ These test files mock `q-badge`/`q-chip` components or query `.q-chip`/`.q-badge
 
 | File | Lines | What to update |
 |------|-------|---------------|
-| `src/components/settings/BuiltInPatternsTab.spec.ts` | 128 | Remove `q-chip` mock from global stubs |
+| `src/components/PredefinedThemes.spec.ts` | — | Update `q-badge`/`q-chip` stubs/selectors after parent migration |
+| `src/components/cross-linking/CrossLinkDialog.spec.ts` | — | Update `q-chip` stubs/selectors after parent migration |
 | `src/components/cross-linking/CrossLinkManager.spec.ts` | 58–64, 155 | Remove `q-chip`/`q-badge` mocks; update `.q-chip` selector to new class |
+| `src/components/queries/RunningQueries.spec.ts` | — | Update `q-badge`/`q-chip` stubs/selectors after parent migration |
+| `src/components/settings/BuiltInPatternsTab.spec.ts` | 128 | Remove `q-chip` mock from global stubs |
+| `src/components/settings/DiscoveredServices.spec.ts` | — | Update `q-badge`/`q-chip` stubs/selectors after parent migration |
+| `src/components/settings/Nodes.spec.ts` | — | Update `q-badge` stub after parent migration |
+| `src/components/settings/ServiceIdentityConfig.spec.ts` | — | Update `q-chip` stubs after parent migration |
+| `src/components/settings/TestModelMatchDialog.spec.ts` | — | Update `q-badge` stub after parent migration |
+| `src/enterprise/components/billings/enterprisePlan.spec.ts` | — | Update `q-chip` stubs after parent migration |
+| `src/enterprise/components/billings/proPlan.spec.ts` | — | Update `q-chip` stubs after parent migration |
 
 ---
 
@@ -508,9 +522,10 @@ These test files mock `q-badge`/`q-chip` components or query `.q-chip`/`.q-badge
 | Category | Total files | Done | Remaining |
 |----------|------------|------|-----------|
 | q-badge | 30 | 0 | 30 |
-| q-chip (display) | 23 | 0 | 23 |
+| q-chip (display) | 22 | 0 | 22 |
+| Deferred — needs `OTag` | 3 | 0 | 3 (excluded from scope) |
 | CSS-only refs | 5 | 0 | 5 |
-| Test mocks | 2 | 0 | 2 |
-| **Total** | **60** | **0** | **60** |
+| Test mocks | 11 | 0 | 11 |
+| **Total (in scope)** | **68** | **0** | **68** |
 
 _Update this table as files are completed._

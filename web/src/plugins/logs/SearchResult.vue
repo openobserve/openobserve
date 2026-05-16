@@ -48,20 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : noOfRecordsTitle
           }}
           <span v-if="searchObj.loadingCounter" class="q-ml-md">
-            <q-spinner-hourglass
-              color="primary"
-              size="25px"
-              class="search-spinner"
-            />
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-            >
-              <span class="search-loading-text"
-                >Fetching the search events</span
-              >
-            </q-tooltip>
+            <OSpinner size="xs" class="search-spinner" />
           </span>
           <div
             v-else-if="
@@ -77,10 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- {{ searchObj.data.histogram.errorMsg }} -->
-            <q-icon name="info" color="warning" size="sm"> </q-icon>
-            <q-tooltip position="top" class="tw:text-sm tw:font-semi-bold">
-              {{ searchObj.data.histogram.errorMsg }}
-            </q-tooltip>
+            <OIcon name="info-outline" size="sm"> </OIcon>
+            <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
           <!-- Inspect Button -->
           <OButton
@@ -97,10 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openSearchJobInspector"
             data-test="logs-inspect-button"
           >
-            <q-icon name="troubleshoot" size="xs" />
-            <q-tooltip>
-              {{ t("volumeInsights.searchInspectionsLabel") }}
-            </q-tooltip>
+            <OIcon name="troubleshoot" size="xs" />
+            <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
           </OButton>
           <!-- Volume Analysis Button -->
           <OButton
@@ -114,10 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openVolumeAnalysisDashboard"
             data-test="logs-analyze-dimensions-button"
           >
-            <q-icon name="timeline" size="xs" />
-            <q-tooltip>
-              {{ t("volumeInsights.analyzeTooltipLogs") }}
-            </q-tooltip>
+            <OIcon name="timeline" size="xs" />
+            <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
           </OButton>
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
@@ -167,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
             data-test="logs-search-result-pagination"
           />
-          <q-select
+          <OSelect
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs'
@@ -177,10 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="rowsPerPageOptions"
             class="float-right select-pagination"
             size="sm"
-            dense
-            borderless
             @update:model-value="getPageData('recordsPerPage')"
-          ></q-select>
+          />
           <!-- Wrap Content Button -->
           <OButton
             v-if="
@@ -198,10 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
             "
           >
-            <q-icon name="wrap_text" />
-            <q-tooltip>
-              {{ t("search.messageWrapContent") }}
-            </q-tooltip>
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
         </div>
       </div>
@@ -250,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <h6 class="text-center">
               <span class="histogram-empty__message">
-                <q-icon name="warning" color="warning" size="xs"></q-icon> No
+                <OIcon name="warning" size="xs"></OIcon> No
                 data found for histogram.</span
               >
             </h6>
@@ -271,11 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="q-pb-sm histogram-loader" v-if="histogramLoader">
-            <q-spinner-hourglass
-              color="primary"
-              size="25px"
-              class="search-spinner"
-            />
+            <OSpinner size="xs" class="search-spinner" />
           </div>
         </div>
         <div
@@ -299,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data.histogram.errorCode != -1
             "
           >
-            <q-icon name="warning" color="warning" size="xs"></q-icon> Error
+            <OIcon name="warning" size="xs"></OIcon> Error
             while fetching histogram data.
             <OButton
               variant="secondary"
@@ -448,16 +421,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end combined scroll area -->
 
-      <q-dialog
+      <ODrawer
+        lazy
         data-test="logs-search-result-detail-dialog"
-        v-model="searchObj.meta.showDetailTab"
-        position="right"
-        full-height
-        maximized
-        allow-focus-outside
-        @escap.stop="reDrawChart"
-        @hide="reDrawChart"
-        @before-hide="reDrawChart"
+        v-model:open="searchObj.meta.showDetailTab"
+        :width="85"
+        :title="t('search.rowDetail')"
+        @update:open="(v) => !v && reDrawChart()"
       >
         <DetailTable
           v-if="searchObj.data.queryResults?.hits?.length"
@@ -484,6 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
+          @close="searchObj.meta.showDetailTab = false"
           @view-trace="
             redirectToTraces(
               searchObj.data.queryResults.hits[
@@ -495,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
-      </q-dialog>
+      </ODrawer>
 
       <!-- Pattern Details Drawer -->
       <PatternDetailsDialog
@@ -592,12 +563,21 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
     OButton,
+    ODrawer,
+    OSpinner,
+    OTooltip,
+    OSelect,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -617,7 +597,8 @@ export default defineComponent({
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
-  },
+    OIcon,
+},
   emits: [
     "update:scroll",
     "update:datetime",

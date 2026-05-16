@@ -15,8 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none tw:flex tw:flex-col"
+  <div class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -29,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('modelPricing.goBack')"
         @click="goBack"
       >
-        <q-icon name="arrow_back_ios_new" size="14px" />
+        <OIcon name="arrow-back-ios-new" size="xs" />
       </div>
       <div class="tw:flex tw:flex-col tw:justify-center">
         <div
@@ -70,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex-1">
               <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label">
                 {{ t("modelPricing.modelNameField") }}
-                <q-icon
+                <OIcon
                   name="info"
-                  size="14px"
+                  size="xs"
                   class="q-ml-xs cursor-pointer"
                   :class="
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
@@ -87,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       t("modelPricing.modelNameTooltip")
                     }}</span>
                   </q-tooltip>
-                </q-icon>
+                </OIcon>
               </div>
               <q-input
                 v-model="model.name"
@@ -108,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <q-icon
+                  <OIcon
                     name="info"
-                    size="14px"
+                    size="xs"
                     class="q-ml-xs cursor-pointer"
                     :class="
                       store.state.theme === 'dark'
@@ -127,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         t("modelPricing.matchPatternTooltip")
                       }}</span>
                     </q-tooltip>
-                  </q-icon>
+                  </OIcon>
                 </div>
                 <q-input
                   v-model="model.match_pattern"
@@ -148,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="pattern-examples-btn tw:mt-7"
                 @click="showExamples = true"
               >
-                <q-icon name="lightbulb_outline" size="14px" />
+                <OIcon name="lightbulb-outline" size="xs" />
                 <q-tooltip
                   anchor="top right"
                   self="bottom right"
@@ -159,64 +158,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
 
               <!-- Pattern Examples Dialog -->
-              <q-dialog v-model="showExamples">
-                <q-card class="pattern-examples-card">
-                  <q-card-section
-                    class="tw:flex tw:items-center tw:justify-between tw:pb-0"
+              <ODialog data-test="model-pricing-editor-examples-dialog" v-model:open="showExamples" size="sm"
+                :title="t('modelPricing.patternExamplesTitle')"
+                :sub-title="t('modelPricing.patternExamplesDesc')"
+              >
+                <div class="examples-table">
+                  <div class="examples-table-head">
+                    <span>{{
+                      t("modelPricing.patternExamplesModelCol")
+                    }}</span>
+                    <span>{{
+                      t("modelPricing.patternExamplesPatternCol")
+                    }}</span>
+                  </div>
+                  <div
+                    v-for="ex in patternExamples"
+                    :key="ex.name"
+                    class="examples-table-row"
                   >
-                    <div>
-                      <div class="tw:font-semibold tw:text-sm">
-                        {{ t("modelPricing.patternExamplesTitle") }}
-                      </div>
-                      <div class="tw:text-xs tw:opacity-50 tw:mt-0.5">
-                        {{ t("modelPricing.patternExamplesDesc") }}
-                      </div>
-                    </div>
-                    <OButton variant="ghost" size="icon" v-close-popup>
-                      <q-icon name="cancel" size="14px" />
+                    <span class="examples-model-name">{{ ex.name }}</span>
+                    <code class="examples-pattern">{{
+                      ex.match_pattern
+                    }}</code>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="examples-copy-btn"
+                      @click="copyPattern(ex.match_pattern)"
+                    >
+                      <OIcon
+                        :name="copiedPattern === ex.match-pattern ? 'check' : 'content-copy'"
+                        size="12px"
+                        :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
+                      />
+                      <q-tooltip :offset="[0, 4]">{{
+                        copiedPattern === ex.match_pattern
+                          ? t("modelPricing.copied")
+                          : t("modelPricing.copyPattern")
+                      }}</q-tooltip>
                     </OButton>
-                  </q-card-section>
-                  <q-card-section class="tw:pt-3">
-                    <div class="examples-table">
-                      <div class="examples-table-head">
-                        <span>{{
-                          t("modelPricing.patternExamplesModelCol")
-                        }}</span>
-                        <span>{{
-                          t("modelPricing.patternExamplesPatternCol")
-                        }}</span>
-                      </div>
-                      <div
-                        v-for="ex in patternExamples"
-                        :key="ex.name"
-                        class="examples-table-row"
-                      >
-                        <span class="examples-model-name">{{ ex.name }}</span>
-                        <code class="examples-pattern">{{
-                          ex.match_pattern
-                        }}</code>
-                        <OButton
-                          variant="ghost"
-                          size="icon-xs-sq"
-                          class="examples-copy-btn"
-                          @click="copyPattern(ex.match_pattern)"
-                        >
-                          <q-icon
-                            :name="copiedPattern === ex.match_pattern ? 'check' : 'content_copy'"
-                            size="12px"
-                            :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
-                          />
-                          <q-tooltip :offset="[0, 4]">{{
-                            copiedPattern === ex.match_pattern
-                              ? t("modelPricing.copied")
-                              : t("modelPricing.copyPattern")
-                          }}</q-tooltip>
-                        </OButton>
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </q-dialog>
+                  </div>
+                </div>
+              </ODialog>
             </div>
           </div>
         </div>
@@ -260,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     @click="removeTier(idx as number)"
                   >
-                    <q-icon :name="outlinedDelete" size="14px" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                 </div>
               </div>
@@ -397,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon"
                         @click="deletePrice(tier, entry.key)"
                       >
-                        <q-icon :name="outlinedDelete" size="14px" />
+                        <OIcon name="delete" size="sm" />
                       </OButton>
                     </div>
 
@@ -447,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!addState[idx as number].key.trim()"
                         @click="addPrice(tier, idx)"
                       >
-                        <q-icon name="add" size="14px" />
+                        <OIcon name="add" size="xs" />
                       </OButton>
                     </div>
                   </div>
@@ -549,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("modelPricing.save") }}
       </OButton>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -559,8 +542,9 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -1274,11 +1258,6 @@ onBeforeMount(async () => {
   &:hover {
     opacity: 1;
   }
-}
-
-.pattern-examples-card {
-  min-width: 480px;
-  max-width: 560px;
 }
 
 .examples-table {

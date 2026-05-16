@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <q-page class="logPage" id="logPage">
+  <div class="tw:rounded-md logPage" id="logPage">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
@@ -96,12 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @click="collapseFieldList"
                   ><template #icon-left>
-                    <q-icon
+                    <OIcon
                       :name="
                         searchObj.meta.showFields
-                          ? 'chevron_left'
-                          : 'chevron_right'
-                      "
+                          ? 'chevron-left'
+                          : 'chevron-right'
+                      " size="sm"
                     />
                   </template>
                 </OButton>
@@ -119,9 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:justify-center"
                     >
                       <h5 class="text-center">
-                        <q-icon
+                        <OIcon
                           name="warning"
-                          color="warning"
                           size="10rem"
                         /><br />
                         <div
@@ -212,8 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="logs-search-no-stream-selected-text"
                         class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
-size="md" />
+                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.noStreamSelectedMessage") }}
                       </h6>
                     </div>
@@ -231,7 +229,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <OIcon name="info"
 size="md" />
                         {{ t("search.noRecordFound") }}
                         <OButton
@@ -261,7 +259,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <OIcon name="info"
 size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
@@ -279,7 +277,7 @@ size="md" />
                         data-test="logs-search-error-message"
                         class="text-center q-ma-none col-10 tw:pt-[2rem]"
                       >
-                        <q-icon name="info" color="primary"
+                        <OIcon name="info"
 size="md" />
                         {{ t("search.applySearch") }}
                       </h6>
@@ -378,10 +376,9 @@ size="md" />
         >
           <div>
             <div>
-              <q-icon
+              <OIcon
                 name="history"
                 size="100px"
-                color="gray"
                 class="search-history-empty__icon"
               />
             </div>
@@ -391,8 +388,8 @@ size="md" />
             <div
               class="search-history-empty__info q-mt-sm flex items-center justify-center"
             >
-              <q-icon name="info" class="q-mr-xs"
-size="20px" />
+              <OIcon name="info" class="q-mr-xs"
+size="md" />
               <span class="text-h6 text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
@@ -417,7 +414,7 @@ size="20px" />
         :isClicked="showSearchScheduler"
       />
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -498,7 +495,7 @@ import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { ChevronRight, ChevronLeft } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -512,8 +509,6 @@ export default defineComponent({
     SearchBar,
     IndexList,
     OButton,
-    ChevronRight,
-    ChevronLeft,
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
@@ -530,7 +525,8 @@ export default defineComponent({
     SearchHistory: defineAsyncComponent(
       () => import("@/plugins/logs/SearchHistory.vue"),
     ),
-  },
+    OIcon,
+},
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
   methods: {

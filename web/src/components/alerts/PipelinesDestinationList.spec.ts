@@ -488,8 +488,8 @@ describe('PipelinesDestinationList Component - Comprehensive Function Tests', ()
       expect(typeof wrapper.vm.getImageURL).toBe('function');
     });
 
-    it('should have outlinedDelete icon', () => {
-      expect(wrapper.vm.outlinedDelete).toBeDefined();
+    it('should have "delete" icon', () => {
+      expect(wrapper.vm."delete").toBeDefined();
     });
 
     it('should have store and translation functions', () => {

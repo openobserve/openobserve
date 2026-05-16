@@ -7,38 +7,35 @@
       data-test="test-function-query-section"
       class="test-function-query-container tw:w-[100%] tw:mt-2"
     >
-      <q-form ref="querySelectionRef" @submit="getResults">
-        <FullViewContainer
+      <FullViewContainer
           data-test="test-function-query-title-section"
           name="function"
           v-model:is-expanded="expandState.query"
           :label="t('common.query')"
         >
           <template #left>
-            <q-icon
+            <OIcon
               v-if="!!sqlQueryErrorMsg"
-              name="info"
+              name="info-outline"
               class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-              size="16px"
+              size="sm"
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                :offset="[10, 10]"
-                class="tw:text-[12px]"
-              >
-                {{ sqlQueryErrorMsg }}
-              </q-tooltip>
-            </q-icon>
+              <OTooltip
+                side="right"
+                align="center"
+                :side-offset="10"
+                :content="sqlQueryErrorMsg"
+              />
+            </OIcon>
           </template>
           <template #right>
             <OButton
               variant="primary"
               size="sm-action"
-              type="submit"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
+              @click="getResults"
             >
-              <Search :size="14" class="tw:mr-1" />
+              <OIcon name="search" size="sm"  class="tw:mr-1" />
               {{ t('search.runQuery') }}
             </OButton>
           </template>
@@ -63,18 +60,11 @@
               {{ t("alerts.streamType") + " *" }}
             </div>
 
-            <q-select
+            <OSelect
               v-model="selectedStream.type"
               :options="streamTypes"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-xs showLabelOnTop no-case"
-              emit-value
-              stack-label
-              outlined
-              filled
-              dense
+              labelKey="label"
+              valueKey="value"
               @update:model-value="updateStreams()"
               style="width: 100px"
             />
@@ -90,25 +80,14 @@
             >
               {{ t("alerts.stream_name") + " *" }}
             </div>
-            <q-select
+            <OSelect
               v-model="selectedStream.name"
               :options="filteredStreams"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-xs showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              hide-selected
-              fill-input
               :loading="isFetchingStreams"
+              searchable
               style="min-width: 120px"
-              @filter="filterStreams"
+              @search="filterStreams"
               @update:model-value="updateQuery"
-              :rules="[(val: any) => !!val || '']"
             />
           </div>
           <div class="functions-duration-input tw:w-[330px]">
@@ -168,7 +147,6 @@
             </div>
           </div>
         </div>
-      </q-form>
     </div>
   </div>
   <div>
@@ -184,26 +162,24 @@
             v-if="loading.events"
             class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
           >
-            <q-spinner-hourglass size="18px" />
+            <OSpinner size="xs" />
             <div class="tw:relative tw:top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
-          <q-icon
+          <OIcon
             v-if="!!eventsErrorMsg"
-            name="info"
+            name="info-outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-            size="16px"
+            size="sm"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              :offset="[10, 10]"
-              class="tw:text-[12px]"
-            >
-              {{ eventsErrorMsg }}
-            </q-tooltip>
-          </q-icon>
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="eventsErrorMsg"
+            />
+          </OIcon>
         </template>
         <template #right>
            <!-- o2 ai context add button in the test function -->
@@ -244,27 +220,25 @@
             v-if="loading.output"
             class="text-subtitle2 text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
           >
-            <q-spinner-hourglass size="18px" />
+            <OSpinner size="xs" />
             <div class="tw:relative tw:top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
 
-          <q-icon
+          <OIcon
             v-if="!!outputEventsErrorMsg"
-            name="info"
+            name="info-outline"
             class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-            size="16px"
+            size="sm"
           >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              :offset="[10, 10]"
-              class="tw:text-[12px]"
-            >
-              {{ outputEventsErrorMsg }}
-            </q-tooltip>
-          </q-icon>
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="outputEventsErrorMsg"
+            />
+          </OIcon>
         </template>
       </FullViewContainer>
 
@@ -277,8 +251,8 @@
           v-if="!outputEvents"
           class="tw:absolute tw:z-10 tw:flex tw:flex-col tw:justify-center tw:items-center tw:w-full tw:h-full tw:opacity-90"
         >
-          <q-icon
-            :name="outlinedLightbulb"
+          <OIcon
+            name="lightbulb"
             size="40px"
             class="tw:text-orange-400"
           />
@@ -322,7 +296,6 @@ import { useI18n } from "vue-i18n";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import useQuery from "@/composables/useQuery";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
@@ -333,7 +306,10 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Search, FileText, BarChart2, Activity } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const props = defineProps({
   vrlFunction: {
@@ -387,8 +363,6 @@ const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
-const querySelectionRef = ref<any>();
-
 const outputEventsErrorMsg = ref<string>("");
 
 const loading = ref({
@@ -408,9 +382,9 @@ const { getStreams } = useStreams();
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs", icon: FileText },
-  { label: "Metrics", value: "metrics", icon: BarChart2 },
-  { label: "Traces", value: "traces", icon: Activity },
+  { label: "Logs", value: "logs", icon: "description" },
+  { label: "Metrics", value: "metrics", icon: "bar-chart" },
+  { label: "Traces", value: "traces", icon: "activity" },
 ];
 
 const isFetchingStreams = ref(false);
@@ -486,25 +460,16 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(streams.value, val, update);
+const filterStreams = (val: string) => {
+  filteredStreams.value = filterColumns(streams.value, val);
 };
 
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
+const filterColumns = (options: any[], val: string) => {
+  if (val === "") return [...options];
+  const value = val.toLowerCase();
+  return options.filter(
+    (column: any) => column.toLowerCase().indexOf(value) > -1,
+  );
 };
 
 const updateQuery = () => {
@@ -798,7 +763,7 @@ defineExpose({
     font-size: 11px !important;
     margin: 1px 2px !important;
 
-    .q-icon {
+    .OIcon {
       margin-right: 4px !important;
       font-size: 13px;
     }
@@ -830,7 +795,7 @@ defineExpose({
   :deep(.date-time-button) {
     width: 100%;
 
-    .q-icon.on-right {
+    .OIcon.on-right {
       margin-left: auto;
     }
   }
