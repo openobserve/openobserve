@@ -396,7 +396,8 @@
     "traces": "Spuren",
     "switchToLogs": "klicken Sie hier, um zurück zu Logs zu wechseln",
     "patternNoValuesAvailable": "Keine Werte verfügbar",
-    "selectLogStream": "Logs-Stream auswählen"
+    "selectLogStream": "Logs-Stream auswählen",
+    "noData": "Keine Daten verfügbar"
   },
   "menu": {
     "home": "Startseite",
