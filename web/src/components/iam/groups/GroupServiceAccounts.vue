@@ -61,33 +61,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto card-container">
+      <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
         <template v-if="rows.length">
-          <app-table
-            :rows="visibleRows"
+          <OTable
+            :data="rows"
             :columns="columns"
-            :dense="true"
-            :virtual-scroll="false"
-            style="height: fit-content"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            :tableStyle="hasVisibleRows ? 'height: 100%; overflow-y: auto;' : ''"
-            :hideTopPagination="true"
-            :showBottomPaginationWithTitle="true"
-            :filter="{
-              value: userSearchKey,
-              method: filterUsers,
-            }"
-            :title="t('iam.serviceAccounts')"
+            row-key="email"
+            :global-filter="userSearchKey"
+            pagination="client"
+            :page-size="100"
+            sorting="client"
+            filter-mode="client"
+            :default-columns="false"
+            :show-global-filter="false"
+            dense
           >
-            <template v-slot:select="slotProps: any">
+            <template #cell-select="{ row }">
               <OCheckbox
-                :data-test="`iam-service-accounts-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
-                v-model="slotProps.column.row.isInGroup"
+                :data-test="`iam-service-accounts-selection-table-body-row-${row.email}-checkbox`"
+                :model-value="row.isInGroup"
                 class="filter-check-box cursor-pointer"
-                @click="toggleUserSelection(slotProps.column.row)"
+                @update:model-value="toggleUserSelection(row)"
               />
             </template>
-          </app-table>
+          </OTable>
         </template>
         <div
           data-test="iam-service-accounts-selection-table-no-users-text"
@@ -101,14 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </template>
   
   <script setup lang="ts">
-  import AppTable from "@/components/AppTable.vue";
+  import OTable from "@/lib/core/Table/OTable.vue";
+  import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
   import OInput from "@/lib/forms/Input/OInput.vue";
   import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";
-  import { computed, watch } from "vue";
+  import { watch } from "vue";
   import type { Ref } from "vue";
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
@@ -165,23 +163,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   const { serviceAccountsState } = usePermissions();
   
-  const columns = [
+  const columns: OTableColumnDef[] = [
     {
-      name: "select",
-      field: "",
-      label: "",
-      align: "left",
-      sortable: false,
-      slot: true,
-      slotName: "select",
-      style: "width: 67px"
+      id: "select",
+      header: "",
+      accessorKey: "isInGroup",
+    cell: (info: any) => info.getValue(),
+    size: 36,
+      minSize: 32,
+      maxSize: 40,
+      meta: { align: "center", compactPadding: true },
     },
     {
-      name: "email",
-      field: "email",
-      label: t("iam.serviceAccountsName"),
-      align: "left",
+      id: "email",
+      header: t("iam.serviceAccountsName"),
+      accessorKey: "email",
       sortable: true,
+      meta: { align: "left" },
     },
   ];
   
@@ -268,23 +266,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }
   };
   
-  const filterUsers = (rows: any[], term: string) => {
-    var filtered = [];
-    for (var i = 0; i < rows.length; i++) {
-      var user = rows[i];
-      if (user.email.toLowerCase().indexOf(term.toLowerCase()) > -1) {
-        filtered.push(user);
-      }
-    }
-    return filtered;
-  };
-
-  const visibleRows = computed(() => {
-    if (!userSearchKey.value) return rows.value || [];
-    return filterUsers(rows.value || [], userSearchKey.value);
-  });
-
-  const hasVisibleRows = computed(() => visibleRows.value.length > 0);
   </script>
   
   <style scoped></style>

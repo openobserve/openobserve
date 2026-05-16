@@ -325,7 +325,7 @@ export default defineComponent({
         size: 40,
         minSize: 32,
         maxSize: 50,
-        meta: { compactPadding: true, align: "center" },
+        meta: { compactPadding: true, align: "left" },
       },
       {
         id: "email",
@@ -366,7 +366,7 @@ export default defineComponent({
         size: 120,
         minSize: 80,
         maxSize: 140,
-        meta: { align: "center" },
+        meta: { align: "left" },
       },
     ];
     const userEmail: any = ref("");
