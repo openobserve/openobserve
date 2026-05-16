@@ -39,40 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
             >
               <q-icon name="info_outline" />
-              <q-tooltip>{{
-                t("alerts.alertSettings.templateTooltip")
-              }}</q-tooltip>
+              <OTooltip :content="t('alerts.alertSettings.templateTooltip')" />
             </OButton>
           </div>
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-select
+            <OSelect
               v-model="localTemplate"
-              :options="filteredTemplates"
-              class="no-case q-py-none inline-condition-select alert-v3-select"
-              borderless
-              dense
-              use-input
+              :options="formattedTemplates"
               clearable
-              emit-value
-              :input-debounce="400"
-              hide-bottom-space
-              @filter="filterTemplates"
+              class="tw:min-w-[240px] tw:max-w-[300px]"
               @update:model-value="emitTemplateUpdate"
-              style="min-width: 240px; max-width: 300px"
             >
-              <template v-slot:selected>
-                <div v-if="localTemplate" class="ellipsis">
-                  {{ localTemplate }}<q-tooltip>{{ localTemplate }}</q-tooltip>
-                </div>
-              </template>
-              <template v-slot:no-option>
-                <q-item
-                  ><q-item-section class="text-grey">{{
-                    t("alerts.advanced.noTemplatesAvailable")
-                  }}</q-item-section></q-item
-                >
-              </template>
-            </q-select>
+              <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
+            </OSelect>
             <OButton
               variant="ghost"
               size="icon-circle-sm"
@@ -94,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
             >
               <q-icon name="info_outline" />
-              <q-tooltip>{{ t("alerts.advanced.variablesTooltip") }}</q-tooltip>
+              <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
             </OButton>
           </div>
           <template v-if="!localVariables.length">
@@ -114,24 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
               :data-test="`alert-variables-${index + 1}`"
             >
-              <q-input
+              <OInput
                 data-test="alert-variables-key-input"
                 v-model="variable.key"
                 :placeholder="t('common.name')"
-                dense
-                borderless
-                class="inline-condition-select alert-v3-input"
-                style="min-width: 140px"
+                class="tw:min-w-[140px]"
                 @update:model-value="emitUpdate"
               />
-              <q-input
+              <OInput
                 data-test="alert-variables-value-input"
                 v-model="variable.value"
                 :placeholder="t('common.value')"
-                dense
-                borderless
-                class="inline-condition-select alert-v3-input"
-                style="min-width: 200px"
+                class="tw:min-w-[200px]"
                 @update:model-value="emitUpdate"
               />
               <OButton
@@ -160,15 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="subsection-label tw:mb-2">
             <span>{{ t("alerts.description") }}</span>
           </div>
-          <q-input
+          <OTextarea
             v-model="localDescription"
-            dense
-            borderless
-            class="inline-condition-select"
-            style="width: 100%; resize: none"
-            type="textarea"
             :placeholder="t('alerts.placeholders.typeSomething')"
-            rows="4"
+            :rows="4"
             @update:model-value="emitUpdate"
           />
         </div>
@@ -185,9 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-sm"
               >
                 <q-icon name="info_outline" />
-                <q-tooltip>{{
-                  t("alerts.advanced.rowTemplateTooltip")
-                }}</q-tooltip>
+                <OTooltip :content="t('alerts.advanced.rowTemplateTooltip')" />
               </OButton>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
@@ -210,16 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
             </div>
           </div>
-          <q-input
+          <OTextarea
             data-test="add-alert-row-input-textarea"
             v-model="localRowTemplate"
-            dense
-            borderless
-            class="inline-condition-select"
-            style="width: 100%; resize: none"
-            type="textarea"
             :placeholder="rowTemplatePlaceholder"
-            rows="4"
+            :rows="4"
             @update:model-value="emitUpdate"
           />
         </div>
@@ -235,7 +196,6 @@ import {
   computed,
   watch,
   type PropType,
-  type Ref,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -243,6 +203,10 @@ import { getUUID } from "@/utils/zincutils";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { Type as TypeIcon, Braces } from "lucide-vue-next";
 
 export interface Variable {
@@ -253,7 +217,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
-  components: { OToggleGroup, OToggleGroupItem, OButton, TypeIcon, Braces },
+  components: { OToggleGroup, OToggleGroupItem, OButton, TypeIcon, Braces, OInput, OTextarea, OSelect, OTooltip },
   props: {
     template: {
       type: String,
@@ -297,19 +261,6 @@ export default defineComponent({
     const formattedTemplates = computed(() =>
       props.templates.map((t: any) => t.name),
     );
-    const filteredTemplates: Ref<string[]> = ref([]);
-    const filterTemplates = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredTemplates.value = [...formattedTemplates.value];
-        } else {
-          const needle = val.toLowerCase();
-          filteredTemplates.value = formattedTemplates.value.filter(
-            (v: string) => v.toLowerCase().indexOf(needle) > -1,
-          );
-        }
-      });
-    };
     const emitTemplateUpdate = () => {
       emit("update:template", localTemplate.value || "");
     };
@@ -320,14 +271,6 @@ export default defineComponent({
         localTemplate.value = newVal;
       },
     );
-    watch(
-      () => props.templates,
-      () => {
-        filteredTemplates.value = [...formattedTemplates.value];
-      },
-      { immediate: true },
-    );
-
     const localVariables = ref<Variable[]>([...props.contextAttributes]);
     const localDescription = ref(props.description);
     const localRowTemplate = ref(props.rowTemplate);
@@ -407,8 +350,7 @@ export default defineComponent({
       t,
       store,
       localTemplate,
-      filteredTemplates,
-      filterTemplates,
+      formattedTemplates,
       emitTemplateUpdate,
       localVariables,
       localDescription,
@@ -494,43 +436,5 @@ export default defineComponent({
   font-weight: 600;
 }
 
-.inline-condition-select {
-  :deep(.q-field__control) {
-    border: 1px solid var(--o2-border-color, #e0e0e0);
-    border-radius: 0.375rem;
-    padding: 0 8px;
-    min-height: 28px;
-    height: 28px;
-    background-color: transparent;
-  }
 
-  :deep(.q-field__native),
-  :deep(.q-field__input) {
-    font-size: 13px;
-    min-height: 28px;
-    height: 28px;
-    padding: 0 !important;
-  }
-
-  :deep(.q-field__marginal) {
-    height: 28px !important;
-  }
-
-  :deep(.q-field__append) {
-    height: 28px !important;
-    align-items: center;
-  }
-}
-
-// Override fixed height for textarea fields
-.inline-condition-select:has(textarea) {
-  :deep(.q-field__control) {
-    height: auto !important;
-    min-height: 80px !important;
-  }
-  :deep(.q-field__native) {
-    height: auto !important;
-    min-height: 80px !important;
-  }
-}
 </style>

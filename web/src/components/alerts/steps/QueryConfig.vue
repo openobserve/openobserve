@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Custom Query Builder -->
       <template v-if="localTab === 'custom'">
-        <q-form ref="customConditionsForm" greedy>
+        <div>
 
           <!-- Section 1: Alert condition sentence — scheduled only -->
           <div v-if="isRealTime === 'false'" class="alert-condition-rows">
@@ -71,49 +71,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <OSelect
                     v-model="selectedFunction"
                     :options="logFunctionOptions"
-                    emit-value
-                    map-options
-                    dense
-                    borderless
-                    hide-bottom-space
+                    labelKey="label"
+                    valueKey="value"
                     class="alert-v3-select"
                     style="min-width: 130px; max-width: 180px;"
                     @update:model-value="onLogFunctionChange"
                   >
-                    <q-tooltip :delay="400">
-                      {{ logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || '' }}
-                    </q-tooltip>
-                    <template #option="{ opt, itemProps }">
-                      <q-item v-bind="itemProps" dense>
-                        <q-item-section>
-                          <q-item-label>{{ opt.label }}</q-item-label>
-                        </q-item-section>
-                        <q-tooltip v-if="opt.tooltip" anchor="center right" self="center left" :delay="300">
-                          {{ opt.tooltip }}
-                        </q-tooltip>
-                      </q-item>
-                    </template>
-                  </q-select>
+                    <OTooltip :content="logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || ''" :delay="400" />
+                  </OSelect>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
-                    <q-select
+                    <OSelect
                       v-model="logMeasureColumn"
-                      :options="filteredLogMeasureColumns"
-                      emit-value
-                      dense
-                      borderless
-                      use-input
-                      hide-selected
-                      fill-input
-                      hide-bottom-space
+                      :options="numericColumns"
+                      searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
-                      @filter="filterLogMeasureColumns"
-                      class="alert-v3-select"
                       :class="columnSelectError ? 'column-select-error' : ''"
+                      class="alert-v3-select"
                       style="min-width: 140px; max-width: 200px;"
                       @update:model-value="columnSelectError = false; onLogMeasureColumnChange($event)"
                     />
@@ -121,29 +99,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- COUNT mode -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <q-select
+                    <OSelect
                       v-model="triggerOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <q-input
+                    <OInput
                       v-model="triggerThreshold"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
                       @blur="restoreDefaultThreshold"
                       class="alert-v3-input"
                       style="min-width: 60px; max-width: 80px;"
                       min="1"
-                      :rules="[(val: any) => !!val || 'Required']"
-                      @update:model-value="onTriggerThresholdChange"
+                      :error="!!triggerThresholdError"
+                      :error-message="triggerThresholdError"
+                      @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
                     <span v-if="streamName" class="condition-text">matching {{ streamType === 'traces' ? 'traces' : 'logs' }} found</span>
                   </template>
@@ -151,28 +123,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- MEASURE mode -->
                   <template v-else>
                     <span class="condition-text">is</span>
-                    <q-select
+                    <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <q-input
+                    <OInput
                       v-model="conditionValue"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      @update:model-value="onConditionValueChange"
+                      :error="!!conditionValueError"
+                      :error-message="conditionValueError"
+                      @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
                     />
                   </template>
                 </div>
@@ -182,9 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.groupBy') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    {{ t('alerts.queryConfig.groupByTooltip') }}
-                  </q-tooltip>
+                  <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
                   <template
@@ -192,20 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <div class="tw:flex tw:items-center tw:gap-1">
-                      <q-select
+                      <OSelect
                         v-model="logGroupBy[index]"
-                        :options="filteredFields"
-                        class="alert-v3-select"
-                        borderless
-                        dense
-                        use-input
-                        emit-value
-                        hide-selected
+                        :options="columns"
+                        searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        fill-input
-                        :input-debounce="400"
-                        hide-bottom-space
-                        @filter="(val: string, update: any) => filterFields(val, update)"
+                        class="alert-v3-select"
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="onLogGroupByChange"
                       />
@@ -225,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="addLogGroupByColumn"
                   >
                     <q-icon name="add" />
-                    <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
+                    <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                   </OButton>
                 </div>
               </div>
@@ -234,27 +190,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.queryConfig.havingGroups') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    {{ t('alerts.queryConfig.havingGroupsTooltip') }}
-                  </q-tooltip>
+                  <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <OSelect
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <q-input
+                  <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
-                    @update:model-value="onTriggerThresholdChange"
+                    @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
                   />
                 </div>
@@ -267,114 +219,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="alert-condition-row">
                 <span class="condition-label">Alert if *</span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <OSelect
                     v-model="selectedFunction"
                     :options="logFunctionOptions"
-                    emit-value
-                    map-options
-                    dense
-                    borderless
-                    hide-bottom-space
+                    labelKey="label"
+                    valueKey="value"
                     class="alert-v3-select"
                     style="min-width: 130px; max-width: 180px;"
                     @update:model-value="onMetricFunctionChange"
                   >
-                    <q-tooltip :delay="400">
-                      {{ logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || '' }}
-                    </q-tooltip>
-                    <template #option="{ opt, itemProps }">
-                      <q-item v-bind="itemProps" dense>
-                        <q-item-section>
-                          <q-item-label>{{ opt.label }}</q-item-label>
-                        </q-item-section>
-                        <q-tooltip v-if="opt.tooltip" anchor="center right" self="center left" :delay="300">
-                          {{ opt.tooltip }}
-                        </q-tooltip>
-                      </q-item>
-                    </template>
-                  </q-select>
+                    <OTooltip :content="logFunctionOptions.find((o: any) => o.value === selectedFunction)?.tooltip || ''" :delay="400" />
+                  </OSelect>
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
                     <span class="condition-text">of</span>
                     <div style="position: relative; display: inline-flex;">
-                      <q-select
+                      <OSelect
                         v-model="inputData.aggregation.having.column"
-                        :options="filteredNumericColumns"
-                        emit-value
-                        dense
-                        borderless
-                        use-input
-                        hide-selected
-                        fill-input
-                        hide-bottom-space
+                        :options="columns"
+                        searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        :readonly="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
-                        :disable="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
-                        @filter="filterNumericColumns"
+                        :readonly="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
+                        :disable="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @update:model-value="columnSelectError = false; emitAggregationUpdate()"
                         class="alert-v3-select"
                         :class="columnSelectError ? 'column-select-error' : ''"
                         style="min-width: 140px; max-width: 200px;"
-                      />
-                      <q-tooltip v-if="inputData.aggregation.having.column === 'value' && filteredNumericColumns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" anchor="bottom middle" self="top middle" :delay="300">
-                        Metrics streams store their measurement in the "value" field by default
-                      </q-tooltip>
+                      >
+                        <OTooltip v-if="inputData.aggregation.having.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" content="Metrics streams store their measurement in the &quot;value&quot; field by default" :delay="300" side="bottom" />
+                      </OSelect>
                     </div>
                     <span class="condition-text">is</span>
                   </template>
 
                   <!-- Count mode for metrics -->
                   <template v-if="selectedFunction === 'total_events'">
-                    <q-select
+                    <OSelect
                       v-model="triggerOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
-                    <q-input
+                    <OInput
                       v-model="triggerThreshold"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      @update:model-value="onTriggerThresholdChange"
+                      :error="!!triggerThresholdError"
+                      :error-message="triggerThresholdError"
+                      @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     />
                     <span class="condition-text">matching metrics found</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
                   <template v-else>
-                    <q-select
+                    <OSelect
                       v-model="conditionOperator"
                       :options="numericOperators"
-                      dense
-                      borderless
-                      hide-bottom-space
                       class="alert-v3-select"
                       style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
-                    <q-input
+                    <OInput
                       v-model="conditionValue"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
                       :placeholder="t('alerts.placeholders.value')"
                       class="alert-v3-input"
                       style="min-width: 80px; max-width: 120px;"
-                      :rules="[(val: any) => !!val || 'Field is required!']"
-                      @update:model-value="onConditionValueChange"
+                      :error="!!conditionValueError"
+                      :error-message="conditionValueError"
+                      @update:model-value="conditionValueError = ''; onConditionValueChange($event)"
                     />
                   </template>
                 </div>
@@ -384,9 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.groupBy') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    {{ t('alerts.queryConfig.groupByTooltip') }}
-                  </q-tooltip>
+                  <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
                   <template
@@ -394,20 +309,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="index"
                   >
                     <div class="tw:flex tw:items-center tw:gap-1">
-                      <q-select
+                      <OSelect
                         v-model="inputData.aggregation.group_by[index]"
-                        :options="filteredFields"
-                        class="alert-v3-select"
-                        borderless
-                        dense
-                        use-input
-                        emit-value
-                        hide-selected
+                        :options="columns"
+                        searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        fill-input
-                        :input-debounce="400"
-                        hide-bottom-space
-                        @filter="(val: string, update: any) => filterFields(val, update)"
+                        class="alert-v3-select"
                         style="min-width: 120px; max-width: 180px;"
                         @update:model-value="emitAggregationUpdate"
                       />
@@ -427,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="addGroupByColumn"
                   >
                     <q-icon name="add" />
-                    <q-tooltip>{{ t('alerts.queryConfig.addGroupByField') }}</q-tooltip>
+                    <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                   </OButton>
                 </div>
               </div>
@@ -436,27 +343,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="alert-condition-row">
                 <span class="condition-label tw:font-bold">
                   {{ t('alerts.queryConfig.havingGroups') }}
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    {{ t('alerts.queryConfig.havingGroupsTooltip') }}
-                  </q-tooltip>
+                  <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
-                  <q-select
+                  <OSelect
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <q-input
+                  <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
-                    @update:model-value="onTriggerThresholdChange"
+                    @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
                   />
                 </div>
@@ -467,36 +370,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="alert-condition-row tw:!items-start">
               <span class="condition-label" style="line-height: 28px;">
                 Check every *
-                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                  How often to check this alert condition
-                </q-tooltip>
+                <OTooltip content="How often to check this alert condition" :delay="300" side="top" />
               </span>
               <div class="tw:flex tw:flex-col tw:gap-1">
                 <div class="tw:flex tw:items-center tw:gap-2">
                   <!-- Minutes/hours mode: number input -->
                   <template v-if="frequencyMode !== 'cron'">
-                    <q-input
+                    <OInput
                       v-model="checkEveryFrequency"
                       type="number"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      no-error-icon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
-                      :rules="[(val: any) => !!val || 'Required']"
-                      @update:model-value="onCheckEveryChange"
+                      :error="!!checkEveryFrequencyError"
+                      :error-message="checkEveryFrequencyError"
+                      @update:model-value="checkEveryFrequencyError = ''; onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
                     />
                   </template>
                   <!-- Cron mode: expression input + timezone -->
                   <template v-else>
-                    <q-input
+                    <OInput
                       v-model="cronExpression"
-                      dense
-                      borderless
-                      hide-bottom-space
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
@@ -505,14 +400,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <!-- Unit dropdown: minutes / hours / cron -->
-                  <q-select
+                  <OSelect
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
-                    dense
-                    borderless
-                    hide-bottom-space
-                    emit-value
-                    map-options
+                    labelKey="label"
+                    valueKey="value"
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
@@ -520,26 +412,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Timezone (only for cron, inline) -->
                   <template v-if="frequencyMode === 'cron'">
-                    <q-select
+                    <OSelect
                       v-model="cronTimezone"
                       :options="filteredTimezones"
-                      dense
-                      borderless
-                      hide-bottom-space
-                      use-input
-                      emit-value
-                      fill-input
-                      hide-selected
-                      :input-debounce="0"
-                      class="alert-v3-select"
+                      searchable
                       placeholder="timezone"
-                      :display-value="cronTimezone || 'timezone'"
+                      class="alert-v3-select"
                       style="min-width: 150px; max-width: 150px;"
-                      @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
-                    <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
-                  </q-select>
+                      <OTooltip v-if="cronTimezone" :content="cronTimezone" :delay="300" side="bottom" />
+                    </OSelect>
                   </template>
 
                   <span class="condition-text">on these</span>
@@ -578,15 +461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
                           :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
                       view the alert query
-                      <q-tooltip
-                        anchor="bottom middle"
-                        self="top middle"
-                        :delay="200"
-                        max-width="500px"
-                        class="sql-preview-tooltip"
-                      >
+                      <OTooltip :delay="200" side="bottom">
                         <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
-                      </q-tooltip>
+                      </OTooltip>
                     </span>
                   </div>
                 </div>
@@ -660,15 +537,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:text-xs tw:italic tw:ml-1 sql-query-hint"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
                   view the alert query
-                  <q-tooltip
-                    anchor="bottom middle"
-                    self="top middle"
-                    :delay="200"
-                    max-width="500px"
-                    class="sql-preview-tooltip"
-                  >
+                  <OTooltip :delay="200" side="bottom">
                     <pre class="hljs tw:text-xs tw:m-0 tw:whitespace-pre-wrap tw:font-mono tw:p-2 tw:rounded" v-html="highlightedSqlQuery" />
-                  </q-tooltip>
+                  </OTooltip>
                 </span>
               </div>
             </div>
@@ -689,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-        </q-form>
+        </div>
       </template>
 
       <!-- SQL/PromQL Inline Editor Mode -->
@@ -710,16 +581,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="inline-editor-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
                   </div>
                   <!-- fx toggle shown here only when VRL is not yet enabled -->
-                  <q-toggle
+                  <OSwitch
                     v-if="localTab === 'sql' && !showVrl"
                     v-model="showVrl"
-                    :icon="'img:' + getImageURL('images/common/function.svg')"
-                    size="xs"
-                    class="o2-toggle-button-xs"
-                    :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                   >
-                    <q-tooltip class="tw:text-[12px]" :delay="300">Show VRL editor</q-tooltip>
-                  </q-toggle>
+                    <OTooltip content="Show VRL editor" :delay="300" />
+                  </OSwitch>
                 </div>
                 <div style="position: relative; flex: 1; min-height: 0;">
                   <div style="position: absolute; inset: 0;">
@@ -753,33 +620,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="inline-editor-title">VRL Editor</span>
                   </div>
                   <div class="tw:flex tw:items-center tw:gap-1">
-                    <q-select
+                    <OSelect
                       :model-value="null"
                       :options="functionsList"
-                      option-label="name"
-                      option-value="name"
-                      borderless dense use-input hide-selected fill-input
-                      input-debounce="0"
-                      behavior="menu"
+                      labelKey="name"
                       clearable
                       class="mini-select alert-v3-select"
                       style="width: 130px;"
                       :placeholder="t('alerts.placeholders.savedFunctions')"
-                      @update:model-value="(fn) => fn && (vrlFunctionContent = fn.function || fn.body || '')"
+                      @update:model-value="(fn: any) => fn && (vrlFunctionContent = fn.function || fn.body || '')"
                     >
-                      <template #no-option>
-                        <q-item><q-item-section>{{ t('alerts.queryConfig.noFunctions') }}</q-item-section></q-item>
+                      <template #empty>
+                        <span>{{ t('alerts.queryConfig.noFunctions') }}</span>
                       </template>
-                    </q-select>
-                    <q-toggle
-                      v-model="showVrl"
-                      :icon="'img:' + getImageURL('images/common/function.svg')"
-                      size="xs"
-                      class="o2-toggle-button-xs"
-                      :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-                    >
-                      <q-tooltip class="tw:text-[12px]" :delay="300">Hide VRL editor</q-tooltip>
-                    </q-toggle>
+                    </OSelect>
+                    <OSwitch v-model="showVrl">
+                      <OTooltip content="Hide VRL editor" :delay="300" />
+                    </OSwitch>
                   </div>
                 </div>
                 <div style="position: relative; flex: 1; min-height: 0;">
@@ -814,6 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
                 <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
                 <span class="sql-status-bar__msg">{{ sqlQueryErrorMsg }}</span>
+                <OTooltip side="top" style="font-size:11px;white-space:pre-wrap;word-break:break-word;">{{ sqlQueryErrorMsg }}</OTooltip>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                 <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
@@ -824,11 +682,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>
-            <q-tooltip
-              v-if="inlineStatusState === 'sql-status-bar--error'"
-              anchor="top middle" self="bottom middle" max-width="520px"
-              style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
-            >{{ sqlQueryErrorMsg }}</q-tooltip>
           </div>
 
           <!-- SQL/PromQL condition rows (scheduled only): Check every + Alert if in one block -->
@@ -838,61 +691,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="alert-condition-row tw:!items-start">
               <span class="condition-label sql-promql-label" style="line-height: 28px;">
                 Check every *
-                <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                  How often to check this alert condition
-                </q-tooltip>
+                <OTooltip content="How often to check this alert condition" :delay="300" side="top" />
               </span>
               <div class="tw:flex tw:flex-col tw:gap-1">
                 <div class="tw:flex tw:items-center tw:gap-2">
                   <template v-if="frequencyMode !== 'cron'">
-                    <q-input
+                    <OInput
                       v-model="checkEveryFrequency"
                       type="number"
-                      dense borderless hide-bottom-space
-                      no-error-icon
                       class="alert-v3-input"
                       style="min-width: 100px; max-width: 100px;"
                       min="1"
-                      :rules="[(val: any) => !!val || 'Required']"
-                      @update:model-value="onCheckEveryChange"
+                      :error="!!checkEveryFrequencyError"
+                      :error-message="checkEveryFrequencyError"
+                      @update:model-value="checkEveryFrequencyError = ''; onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
                     />
                   </template>
                   <template v-else>
-                    <q-input
+                    <OInput
                       v-model="cronExpression"
-                      dense borderless hide-bottom-space
                       class="alert-v3-input"
                       placeholder="0 */10 * * * *"
                       style="min-width: 100px; max-width: 100px;"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
-                  <q-select
+                  <OSelect
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
-                    dense borderless hide-bottom-space
-                    emit-value map-options
+                    labelKey="label"
+                    valueKey="value"
                     class="alert-v3-select frequency-unit-select"
                     style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
                   <template v-if="frequencyMode === 'cron'">
-                    <q-select
+                    <OSelect
                       v-model="cronTimezone"
                       :options="filteredTimezones"
-                      dense borderless hide-bottom-space
-                      use-input emit-value fill-input hide-selected
-                      :input-debounce="0"
-                      class="alert-v3-select"
+                      searchable
                       placeholder="timezone"
-                      :display-value="cronTimezone || 'timezone'"
+                      class="alert-v3-select"
                       style="min-width: 150px; max-width: 150px;"
-                      @filter="timezoneFilterFn"
                       @update:model-value="onCronTimezoneChange"
                     >
-                      <q-tooltip v-if="cronTimezone" :delay="300" anchor="bottom middle" self="top middle">{{ cronTimezone }}</q-tooltip>
-                    </q-select>
+                      <OTooltip v-if="cronTimezone" :content="cronTimezone" :delay="300" side="bottom" />
+                    </OSelect>
                   </template>
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
@@ -909,22 +754,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="localTab === 'sql'" class="alert-condition-row">
               <span class="condition-label sql-promql-label">Alert if No. of events *</span>
               <div class="tw:flex tw:items-center tw:gap-2">
-                <q-select
+                <OSelect
                   v-model="triggerOperator"
                   :options="numericOperators"
-                  dense borderless hide-bottom-space
                   class="alert-v3-select"
                   style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />
-                <q-input
+                <OInput
                   v-model="triggerThreshold"
                   type="number"
-                  dense borderless hide-bottom-space
                   class="alert-v3-input"
                   style="min-width: 60px; max-width: 80px;"
                   min="1"
-                  @update:model-value="onTriggerThresholdChange"
+                  :error="!!triggerThresholdError"
+                  :error-message="triggerThresholdError"
+                  @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                   @blur="restoreDefaultThreshold"
                 />
               </div>
@@ -934,59 +779,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="localTab === 'promql' && promqlCondition">
               <div class="alert-condition-row">
                 <span class="condition-label sql-promql-label">Alert if the value is *
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more.
-                  </q-tooltip>
+                  <OTooltip content="Alert when the PromQL expression evaluates to this condition for a time series. Example: &gt;= 100 triggers when the result is 100 or more." :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <q-select
+                  <OSelect
                     v-model="promqlCondition.operator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
-                    no-error-icon
                     class="alert-v3-select"
                     data-test="alert-threshold-operator-select"
                     style="min-width: 70px; max-width: 120px;"
-                    :rules="[(val: any) => !!val || 'Field is required!']"
-                    @update:model-value="emitPromqlConditionUpdate"
+                    :error="!!promqlOperatorError"
+                    :error-message="promqlOperatorError"
+                    @update:model-value="promqlOperatorError = ''; emitPromqlConditionUpdate()"
                   />
-                  <q-input
+                  <OInput
                     v-model.number="promqlCondition.value"
                     type="number"
-                    dense borderless hide-bottom-space
-                    no-error-icon
                     class="alert-v3-input"
                     data-test="alert-threshold-value-input"
                     style="min-width: 60px; max-width: 120px;"
-                    debounce="300"
-                    :rules="[(val: any) => (val !== undefined && val !== null && val !== '') || 'Field is required!']"
-                    @update:model-value="emitPromqlConditionUpdate"
+                    :debounce="300"
+                    :error="!!promqlValueError"
+                    :error-message="promqlValueError"
+                    @update:model-value="promqlValueError = ''; emitPromqlConditionUpdate()"
                   />
                 </div>
               </div>
               <div class="alert-condition-row">
                 <span class="condition-label sql-promql-label">Having series *
-                  <q-tooltip anchor="top middle" self="bottom middle" :delay="300">
-                    Minimum number of time series that must satisfy the condition above to trigger the alert.
-                  </q-tooltip>
+                  <OTooltip content="Minimum number of time series that must satisfy the condition above to trigger the alert." :delay="300" side="top" />
                 </span>
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <q-select
+                  <OSelect
                     v-model="triggerOperator"
                     :options="numericOperators"
-                    dense borderless hide-bottom-space
                     class="alert-v3-select"
                     style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
-                  <q-input
+                  <OInput
                     v-model="triggerThreshold"
                     type="number"
-                    dense borderless hide-bottom-space
                     class="alert-v3-input"
                     style="min-width: 60px; max-width: 80px;"
                     min="1"
-                    @update:model-value="onTriggerThresholdChange"
+                    :error="!!triggerThresholdError"
+                    :error-message="triggerThresholdError"
+                    @update:model-value="triggerThresholdError = ''; onTriggerThresholdChange($event)"
                     @blur="restoreDefaultThreshold"
                   />
                 </div>
@@ -1048,6 +887,10 @@ import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { Wrench, Database, ChartLine } from "lucide-vue-next";
 
 const QueryEditor = defineAsyncComponent(
@@ -1068,6 +911,10 @@ export default defineComponent({
     OButton,
     OToggleGroup,
     OToggleGroupItem,
+    OInput,
+    OSelect,
+    OSwitch,
+    OTooltip,
     Wrench,
     Database,
     ChartLine,
@@ -1153,6 +1000,13 @@ export default defineComponent({
     const viewSqlEditor = ref(false);
     const customConditionsForm = ref(null);
     const showMultiWindowDialog = ref(false);
+
+    // Field-level error refs (replaces Quasar :rules validation)
+    const triggerThresholdError = ref('');
+    const conditionValueError = ref('');
+    const checkEveryFrequencyError = ref('');
+    const promqlOperatorError = ref('');
+    const promqlValueError = ref('');
     const pendingTab = ref<string | null>(null);
 
     // Field refs for focus manager
@@ -1477,25 +1331,6 @@ export default defineComponent({
     };
     initTimezones();
 
-    const timezoneFilterFn = (val: string, update: any) => {
-      update(() => {
-        try {
-          // @ts-ignore
-          const all: string[] = (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function')
-            // @ts-ignore
-            ? Intl.supportedValuesOf("timeZone") : [cronTimezone.value];
-          if (val === '') {
-            filteredTimezones.value = all;
-          } else {
-            const needle = val.toLowerCase();
-            filteredTimezones.value = all.filter((tz: string) => tz.toLowerCase().includes(needle));
-          }
-        } catch {
-          // keep current list
-        }
-      });
-    };
-
     const validateCron = () => {
       cronError.value = '';
       if (frequencyMode.value !== 'cron') return;
@@ -1627,38 +1462,6 @@ export default defineComponent({
     // Trigger operators
     const triggerOperators = ["=", "!=", ">=", ">", "<=", "<", "Contains", "NotContains"];
 
-    // Filtered fields for group by
-    const filteredFields = ref([...props.columns]);
-    const filterFields = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredFields.value = [...props.columns];
-        } else {
-          const needle = val.toLowerCase();
-          filteredFields.value = props.columns.filter((v: any) => {
-            const label = typeof v === "string" ? v : v.label || v.value || "";
-            return label.toLowerCase().indexOf(needle) > -1;
-          });
-        }
-      });
-    };
-
-    // Filtered numeric columns for aggregation
-    const filteredNumericColumns = ref([...props.columns]);
-    const filterNumericColumns = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredNumericColumns.value = [...props.columns];
-        } else {
-          const needle = val.toLowerCase();
-          filteredNumericColumns.value = props.columns.filter((v: any) => {
-            const label = typeof v === "string" ? v : v.label || v.value || "";
-            return label.toLowerCase().indexOf(needle) > -1;
-          });
-        }
-      });
-    };
-
     // Helper to get numeric columns based on selected function
     const getNumericColumns = (cols: any[]) => {
       if (selectedFunction.value === 'count' || selectedFunction.value === 'total_events') {
@@ -1671,22 +1474,8 @@ export default defineComponent({
       });
     };
 
-    // Filtered columns for log measure column (unique count uses all fields, measure uses numeric)
-    const filteredLogMeasureColumns = ref(getNumericColumns(props.columns));
-    const filterLogMeasureColumns = (val: string, update: any) => {
-      update(() => {
-        const numericCols = getNumericColumns(props.columns);
-        if (val === "") {
-          filteredLogMeasureColumns.value = numericCols;
-        } else {
-          const needle = val.toLowerCase();
-          filteredLogMeasureColumns.value = numericCols.filter((v: any) => {
-            const label = typeof v === "string" ? v : v.label || v.value || "";
-            return label.toLowerCase().indexOf(needle) > -1;
-          });
-        }
-      });
-    };
+    // Computed column lists — OSelect handles built-in filtering, no @filter needed
+    const numericColumns = computed(() => getNumericColumns(props.columns));
 
     // Get saved VRL functions from store
     const functionsList = computed(() => store.state.organizationData.functions || []);
@@ -2104,14 +1893,10 @@ export default defineComponent({
       }
     });
 
-    // Sync filtered lists when columns prop changes (async stream load)
+    // Sync aggregation state when columns prop changes (async stream load)
     watch(
       () => props.columns,
       (newCols) => {
-        filteredFields.value = [...newCols];
-        filteredNumericColumns.value = [...newCols];
-        filteredLogMeasureColumns.value = getNumericColumns(newCols);
-
         if (!isEventBased.value && props.inputData.aggregation?.having) {
           const currentCol = props.inputData.aggregation.having.column;
           const colExistsInNewStream = currentCol
@@ -2226,7 +2011,6 @@ export default defineComponent({
 
     // When function switches to measure mode, reset threshold to >= 1 if group-by is empty
     watch(selectedFunction, (value) => {
-      filteredLogMeasureColumns.value = getNumericColumns(props.columns);
       if (value === 'total_events') return;
       const groupByEmpty = isEventBased.value
         ? !hasLogGroupByFields.value
@@ -2303,27 +2087,35 @@ export default defineComponent({
         return true;
       }
 
-      // Use Quasar form validation
-      if (customConditionsForm.value && typeof (customConditionsForm.value as any).validate === 'function') {
-        const validationResult = (customConditionsForm.value as any).validate();
+      let isValid = true;
 
-        // Await if async
-        const isValid = validationResult instanceof Promise ? await validationResult : validationResult;
-
-        // Focus first error field if validation failed
-        if (!isValid) {
-          await nextTick();
-          const firstErrorField = document.querySelector('.q-field--error input, .q-field--error textarea, .q-field--error .q-select') as HTMLElement;
-          if (firstErrorField) {
-            firstErrorField.focus();
-          }
-        }
-
-        return isValid;
+      // Validate triggerThreshold (count mode and having-groups rows)
+      if (selectedFunction.value === 'total_events' || hasLogGroupByFields.value || hasMetricGroupByFields.value) {
+        triggerThresholdError.value = !triggerThreshold.value ? 'Required' : '';
+        if (triggerThresholdError.value) isValid = false;
       }
 
-      // If form validation is not available, return true as safe fallback
-      return true;
+      // Validate conditionValue (measure mode)
+      if (selectedFunction.value !== 'total_events') {
+        conditionValueError.value = !conditionValue.value ? 'Field is required!' : '';
+        if (conditionValueError.value) isValid = false;
+      }
+
+      // Validate checkEveryFrequency (when not in cron mode)
+      if (frequencyMode.value !== 'cron') {
+        checkEveryFrequencyError.value = !checkEveryFrequency.value ? 'Required' : '';
+        if (checkEveryFrequencyError.value) isValid = false;
+      }
+
+      if (!isValid) {
+        await nextTick();
+        const firstErrorField = document.querySelector('[data-o2-error] input, [data-o2-error] textarea') as HTMLElement;
+        if (firstErrorField) {
+          firstErrorField.focus();
+        }
+      }
+
+      return isValid;
     };
 
     // Validate SQL mode
@@ -2370,7 +2162,6 @@ export default defineComponent({
       handleValidateSql,
       functionsList,
       validate,
-      customConditionsForm,
       // Field refs for focus manager
       customPreviewRef,
       sqlPromqlPreviewRef,
@@ -2383,10 +2174,7 @@ export default defineComponent({
       localIsAggregationEnabled,
       aggFunctions,
       triggerOperators,
-      filteredFields,
-      filterFields,
-      filteredNumericColumns,
-      filterNumericColumns,
+      numericColumns,
       toggleAggregation,
       addGroupByColumn,
       deleteGroupByColumn,
@@ -2415,15 +2203,12 @@ export default defineComponent({
       cronError,
       cronDescription,
       filteredTimezones,
-      timezoneFilterFn,
       onFrequencyUnitChange,
       frequencyUnitOptions,
       onCronExpressionChange,
       onCronTimezoneChange,
       logMeasureColumn,
       columnSelectError,
-      filteredLogMeasureColumns,
-      filterLogMeasureColumns,
       logGroupBy,
       onFunctionChange,
       onMetricFunctionChange,
@@ -2450,6 +2235,12 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       handleInlineQueryUpdate,
+      // Field error state (for inline :error/:error-message)
+      triggerThresholdError,
+      conditionValueError,
+      checkEveryFrequencyError,
+      promqlOperatorError,
+      promqlValueError,
     };
   },
 });

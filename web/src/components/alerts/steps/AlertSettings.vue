@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="section-header-title">{{ t('alerts.alertSettings.sectionTitle') }}</span>
     </div>
     <div class="tw:px-3 tw:py-2">
-      <q-form ref="alertSettingsForm" @submit.prevent>
+      <div>
       <!-- For Real-Time Alerts -->
       <template v-if="isRealTime === 'true'">
         <!-- Silence Notification (Cooldown) -->
@@ -30,16 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
-              name="info"
+              name="info_outline"
               size="17px"
               class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.cooldownTooltip') }}
-                </span>
-              </q-tooltip>
+              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </q-icon>
           </div>
           <div>
@@ -48,14 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 87px; margin-left: 0 !important"
                 class="silence-notification-input"
               >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
+                <OInput
+                  v-model="formData.trigger_condition.silence"
                   type="number"
-                  dense
-                  borderless
                   min="0"
-                  class="alert-v3-input"
-                  style="background: none"
                   @update:model-value="$emit('update:trigger', formData.trigger_condition)"
                 />
               </div>
@@ -93,51 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:flex-col">
             <div class="tw:flex tw:items-center">
-              <q-select
+              <OSelect
                 v-model="localDestinations"
-                :options="filteredDestinations"
+                :options="formattedDestinations"
                 data-test="alert-destinations-select"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop no-case destinations-select-field"
-                filled
-                dense
                 multiple
-                use-input
-                input-debounce="0"
-                @filter="filterDestinations"
-                style="width: 300px; max-width: 300px"
+                class="tw:min-w-[180px] tw:max-w-[300px]"
                 @update:model-value="emitDestinationsUpdate"
               >
-                <template v-slot:selected>
-                  <div v-if="localDestinations.length > 0" class="ellipsis">
-                    {{ localDestinations.join(", ") }}
-                  </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="destinationError = false; emitDestinationsUpdate()"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">{{ t('alerts.alertSettings.noDestinationsAvailable') }}</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+                <template #empty>{{ t('alerts.alertSettings.noDestinationsAvailable') }}</template>
+              </OSelect>
               <OButton
                 class="q-ml-xs"
                 variant="ghost"
@@ -174,30 +130,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.period") + " *" }}
             <q-icon
-              name="info"
+              name="info_outline"
               size="17px"
               class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.periodTooltip') }}
-                </span>
-              </q-tooltip>
-          </q-icon>
+              <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
+            </q-icon>
           </div>
           <div>
             <div ref="periodFieldRef" class="flex items-center q-mr-sm" style="width: fit-content">
               <div style="width: 87px; margin-left: 0 !important" class="period-input-container">
-                <q-input
-                  v-model.number="formData.trigger_condition.period"
+                <OInput
+                  v-model="formData.trigger_condition.period"
                   type="number"
-                  dense
-                  borderless
                   min="1"
-                  class="alert-v3-input"
-                  style="background: none"
-                  debounce="300"
+                  :debounce="300"
                   @update:model-value="handlePeriodChange"
                 />
               </div>
@@ -225,16 +172,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.silenceNotification") + " *" }}
             <q-icon
-              name="info"
+              name="info_outline"
               size="17px"
               class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">
-                  {{ t('alerts.alertSettings.cooldownTooltip') }}
-                </span>
-              </q-tooltip>
+              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </q-icon>
           </div>
           <div>
@@ -242,14 +184,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 style="width: 87px; margin-left: 0 !important"
               >
-                <q-input
-                  v-model.number="formData.trigger_condition.silence"
+                <OInput
+                  v-model="formData.trigger_condition.silence"
                   type="number"
-                  dense
-                  borderless
                   min="0"
-                  class="alert-v3-input"
-                  debounce="300"
+                  :debounce="300"
                   @update:model-value="emitTriggerUpdate"
                 />
               </div>
@@ -286,69 +225,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:font-semibold flex items-center" style="width: 190px; height: 28px">
             {{ t("alerts.destination") + " *" }}
             <q-icon
-              name="info"
+              name="info_outline"
               size="17px"
               class="q-ml-xs cursor-pointer"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
             >
-              <q-tooltip anchor="center right" self="center left" max-width="300px">
-                <span style="font-size: 14px">{{ t('alerts.alertSettings.destinationsTooltip') }}</span>
-              </q-tooltip>
+              <OTooltip :content="t('alerts.alertSettings.destinationsTooltip')" side="right" />
             </q-icon>
           </div>
           <div>
             <div class="flex items-center">
-              <q-select
+              <OSelect
                 ref="destinationsFieldRef"
                 v-model="localDestinations"
-                :options="filteredDestinations"
+                :options="formattedDestinations"
                 data-test="alert-destinations-select"
-                class="no-case q-py-none destinations-select-field alert-v3-select destination-select-field"
-                :class="destinationError ? 'destination-select-error' : ''"
-                borderless
-                dense
                 multiple
-                use-input
-                fill-input
-                :input-debounce="400"
-                hide-bottom-space
-                @filter="filterDestinations"
+                :error="destinationError"
+                class="tw:min-w-[180px] tw:max-w-[300px]"
                 @update:model-value="destinationError = false; emitDestinationsUpdate()"
-                style="width: 180px; max-width: 300px"
               >
-                <template v-slot:selected>
-                  <div
-                    v-if="localDestinations.length > 0"
-                    class="ellipsis"
-                  >
-                    {{ localDestinations.join(", ") }}
-                    <q-tooltip>{{ localDestinations.join(", ") }}</q-tooltip>
-                  </div>
-                </template>
-                <template v-slot:option="option">
-                  <q-list dense>
-                    <q-item tag="label" :data-test="`alert-destination-option-${option.opt}`">
-                      <q-item-section avatar>
-                        <q-checkbox
-                          size="xs"
-                          dense
-                          v-model="localDestinations"
-                          :val="option.opt"
-                          @update:model-value="destinationError = false; emitDestinationsUpdate()"
-                        />
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="ellipsis">{{ option.opt }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </template>
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">{{ t('alerts.alertSettings.noDestinationsAvailable') }}</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+                <template #empty>{{ t('alerts.alertSettings.noDestinationsAvailable') }}</template>
+              </OSelect>
               <OButton
                 class="q-ml-xs"
                 variant="ghost"
@@ -386,26 +283,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("alerts.alertSettings.createsIncident") }}
           <q-icon
-            name="info"
+            name="info_outline"
             size="17px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            <q-tooltip anchor="center right" self="center left" max-width="350px">
-              <span style="font-size: 14px">
-                {{ t("alerts.alertSettings.createsIncidentTooltip") }}
-              </span>
-            </q-tooltip>
+            <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </q-icon>
         </div>
-        <q-toggle
+        <OSwitch
           v-model="formData.creates_incident"
           data-test="alert-creates-incident-toggle"
-          size="30px"
-          class="o2-toggle-button-xs"
         />
       </div>
-      </q-form>
+      </div>
     </div>
   </div>
 </template>
@@ -416,6 +306,10 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -424,7 +318,7 @@ import {
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton },
+  components: { OButton, OInput, OSelect, OSwitch, OTooltip },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -589,19 +483,7 @@ export default defineComponent({
     };
 
     // Filtered destinations
-    const filteredDestinations = ref([...props.formattedDestinations]);
-    const filterDestinations = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredDestinations.value = [...props.formattedDestinations];
-        } else {
-          const needle = val.toLowerCase();
-          filteredDestinations.value = props.formattedDestinations.filter(
-            (v: any) => v.toLowerCase().indexOf(needle) > -1
-          );
-        }
-      });
-    };
+
 
     // Timezone filter function
     const timezoneFilterFn = (val: string, update: any) => {
@@ -915,8 +797,6 @@ export default defineComponent({
       triggerOperators,
       filteredNumericColumns,
       filterNumericColumns,
-      filteredDestinations,
-      filterDestinations,
       emitTriggerUpdate,
       emitAggregationUpdate,
       emitDestinationsUpdate,

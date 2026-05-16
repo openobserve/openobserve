@@ -27,14 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t("alerts.deduplication.fingerprintFields") }}
           <q-icon
-            name="info"
+            name="info_outline"
             size="17px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-              {{ t("alerts.deduplication.fingerprintFieldsTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('alerts.deduplication.fingerprintFieldsTooltip')" side="right" />
           </q-icon>
         </div>
         <div
@@ -44,34 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.deduplication.fingerprintFieldsHint") }}
         </div>
         <div class="tw:relative">
-          <q-select
+          <OSelect
             v-model="localDeduplication.fingerprint_fields"
-            :options="filteredColumns"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
-            dense
-            borderless
+            :options="props.columns || []"
             multiple
-            use-chips
-            use-input
-            input-debounce="300"
-            new-value-mode="add-unique"
-            emit-value
-            map-options
-            @filter="filterColumns"
+            creatable
+            class="tw:max-w-[600px] tw:min-w-[300px]"
+            helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
             @update:model-value="emitUpdate"
-          >
-            <template v-slot:hint>
-              <div class="tw:text-xs">
-                💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
-                fields)
-              </div>
-            </template>
-          </q-select>
-          <q-tooltip v-if="localDeduplication.fingerprint_fields?.length > 0" max-width="400px">
-            {{ localDeduplication.fingerprint_fields.join(', ') }}
-          </q-tooltip>
+            @create="addFingerprintField"
+          />
+          <OTooltip v-if="localDeduplication.fingerprint_fields?.length > 0" :content="localDeduplication.fingerprint_fields.join(', ')" max-width="400px" />
         </div>
       </div>
 
@@ -80,14 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t("alerts.deduplication.timeWindow") }}
           <q-icon
-            name="info"
+            name="info_outline"
             size="17px"
             class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
           >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-              {{ t("alerts.deduplication.timeWindowTooltip") }}
-            </q-tooltip>
+            <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
           </q-icon>
         </div>
         <div
@@ -98,15 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:flex tw:items-center">
           <div class="tw:w-[210px] tw:ml-0">
-            <q-input
-              v-model.number="localDeduplication.time_window_minutes"
+            <OInput
+              v-model="localDeduplication.time_window_minutes"
               type="number"
-              dense
-              borderless
               min="1"
-              class="alert-v3-input"
               :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-              style="background: none;"
               @update:model-value="emitUpdate"
             />
           </div>
@@ -126,11 +99,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, type PropType } from "vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 export default defineComponent({
   name: "Step5Deduplication",
+  components: { OInput, OSelect, OTooltip },
   props: {
     deduplication: {
       type: Object as PropType<any>,
@@ -156,8 +133,6 @@ export default defineComponent({
       time_window_minutes: props.deduplication?.time_window_minutes || undefined,
     });
 
-    const filteredColumns = ref(props.columns || []);
-
     // Watch for prop changes
     watch(
       () => props.deduplication,
@@ -172,14 +147,6 @@ export default defineComponent({
         }
       },
       { deep: true }
-    );
-
-    // Watch for columns prop changes
-    watch(
-      () => props.columns,
-      (newVal) => {
-        filteredColumns.value = newVal || [];
-      }
     );
 
     const sanitizeTimeWindow = (val: any): number | undefined => {
@@ -197,27 +164,23 @@ export default defineComponent({
       });
     };
 
-    const filterColumns = (val: string, update: any) => {
-      update(() => {
-        if (val === '') {
-          filteredColumns.value = props.columns || [];
-        } else {
-          const needle = val.toLowerCase();
-          filteredColumns.value = (props.columns || []).filter((v: any) => {
-            const str = typeof v === 'string' ? v : (v?.label || v?.value || '');
-            return str.toLowerCase().indexOf(needle) > -1;
-          });
-        }
-      });
+    const addFingerprintField = (value: string) => {
+      if (!localDeduplication.value.fingerprint_fields) {
+        localDeduplication.value.fingerprint_fields = [];
+      }
+      if (!localDeduplication.value.fingerprint_fields.includes(value)) {
+        localDeduplication.value.fingerprint_fields.push(value);
+        emitUpdate();
+      }
     };
 
     return {
       t,
       store,
+      props,
       localDeduplication,
-      filteredColumns,
       emitUpdate,
-      filterColumns,
+      addFingerprintField,
     };
   },
 });
