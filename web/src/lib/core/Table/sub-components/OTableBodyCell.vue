@@ -5,6 +5,7 @@ import type { Cell, Row } from "@tanstack/vue-table";
 import { computed, ref } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { sanitize } = useSanitizedHtml();
 
@@ -82,10 +83,15 @@ const displayValue = computed(() => {
   return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
 });
 
+const isAutoWidth = computed(() => meta.value?.autoWidth === true);
+
 const cellStyle = computed(() => {
-  const base: Record<string, any> = {
-    width: `calc(var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size) * 1px)`,
-  };
+  const base: Record<string, any> = {};
+  if (!isAutoWidth.value) {
+    const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
+    base.width = sizeVar;
+    base.maxWidth = sizeVar;
+  }
   if (isPinned.value === "left") {
     base.position = "sticky";
     base.left = `${pinOffset.value}px`;
@@ -127,12 +133,12 @@ function handleClick() {
   <td
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
-      'tw:px-2',
-      dense ? 'tw:py-1' : 'tw:py-2',
+      meta?.compactPadding ? 'tw:px-1 tw:py-0.5 tw:align-middle' : 'tw:px-2 tw:py-1 tw:align-middle',
+      bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+      dense ? 'tw:py-0.5' : '',
       alignClass,
-      bordered ? 'tw:border-r tw:border-border-default' : '',
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
-      isPinned ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
+      isPinned && !isAction ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
       wrap ? 'tw:break-words tw:whitespace-normal' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
     ]"
@@ -166,7 +172,7 @@ function handleClick() {
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >
-      <q-icon :name="copied ? 'check' : 'content_copy'" size="0.8rem" />
+      <OIcon :name="copied ? 'check' : 'content_copy'" size="0.8rem" />
     </button>
   </td>
 </template>

@@ -6,7 +6,7 @@ import type { InjectionKey } from "vue";
  * The form instance returned by `useForm()` from @tanstack/vue-form.
  * Typed broadly to avoid re-exporting the full generic chain.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export type FormContextValue = any;
 
 /** Provide/inject key for the OForm context. */
