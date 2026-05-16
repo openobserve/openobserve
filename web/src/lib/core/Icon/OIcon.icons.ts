@@ -258,6 +258,20 @@ import Compress from "~icons/material-symbols/compress";
 import Pattern from "~icons/material-symbols/pattern";
 import CallMerge from "~icons/material-symbols/call-merge";
 import AutoGraph from "~icons/material-symbols/auto-graph";
+import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
+import Pets from "~icons/material-symbols/pets";
+import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
+import Dataset from "~icons/material-symbols/dataset-outline";
+import FolderOpen from "~icons/material-symbols/folder-open-outline";
+import Widgets from "~icons/material-symbols/widgets-outline";
+import Lan from "~icons/material-symbols/lan-outline";
+import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
+import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
+import TrendingUpFilled from "~icons/material-symbols/trending-up";
+import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
+import ViewInAr from "~icons/material-symbols/view-in-ar-outline";
+import Input from "~icons/material-symbols/input";
+import Transform from "~icons/material-symbols/transform";
 
 import type { Component } from "vue";
 
@@ -384,6 +398,22 @@ export const iconRegistry = {
   "pattern": Pattern,
   "call-merge": CallMerge,
   "auto-graph": AutoGraph,
+  "play-circle-filled": PlayCircleFilled,
+  "pets": Pets,
+  "monitor-heart": MonitorHeart,
+  "dataset": Dataset,
+  "folder-open": FolderOpen,
+  "widgets": Widgets,
+  "lan": Lan,
+  "auto-awesome": AutoAwesome,
+  "check-circle-outline": CheckCircleOutline,
+  "trending-up-filled": TrendingUpFilled,
+  "view-in-ar": ViewInAr,
+  "input": Input,
+  "transform": Transform,
+  "processing": Transform,
+  "navigate-before": ChevronLeft,
+  "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
   "group": Group,
   "hourglass-empty": HourglassEmpty,

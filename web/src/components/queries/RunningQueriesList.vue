@@ -126,7 +126,7 @@ import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X, ODrawer, OSpinner, OCheckbox },
+  components: { QueryList, QTablePagination, NoData, OButton, ODrawer, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
