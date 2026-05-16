@@ -315,7 +315,7 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     }
     return value.map((item) => {
       const key = String(item);
-      return valueMap.get(key) ?? key;
+      return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
     });
   }
 
@@ -323,12 +323,12 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     const first = value[0];
     if (first === undefined || first === null) return undefined;
     const key = String(first);
-    return valueMap.get(key) ?? key;
+    return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
   }
 
   if (value === undefined || value === null) return undefined;
   const key = String(value);
-  return valueMap.get(key) ?? key;
+  return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
 }
 
 function handleListboxUpdate(value: unknown) {
@@ -336,8 +336,10 @@ function handleListboxUpdate(value: unknown) {
 
   // Single-select: prevent deselecting the already-selected option
   if (!props.multiple) {
-    if (resolved === undefined || resolved === null) {
+    if (resolved === undefined) {
       // Reka toggled off the current selection — ignore it
+      // Note: resolved === null is a valid mapped value (e.g. "None"/"Auto"/"Default"
+      // options that use null as their value), so it must NOT be blocked here.
       popoverOpen.value = false;
       return;
     }
