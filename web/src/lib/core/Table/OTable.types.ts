@@ -12,6 +12,8 @@ export interface OTableColumnMeta {
   headerClass?: string;
   /** Additional class applied to the <td> */
   cellClass?: string;
+  /** Format function applied to cell value before rendering */
+  format?: (value: any, row: any) => any;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -39,6 +41,8 @@ export interface OTableColumnDef<TData = any> {
   resizable?: boolean;
   /** Can the user pin this column? */
   pinnable?: boolean;
+  /** Pin this column to the left or right edge */
+  pinned?: "left" | "right" | false;
   /** Can the user hide/close this column? */
   hideable?: boolean;
   /** Action columns (no data, just buttons/icons) get compact styling */
@@ -184,10 +188,22 @@ export interface OTableProps<TData = any> {
   getRowStyle?: (row: TData) => Record<string, any>;
   /** Returns a CSS color for the status bar (4px left border) per row */
   getRowStatusColor?: (row: TData) => string | undefined;
+  /** Returns inline styles for individual cells */
+  getCellStyle?: (params: {
+    columnId: string;
+    row: TData;
+    value: any;
+  }) => Record<string, any>;
   /** Show hover-visible copy button on each cell */
   enableCellCopy?: boolean;
   /** Fixed row height in px (for virtual scroll accuracy) */
   rowHeight?: number;
+
+  // ── Scroll ──
+  /** External scroll element (for shared scroll containers) */
+  scrollEl?: HTMLElement | null;
+  /** Margin for scroll detection (default 0) */
+  scrollMargin?: number;
 
   // ── Pivot (Dashboard) ──
   /** Pivot header levels (multi-level headers) */
@@ -239,6 +255,10 @@ export interface OTableEmits<TData = any> {
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
   "column-close": [columnId: string];
+  "update:columnSizes": [
+    sizes: Record<string, number>,
+    idMap: Record<string, string>,
+  ];
 
   // Virtual scroll
   "scroll-end": [scrollInfo: any];
@@ -259,9 +279,23 @@ export interface OTableSlots<TData = any> {
   "header-actions"?: () => any;
   /** Content above the table */
   top?: () => any;
-  /** Content below the table (above pagination) */
-  bottom?: () => any;
-  /** Custom loading indicator */
+  /** Content below the table (above pagination). Scoped with pagination state. */
+  bottom?: (props: {
+    currentPage: number;
+    pageSize: number;
+    totalPages: number;
+    totalRows: number;
+    isFirstPage: boolean;
+    isLastPage: boolean;
+    setPageSize: (size: number) => void;
+    firstPage: () => void;
+    prevPage: () => void;
+    nextPage: () => void;
+    lastPage: () => void;
+  }) => any;
+  /** Shown when loading=true AND data exists (thin banner, not overlay) */
+  "loading-banner"?: () => any;
+  /** Custom loading indicator (overlay when no data) */
   loading?: () => any;
   /** Custom empty state */
   empty?: () => any;
@@ -286,4 +320,6 @@ export interface OTableExposed<TData = any> {
   resetColumnOrder: () => void;
   /** Scroll to top */
   scrollToTop: () => void;
+  /** Get all currently visible rows as plain objects */
+  getRows: () => TData[];
 }

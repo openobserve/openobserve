@@ -34,6 +34,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
   const isFirefox = computed(() => {
     return (
       typeof document !== "undefined" &&
+      typeof CSS !== "undefined" &&
       CSS.supports("-moz-appearance", "none")
     );
   });

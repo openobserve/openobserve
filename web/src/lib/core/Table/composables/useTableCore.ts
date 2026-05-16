@@ -6,7 +6,9 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useVueTable,
+  type AggregationFns,
   type ColumnDef,
+  type Row,
   type Table,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
@@ -48,7 +50,47 @@ export function useTableCore<TData>(
   const columnResizeMode = "onChange";
 
   // Track sorting state for client-side
-  const sortingState = ref<any[]>([]);
+  const initialSorting = computed(() => {
+    if (props.sorting === "client" && props.sortBy) {
+      const field = props.sortFieldMap?.[props.sortBy] ?? props.sortBy;
+      return [{ id: field, desc: props.sortOrder === "desc" }];
+    }
+    return [];
+  });
+
+  const sortingState = ref<any[]>(initialSorting.value);
+
+  // Column pinning — auto-pin isAction columns to right, pivotRowColumns to left, plus explicitly pinned columns
+  const pivotRowColumnIds = computed(() => {
+    const raw = (props as any).pivotRowColumns as any[] | undefined;
+    if (!raw || !raw.length) return undefined;
+    return raw.map((c: any) => (typeof c === "string" ? c : c.id));
+  });
+  const rightPinnedIds = computed(() =>
+    props.columns
+      .filter((c) => c.isAction || c.pinned === "right")
+      .map((c) => c.id),
+  );
+  const leftPinnedIds = computed(() => {
+    const explicit = props.columns
+      .filter((c) => c.pinned === "left")
+      .map((c) => c.id);
+    const pivot = pivotRowColumnIds.value ?? [];
+    return [...new Set([...explicit, ...pivot])];
+  });
+  const columnPinning = ref<{ left?: string[]; right?: string[] }>({});
+
+  // Keep auto-pinned columns in sync
+  watch(
+    [rightPinnedIds, leftPinnedIds],
+    () => {
+      columnPinning.value = {
+        left: leftPinnedIds.value.length ? leftPinnedIds.value : undefined,
+        right: rightPinnedIds.value.length ? rightPinnedIds.value : undefined,
+      };
+    },
+    { immediate: true },
+  );
 
   // Build TanStack ColumnDef array from our OTableColumnDef
   const tanstackColumns = computed<ColumnDef<TData>[]>(() => {
@@ -95,14 +137,27 @@ export function useTableCore<TData>(
     () => (props.filterMode ?? "client") === "client",
   );
 
-  // Initial sorting state (client-side)
-  const initialSorting = computed(() => {
-    if (props.sorting === "client" && props.sortBy) {
-      const field = props.sortFieldMap?.[props.sortBy] ?? props.sortBy;
-      return [{ id: field, desc: props.sortOrder === "desc" }];
-    }
-    return [];
-  });
+  // Built-in aggregation functions for footer totals
+  const aggregationFns: AggregationFns<TData> = {
+    sum: (columnId: string, leafRows: Row<TData>[]) => {
+      return leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0);
+    },
+    count: (_columnId: string, leafRows: Row<TData>[]) => {
+      return leafRows.length;
+    },
+    avg: (columnId: string, leafRows: Row<TData>[]) => {
+      if (leafRows.length === 0) return 0;
+      return leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0) / leafRows.length;
+    },
+    min: (columnId: string, leafRows: Row<TData>[]) => {
+      if (leafRows.length === 0) return undefined;
+      return Math.min(...leafRows.map((row) => Number(row.getValue(columnId)) || 0));
+    },
+    max: (columnId: string, leafRows: Row<TData>[]) => {
+      if (leafRows.length === 0) return undefined;
+      return Math.max(...leafRows.map((row) => Number(row.getValue(columnId)) || 0));
+    },
+  };
 
   // Build the TanStack table instance
   const table = useVueTable({
@@ -120,6 +175,7 @@ export function useTableCore<TData>(
     getPaginationRowModel: isClientPagination.value
       ? getPaginationRowModel()
       : undefined,
+    aggregationFns,
     getSubRows: props.getSubRows as any,
     enableSorting: props.sorting !== "none",
     enableColumnResizing: props.enableColumnResize ?? false,
@@ -131,6 +187,12 @@ export function useTableCore<TData>(
         typeof updater === "function" ? updater(old) : updater;
       sortingState.value = next;
     },
+    onColumnPinningChange: (updater: any) => {
+      const old = columnPinning.value;
+      const next =
+        typeof updater === "function" ? updater(old) : updater;
+      columnPinning.value = next;
+    },
     defaultColumn: {
       minSize: 40,
       maxSize: 800,
@@ -140,6 +202,9 @@ export function useTableCore<TData>(
         if (isClientSort.value) return sortingState.value;
         return [];
       },
+      get globalFilter() {
+        return props.globalFilter ?? "";
+      },
       get columnOrder() {
         return columnOrder.value.length ? columnOrder.value : undefined;
       },
@@ -148,6 +213,9 @@ export function useTableCore<TData>(
       },
       get columnVisibility() {
         return props.columnVisibility ?? {};
+      },
+      get columnPinning() {
+        return columnPinning.value;
       },
     },
   });

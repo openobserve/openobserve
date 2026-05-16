@@ -322,6 +322,7 @@
   --color-table-row-selected-bg: var(--color-primary-100);
   --color-table-row-striped-bg: var(--color-surface-subtle);
   --color-table-border: var(--color-border-default);
+  --color-table-cell-bg: var(--color-surface-base);
   --color-table-cell-text: var(--color-text-primary);
   --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-400) 35%, transparent);
   --color-table-highlight-text: var(--color-text-primary);
@@ -624,6 +625,7 @@
   --color-table-row-selected-bg: var(--color-table-row-selected-bg);
   --color-table-row-striped-bg: var(--color-table-row-striped-bg);
   --color-table-border: var(--color-table-border);
+  --color-table-cell-bg: var(--color-table-cell-bg);
   --color-table-cell-text: var(--color-table-cell-text);
   --color-table-highlight-bg: var(--color-table-highlight-bg);
   --color-table-highlight-text: var(--color-table-highlight-text);

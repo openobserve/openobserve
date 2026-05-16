@@ -36,6 +36,11 @@ const props = defineProps<{
   dense?: boolean;
   bordered?: boolean;
   enableCellCopy?: boolean;
+  getCellStyle?: (params: {
+    columnId: string;
+    row: any;
+    value: any;
+  }) => Record<string, any>;
 }>();
 
 const emit = defineEmits<{
@@ -55,11 +60,57 @@ const alignClass = computed(() => {
 
 const isAction = computed(() => meta.value?.isAction ?? false);
 
+const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
+
+const pinOffset = computed(() => {
+  if (!isPinned.value) return 0;
+  if (isPinned.value === "left")
+    return props.cell.column.getStart?.("left") ?? 0;
+  if (isPinned.value === "right")
+    return props.cell.column.getAfter?.("right") ?? 0;
+  return 0;
+});
+
+const rawValue = computed(() => props.cell.getValue());
+
+const displayValue = computed(() => {
+  const formatFn = meta.value?.format as
+    | ((value: any, row: any) => any)
+    | undefined;
+  if (rawValue.value === null || rawValue.value === undefined)
+    return rawValue.value;
+  return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
+});
+
+const cellStyle = computed(() => {
+  const base: Record<string, any> = {
+    width: `calc(var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size) * 1px)`,
+  };
+  if (isPinned.value === "left") {
+    base.position = "sticky";
+    base.left = `${pinOffset.value}px`;
+    base.zIndex = 1;
+    base.boxShadow = "2px 0 4px -2px var(--color-border-default)";
+  }
+  if (isPinned.value === "right") {
+    base.position = "sticky";
+    base.right = `${pinOffset.value}px`;
+    base.zIndex = 1;
+    base.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
+  }
+  const extra = props.getCellStyle?.({
+    columnId: props.cell.column.id,
+    row: props.row.original,
+    value: rawValue.value,
+  });
+  return extra ? { ...base, ...extra } : base;
+});
+
 const highlightedHtml = computed(() => {
   if (!props.highlightText || !props.shouldHighlight || !props.getHighlightedHtml) {
     return null;
   }
-  const raw = props.getHighlightedHtml(props.cell.column.id, props.cell.getValue());
+  const raw = props.getHighlightedHtml(props.cell.column.id, displayValue.value);
   return raw ? sanitize(raw) : null;
 });
 
@@ -81,12 +132,11 @@ function handleClick() {
       alignClass,
       bordered ? 'tw:border-r tw:border-border-default' : '',
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
+      isPinned ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
       wrap ? 'tw:break-words tw:whitespace-normal' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
     ]"
-    :style="{
-      width: `calc(var(--header-${cell.column.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
-    }"
+    :style="cellStyle"
     @click="handleClick"
   >
     <slot v-if="$slots.default" />
@@ -104,7 +154,7 @@ function handleClick() {
     />
     <!-- Default: plain text -->
     <span v-else class="tw:text-text-primary tw:text-sm">
-      {{ cell.renderValue() }}
+      {{ displayValue }}
     </span>
 
     <!-- Cell copy button (visible on hover) -->

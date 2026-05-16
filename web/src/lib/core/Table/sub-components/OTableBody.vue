@@ -35,6 +35,12 @@ const props = defineProps<{
   getStatusBarColor?: (row: any) => string | undefined;
   /** Enable click-to-copy on cell values */
   enableCellCopy?: boolean;
+  /** Per-cell inline style function */
+  getCellStyle?: (params: {
+    columnId: string;
+    row: any;
+    value: any;
+  }) => Record<string, any>;
 }>();
 
 const emit = defineEmits<{
@@ -83,10 +89,11 @@ function getRowForIndex(index: number) {
       :row-style-fn="rowStyleFn"
       :status-bar-color="getStatusBarColor?.(row.original)"
       :enable-cell-copy="enableCellCopy"
+      :get-cell-style="getCellStyle"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"
-      @row-click="emit('row-click', $event[0], $event[1])"
-      @row-dblclick="emit('row-dblclick', $event[0], $event[1])"
+      @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
+      @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
       @cell-click="emit('cell-click', $event)"
     >
       <!-- Pass through named cell slots from parent -->
@@ -143,8 +150,8 @@ function getRowForIndex(index: number) {
       })"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"
-      @row-click="emit('row-click', $event[0], $event[1])"
-      @row-dblclick="emit('row-dblclick', $event[0], $event[1])"
+      @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
+      @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
       @cell-click="emit('cell-click', $event)"
     >
       <template
