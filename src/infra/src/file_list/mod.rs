@@ -69,6 +69,21 @@ pub trait FileList: Sync + Send + 'static {
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
+    /// Bulk-set `bloom_ver` for the given file_list ids. Used by the
+    /// post-merge bloom builder (see `service::compact::bloom_build`).
+    /// Empty `ids` is a no-op.
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
+    /// Distinct `date` (YYYY/MM/DD/HH) values for `stream_key` that
+    /// contain at least one row with `bloom_ver = 0` AND whose newest
+    /// row was last touched before `max_updated_at_us`. The
+    /// `updated_at` filter is the settling window — buckets still
+    /// being actively compacted are excluded so the catchup sweep
+    /// doesn't race the per-merge bloom build.
+    async fn query_pending_bloom_dates(
+        &self,
+        stream_key: &str,
+        max_updated_at_us: i64,
+    ) -> Result<Vec<String>>;
     async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
@@ -281,6 +296,25 @@ pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
 }
 
 #[inline]
+pub async fn update_bloom_ver(ids: &[i64], bloom_ver: i64) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    CLIENT.update_bloom_ver(ids, bloom_ver).await
+}
+
+#[inline]
+pub async fn query_pending_bloom_dates(
+    stream_key: &str,
+    max_updated_at_us: i64,
+) -> Result<Vec<String>> {
+    CLIENT
+        .query_pending_bloom_dates(stream_key, max_updated_at_us)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:update_compressed_size")]
 pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
     CLIENT.update_compressed_size(file, size).await
 }
@@ -668,6 +702,8 @@ pub struct FileRecord {
     #[sqlx(default)]
     pub index_size: i64,
     #[sqlx(default)]
+    pub bloom_ver: i64,
+    #[sqlx(default)]
     pub flattened: bool,
     #[sqlx(default)]
     pub updated_at: i64,
@@ -695,6 +731,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: r.original_size,
             compressed_size: r.compressed_size,
             index_size: r.index_size,
+            bloom_ver: r.bloom_ver,
             flattened: r.flattened,
         }
     }
@@ -882,6 +919,7 @@ mod tests {
             original_size: 102400,
             compressed_size: 51200,
             index_size: 1024,
+            bloom_ver: 0,
             flattened: true,
             updated_at: 9999,
         };
@@ -914,6 +952,7 @@ mod tests {
             original_size: 4096,
             compressed_size: 2048,
             index_size: 0,
+            bloom_ver: 0,
             flattened: false,
             updated_at: 0,
         };
@@ -929,6 +968,59 @@ mod tests {
         assert!(key.segment_ids.is_none());
         assert_eq!(key.meta.min_ts, 100);
         assert_eq!(key.meta.max_ts, 200);
+    }
+
+    // ── bloom_ver coverage on FileRecord ─────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_from_file_record_carries_bloom_ver() {
+        let record = FileRecord {
+            id: 1,
+            account: "a".to_string(),
+            org: "o".to_string(),
+            stream: "s/logs/x".to_string(),
+            date: "2026/05/08/00".to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            min_ts: 1,
+            max_ts: 2,
+            records: 3,
+            original_size: 4,
+            compressed_size: 5,
+            index_size: 6,
+            bloom_ver: 1_715_000_000_000_000,
+            flattened: false,
+            updated_at: 0,
+        };
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, record.bloom_ver);
+    }
+
+    #[test]
+    fn test_file_record_bloom_ver_default_is_zero() {
+        // sqlx::FromRow with #[sqlx(default)] should fall back to 0 for missing column.
+        let record = FileRecord {
+            id: 0,
+            account: String::new(),
+            org: String::new(),
+            stream: String::new(),
+            date: String::new(),
+            file: String::new(),
+            deleted: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 0,
+            compressed_size: 0,
+            index_size: 0,
+            bloom_ver: 0,
+            flattened: false,
+            updated_at: 0,
+        };
+        // Conversion yields meta.bloom_ver == 0 too, which is the "no .bf" sentinel
+        // that downstream search code uses to fall back to the original tantivy path.
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, 0);
     }
 
     // ── From<&StatsRecord> for StreamStats ───────────────────────────────────

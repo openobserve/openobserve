@@ -105,6 +105,55 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if *use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
+        // Bloom prune *before* opening any tantivy file — pulls eligible
+        // candidates from `.bf` blobs that are 1000x cheaper than the
+        // tantivy footers. Failure here degrades to "keep all" so search
+        // correctness never depends on the bloom layer.
+        let cfg = get_config();
+        if cfg.common.bloom_filter_enabled {
+            let stream_settings =
+                infra::schema::get_settings(org_id, stream_name, *stream_type).await;
+            let bloom_fields: std::collections::HashSet<String> =
+                infra::schema::get_stream_setting_bloom_filter_fields(&stream_settings)
+                    .into_iter()
+                    .collect();
+            if !bloom_fields.is_empty() {
+                let preds = super::super::bloom_predicate::extract(
+                    index_condition.as_ref().unwrap(),
+                    &bloom_fields,
+                );
+                if !preds.is_empty() {
+                    let bloom_start = std::time::Instant::now();
+                    let before = files.len();
+                    files = super::super::bloom_pruner::prune(
+                        files,
+                        &preds,
+                        org_id,
+                        *stream_type,
+                        stream_name,
+                    )
+                    .await;
+                    let elapsed = bloom_start.elapsed();
+                    log::info!(
+                        "[trace_id {trace_id}] search->storage: bloom prune {before} -> {} in {} ms",
+                        files.len(),
+                        elapsed.as_millis()
+                    );
+                    config::metrics::BLOOM_PRUNE_DURATION
+                        .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                        .observe(elapsed.as_secs_f64());
+                    if before > 0 {
+                        config::metrics::BLOOM_PRUNE_KEEP_RATIO
+                            .with_label_values(&[org_id.as_str(), stream_type.as_str()])
+                            .observe(files.len() as f64 / before as f64);
+                    }
+                    if files.is_empty() {
+                        return Ok((vec![], ScanStats::default(), HashSet::new()));
+                    }
+                }
+            }
+        }
+
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,

@@ -99,6 +99,21 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     });
 
+    // Bloom-filter catchup: handles buckets the per-merge hook never
+    // fires for (1-file hours, settled streams, freshly-enabled bloom).
+    // Fires on the same cadence as compaction so a backfill-enable is
+    // visible within a couple of cycles.
+    spawn_pausable_job!(
+        "run_bloom_catchup",
+        get_config().compact.interval.saturating_add(5),
+        {
+            log::debug!("[COMPACTOR::JOB] Running bloom catchup");
+            if let Err(e) = compact::bloom_build::run_catchup().await {
+                log::error!("[COMPACTOR::JOB] bloom catchup error: {e}");
+            }
+        }
+    );
+
     spawn_pausable_job!("run_delay_deletion", get_config().compact.interval + 4, {
         log::debug!("[COMPACTOR::JOB] Running data delay deletion");
         if let Err(e) = compact::run_delay_deletion().await {

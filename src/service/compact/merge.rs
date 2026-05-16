@@ -457,6 +457,14 @@ pub async fn merge_by_stream(
         let partition = partition_files_with_size.entry(prefix).or_default();
         partition.push(file.to_owned());
     }
+    // Snapshot the distinct prefixes (one per (stream, hour) bucket the
+    // compactor visited) before consuming the map. We use this *after*
+    // the merge tasks complete to fire `bloom_build` for every visited
+    // bucket — including buckets where no merging happened (e.g. only
+    // one file was present, or all files were already at max size).
+    // The previous design hooked bloom_build inside the per-prefix
+    // worker, which silently skipped all such buckets.
+    let visited_prefixes: Vec<String> = partition_files_with_size.keys().cloned().collect();
 
     // use multiple threads to merge
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.file_merge_thread_num));
@@ -627,6 +635,31 @@ pub async fn merge_by_stream(
         task.await??;
     }
 
+    // (Re)build the bloom for every (stream, hour-prefix) the compactor
+    // visited, regardless of whether any merging actually happened.
+    // `build_for_bucket` is internally a no-op when nothing changed
+    // (every file already has a non-zero bloom_ver) so this is cheap on
+    // already-settled buckets. Failure is non-fatal — search degrades to
+    // the pre-bloom path for affected files.
+    for prefix in visited_prefixes {
+        let date_key = derive_date_key_from_prefix(&prefix);
+        if date_key.is_empty() {
+            continue;
+        }
+        if let Err(e) = crate::service::compact::bloom_build::build_for_bucket(
+            org_id,
+            stream_type,
+            stream_name,
+            &date_key,
+        )
+        .await
+        {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_key} failed: {e}"
+            );
+        }
+    }
+
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
@@ -639,6 +672,18 @@ pub async fn merge_by_stream(
         .inc_by(time);
 
     Ok(())
+}
+
+/// Pull the `YYYY/MM/DD/HH` segment out of a partition prefix like
+/// `files/{org}/{type}/{stream}/2026/05/08/14`. Used to translate the
+/// merge worker's prefix into the `file_list.date` value that the
+/// bloom-build helper queries on.
+fn derive_date_key_from_prefix(prefix: &str) -> String {
+    let parts: Vec<&str> = prefix.split('/').collect();
+    if parts.len() < 8 {
+        return String::new();
+    }
+    format!("{}/{}/{}/{}", parts[4], parts[5], parts[6], parts[7])
 }
 
 // merge small files into big file, upload to storage, returns the big file key and merged files
@@ -741,6 +786,7 @@ pub async fn merge_files(
         compressed_size: 0,
         flattened: false,
         index_size: 0,
+        bloom_ver: 0,
     };
     if new_file_meta.records == 0 {
         return Err(anyhow::anyhow!("merge_files error: records is 0"));
@@ -838,6 +884,9 @@ pub async fn merge_files(
 
     let merge_result = {
         let stream_name = stream_name.to_string();
+        // Clone for the spawn — we still need bloom_filter_fields below to
+        // drive the per-file `.bf` build path after the merge completes.
+        let bloom_fields_for_merge = bloom_filter_fields.clone();
         DATAFUSION_RUNTIME
             .spawn(async move {
                 merge::merge_parquet_files(
@@ -845,7 +894,7 @@ pub async fn merge_files(
                     &stream_name,
                     schema,
                     tables,
-                    &bloom_filter_fields,
+                    &bloom_fields_for_merge,
                     new_file_meta,
                     false,
                 )
@@ -918,7 +967,6 @@ pub async fn merge_files(
             }
 
             if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                // generate inverted index
                 generate_inverted_index(
                     org_id,
                     &new_file_key,
@@ -966,7 +1014,6 @@ pub async fn merge_files(
                 }
 
                 if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
-                    // generate inverted index
                     generate_inverted_index(
                         org_id,
                         &new_file_key,
@@ -1328,6 +1375,7 @@ mod tests {
                 compressed_size: original_size / 2, // assume 50% compression
                 index_size: 0,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
             segment_ids: None,
@@ -2998,5 +3046,26 @@ mod tests {
         // Both files must appear; overlap.parquet goes to a new group.
         let keys: Vec<&str> = result.iter().map(|f| f.key.as_str()).collect();
         assert!(keys.contains(&"overlap.parquet"));
+    }
+
+    #[test]
+    fn test_derive_date_key_from_prefix_standard() {
+        let prefix = "files/default/logs/nginx/2026/05/08/14";
+        assert_eq!(derive_date_key_from_prefix(prefix), "2026/05/08/14");
+    }
+
+    #[test]
+    fn test_derive_date_key_from_prefix_with_extra_segments() {
+        // Some streams (traces) embed extra segments after the hour.
+        let prefix = "files/o/traces/svc/2026/05/08/14/service_name=foo";
+        assert_eq!(derive_date_key_from_prefix(prefix), "2026/05/08/14");
+    }
+
+    #[test]
+    fn test_derive_date_key_from_prefix_too_short_returns_empty() {
+        // Bloom build is no-op on empty date_key, so a malformed prefix
+        // just disables the build for this batch — never panics.
+        assert!(derive_date_key_from_prefix("too/short").is_empty());
+        assert!(derive_date_key_from_prefix("files/o/logs/nginx").is_empty());
     }
 }

@@ -336,7 +336,7 @@ impl super::FileList for PostgresFileList {
         let start = std::time::Instant::now();
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flattened, file, date
+SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened, file, date
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -416,6 +416,45 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         Ok(())
     }
 
+    async fn query_pending_bloom_dates(
+        &self,
+        stream_key: &str,
+        max_updated_at_us: i64,
+    ) -> Result<Vec<String>> {
+        let pool = CLIENT.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["select", "file_list"])
+            .inc();
+        let rows: Vec<(String,)> = sqlx::query_as(
+            r#"SELECT DISTINCT date FROM file_list
+               WHERE stream = $1 AND bloom_ver = 0 AND updated_at < $2;"#,
+        )
+        .bind(stream_key)
+        .bind(max_updated_at_us)
+        .fetch_all(&pool)
+        .await?;
+        Ok(rows.into_iter().map(|(d,)| d).collect())
+    }
+
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let pool = CLIENT.clone();
+        // Use ANY($2) with a bigint array — postgres handles arbitrary length
+        // without needing chunking, and the partition pruning works on the
+        // file_list_*_pkey index.
+        DB_QUERY_NUMS
+            .with_label_values(&["update", "file_list"])
+            .inc();
+        sqlx::query("UPDATE file_list SET bloom_ver = $1 WHERE id = ANY($2)")
+            .bind(bloom_ver)
+            .bind(ids)
+            .execute(&pool)
+            .await?;
+        Ok(())
+    }
+
     async fn list(&self) -> Result<Vec<FileKey>> {
         return Ok(vec![]); // disallow list all data
     }
@@ -439,7 +478,7 @@ SELECT min_ts, max_ts, records, original_size, compressed_size, index_size, flat
         let ret = if let Some(flattened) = flattened {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#
@@ -452,7 +491,7 @@ SELECT id, account, stream, date, file, deleted, min_ts, max_ts, records, origin
             let max_ts_upper_bound = super::calculate_max_ts_upper_bound(time_end, stream_type);
             let (date_from, date_to) = derive_date_range(time_start, time_end);
             let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND date >= $5 AND date < $6;
                 "#;
@@ -496,7 +535,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let cfg = get_config();
         let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
-SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
+SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver, flattened
     FROM file_list
     WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
@@ -595,7 +634,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!(
-                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size FROM file_list WHERE id IN ({ids})"
+                "SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, bloom_ver FROM file_list WHERE id IN ({ids})"
             );
             DB_QUERY_NUMS
                 .with_label_values(&["query_by_ids", "file_list"])
@@ -2298,6 +2337,11 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
     .execute(&mut *tx)
     .await?;
     sqlx::query(&format!(
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
+    ))
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(&format!(
         "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 1762819200000000 NOT NULL"
     ))
     .execute(&mut *tx)
@@ -2633,6 +2677,15 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             Some("p") => {
                 // Already partitioned: just ensure partitions exist
                 log::info!("[POSTGRES] Table {table} already partitioned, ensuring partitions");
+                // Ensure newly-added columns exist on already-partitioned tables.
+                // PG declarative partitioning propagates ALTER on parent to all partitions.
+                if *table == "file_list" || *table == "file_list_history" {
+                    sqlx::query(&format!(
+                        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS bloom_ver BIGINT DEFAULT 0 NOT NULL"
+                    ))
+                    .execute(pool)
+                    .await?;
+                }
             }
             Some("r") => {
                 // Regular table: needs migration
@@ -2701,6 +2754,7 @@ CREATE TABLE {table} (
     original_size   BIGINT NOT NULL,
     compressed_size BIGINT NOT NULL,
     index_size      BIGINT NOT NULL,
+    bloom_ver BIGINT DEFAULT 0 NOT NULL,
     updated_at      BIGINT NOT NULL
 ) PARTITION BY RANGE (date)
         "#
@@ -3373,6 +3427,7 @@ mod tests {
             compressed_size: 10000,
             flattened: false,
             index_size: 5000,
+            bloom_ver: 0,
         }
     }
 

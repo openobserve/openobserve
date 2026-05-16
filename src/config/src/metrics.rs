@@ -498,6 +498,92 @@ pub static QUERY_PARQUET_METADATA_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::ne
     .expect("Metric created")
 });
 
+// bloom filter prune metrics
+//
+// Records the ratio of files surviving the search-side bloom prune step
+// (kept_files / candidate_files). A low value indicates strong pruning;
+// 1.0 means everything was kept (e.g. files without bloom_ver, or every
+// bloom returned "maybe"). Only emitted when bloom prune actually runs.
+pub static BLOOM_PRUNE_KEEP_RATIO: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "bloom_prune_keep_ratio",
+            "Search-side bloom prune kept-file ratio (kept / candidate).".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.0, 0.001, 0.005, 0.01, 0.05, 0.10, 0.20, 0.30, 0.50, 0.75, 1.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+pub static BLOOM_PRUNE_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    HistogramVec::new(
+        HistogramOpts::new(
+            "bloom_prune_duration_seconds",
+            "Search-side bloom prune duration (seconds).".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .buckets(vec![
+            0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+        ])
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+// Counts bloom-check errors at the search side. A non-zero value means
+// at least one `.bf` is corrupt (failed `Sbbf::from_bytes`) and pruning
+// silently degrades to "keep" for the affected entries — investigate.
+pub static BLOOM_CHECK_ERRORS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bloom_check_errors_total",
+            "Number of bloom membership-check errors (e.g. corrupt .bf bytes).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+// Counts every .bf file uploaded by the compactor.
+pub static BLOOM_FILE_BUILT_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bloom_file_built_total",
+            "Number of bloom filter (.bf) files built by the compactor.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
+
+// Counts compactor bloom-build attempts that failed at any stage
+// (`stage` is one of: serialize, upload, update_file_list). Failures
+// are non-fatal — the counter exists so the asymmetry between
+// BUILT_TOTAL and BUILD_FAILED_TOTAL is visible on dashboards.
+pub static BLOOM_FILE_BUILD_FAILED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "bloom_file_build_failed_total",
+            "Number of compactor bloom-build attempts that failed.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "stage"],
+    )
+    .expect("Metric created")
+});
+
 // compactor stats
 pub static COMPACT_USED_TIME: Lazy<CounterVec> = Lazy::new(|| {
     CounterVec::new(
@@ -1763,6 +1849,23 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(COMPACT_PENDING_JOBS.clone()))
+        .expect("Metric registered");
+
+    // bloom filter prune metrics
+    registry
+        .register(Box::new(BLOOM_PRUNE_KEEP_RATIO.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_PRUNE_DURATION.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_FILE_BUILT_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_FILE_BUILD_FAILED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(BLOOM_CHECK_ERRORS_TOTAL.clone()))
         .expect("Metric registered");
 
     // stream stats aggregation metrics

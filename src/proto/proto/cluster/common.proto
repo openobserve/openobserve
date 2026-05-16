@@ -16,6 +16,7 @@ message FileMeta {
     int64 original_size   = 4;
     int64 compressed_size = 5;
     int64 index_size      = 6;
+    int64 bloom_ver = 7; // 0 = no .bf; otherwise = us ts encoded in .bf filename
 }
 
 // Job information for a request

@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    cmp::{max, min},
-    io::Cursor,
-    path::PathBuf,
-    pin::Pin,
-    sync::Arc,
-};
+use std::{io::Cursor, path::PathBuf, pin::Pin, sync::Arc};
 
 #[cfg(feature = "vortex")]
 use arrow::{array::StructArray, datatypes::DataType};
@@ -82,25 +76,10 @@ pub fn new_parquet_writer<'a>(
             ),
         ]));
     }
-    // Bloom filter stored by row_group, set NDV to reduce the memory usage.
-    // In this link, it says that the optimal number of NDV is 1000, here we use rg_size / NDV_RATIO
-    // refer: https://www.influxdata.com/blog/using-parquets-bloom-filters/
-    let mut bf_ndv = min(metadata.records as u64, PARQUET_MAX_ROW_GROUP_SIZE as u64);
-    if bf_ndv > 1000 {
-        bf_ndv = max(1000, bf_ndv / cfg.common.bloom_filter_ndv_ratio);
-    }
-    if cfg.common.bloom_filter_enabled {
-        let mut fields = bloom_filter_fields.to_vec();
-        fields.extend(BLOOM_FILTER_DEFAULT_FIELDS.clone());
-        fields.sort();
-        fields.dedup();
-        for field in fields {
-            writer_props = writer_props
-                .set_column_bloom_filter_enabled(field.as_str().into(), true)
-                .set_column_bloom_filter_fpp(field.as_str().into(), DEFAULT_BLOOM_FILTER_FPP)
-                .set_column_bloom_filter_ndv(field.into(), bf_ndv); // take the field ownership
-        }
-    }
+    // Parquet's per-column bloom filter writing is replaced by the higher-level
+    // `.bf` files maintained by the compactor (see project_bloom_filter_above_tantivy).
+    // The `bloom_filter_fields` argument is kept for API stability but unused here.
+    let _ = bloom_filter_fields;
     let writer_props = writer_props.build();
     AsyncArrowWriter::try_new(buf, schema.clone(), Some(writer_props)).unwrap()
 }
@@ -576,5 +555,44 @@ mod tests {
         let (min_ts, max_ts) = parse_time_range_from_filename(old_format);
         assert_eq!(min_ts, 1000);
         assert_eq!(max_ts, 2000);
+    }
+
+    /// Verifies that the parquet writer no longer emits per-column bloom filters.
+    /// The replacement is the higher-level `.bf` files maintained by the compactor.
+    #[tokio::test]
+    async fn test_parquet_writer_does_not_emit_column_bloom_filters() {
+        let (schema, batch) = create_test_batch();
+        let metadata = FileMeta {
+            min_ts: 0,
+            max_ts: 0,
+            records: batch.num_rows() as i64,
+            original_size: 1,
+            compressed_size: 1,
+            index_size: 0,
+            flattened: false,
+            bloom_ver: 0,
+        };
+        // Even when bloom_filter_fields requests bloom on a column, the writer
+        // should ignore it now.
+        let bloom_fields = vec!["id".to_string(), "name".to_string()];
+        let buf = write_recordbatch_to_parquet(schema.clone(), &[batch], &bloom_fields, &metadata)
+            .await
+            .expect("write parquet");
+
+        // Read metadata back from the buffer: every row group / column must
+        // report no bloom filter offset.
+        let bytes = bytes::Bytes::from(buf);
+        let reader = parquet::file::serialized_reader::SerializedFileReader::new(bytes)
+            .expect("parse parquet");
+        let md = parquet::file::reader::FileReader::metadata(&reader);
+        for rg in md.row_groups() {
+            for col in rg.columns() {
+                assert!(
+                    col.bloom_filter_offset().is_none(),
+                    "column {} unexpectedly has bloom filter offset",
+                    col.column_descr().name()
+                );
+            }
+        }
     }
 }
