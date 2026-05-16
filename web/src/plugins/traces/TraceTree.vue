@@ -122,9 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex no-wrap full-width relative-position operation-name-container tw:cursor-pointer tw:items-center"
                 :class="[
                   store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-                  isLLMTrace((spans as any[])[virtualRow.index])
-                    ? ''
-                    : 'q-pt-sm',
                 ]"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
@@ -238,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
                       >
-                        {{ (spans as any[])[virtualRow.index].serviceName }}
+                        {{ (spans as any[])[virtualRow.index].resolvedIdentity }}
                       </span>
                       <SpanKindBadge
                         v-if="(spans as any[])[virtualRow.index]?.spanKind"

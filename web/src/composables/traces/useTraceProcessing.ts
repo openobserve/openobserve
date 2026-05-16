@@ -22,7 +22,7 @@ import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
  * Composable for trace data processing
  * @param spans - Either flat Span[] or nested tree with spans
  */
-export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
+export function useTraceProcessing(spans: Ref<Span[] | any[]>, spanMap: Ref<{[key:string]: Span[] | any[]}>) {
   /**
    * Convert old tree format to EnrichedSpan format and flatten
    * Handles tree nodes with 'spans' property (children) and 'depth' or calculates depth
@@ -45,19 +45,10 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         ? (node.startTimeUs - traceStartTimeUs) / 1000
         : node.startTimeMs || 0;
 
-      const resolvedIdentity = resolveSpanIdentity({
-        span_kind: node.spanKind,
-        service_name: node.serviceName || "unknown",
-        operation_name: node.operationName || "unknown",
-        attributes: node.attributes || {},
-        span_id: node.spanId || node.span_id || "",
-        trace_id: node.traceId || node.trace_id || "",
-        start_time: 0,
-        end_time: 0,
-        duration: 0,
-        _timestamp: 0,
-      } as Span);
+      console.log(spanMap, node)
+      const resolvedIdentity = resolveSpanIdentity(spanMap.value[node.spanId] as Span);
 
+      console.log("called", resolvedIdentity);
       // Convert old format to EnrichedSpan
       const enrichedSpan: EnrichedSpan = {
         span_id: node.spanId || node.span_id,
@@ -121,6 +112,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
   const buildSpanTree = (spanList: Span[]): EnrichedSpan[] => {
     if (!spanList || spanList.length === 0) return [];
 
+    console.log("build span tree");
     const spanMap = new Map<string, EnrichedSpan>();
     const rootSpans: EnrichedSpan[] = [];
 
@@ -130,6 +122,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
     // First pass: convert to enriched spans
     spanList.forEach((span) => {
       const resolvedIdentity = resolveSpanIdentity(span);
+      console.log("resolvedIdentity", resolvedIdentity);
       const enriched: EnrichedSpan = {
         ...span,
         depth: 0,
@@ -232,6 +225,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
     traceId: string,
     spanTree: EnrichedSpan[],
   ): TraceMetadata => {
+    console.log(spanTree);
     const allSpans = flattenSpanTree(spanTree);
 
     if (allSpans.length === 0) {
@@ -429,10 +423,12 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
     if (!spans.value || spans.value.length === 0) return [];
 
     // Check if it's the old tree format (from TraceDetails.vue)
+    console.log(spans.value);
     if (isOldTreeFormat(spans.value)) {
       return flattenOldTreeFormat(spans.value);
     }
 
+    console.log(spanTree.value);
     // Flatten the built span tree
     return flattenSpanTree(spanTree.value);
   });

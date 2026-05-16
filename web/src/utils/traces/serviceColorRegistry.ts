@@ -4,6 +4,7 @@ import { getSpanColorHex } from "@/utils/traces/traceColors";
 const registry = new Map<string, string>();
 
 export function getOrSetServiceColor(name: string): string {
+  console.log(name);
   if (!name) return getSpanColorHex(0);
   if (!registry.has(name)) {
     registry.set(name, getSpanColorHex(registry.size));
