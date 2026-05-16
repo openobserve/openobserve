@@ -91,20 +91,30 @@
     --color-badge-default-solid-text: var(--color-grey-100);
     --color-badge-default-ol-border: var(--color-grey-500);
     --color-badge-default-ol-text: var(--color-grey-300);
+    --color-badge-default-soft-bg: var(--color-grey-800);
+    --color-badge-default-soft-text: var(--color-grey-300);
 
     /* primary: solid unchanged (primary-600 + white is fine on dark); outline text lighter */
     --color-badge-primary-ol-text: var(--color-primary-300);
+    --color-badge-primary-soft-bg: var(--color-primary-900);
+    --color-badge-primary-soft-text: var(--color-primary-300);
 
     /* success: solid unchanged; outline text brightened (700 too dark on dark bg) */
     --color-badge-success-ol-text: var(--color-success-500);
+    --color-badge-success-soft-bg: color-mix(in srgb, var(--color-success-500) 15%, transparent);
+    --color-badge-success-soft-text: var(--color-success-500);
 
     /* warning: solid unchanged (yellow + dark text works on any bg); outline brightened */
     --color-badge-warning-ol-border: var(--color-warning-400);
     --color-badge-warning-ol-text: var(--color-warning-400);
+    --color-badge-warning-soft-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
+    --color-badge-warning-soft-text: var(--color-warning-400);
 
     /* error: solid unchanged; outline brightened */
     --color-badge-error-ol-border: var(--color-error-400);
     --color-badge-error-ol-text: var(--color-error-400);
+    --color-badge-error-soft-bg: color-mix(in srgb, var(--color-error-400) 15%, transparent);
+    --color-badge-error-soft-text: var(--color-error-400);
 
     /* Button — ghost-warning / outline-warning (bright yellow for readability on dark bg) */
     --color-button-ghost-warning-text: var(--color-warning-400);

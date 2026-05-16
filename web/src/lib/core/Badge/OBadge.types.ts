@@ -11,6 +11,9 @@
  *
  * Outline variants (transparent background, coloured ring + text):
  *   default-outline | primary-outline | success-outline | warning-outline | error-outline
+ *
+ * Soft variants (light tinted background, dark text — no ring):
+ *   default-soft | primary-soft | success-soft | warning-soft | error-soft
  */
 export type BadgeVariant =
   | "default"
@@ -22,7 +25,12 @@ export type BadgeVariant =
   | "primary-outline"
   | "success-outline"
   | "warning-outline"
-  | "error-outline";
+  | "error-outline"
+  | "default-soft"
+  | "primary-soft"
+  | "success-soft"
+  | "warning-soft"
+  | "error-soft";
 
 /** Size controls padding and font-size only — shape is always pill (rounded-full). */
 export type BadgeSize = "sm" | "md";

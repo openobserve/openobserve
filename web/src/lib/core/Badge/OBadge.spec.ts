@@ -123,6 +123,20 @@ describe("OBadge", () => {
     expect(wrapper.classes().join(" ")).toContain("tw:bg-transparent");
   });
 
+  it.each([
+    ["default-soft", "tw:bg-badge-default-soft-bg"],
+    ["primary-soft", "tw:bg-badge-primary-soft-bg"],
+    ["success-soft", "tw:bg-badge-success-soft-bg"],
+    ["warning-soft", "tw:bg-badge-warning-soft-bg"],
+    ["error-soft",   "tw:bg-badge-error-soft-bg"],
+  ] as const)("applies %s soft variant classes", (variant, expectedClass) => {
+    const wrapper = mount(OBadge, {
+      props: { variant },
+      slots: { default: "x" },
+    });
+    expect(wrapper.classes().join(" ")).toContain(expectedClass);
+  });
+
   // ── Sizes ───────────────────────────────────────────────────────────────
 
   it("applies md size classes by default", () => {

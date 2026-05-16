@@ -3,8 +3,133 @@
 Tracks replacement of `<q-badge>` and `<q-chip>` (display-only) with `<OBadge>`.
 
 **Component:** `@/lib/core/Badge/OBadge.vue`  
-**Replaces:** `q-badge` (62 usages), `q-chip` display-only (63 usages)  
+**Replaces:** `q-badge` (63 usages), `q-chip` display-only (63 usages)  
 **Excludes:** `TagInput.vue` — needs `OTag` (separate component, not OBadge)
+
+---
+
+## OBadge capability audit
+
+### What OBadge supports
+
+| Feature | API | Notes |
+|---------|-----|-------|
+| 15 semantic variants | `variant` prop | `default`, `primary`, `success`, `warning`, `error` + `-outline` and `-soft` of each |
+| 2 sizes | `size` prop | `sm`, `md` |
+| Material icon (left) | `icon` prop | Renders as `<span class="material-icons">` |
+| Custom icon (left) | `#icon` slot | Any markup — images, SVGs, avatars |
+| Trailing segment (right) | `count` prop / `#trailing` slot | Separated by a thin divider |
+| Flexible label | default slot | Text, tooltips, spinners, icons — anything |
+| Clickable | `clickable` prop + `@click` | Renders `<button>`, adds focus ring + hover |
+| Disabled | `disabled` prop | Mutes opacity, suppresses interaction |
+| Passthrough attrs | `v-bind="$attrs"` | `data-test`, `class`, `style`, `title` all pass through |
+| Shape | Always pill (`rounded-full`) | Not configurable |
+
+### Gaps — what needs attention before migration
+
+#### ~~GAP 1 — Colors beyond 5 semantic variants~~ ✅ RESOLVED (migration strategy)
+
+No component changes needed. Rewrite each color helper to return `BadgeVariant` during file migration.
+
+**1. `getSeverityColorHex()` in `IncidentDetailDrawer.vue`** (line 2227)
+
+```ts
+// Before — returns arbitrary hex
+const getSeverityColorHex = (severity: string) => {
+  switch (severity) {
+    case "P1": return "#b91c1c"
+    case "P2": return "#c2410c"
+    case "P3": return "#d97706"
+    case "P4": return "#6b7280"
+    default:   return "#6b7280"
+  }
+}
+
+// After — returns BadgeVariant
+import type { BadgeVariant } from '@/lib/core/Badge/OBadge.types'
+const getSeverityVariant = (severity: string): BadgeVariant => {
+  switch (severity) {
+    case "P1": return "error"         // red-700 → error
+    case "P2": return "warning"       // orange-700 → warning
+    case "P3": return "warning-soft"  // amber-600 → warning-soft
+    case "P4": return "default"       // gray-500 → default
+    default:   return "default"
+  }
+}
+```
+Template: `:style="{ color: getSeverityColorHex(...) }" outline` → `:variant="getSeverityVariant(...)"`
+
+**2. `getStatusColor()` in `IncidentDetailDrawer.vue`** (line 2201)
+
+```ts
+// Before
+"open" → "negative" | "acknowledged" → "orange" | "resolved" → "positive" | default → "grey"
+
+// After
+"open" → "error" | "acknowledged" → "warning" | "resolved" → "success" | default → "default"
+```
+
+**3. `getStatusColor()` in `AlertHistory.vue`** (line 943)
+
+```ts
+// Before
+success/ok/completed → "positive" | error/failed → "negative" | warning → "warning"
+pending/running → "info" | default → theme-based "white"/"black"
+
+// After
+success/ok/completed → "success" | error/failed → "error" | warning → "warning"
+pending/running → "primary" | default → "default"
+```
+
+**4. `getObservationTypeColor()` in `llmUtils.ts`** (line 450) — used in 1 badge
+
+Collapse 13+ Quasar colors to semantic variants:
+
+| Quasar color(s) | Maps to | Types |
+|-----------------|---------|-------|
+| `green` | `success` | chat, text_completion, generate_content |
+| `blue`, `indigo`, `cyan`, `teal`, `light-blue` | `primary` | embeddings, chain, retrieval, task, rerank |
+| `purple`, `deep-purple`, `pink` | `primary-soft` | invoke_agent, create_agent, invoke_workflow, evaluator |
+| `orange`, `amber` | `warning` | execute_tool, event |
+| `red` | `error` | guardrail |
+| `grey` | `default` | span, fallback |
+
+**5. Stream type badge** in `IncidentDetailDrawer.vue` (line 929)
+
+`blue`/`purple`/`teal` → all collapse to `variant="primary-outline"` (same as existing guide note)
+
+#### ~~GAP 2 — No "soft/tinted" variant style~~ ✅ RESOLVED
+
+Added 5 soft variants: `default-soft`, `primary-soft`, `success-soft`, `warning-soft`, `error-soft`.
+
+Light tinted bg + dark text. Maps directly:
+- `color="indigo-1" text-color="indigo-10"` → `variant="primary-soft"`
+- `color="green-2" text-color="green-10"` → `variant="success-soft"`
+- `color="grey-3" text-color="grey-8"` → `variant="default-soft"`
+- `color="blue-2" text-color="blue-8"` → `variant="primary-soft"`
+
+#### GAP 3 — Shape always pill (~18 usages, cosmetic only) — NO FIX NEEDED
+
+OBadge is always `rounded-full`. Accept pill shape for all migrated badges. The square metric tiles in `ThreadView.vue` and `TraceDetailsSidebar.vue` can override via `class="tw:rounded-md!"` through `$attrs` if pill feels wrong after visual review.
+
+### What works without issues (all 126 usages)
+
+The vast majority of usages map cleanly:
+
+- `color="positive"/"green"` → `variant="success"` ✅
+- `color="negative"/"red"` → `variant="error"` ✅
+- `color="warning"` → `variant="warning"` ✅
+- `color="primary"/"blue"` → `variant="primary"` ✅
+- `color="grey"/"grey-6"` → `variant="default"` ✅
+- `outline` → append `-outline` to variant ✅
+- `label` prop → default slot ✅
+- `dense` / `size="sm"` → `size="sm"` ✅
+- `clickable @click` → same API ✅
+- `<q-icon>` in badge → `icon` prop or `#icon` slot ✅
+- `<q-tooltip>` in badge → default slot ✅
+- `<q-spinner>` in badge → default slot ✅
+- `data-test`, custom `class`, `style` → passthrough via `$attrs` ✅
+- `v-for` loops, `v-if` conditionals → standard Vue, works naturally ✅
 
 ---
 
@@ -17,7 +142,10 @@ Tracks replacement of `<q-badge>` and `<q-chip>` (display-only) with `<OBadge>`.
 | `color="warning"` | `variant="warning"` |
 | `color="primary"` / `color="blue"` / `color="teal"` | `variant="primary"` |
 | `color="grey"` / `color="grey-6"` / `color="grey-4"` | `variant="default"` |
-| `color="blue-2"` (light tint) | `variant="primary"` |
+| `color="blue-2"` (light tint) | `variant="primary-soft"` |
+| `color="indigo-1" text-color="indigo-10"` | `variant="primary-soft"` |
+| `color="green-2" text-color="green-10"` | `variant="success-soft"` |
+| `color="grey-3" text-color="grey-8"` | `variant="default-soft"` |
 | `outline` boolean flag | append `-outline` → e.g. `variant="primary-outline"` |
 | `label="text"` prop | move to default slot: `>text</OBadge>` |
 | `text-color` | dropped — baked into variant token |
@@ -82,6 +210,7 @@ Tracks replacement of `<q-badge>` and `<q-chip>` (display-only) with `<OBadge>`.
 | `src/components/settings/ServiceIdentitySetup.vue` | 475, 482, 574, 581, 1450, 1465 | 6 | dynamic status | ⬜ |
 | `src/components/settings/AiToolsets.vue` | 85 | 1 | dynamic status | ⬜ |
 | `src/components/settings/License.vue` | 102 | 1 | `success` / `error` (expired) | ⬜ |
+| `src/components/settings/OrgStorageSettings.vue` | 190 | 1 | `success` (active status + icon in slot) | ⬜ |
 | `src/components/settings/TestModelMatchDialog.vue` | 150 | 1 | dynamic status | ⬜ |
 
 ### dashboards/
@@ -225,7 +354,7 @@ Tracks replacement of `<q-badge>` and `<q-chip>` (display-only) with `<OBadge>`.
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/ai_toolsets/AddAiToolset.vue` | 182 | 1 | label chip | ⬜ |
+| `src/components/ai_toolsets/AddAiToolset.vue` | 182 | 1 | ⚠️ clickable preset chips — `clickable @click` (see special cases) | ⬜ |
 
 ### TelemetryCorrelationPanel
 
@@ -237,7 +366,7 @@ Tracks replacement of `<q-badge>` and `<q-chip>` (display-only) with `<OBadge>`.
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/plugins/traces/TraceDetailsSidebar.vue` | 77–255 | 11 | ⚠️ includes 1 clickable chip (copy span ID) → `clickable @click` | ⬜ |
+| `src/plugins/traces/TraceDetailsSidebar.vue` | 77, 100, 115, 131, 146, 164, 213, 226, 240, 255 | 10 | ⚠️ includes 1 clickable chip (line 164 — copy span ID) → `clickable @click` | ⬜ |
 | `src/plugins/traces/TraceDAG.vue` | 66 | 1 | `error` chip `"ERR"` | ⬜ |
 | `src/plugins/traces/ThreadView.vue` | 35, 46, 52, 60, 68, 80 | 6 | ⚠️ square metric chips — see special cases | ⬜ |
 
@@ -288,6 +417,28 @@ Map all three to `variant="primary"`. Purple/teal are not in the token palette �
 ### ⚠️ `FrustrationBadge.vue` / `FrustrationEventBadge.vue`
 These files use custom CSS class overrides on `q-badge` instead of `color` prop. Inspect the actual rendered colours and map to the nearest semantic variant (`error`, `warning`, `default`). Remove the custom CSS overrides after migration.
 
+### ⚠️ `AddAiToolset.vue` — Clickable preset chips
+```html
+<q-chip
+  v-for="preset in CLI_PRESETS"
+  :key="preset.id"
+  clickable
+  @click="applyPreset(preset)"
+>
+  {{ preset.label }}
+</q-chip>
+```
+These are **clickable** preset selection chips, not display-only labels. Migrate using `OBadge` with `clickable` + `@click`. The `v-for` loop stays the same.
+
+### ⚠️ `OrgStorageSettings.vue` line 190 — Badge with icon in slot
+```html
+<q-badge color="positive" style="...">
+  <q-icon name="check_circle" size="11px" style="margin-right: 3px;" />
+  {{ t("storage_settings.active") }}
+</q-badge>
+```
+Uses inline style for pill shape. After migration, use `OBadge variant="success"` with `#icon` slot for the check icon. Drop inline styles.
+
 ### ⚠️ `AnomalyDetectionList.vue` line 50 — Spinner in badge slot
 ```html
 <q-badge ...>
@@ -321,12 +472,45 @@ function statusVariant(status: string): BadgeVariant {
 
 ---
 
+## CSS-only references (post-migration cleanup)
+
+These files have `.q-chip` or `.q-badge` CSS selectors in `<style>` blocks but no template-level component usage. Update these selectors **after** the parent component's template is migrated.
+
+| File | Lines | Selector(s) | Notes |
+|------|-------|-------------|-------|
+| `src/components/alerts/steps/Deduplication.vue` | 312, 333, 352 | `.q-chip` | Styles chips rendered by child (TagInput/q-select) — update when `OTag` is built |
+| `src/enterprise/components/EvalTemplateEditor.vue` | 365, 382, 393 | `.q-chip` | Dimension selection chips — dark/light mode overrides |
+| `src/plugins/traces/TraceDetailsSidebar.vue` | 2191, 2197 | `.q-chip__content`, `.q-chip__icon--remove` | Styling for trace detail chips — update alongside template migration |
+| `src/components/dashboards/settings/VariableSettings.vue` | 544 | `.q-badge` | Font-size/padding override — remove after template migration |
+| `src/components/alerts/ImportSemanticGroups.vue` | 679 | `:deep(.q-chip__content)` | Padding/font-weight override — remove after template migration |
+
+---
+
+## Test file mocks (post-migration cleanup)
+
+These test files mock `q-badge`/`q-chip` components or query `.q-chip`/`.q-badge` CSS classes. Update after the parent component is migrated.
+
+| File | Lines | What to update |
+|------|-------|---------------|
+| `src/components/settings/BuiltInPatternsTab.spec.ts` | 128 | Remove `q-chip` mock from global stubs |
+| `src/components/cross-linking/CrossLinkManager.spec.ts` | 58–64, 155 | Remove `q-chip`/`q-badge` mocks; update `.q-chip` selector to new class |
+
+---
+
+## ESLint deprecation rules
+
+`eslint.config.js` (lines 127–132) already has deprecation warnings for both `q-badge` and `q-chip` → `OBadge`. These rules should remain active until migration is complete, then be removed.
+
+---
+
 ## Progress summary
 
 | Category | Total files | Done | Remaining |
 |----------|------------|------|-----------|
-| q-badge | 29 | 0 | 29 |
-| q-chip (display) | 27 | 0 | 27 |
-| **Total** | **56** | **0** | **56** |
+| q-badge | 30 | 0 | 30 |
+| q-chip (display) | 23 | 0 | 23 |
+| CSS-only refs | 5 | 0 | 5 |
+| Test mocks | 2 | 0 | 2 |
+| **Total** | **60** | **0** | **60** |
 
 _Update this table as files are completed._

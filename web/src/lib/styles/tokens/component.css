@@ -163,30 +163,40 @@
   --color-badge-default-solid-text: var(--color-grey-700);
   --color-badge-default-ol-border: var(--color-grey-400);
   --color-badge-default-ol-text: var(--color-grey-600);
+  --color-badge-default-soft-bg: var(--color-grey-100);
+  --color-badge-default-soft-text: var(--color-grey-700);
 
   /* Badge — primary */
   --color-badge-primary-solid-bg: var(--color-primary-600);
   --color-badge-primary-solid-text: var(--color-white);
   --color-badge-primary-ol-border: var(--color-primary-400);
   --color-badge-primary-ol-text: var(--color-primary-700);
+  --color-badge-primary-soft-bg: var(--color-primary-50);
+  --color-badge-primary-soft-text: var(--color-primary-700);
 
   /* Badge — success */
   --color-badge-success-solid-bg: var(--color-success-500);
   --color-badge-success-solid-text: var(--color-white);
   --color-badge-success-ol-border: var(--color-success-500);
   --color-badge-success-ol-text: var(--color-success-700);
+  --color-badge-success-soft-bg: var(--color-success-50);
+  --color-badge-success-soft-text: var(--color-success-700);
 
   /* Badge — warning (dark text on yellow — never white) */
   --color-badge-warning-solid-bg: var(--color-warning-400);
   --color-badge-warning-solid-text: var(--color-grey-900);
   --color-badge-warning-ol-border: var(--color-warning-600);
   --color-badge-warning-ol-text: var(--color-warning-700);
+  --color-badge-warning-soft-bg: var(--color-warning-50);
+  --color-badge-warning-soft-text: var(--color-warning-700);
 
   /* Badge — error */
   --color-badge-error-solid-bg: var(--color-error-600);
   --color-badge-error-solid-text: var(--color-white);
   --color-badge-error-ol-border: var(--color-error-500);
   --color-badge-error-ol-text: var(--color-error-600);
+  --color-badge-error-soft-bg: var(--color-error-50);
+  --color-badge-error-soft-text: var(--color-error-700);
 
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-primary-400);
@@ -349,30 +359,40 @@
   --color-badge-default-solid-text: var(--color-badge-default-solid-text);
   --color-badge-default-ol-border: var(--color-badge-default-ol-border);
   --color-badge-default-ol-text: var(--color-badge-default-ol-text);
+  --color-badge-default-soft-bg: var(--color-badge-default-soft-bg);
+  --color-badge-default-soft-text: var(--color-badge-default-soft-text);
 
   /* Badge — primary */
   --color-badge-primary-solid-bg: var(--color-badge-primary-solid-bg);
   --color-badge-primary-solid-text: var(--color-badge-primary-solid-text);
   --color-badge-primary-ol-border: var(--color-badge-primary-ol-border);
   --color-badge-primary-ol-text: var(--color-badge-primary-ol-text);
+  --color-badge-primary-soft-bg: var(--color-badge-primary-soft-bg);
+  --color-badge-primary-soft-text: var(--color-badge-primary-soft-text);
 
   /* Badge — success */
   --color-badge-success-solid-bg: var(--color-badge-success-solid-bg);
   --color-badge-success-solid-text: var(--color-badge-success-solid-text);
   --color-badge-success-ol-border: var(--color-badge-success-ol-border);
   --color-badge-success-ol-text: var(--color-badge-success-ol-text);
+  --color-badge-success-soft-bg: var(--color-badge-success-soft-bg);
+  --color-badge-success-soft-text: var(--color-badge-success-soft-text);
 
   /* Badge — warning */
   --color-badge-warning-solid-bg: var(--color-badge-warning-solid-bg);
   --color-badge-warning-solid-text: var(--color-badge-warning-solid-text);
   --color-badge-warning-ol-border: var(--color-badge-warning-ol-border);
   --color-badge-warning-ol-text: var(--color-badge-warning-ol-text);
+  --color-badge-warning-soft-bg: var(--color-badge-warning-soft-bg);
+  --color-badge-warning-soft-text: var(--color-badge-warning-soft-text);
 
   /* Badge — error */
   --color-badge-error-solid-bg: var(--color-badge-error-solid-bg);
   --color-badge-error-solid-text: var(--color-badge-error-solid-text);
   --color-badge-error-ol-border: var(--color-badge-error-ol-border);
   --color-badge-error-ol-text: var(--color-badge-error-ol-text);
+  --color-badge-error-soft-bg: var(--color-badge-error-soft-bg);
+  --color-badge-error-soft-text: var(--color-badge-error-soft-text);
 
   /* Badge — shared */
   --color-badge-focus-ring: var(--color-badge-focus-ring);
