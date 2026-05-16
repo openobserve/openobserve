@@ -203,4 +203,6 @@
     --color-table-row-striped-bg: var(--color-grey-800);
     --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-700) 40%, transparent);
     --color-table-sort-icon-active: var(--color-primary-400);
+    --color-table-streaming-bar: var(--color-primary-400);
+    --color-table-row-expanded-bg: var(--color-grey-850);
 }

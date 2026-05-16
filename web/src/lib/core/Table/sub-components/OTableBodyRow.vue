@@ -26,6 +26,10 @@ const props = defineProps<{
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
+  /** Status bar color — renders a 4px left border indicator per row */
+  statusBarColor?: string;
+  /** Enable hover-visible copy button on cells */
+  enableCellCopy?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -92,6 +96,14 @@ function onDblclick(event: MouseEvent) {
     @click="onClick"
     @dblclick="onDblclick"
   >
+    <!-- Status bar color indicator -->
+    <td
+      v-if="statusBarColor"
+      class="tw:absolute tw:left-0 tw:inset-y-0 tw:w-1 tw:p-0 tw:border-0 tw:z-10"
+      :style="{ backgroundColor: statusBarColor }"
+      data-test="o2-table-status-bar"
+    />
+
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
@@ -130,6 +142,7 @@ function onDblclick(event: MouseEvent) {
       :wrap="wrap"
       :dense="dense"
       :bordered="bordered"
+      :enable-cell-copy="enableCellCopy"
       @cell-click="emit('cell-click', $event)"
     >
       <template v-if="slots[`cell-${cell.column.id}`]" #default>

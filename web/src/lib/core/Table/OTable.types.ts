@@ -182,6 +182,10 @@ export interface OTableProps<TData = any> {
   rowClass?: string | ((row: TData) => string);
   /** Dynamic inline style for row */
   getRowStyle?: (row: TData) => Record<string, any>;
+  /** Returns a CSS color for the status bar (4px left border) per row */
+  getRowStatusColor?: (row: TData) => string | undefined;
+  /** Show hover-visible copy button on each cell */
+  enableCellCopy?: boolean;
   /** Fixed row height in px (for virtual scroll accuracy) */
   rowHeight?: number;
 

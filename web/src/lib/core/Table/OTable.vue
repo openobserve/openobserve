@@ -196,11 +196,15 @@ useTableKeyboard(table, scrollContainerRef, {
 
 // ── Table-level empty/loading/error state ──────────────────────
 const showEmpty = computed(
-  () => !props.loading && !props.error && displayRows.value.length === 0,
+  () => !props.loading && !props.streaming && !props.error && displayRows.value.length === 0,
 );
 const showError = computed(() => !props.loading && !!props.error);
 const showLoadingOverlay = computed(
   () => props.loading && displayRows.value.length === 0,
+);
+/** Streaming: data is arriving incrementally. Show pulsing indicator while stream is active and data exists. */
+const showStreaming = computed(
+  () => props.streaming && displayRows.value.length > 0,
 );
 
 // ── Scroll event handler ────────────────────────────────────────
@@ -335,6 +339,8 @@ defineExpose({
           :striped="props.striped"
           :row-class="(props.rowClass as any)"
           :row-style-fn="props.getRowStyle"
+          :get-status-bar-color="props.getRowStatusColor"
+          :enable-cell-copy="props.enableCellCopy"
           :loading="props.loading"
           :virtual-rows="isVirtual ? virtualRows : undefined"
           :total-size="isVirtual ? totalSize : undefined"
@@ -405,6 +411,14 @@ defineExpose({
           <slot name="error" v-bind="errProps" />
         </template>
       </OTableError>
+
+      <!-- ── Streaming Indicator ─────────────────────────────── -->
+      <div
+        v-if="showStreaming"
+        data-test="o2-table-streaming-bar"
+        class="tw:sticky tw:bottom-0 tw:h-1 tw:w-full tw:bg-[var(--color-table-streaming-bar)] tw:animate-pulse tw:z-10"
+        aria-label="Data streaming in progress"
+      />
     </div>
 
     <!-- ── Bottom slot (custom actions) ─────────────────────── -->
