@@ -1498,7 +1498,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
-import useKeyboardShortcuts from "@/composables/useKeyboardShortcuts";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import {
   useAiDashboardEvents,
   getDashboardEventType,
@@ -3493,20 +3493,32 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    useKeyboardShortcuts([
+    const toggleAiChat = () => {
+      store.dispatch('setIsAiChatEnabled', !store.state.isAiChatEnabled);
+      window.dispatchEvent(new Event('resize'));
+    };
+
+    useShortcuts([
       {
-        key: "Escape",
+        key: 'escape',
+        description: 'Close AI chat',
         handler: () => {
-          if (store.state.isAiChatExpanded) {
-            store.dispatch("setIsAiChatExpanded", false);
-            window.dispatchEvent(new Event("resize"));
+          if (store.state.isAiChatEnabled) {
+            store.dispatch('setIsAiChatEnabled', false);
+            store.dispatch('setIsAiChatExpanded', false);
+            window.dispatchEvent(new Event('resize'));
           }
         },
       },
       {
-        key: "b",
-        ctrlOrMeta: true,
-        handler: () => toggleExpand(),
+        key: 'ctrl+b',
+        description: 'Toggle AI chat',
+        handler: toggleAiChat,
+      },
+      {
+        key: 'meta+b',
+        description: 'Toggle AI chat',
+        handler: toggleAiChat,
       },
     ]);
 

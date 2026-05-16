@@ -1197,6 +1197,7 @@ export default defineComponent({
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,
+      aiChatPayload,
       userClickedOrg,
       searchQuery,
       filteredOrganizations,
