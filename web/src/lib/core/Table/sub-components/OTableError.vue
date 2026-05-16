@@ -1,9 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
-
-const { t } = useI18n();
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 defineProps<{
   message?: string | null;
@@ -19,19 +17,23 @@ defineSlots<{
 </script>
 
 <template>
-  <div
-    data-test="o2-table-error"
-    class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-8 tw:text-center tw:gap-2"
-  >
+  <div data-test="o2-table-error" class="tw:py-4 tw:px-2">
     <slot :message="message ?? ''">
-      <q-icon
-        name="warning"
-        size="1.25rem"
-        class="tw:text-warning-500"
-      />
-      <div class="tw:text-text-secondary tw:text-sm">
-        {{ message ?? t("errors.defaultError") }}
-      </div>
+      <OBanner
+        variant="error"
+        :content="message ?? ''"
+        inline-actions
+      >
+        <template v-if="message" #actions>
+          <button
+            data-test="o2-table-error-retry-btn"
+            class="tw:px-3 tw:py-1 tw:text-sm tw:rounded tw:bg-white/20 tw:hover:bg-white/30 tw:transition-colors"
+            @click="$emit('retry')"
+          >
+            Retry
+          </button>
+        </template>
+      </OBanner>
     </slot>
   </div>
 </template>

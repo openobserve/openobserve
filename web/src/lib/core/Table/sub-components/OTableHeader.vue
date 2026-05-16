@@ -29,6 +29,7 @@ const props = defineProps<{
   pivotHeaderLevels?: any[];
   pivotRowColumns?: any[];
   stickyColTotals?: boolean;
+  dense?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -64,6 +65,18 @@ function handleDragStart(event: any) {
 
 function handleDragEnd() {
   emit("drag-end");
+}
+
+function isAutoWidthColumn(header: any): boolean {
+  return (header.column.columnDef.meta as any)?.autoWidth === true;
+}
+
+function headerPaddingClass(header: any): string {
+  return (header.column.columnDef.meta as any)?.compactPadding ? 'tw:px-1' : 'tw:px-2';
+}
+
+function headerSizeVar(header: any): string {
+  return `var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size)`;
 }
 
 // ── Pivot helpers ───────────────────────────────────────────────
@@ -208,6 +221,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
+      'tw:bg-[var(--color-table-header-bg)]',
+      'tw:border-b tw:border-[var(--color-table-header-border)]',
       stickyHeader ? 'tw:sticky tw:top-0 tw:z-10' : '',
     ]"
     data-test="o2-table-header"
@@ -234,14 +249,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="tw:w-0 tw:px-0"
+        class="tw:w-0 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
 
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:w-0"
+        class="tw:w-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -260,16 +275,16 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          'tw:px-2 tw:text-left tw:font-medium tw:text-text-secondary tw:text-sm tw:select-none tw:relative',
-          bordered ? 'tw:border-r tw:border-border-default' : '',
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-secondary tw:text-xs tw:select-none tw:relative`,
           'table-head',
-          'tw:h-9',
+          dense ? 'tw:h-6' : 'tw:h-7',
+          'tw:border-b tw:border-[var(--color-table-header-border)]',
           'tw:group',
-          header.column.getIsPinned?.() ? 'tw:bg-[var(--o2-table-header-bg)]' : '',
+          header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
-          width: `calc(var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+          ...(isAutoWidthColumn(header) ? {} : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
                 position: 'sticky',
@@ -302,7 +317,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               :props="header.getContext()"
             />
             <!-- Sort icons -->
-            <template v-if="sortBy !== undefined && getSortIcon">
+            <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <q-icon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow_upward"
@@ -367,12 +382,12 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     <tr v-if="!enableColumnReorder">
       <th
         v-if="expansionEnabled"
-        class="tw:w-0 tw:px-0"
+        class="tw:w-0 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
       <th
         v-if="selectionMultiple"
-        class="tw:w-0"
+        class="tw:w-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -387,14 +402,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          'tw:px-2 tw:text-left tw:font-medium tw:text-text-secondary tw:text-sm tw:select-none tw:relative',
-          bordered ? 'tw:border-r tw:border-border-default' : '',
-          'tw:h-9 tw:group',
-          header.column.getIsPinned?.() ? 'tw:bg-[var(--o2-table-header-bg)]' : '',
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-secondary tw:text-xs tw:select-none tw:relative`,
+          dense ? 'tw:h-7 tw:group' : 'tw:h-8 tw:group',
+          'tw:border-b tw:border-[var(--color-table-header-border)]',
+          header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
-          width: `calc(var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size) * 1px)`,
+          ...(isAutoWidthColumn(header) ? {} : { width: headerSizeVar(header), maxWidth: headerSizeVar(header) }),
           ...(header.column.getIsPinned?.() === 'left'
             ? {
                 position: 'sticky',
@@ -425,7 +440,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               :render="header.column.columnDef.header"
               :props="header.getContext()"
             />
-            <template v-if="sortBy !== undefined && getSortIcon">
+            <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <q-icon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow_upward"

@@ -499,6 +499,7 @@
   --color-table-row-hover-bg: var(--color-primary-50);
   --color-table-row-selected-bg: var(--color-primary-100);
   --color-table-row-striped-bg: var(--color-surface-subtle);
+  --color-table-row-divider: var(--color-border-default);
   --color-table-border: var(--color-border-default);
   --color-table-cell-bg: var(--color-surface-base);
   --color-table-cell-text: var(--color-text-primary);
@@ -974,6 +975,7 @@
   --color-table-row-hover-bg: var(--color-table-row-hover-bg);
   --color-table-row-selected-bg: var(--color-table-row-selected-bg);
   --color-table-row-striped-bg: var(--color-table-row-striped-bg);
+  --color-table-row-divider: var(--color-table-row-divider);
   --color-table-border: var(--color-table-border);
   --color-table-cell-bg: var(--color-table-cell-bg);
   --color-table-cell-text: var(--color-table-cell-text);

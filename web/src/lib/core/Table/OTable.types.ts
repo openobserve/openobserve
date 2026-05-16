@@ -129,6 +129,8 @@ export interface OTableProps<TData = any> {
   globalFilter?: string;
   /** Placeholder for global filter input */
   globalFilterPlaceholder?: string;
+  /** Show built-in global filter search bar (default: true) */
+  showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
 
   // ── Selection ──

@@ -310,6 +310,7 @@
     --color-table-row-hover-bg: var(--color-primary-900);
     --color-table-row-selected-bg: color-mix(in srgb, var(--color-primary-800) 50%, var(--color-grey-900));
     --color-table-row-striped-bg: var(--color-grey-800);
+    --color-table-row-divider: var(--color-grey-700);
     --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-700) 40%, transparent);
     --color-table-sort-icon-active: var(--color-primary-400);
     --color-table-streaming-bar: var(--color-primary-400);
