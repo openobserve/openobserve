@@ -1670,8 +1670,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="savedFunctionSelectError = ''"
         />
       </div>
-        />
-      </div>
     </ODialog>
     <ODialog data-test="search-bar-search-scheduler-job-dialog"
       v-model:open="searchSchedulerJob"

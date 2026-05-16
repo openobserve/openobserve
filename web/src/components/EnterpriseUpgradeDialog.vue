@@ -226,6 +226,7 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
@@ -276,6 +277,7 @@ const FEATURE_LINKS = {
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
   components: {
+    OIcon,
     ChartRenderer,
     OButton,
     ODialog,

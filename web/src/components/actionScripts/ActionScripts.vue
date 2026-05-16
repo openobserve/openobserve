@@ -325,6 +325,7 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
+    OIcon,
     QTablePagination,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
