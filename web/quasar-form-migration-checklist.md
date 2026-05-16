@@ -780,7 +780,7 @@ Legend: `[ ]` = not done · `✅` = done
 
 - [ ] src/components/AppTable.vue
 - ✅ src/components/actionScripts/ActionScripts.vue
-- [ ] src/components/alerts/AlertList.vue
+- ✅ src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertsDestinationList.vue
 - ✅ src/components/alerts/ImportAlert.vue
 - [ ] src/components/alerts/ImportSemanticGroups.vue
@@ -789,7 +789,7 @@ Legend: `[ ]` = not done · `✅` = done
 - [ ] src/components/alerts/PipelinesDestinationList.vue
 - ✅ src/components/alerts/SemanticFieldGroupsConfig.vue
 - [ ] src/components/alerts/TemplateList.vue
-- [ ] src/components/alerts/steps/AlertSettings.vue
+- ✅ src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
 - ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/FieldValuesPanel.vue
@@ -858,9 +858,9 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/actionScripts/ScriptToolbar.vue
 - [T] src/components/ai_toolsets/AddAiToolset.vue
 - ✅ src/components/alerts/AddAlert.vue
-- [ ] src/components/alerts/AddDestination.vue
-- [ ] src/components/alerts/AddTemplate.vue
-- [ ] src/components/alerts/AlertList.vue
+- ✅ src/components/alerts/AddDestination.vue
+- ✅ src/components/alerts/AddTemplate.vue
+- ✅ src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertsDestinationList.vue
 - ✅ src/components/alerts/DeduplicationConfig.vue
 - ✅ src/components/alerts/FieldsInput.vue
@@ -876,10 +876,10 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/alerts/SemanticGroupItem.vue
 - [ ] src/components/alerts/TemplateList.vue
 - ✅ src/components/alerts/VariablesInput.vue
-- [T] src/components/alerts/steps/Advanced.vue
-- [ ] src/components/alerts/steps/AlertSettings.vue
-- [ ] src/components/alerts/steps/Deduplication.vue
-- [ ] src/components/alerts/steps/QueryConfig.vue
+- ✅ src/components/alerts/steps/Advanced.vue
+- ✅ src/components/alerts/steps/AlertSettings.vue
+- ✅ src/components/alerts/steps/Deduplication.vue
+- ✅ src/components/alerts/steps/QueryConfig.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddAkeylessType.vue *(also has autogrow — use OTextarea for those fields)*
 - [ ] src/components/cipherkeys/AddCipherKey.vue
@@ -1054,9 +1054,9 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/actionScripts/EditScript.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
 - ✅ src/components/alerts/AddAlert.vue
-- [ ] src/components/alerts/AddDestination.vue
+- ✅ src/components/alerts/AddDestination.vue
 - ✅ src/components/alerts/AlertHistory.vue
-- [ ] src/components/alerts/AlertList.vue
+- ✅ src/components/alerts/AlertList.vue
 - ✅ src/components/alerts/DeduplicationConfig.vue
 - ✅ src/components/alerts/FieldsInput.vue
 - ✅ src/components/alerts/FilterCondition.vue
@@ -1066,10 +1066,10 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/alerts/PrebuiltDestinationForm.vue
 - ✅ src/components/alerts/QueryEditorDialog.vue
 - ✅ src/components/alerts/SemanticFieldGroupsConfig.vue
-- [ ] src/components/alerts/steps/Advanced.vue
-- [ ] src/components/alerts/steps/AlertSettings.vue
-- [ ] src/components/alerts/steps/Deduplication.vue
-- [ ] src/components/alerts/steps/QueryConfig.vue
+- ✅ src/components/alerts/steps/Advanced.vue
+- ✅ src/components/alerts/steps/AlertSettings.vue
+- ✅ src/components/alerts/steps/Deduplication.vue
+- ✅ src/components/alerts/steps/QueryConfig.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddAkeylessType.vue
@@ -1174,15 +1174,15 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 - [ ] src/components/NLModeQueryBar.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
-- [ ] src/components/alerts/AddDestination.vue
+- ✅ src/components/alerts/AddDestination.vue
 - ✅ src/components/alerts/AlertInsights.vue
-- [ ] src/components/alerts/AlertList.vue
+- ✅ src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/ImportDestination.vue
 - [ ] src/components/alerts/PrebuiltDestinationForm.vue
 - ✅ src/components/alerts/QueryEditorDialog.vue
 - ✅ src/components/alerts/SemanticGroupItem.vue
-- [ ] src/components/alerts/steps/AlertSettings.vue
-- [ ] src/components/alerts/steps/QueryConfig.vue
+- ✅ src/components/alerts/steps/AlertSettings.vue
+- ✅ src/components/alerts/steps/QueryConfig.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
 - ✅ src/components/dashboards/addPanel/ConfigPanel.vue
 - ✅ src/components/dashboards/addPanel/DashboardQueryEditor.vue
@@ -1224,9 +1224,9 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/actionScripts/ScriptToolbar.vue
 - [ ] src/components/ai_toolsets/AddAiToolset.vue
 - [ ] src/components/alerts/AddAlert.vue
-- [ ] src/components/alerts/AlertList.vue
-- [ ] src/components/alerts/steps/AlertSettings.vue
-- [ ] src/components/alerts/steps/QueryConfig.vue
+- ✅ src/components/alerts/AlertList.vue
+- ✅ src/components/alerts/steps/AlertSettings.vue
+- ✅ src/components/alerts/steps/QueryConfig.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddCipherKey.vue
 - [ ] src/components/common/BaseImport.vue
@@ -1358,7 +1358,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/alerts/AlertHistory.vue
 - ✅ src/components/alerts/AlertHistoryDrawer.vue
 - ✅ src/components/alerts/AlertInsights.vue
-- [ ] src/components/alerts/AlertList.vue
+- ✅ src/components/alerts/AlertList.vue
 - [ ] src/components/alerts/AlertSummary.vue
 - ✅ src/components/alerts/DedupSummaryCards.vue
 - ✅ src/components/alerts/DeduplicationConfig.vue
@@ -1375,11 +1375,11 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/alerts/SemanticFieldGroupsConfig.vue
 - ✅ src/components/alerts/SemanticGroupItem.vue
 - ✅ src/components/alerts/VariablesInput.vue
-- [ ] src/components/alerts/steps/Advanced.vue
-- [ ] src/components/alerts/steps/AlertSettings.vue
+- ✅ src/components/alerts/steps/Advanced.vue
+- ✅ src/components/alerts/steps/AlertSettings.vue
 - [ ] src/components/alerts/steps/CompareWithPast.vue
-- [ ] src/components/alerts/steps/Deduplication.vue
-- [ ] src/components/alerts/steps/QueryConfig.vue
+- ✅ src/components/alerts/steps/Deduplication.vue
+- ✅ src/components/alerts/steps/QueryConfig.vue
 - [ ] src/components/anomaly_detection/AnomalyDetectionList.vue
 - [ ] src/components/anomaly_detection/AnomalySummary.vue
 - [ ] src/components/anomaly_detection/steps/AnomalyAlerting.vue
