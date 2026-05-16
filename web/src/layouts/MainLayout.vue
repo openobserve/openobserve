@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:flex', 'tw:flex-col']"
   >
     <header class="o2-app-header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
@@ -536,7 +536,7 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible ? "calc(2.25rem + 1.688rem)" : "2.25rem";
+        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
         document.documentElement.style.setProperty(
           "--navbar-height",
           navbarHeight,

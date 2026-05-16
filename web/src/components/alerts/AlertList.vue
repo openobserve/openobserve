@@ -17,14 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="q-pa-none flex flex-col">
+  <div
+    data-test="alert-list-page"
+    class="tw:flex tw:flex-col"
+    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+  >
     <div
-      class="tw:w-full tw:px-[0.625rem] q-pt-xs"
+      class="tw:shrink-0 tw:px-[0.625rem]"
       v-if="!showAddAlertDialog && !showImportAlertDialog"
     >
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px]"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <div
@@ -34,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.header") }}
             </div>
           </div>
-          <div class="flex q-ml-auto tw:ps-2 items-center">
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
             <!-- Alert Tabs -->
             <OToggleGroup
               :model-value="activeTab"
@@ -169,30 +173,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      class="full-width alert-list-table"
-      style="height: calc(100vh - 118px)"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
-      <!-- Alerts View (with folders) -->
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        style="height: calc(100vh - 118px)"
-        data-test="alert-list-splitter"
-      >
-        <template #before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full">
-              <FolderList
-                type="alerts"
-                @update:activeFolderId="updateActiveFolderId"
-              />
-            </div>
-          </div>
-        </template>
-        <template #after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
+      <!-- Left: FolderList -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+        <div class="tw:h-full">
+          <FolderList
+            type="alerts"
+            @update:activeFolderId="updateActiveFolderId"
+          />
+        </div>
+      </div>
+      <!-- Right: Table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <q-table
                 v-model:selected="selectedAlerts"
@@ -204,12 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="columns"
                 row-key="alert_id"
                 :pagination="pagination"
-                style="width: 100%"
-                :style="
-                  filteredResults?.length
-                    ? 'width: 100%; height: calc(100vh  - var(--navbar-height) - 87px)'
-                    : 'width: 100%'
-                "
+                style="width: 100%; height: 100%"
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
                 <template v-slot:header="props">
@@ -682,10 +671,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </q-table>
-            </div>
-          </div>
-        </template>
-      </q-splitter>
+        </div>
+      </div>
     </div>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
