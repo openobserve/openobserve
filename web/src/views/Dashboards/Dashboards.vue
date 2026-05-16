@@ -18,14 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="q-pa-none flex flex-col"
+    class="tw:flex tw:flex-col"
     :key="store.state.selectedOrganization.identifier"
+    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
     <!-- searchBar at top -->
-    <div class="tw:w-full tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
+    <div class="tw:shrink-0 tw:px-[0.625rem]">
       <div class="card-container">
         <div
-          class="flex justify-between full-width tw:py-3 tw:px-4 items-center"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4"
         >
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
@@ -105,21 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="full-width alert-list-table"
-      style="height: calc(100vh - 116px)"
+      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
     >
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[200, 500]"
-        style="height: calc(100vh - 116px)"
-        data-test="dashboard-splitter"
-      >
-        <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full">
-              <div
-                class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
+      <!-- Left: FolderList -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+        <div class="tw:h-full">
+          <div
+            class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]"
               >
                 <!-- folder list starts here -->
                 <div
@@ -236,10 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </template>
-        <template v-slot:after>
-          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-            <div class="tw:h-full card-container">
+      <!-- Right: Table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
               <!-- add dashboard table -->
               <q-table
                 ref="qTable"
@@ -254,11 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loading"
                 @row-click="onRowClick"
                 data-test="dashboard-table"
-                :style="
-                  !filterQuery.length && dashboards.length > 0
-                    ? 'height: calc(100vh  - var(--navbar-height) - 80px)'
-                    : ''
-                "
+                style="width: 100%; height: 100%"
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
                 <!-- if data not available show nodata component -->
@@ -520,10 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:cancel="confirmBulkDelete = false"
                 v-model="confirmBulkDelete"
               />
-            </div>
-          </div>
-        </template>
-      </q-splitter>
+        </div>
+      </div>
     </div>
   </div>
 </template>
