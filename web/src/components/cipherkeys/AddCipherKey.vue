@@ -39,35 +39,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator />
-    <q-form
+    <div
       class="create-cipher-form"
-      ref="addCipherKeyFormRef"
-      @submit="onSubmit"
-    >
     <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
       <div class="row">
         <div class="col-4 o2-input flex q-mx-md q-mt-md">
-          <q-input
+          <OInput
             data-test="add-cipher-key-name-input"
             v-model="formData.name"
             :label="t('cipherKey.name') + ' *'"
-            class="showLabelOnTop full-width"
-            stack-label
-            borderless
-            dense
+            class="full-width"
             v-bind:readonly="isUpdatingCipherKey"
             v-bind:disable="isUpdatingCipherKey"
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidResourceName(val) ||
-                    `Characters like :, ?, /, #, and spaces are not allowed.`
-                  : 'Name is required',
-              (val: any) => maxLengthCharValidation(val, 50),
-              (val: any) =>
-                /^[a-zA-Z0-9_-]+$/.test(val) ||
-                'Only alphanumeric characters, underscores, and hyphens are allowed',
-            ]"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
             tabindex="0"
           />
         </div>
@@ -96,23 +82,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div>
             <div class="q-w-lg">
-              <q-select
+              <OSelect
                 data-test="add-cipher-key-type-input"
                 v-model="formData.key.store.type"
                 :label="t('cipherKey.type') + ' *'"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop full-width"
-                stack-label
-                dense
-                borderless
-                hide-bottom-space
+                class="full-width"
                 :options="cipherKeyTypes"
-                option-value="value"
-                option-label="label"
-                map-options
-                emit-value
-                :rules="[(val: any) => !!val || 'Type is required']"
+                labelKey="label"
+                valueKey="value"
+                :error="!!storeTypeError"
+                :error-message="storeTypeError"
+                @update:model-value="storeTypeError = ''"
                 tabindex="0"
               />
             </div>
@@ -179,13 +159,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-cipher-key-save-btn"
           variant="primary"
           size="sm-action"
-          type="submit"
+          @click="onSubmit"
         >
           {{ t('common.save') }}
         </OButton>
       </div>
     </div>
-    </q-form>
+    </div>
     <ConfirmDialog
       v-model="dialog.show"
       :title="dialog.title"
@@ -211,6 +191,8 @@ import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechani
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
@@ -218,6 +200,8 @@ const router = useRouter();
 const $q = useQuasar();
 const store = useStore();
 const addCipherKeyFormRef: any = ref();
+const nameError = ref('');
+const storeTypeError = ref('');
 const isUpdatingCipherKey: any = ref(false);
 const step = ref(1);
 const isSubmitting = ref(false);
@@ -331,27 +315,51 @@ const setupTemplateData = () => {
   }
 };
 
+const validateName = (): boolean => {
+  if (!formData.value.name) {
+    nameError.value = 'Name is required';
+    return false;
+  }
+  if (!isValidResourceName(formData.value.name)) {
+    nameError.value = 'Characters like :, ?, /, #, and spaces are not allowed.';
+    return false;
+  }
+  if (formData.value.name.length > 50) {
+    nameError.value = 'Name must be 50 characters or less.';
+    return false;
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(formData.value.name)) {
+    nameError.value = 'Only alphanumeric characters, underscores, and hyphens are allowed';
+    return false;
+  }
+  nameError.value = '';
+  return true;
+};
+
+const validateStoreType = (): boolean => {
+  if (!formData.value.key.store.type) {
+    storeTypeError.value = 'Type is required';
+    return false;
+  }
+  storeTypeError.value = '';
+  return true;
+};
+
 const onSubmit = () => {
+  const nameValid = validateName();
+  const typeValid = validateStoreType();
+  if (!nameValid || !typeValid) {
+    $q.notify({ type: 'negative', message: 'Please fill all the required fields' });
+    return;
+  }
   isSubmitting.value = true;
-  addCipherKeyFormRef.value
-    .validate()
-    .then((valid: any) => {
-      isSubmitting.value = false;
-      if (isUpdatingCipherKey.value) {
-        updateCipherKey();
-      } else {
-        createCipherKey();
-      }
-    })
-    .catch((error: any) => {
-      isSubmitting.value = false;
-      if (error?.status != 403) {
-        $q.notify({
-          type: "negative",
-          message: "Please fill all the required fields",
-        });
-      }
-    });
+  if (isUpdatingCipherKey.value) {
+    isSubmitting.value = false;
+    updateCipherKey();
+  } else {
+    isSubmitting.value = false;
+    createCipherKey();
+  }
 };
 
 const createCipherKey = () => {
@@ -475,10 +483,9 @@ const goToCipherList = () => {
 };
 
 const validateForm = async (stepNumber: number) => {
-  // Validate form and expand steps with errors
-  let isValid = await addCipherKeyFormRef.value.validate();
-
-  if (isValid) {
+  const nameValid = validateName();
+  const typeValid = validateStoreType();
+  if (nameValid && typeValid) {
     step.value = stepNumber;
   }
 };

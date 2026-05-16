@@ -17,11 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="aws-integration-grid">
     <div class="tw:mb-4">
-      <q-input
+      <OInput
         v-model="searchQuery"
         placeholder="Search AWS services..."
-        dense
-        outlined
         clearable
         class="tw:max-w-md"
         data-test="aws-integration-search"
@@ -29,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #prepend>
           <q-icon name="search" />
         </template>
-      </q-input>
+      </OInput>
     </div>
 
     <div class="tw:mb-6">
@@ -70,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
 import { defineComponent, ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { awsIntegrations } from "@/utils/awsIntegrations";
@@ -80,6 +79,7 @@ export default defineComponent({
   components: {
     OTabs, OTab,
     AWSIntegrationTile,
+    OInput,
   },
   props: {
     initialSearch: {

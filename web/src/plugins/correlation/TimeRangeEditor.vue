@@ -99,12 +99,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:text-sm tw:font-semibold tw:mb-2">
               {{ t('correlation.logs.timeRange.customStart') }}
             </div>
-            <q-input
+            <OInput
               v-model="customStartTime"
               type="datetime-local"
-              outlined
-              dense
-              :rules="[validateStartTime]"
+              :error="!!startTimeError"
+              :error-message="startTimeError"
+              @update:model-value="onStartTimeChange"
               data-test="custom-start-input"
             />
           </div>
@@ -113,12 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:text-sm tw:font-semibold tw:mb-2">
               {{ t('correlation.logs.timeRange.customEnd') }}
             </div>
-            <q-input
+            <OInput
               v-model="customEndTime"
               type="datetime-local"
-              outlined
-              dense
-              :rules="[validateEndTime]"
+              :error="!!endTimeError"
+              :error-message="endTimeError"
+              @update:model-value="onEndTimeChange"
               data-test="custom-end-input"
             />
           </div>
@@ -155,6 +155,7 @@ import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { date } from 'quasar';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { X, RotateCcw } from 'lucide-vue-next';
 
 interface Props {
@@ -180,6 +181,8 @@ const pendingStartTime = ref<number>(props.currentRange.startTime);
 const pendingEndTime = ref<number>(props.currentRange.endTime);
 const customStartTime = ref<string>('');
 const customEndTime = ref<string>('');
+const startTimeError = ref('');
+const endTimeError = ref('');
 
 // Computed
 const isValid = computed(() => {
@@ -265,6 +268,16 @@ const datetimeToMicros = (datetime: string): number => {
 const microsToDatetime = (micros: number): string => {
   const ms = Math.floor(micros / 1000);
   return date.formatDate(ms, 'YYYY-MM-DDTHH:mm');
+};
+
+const onStartTimeChange = (val: string) => {
+  const result = validateStartTime(val);
+  startTimeError.value = result === true ? '' : (result as string);
+};
+
+const onEndTimeChange = (val: string) => {
+  const result = validateEndTime(val);
+  endTimeError.value = result === true ? '' : (result as string);
 };
 
 /**

@@ -15,45 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="cipher-keys-add-encryption-mechanism">
-    <q-select
+    <OSelect
       data-test="add-cipher-key-auth-method-input"
       v-model="frmData.key.mechanism.type"
       :label="t('cipherKey.providerType') + ' *'"
-      color="input-border q-w-lg"
-      bg-color="input-bg"
-      class="showLabelOnTop full-width"
-      stack-label
-      outlined
-      filled
-      dense
+      class="full-width"
       :options="providerTypeOptions"
-      option-value="value"
-      option-label="label"
-      map-options
-      emit-value
-      :rules="[(val: any) => !!val || 'Provider type is required']"
-      tabindex="0"
+      labelKey="label"
+      valueKey="value"
+      :error="providerTypeTouched && !frmData.key.mechanism.type"
+      :error-message="t('cipherKey.providerTypeRequired') || 'Provider type is required'"
+      @update:model-value="providerTypeTouched = true"
     />
 
-    <q-select
+    <OSelect
       v-if="frmData.key.mechanism.type === 'simple'"
       data-test="add-cipher-algorithm-input"
       v-model="frmData.key.mechanism.simple_algorithm"
       :label="t('cipherKey.algorithm') + ' *'"
-      color="input-border q-w-lg"
-      bg-color="input-bg"
-      class="showLabelOnTop full-width"
-      stack-label
-      outlined
-      filled
-      dense
+      class="full-width"
       :options="plainAlgorithmOptions"
-      option-value="value"
-      option-label="label"
-      map-options
-      emit-value
-      :rules="[(val: any) => !!val || 'Algorithm is required']"
-      tabindex="1"
+      labelKey="label"
+      valueKey="value"
+      :error="algorithmTouched && !frmData.key.mechanism.simple_algorithm"
+      :error-message="t('cipherKey.algorithmRequired') || 'Algorithm is required'"
+      @update:model-value="algorithmTouched = true"
     />
 
   </div>
@@ -62,15 +48,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "PageAddEncryptionMechanism",
+  components: { OSelect },
   props: {
     formData: Object,
   },
   setup(props: any) {
     const { t } = useI18n();
     const frmData = ref(props.formData || {});
+    const providerTypeTouched = ref(false);
+    const algorithmTouched = ref(false);
 
     const providerTypeOptions = ref([
       { value: "simple", label: "Simple" },
@@ -84,6 +74,8 @@ export default defineComponent({
     return {
       t,
       frmData,
+      providerTypeTouched,
+      algorithmTouched,
       providerTypeOptions,
       plainAlgorithmOptions,
     };

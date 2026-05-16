@@ -72,13 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-grey-7">
                 Create a new organization with AWS Marketplace billing
               </p>
-              <q-input
+              <OInput
                 v-model="newOrgName"
                 label="Organization Name"
-                outlined
-                dense
                 class="q-mb-md"
-                :rules="[(val) => !!val || 'Organization name is required']"
               />
               <OButton
                 variant="primary"
@@ -103,14 +100,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-grey-7">
                 Link AWS billing to an existing organization
               </p>
-              <q-select
+              <OSelect
                 v-model="selectedOrg"
                 :options="eligibleOrganizations"
-                option-label="name"
-                option-value="identifier"
+                labelKey="name"
+                valueKey="identifier"
                 label="Select Organization"
-                outlined
-                dense
                 class="q-mb-md"
               />
               <OButton
@@ -189,6 +184,10 @@ import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 type SetupState =
   | "select_org"
@@ -201,7 +200,7 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton, OSpinner },
+  components: { OButton, OSpinner, OInput, OSelect },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -211,6 +210,7 @@ export default defineComponent({
     const errorMessage = ref("");
     const isProcessing = ref(false);
     const newOrgName = ref("");
+    const orgNameError = ref("");
     const selectedOrg = ref<{ identifier: string; name: string } | null>(null);
     const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
       []
@@ -404,6 +404,7 @@ export default defineComponent({
       errorMessage,
       isProcessing,
       newOrgName,
+      orgNameError,
       selectedOrg,
       eligibleOrganizations,
       getImageURL,

@@ -26,16 +26,13 @@
           data-test="add-stream-field-name-input"
           class="q-ml-none o2-input flex items-center"
         >
-          <q-input
+          <OInput
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
             class="q-py-sm"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) => !!val.trim() || t('logStream.fieldRequired'),
-            ]"
+            :error="fieldNameErrors[index] && !field.name.trim()"
+            :error-message="fieldNameErrors[index] && !field.name.trim() ? t('logStream.fieldRequired') : ''"
+            @update:model-value="fieldNameErrors[index] = true"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
@@ -161,6 +158,7 @@ import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { Plus, Trash2 } from "lucide-vue-next";
 
 defineProps({
@@ -228,6 +226,7 @@ const dataTypes = [
 const store = useStore();
 
 const { t } = useI18n();
+const fieldNameErrors = ref<boolean[]>([]);
 
 const isFocused = ref(false);
 //repetitive need to refactor

@@ -27,19 +27,12 @@
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           class="toolbar-toggle-container element-box-shadow"
         >
-          <q-toggle
+          <OSwitch
             :data-test="`${dataTestPrefix}-nlp-mode-toggle`"
             v-model="nlpMode"
-            class="o2-toggle-button-xs"
-            size="xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
           />
           <img :src="nlpIcon" alt="NL Mode" class="toolbar-icon" />
-          <q-tooltip>{{ t('nlMode.toggle') }}</q-tooltip>
+          <OTooltip :content="t('nlMode.toggle')" side="top" />
         </div>
 
         <!-- Action Buttons (always present) -->
@@ -116,11 +109,9 @@
             <span class="tw:text-sm">{{ aiStatusText || t('search.analyzingQuery') }}</span>
           </div>
           <!-- Normal input when not generating -->
-          <q-input
+          <OInput
             v-else
             v-model="aiInputText"
-            dense
-            borderless
             :placeholder="t('search.askAIPlaceholder')"
             class="ai-input-field"
             :data-test="`${dataTestPrefix}-ai-input-field`"
@@ -129,7 +120,7 @@
             <template v-slot:prepend>
               <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <!-- Code Editor -->
@@ -163,6 +154,9 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import { getImageURL } from '@/utils/zincutils';
 import config from '@/aws-exports';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 interface Props {
   // Query props

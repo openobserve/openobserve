@@ -12,26 +12,24 @@
           </p>
 
           <div class="tw:mb-3">
-            <q-input
+              <OInput
               v-model="clusterName"
               label="Cluster Name"
               placeholder="e.g., production, staging, dev"
-              filled
-              dense
               class="tw:max-w-md"
               data-test="kubernetes-cluster-name-input"
             >
               <template #prepend>
                 <q-icon name="dns" />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
           <div v-if="config.isCloud != 'true'" class="tw:mb-3">
             <OTabs v-model="installType" dense>
               <OTab name="external" label="External Endpoint" />
               <OTab name="internal" label="Internal Endpoint">
-                <q-tooltip>Use this if OpenObserve is in the same cluster</q-tooltip>
+                <OTooltip content="Use this if OpenObserve is in the same cluster" side="top" />
               </OTab>
             </OTabs>
           </div>
@@ -108,9 +106,7 @@
               name="internal"
               :label="t('ingestion.internal')"
             >
-              <q-tooltip>
-                {{ t("ingestion.internalLabel") }}
-              </q-tooltip>
+              <OTooltip :content="t('ingestion.internalLabel')" side="top" />
             </OTab>
           </OTabs>
           <q-separator />
@@ -206,6 +202,8 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";

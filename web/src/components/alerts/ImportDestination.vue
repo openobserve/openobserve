@@ -253,16 +253,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-toggle
+                      <OSwitch
                         data-test="destination-import-skip-tls-verify-input"
-                        :model-value="
-                          userSelectedSkipTlsVerify[index] ?? false
-                        "
+                        :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
                         class="q-mt-sm"
-                        @update:model-value="
-                          updateSkipTlsVerify($event, index)
-                        "
+                        @update:model-value="updateSkipTlsVerify($event, index)"
                       />
                     </div>
                   </span>
@@ -322,6 +318,7 @@ import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "ImportDestination",
@@ -930,6 +927,7 @@ export default defineComponent({
     BaseImport,
     OInput,
     OSelect,
+    OSwitch,
   },
 });
 </script>

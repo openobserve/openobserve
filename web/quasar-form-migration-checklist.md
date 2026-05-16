@@ -883,7 +883,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddAkeylessType.vue *(also has autogrow — use OTextarea for those fields)*
 - [ ] src/components/cipherkeys/AddCipherKey.vue
-- [ ] src/components/cipherkeys/AddOpenobserveType.vue *(also has autogrow — use OTextarea for those fields)*
+- [x] src/components/cipherkeys/AddOpenobserveType.vue *(also has autogrow — use OTextarea for those fields)*
 - ✅ src/components/common/BaseImport.vue
 - ✅ src/components/common/DualListSelector.vue
 - [ ] src/components/common/FieldValuesPanel.vue
@@ -934,22 +934,22 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/iam/serviceAccounts/AddServiceAccount.vue
 - ✅ src/components/iam/serviceAccounts/ServiceAccountsList.vue
 - ✅ src/components/iam/users/AddUser.vue
-- [ ] src/components/iam/users/MemberInvitation.vue
+- [x] src/components/iam/users/MemberInvitation.vue
 - ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/iam/users/User.vue
-- [ ] src/components/ingestion/AIIntegrations.vue
-- [ ] src/components/ingestion/Database.vue
-- [ ] src/components/ingestion/DevOps.vue
-- [ ] src/components/ingestion/Languages.vue
-- [ ] src/components/ingestion/MessageQueues.vue
-- [ ] src/components/ingestion/Networking.vue
-- [ ] src/components/ingestion/Others.vue
-- [ ] src/components/ingestion/Security.vue
-- [ ] src/components/ingestion/Server.vue
-- [ ] src/components/ingestion/recommended/AWSIndividualServices.vue
-- [ ] src/components/ingestion/recommended/AWSIntegrationGrid.vue
+- [x] src/components/ingestion/AIIntegrations.vue
+- [x] src/components/ingestion/Database.vue
+- [x] src/components/ingestion/DevOps.vue
+- [x] src/components/ingestion/Languages.vue
+- [x] src/components/ingestion/MessageQueues.vue
+- [x] src/components/ingestion/Networking.vue
+- [x] src/components/ingestion/Others.vue
+- [x] src/components/ingestion/Security.vue
+- [x] src/components/ingestion/Server.vue
+- [x] src/components/ingestion/recommended/AWSIndividualServices.vue
+- [x] src/components/ingestion/recommended/AWSIntegrationGrid.vue
 - ✅ src/components/ingestion/recommended/AzureConfig.vue
-- [ ] src/components/ingestion/recommended/AzureIndividualServices.vue
+- [x] src/components/ingestion/recommended/AzureIndividualServices.vue
 - [ ] src/components/ingestion/recommended/KubernetesConfig.vue
 - ✅ src/components/login/GetStarted.vue
 - ✅ src/components/login/Login.vue
@@ -963,7 +963,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
-- [ ] src/components/pipeline/PipelineEditor.vue
+- [x] src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
 - ✅ src/components/pipeline/StreamSelection.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
@@ -982,8 +982,8 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/settings/DiscoveredServices.vue
 - ✅ src/components/settings/DomainManagement.vue
 - ✅ src/components/settings/General.vue
-- [ ] src/components/settings/ImportModelPricing.vue
-- [ ] src/components/settings/ImportRegexPattern.vue
+- [x] src/components/settings/ImportModelPricing.vue
+- [x] src/components/settings/ImportRegexPattern.vue
 - [T] src/components/settings/License.vue
 - [ ] src/components/settings/ModelPricingEditor.vue
 - ✅ src/components/settings/ModelPricingList.vue
@@ -991,14 +991,14 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/settings/OrganizationManagement.vue
 - [ ] src/components/settings/OrganizationSettings.vue
 - ✅ src/components/settings/RegexPatternList.vue
-- [ ] src/components/settings/TestModelMatchDialog.vue
+- [x] src/components/settings/TestModelMatchDialog.vue
 - [ ] src/components/shared/grid/Pagination.vue
 - [ ] src/components/shared/grid/Table.vue
 - [T] src/enterprise/components/EvalTemplateEditor.vue *(mixed — normal + autogrow fields)*
 - [ ] src/enterprise/components/EvalTemplateList.vue
 - ✅ src/plugins/correlation/DimensionFilterEditor.vue
 - ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
-- [ ] src/plugins/correlation/TimeRangeEditor.vue
+- [x] src/plugins/correlation/TimeRangeEditor.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
 - ✅ src/plugins/logs/JsonPreview.vue
 - ✅ src/plugins/logs/SearchBar.vue
@@ -1011,8 +1011,8 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/plugins/traces/ServicesCatalog.vue
 - ✅ src/plugins/traces/TraceDetails.vue
 - ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
-- [ ] src/views/AwsMarketplaceSetup.vue
-- [ ] src/views/AzureMarketplaceSetup.vue
+- [x] src/views/AwsMarketplaceSetup.vue
+- [x] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 - [ ] src/views/LogStream.vue
 - ✅ src/views/RUM/UploadSourceMaps.vue
@@ -1041,7 +1041,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/functions/FunctionsToolbar.vue
 - ✅ src/components/logstream/AssociatedRegexPatterns.vue
 - ✅ src/components/settings/DomainManagement.vue
-- [ ] src/plugins/correlation/TimeRangeEditor.vue
+- [x] src/plugins/correlation/TimeRangeEditor.vue
 
 ---
 
@@ -1074,7 +1074,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue
 - [ ] src/components/cipherkeys/AddAkeylessType.vue
 - [ ] src/components/cipherkeys/AddCipherKey.vue
-- [ ] src/components/cipherkeys/AddEncryptionMechanism.vue
+- [x] src/components/cipherkeys/AddEncryptionMechanism.vue
 - [ ] src/components/common/sidebar/InlineSelectFolderDropdown.vue
 - [ ] src/components/common/sidebar/SelectFolderDropDown.vue
 - ✅ src/components/cross-linking/CrossLinkDialog.vue
@@ -1111,7 +1111,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - [ ] src/components/iam/quota/Quota.vue
 - ✅ src/components/iam/roles/EditRole.vue
 - ✅ src/components/iam/users/AddUser.vue
-- [ ] src/components/iam/users/MemberInvitation.vue
+- [x] src/components/iam/users/MemberInvitation.vue
 - ✅ src/components/iam/users/UpdateRole.vue
 - ✅ src/components/ingestion/recommended/AWSQuickSetup.vue
 - [ ] src/components/logstream/AddStream.vue
@@ -1144,7 +1144,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/shared/filter/FilterCreatorPopup.vue
 - [ ] src/components/shared/grid/Pagination.vue
 - [ ] src/enterprise/components/EvalTemplateEditor.vue
-- [ ] src/enterprise/components/billings/Billing.vue
+- [x] src/enterprise/components/billings/Billing.vue
 - ✅ src/plugins/correlation/DimensionFiltersBar.vue
 - ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/logs/DetailTable.vue
@@ -1162,8 +1162,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/plugins/traces/ServicesCatalog.vue
 - ✅ src/plugins/traces/TraceDetails.vue
 - ✅ src/plugins/traces/TraceEvaluationsView.vue
-- [ ] src/views/AwsMarketplaceSetup.vue
-- [ ] src/views/AzureMarketplaceSetup.vue
+- [x] src/views/AwsMarketplaceSetup.vue
+- [x] src/views/AzureMarketplaceSetup.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
 - ✅ src/views/Dashboards/addPanel/AddJoinPopUp.vue
 - [ ] src/views/RUM/SourceMaps.vue
@@ -1177,7 +1177,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/alerts/AddDestination.vue
 - ✅ src/components/alerts/AlertInsights.vue
 - ✅ src/components/alerts/AlertList.vue
-- [ ] src/components/alerts/ImportDestination.vue
+- [x] src/components/alerts/ImportDestination.vue
 - ✅ src/components/alerts/PrebuiltDestinationForm.vue
 - ✅ src/components/alerts/QueryEditorDialog.vue
 - ✅ src/components/alerts/SemanticGroupItem.vue
@@ -1424,7 +1424,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/pipeline/NodeForm/Query.vue
 - [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - [ ] src/components/pipeline/NodeSidebar.vue
-- [ ] src/components/pipeline/PipelineEditor.vue
+- [x] src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
 - ✅ src/components/pipelines/BackfillJobsList.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue

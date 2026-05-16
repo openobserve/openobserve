@@ -72,26 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         {{ errorMessage.message }}
-                        <!-- name is required so we need to show the input field -->
                         <div style="width: 300px">
-                          <q-input
+                          <OInput
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPatternName[index]"
                             :label="'Regex Pattern Name *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateRegexPatternName(
-                                userSelectedRegexPatternName[index],
-                                index,
-                              )
-                            "
+                            @update:model-value="updateRegexPatternName(userSelectedRegexPatternName[index], index)"
                           />
                         </div>
                       </span>
@@ -106,24 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <!-- name is required so we need to show the input field -->
                         <div style="width: 300px">
-                          <q-input
+                          <OInput
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPattern[index]"
                             :label="'Regex Pattern *'"
-                            color="input-border"
-                            bg-color="input-bg"
-                            class="showLabelOnTop"
-                            stack-label
-                            outlined
-                            filled
-                            dense
-                            tabindex="0"
-                            @update:model-value="
-                              updateRegexPattern(
-                                userSelectedRegexPattern[index],
-                                index,
-                              )
-                            "
+                            @update:model-value="updateRegexPattern(userSelectedRegexPattern[index], index)"
                           />
                         </div>
                       </span>
@@ -244,6 +217,7 @@ import { useQuasar } from "quasar";
 import AppTabs from "../common/AppTabs.vue";
 import { BookOpen, Upload, Link, ChevronLeft } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
@@ -591,6 +565,7 @@ export default defineComponent({
     BaseImport,
     AppTabs,
     OButton,
+    OInput,
     BuiltInPatternsTab: defineAsyncComponent(
       () => import("@/components/settings/BuiltInPatternsTab.vue"),
     ),
