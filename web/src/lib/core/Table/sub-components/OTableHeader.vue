@@ -6,6 +6,7 @@ import { FlexRender } from "@tanstack/vue-table";
 import { computed, ref } from "vue";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const props = defineProps<{
@@ -144,19 +145,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             :props="{}"
           />
           <span v-else>{{ col.label ?? col.id }}</span>
-          <q-icon
+          <OIcon
             v-if="getSortIcon?.(col.id) === 'asc'"
             name="arrow_upward"
             size="0.85rem"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
-          <q-icon
+          <OIcon
             v-else-if="getSortIcon?.(col.id) === 'desc'"
             name="arrow_downward"
             size="0.85rem"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
-          <q-icon
+          <OIcon
             v-else
             name="unfold_more"
             size="0.85rem"
@@ -193,19 +194,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         @click="cell._sortColumn && handleSort(cell._sortColumn)"
       >
         {{ cell.label }}
-        <q-icon
+        <OIcon
           v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
           name="arrow_upward"
           size="0.85rem"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
-        <q-icon
+        <OIcon
           v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
           name="arrow_downward"
           size="0.85rem"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
-        <q-icon
+        <OIcon
           v-else-if="level.isLeaf && cell._sortColumn"
           name="unfold_more"
           size="0.85rem"
@@ -256,7 +257,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:w-9 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-9 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -318,21 +319,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             />
             <!-- Sort icons -->
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
-              <q-icon
+              <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow_upward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
-              <q-icon
+              <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow_downward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
-              <q-icon
+              <OIcon
                 v-else
                 name="unfold_more"
                 size="0.85rem"
@@ -359,7 +360,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
             @click.stop="handleColumnClose(header.id)"
           >
-            <q-icon name="cancel" size="1rem" />
+            <OIcon name="cancel" size="1rem" />
           </button>
         </div>
 
@@ -387,7 +388,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       />
       <th
         v-if="selectionMultiple"
-        class="tw:w-9 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-9 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -441,21 +442,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               :props="header.getContext()"
             />
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
-              <q-icon
+              <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow_upward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
-              <q-icon
+              <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow_downward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
-              <q-icon
+              <OIcon
                 v-else
                 name="unfold_more"
                 size="0.85rem"
@@ -478,7 +479,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             class="tw:opacity-0 group-hover:tw:opacity-100 tw:bg-transparent tw:border-0 tw:cursor-pointer tw:text-text-secondary tw:hover:text-text-primary tw:p-0 tw:leading-none tw:transition-opacity"
             @click.stop="handleColumnClose(header.id)"
           >
-            <q-icon name="cancel" size="1rem" />
+            <OIcon name="cancel" size="1rem" />
           </button>
         </div>
         <div

@@ -20,6 +20,7 @@ import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
 import OTablePagination from "./sub-components/OTablePagination.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
@@ -291,15 +292,15 @@ defineExpose({
     <slot name="top" />
 
     <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)] tw:rounded">
+    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)]">
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top"
-      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)] tw:bg-[var(--color-table-header-bg)]"
       data-test="o2-table-global-filter"
     >
       <div class="tw:relative tw:max-w-xs">
-        <q-icon
+        <OIcon
           name="search"
           size="0.9rem"
           class="tw:absolute tw:left-2 tw:top-1/2 tw:-translate-y-1/2 tw:text-text-secondary"
@@ -561,7 +562,6 @@ defineExpose({
         aria-label="Data streaming in progress"
       />
     </div>
-    </div> <!-- /bordered wrapper -->
 
     <!-- ── Bottom Pagination (with optional bulk actions slot) ── -->
     <OTablePagination
@@ -599,5 +599,6 @@ defineExpose({
         />
       </template>
     </OTablePagination>
+    </div> <!-- /bordered wrapper -->
   </div>
 </template>

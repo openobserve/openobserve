@@ -4,6 +4,7 @@
 import { useI18n } from "vue-i18n";
 import { useSlots } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 const slots = useSlots();
@@ -83,7 +84,7 @@ function onPageSizeChange(event: Event) {
           data-test="o2-table-prev-page-btn"
           @click="emit('prev-page')"
         >
-          <q-icon name="chevron_left" size="1.1rem" />
+          <OIcon name="chevron_left" size="1.1rem" />
         </OButton>
         <span class="tw:text-xs tw:text-text-secondary tw:min-w-[3rem] tw:text-center">
           {{ currentPage }} / {{ totalPages }}
@@ -95,7 +96,7 @@ function onPageSizeChange(event: Event) {
           data-test="o2-table-next-page-btn"
           @click="emit('next-page')"
         >
-          <q-icon name="chevron_right" size="1.1rem" />
+          <OIcon name="chevron_right" size="1.1rem" />
         </OButton>
       </div>
     </div>

@@ -5,6 +5,7 @@ import type { Cell, Row } from "@tanstack/vue-table";
 import { computed, ref } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { sanitize } = useSanitizedHtml();
 
@@ -171,7 +172,7 @@ function handleClick() {
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >
-      <q-icon :name="copied ? 'check' : 'content_copy'" size="0.8rem" />
+      <OIcon :name="copied ? 'check' : 'content_copy'" size="0.8rem" />
     </button>
   </td>
 </template>
