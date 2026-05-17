@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         size="sm"
                         class="o2-table-checkbox"
@@ -281,14 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <!-- body selection which on click selects the dashboard -->
                 <template #body-selection="scope">
-                  <q-checkbox
+                  <OCheckbox
                     v-model="scope.selected"
                     size="sm"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-table-checkbox-dark'
-                        : 'o2-table-checkbox-light'
-                    "
                     class="o2-table-checkbox"
                   />
                 </template>
@@ -524,6 +519,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 // @ts-nocheck
 import {
   computed,
@@ -587,6 +583,7 @@ export default defineComponent({
     ODropdownItem,
     OInput,
     OSwitch,
+    OCheckbox,
     ODrawer,
     AddDashboard,
     OTooltip,

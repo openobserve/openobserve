@@ -121,12 +121,11 @@
                         >
                           <q-item v-bind="itemProps">
                             <q-item-section side>
-                              <q-checkbox
-                                dense
+                              <OCheckbox
                                 :model-value="selected"
                                 @update:model-value="toggleOption(opt)"
                                 data-test="dashboard-add-condition-list-item"
-                              ></q-checkbox>
+                              />
                             </q-item-section>
                             <q-item-section>
                               <SanitizedHtmlRenderer :html-content="opt" />
@@ -162,6 +161,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -185,6 +185,7 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     StreamFieldSelect,
     OSelect,
+    OCheckbox,
   },
   props: [
     "condition",

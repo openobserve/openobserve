@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         data-test="alert-list-select-all-checkbox"
                         size="sm"
@@ -203,10 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-selection="scope">
-                  <q-checkbox
+                  <OCheckbox
                     v-model="scope.selected"
                     size="sm"
-                    color="secondary"
                   />
                 </template>
                 <template v-slot:body="props">
@@ -217,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="triggerExpand(props)"
                   >
                     <q-td>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         size="sm"
                         class="o2-table-checkbox"
@@ -817,6 +816,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 // import alertList from "./alerts";
 

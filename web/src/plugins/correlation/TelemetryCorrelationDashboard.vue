@@ -251,16 +251,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleMetricStream(stream)"
                         >
                           <q-item-section side>
-                            <q-checkbox
+                            <OCheckbox
                               :model-value="
                                 selectedMetricStreams.some(
                                   (s) => s.stream_name === stream.stream_name,
                                 )
                               "
                               @update:model-value="toggleMetricStream(stream)"
-                              color="primary"
                               size="xs"
-                              dense
                             />
                           </q-item-section>
                           <q-item-section>
@@ -740,16 +738,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleMetricStream(stream)"
                       >
                         <q-item-section side>
-                          <q-checkbox
+                          <OCheckbox
                             :model-value="
                               selectedMetricStreams.some(
                                 (s) => s.stream_name === stream.stream_name,
                               )
                             "
                             @update:model-value="toggleMetricStream(stream)"
-                            color="primary"
                             size="xs"
-                            dense
                           />
                         </q-item-section>
                         <q-item-section>
@@ -1122,16 +1118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="metric-list-item"
             >
               <q-item-section side>
-                <q-checkbox
+                <OCheckbox
                   :model-value="
                     selectedMetricStreams.some(
                       (s) => s.stream_name === stream.stream_name,
                     )
                   "
                   @update:model-value="toggleMetricStream(stream)"
-                  color="primary"
                   size="xs"
-                  dense
                 />
               </q-item-section>
               <q-item-section>
@@ -1197,6 +1191,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

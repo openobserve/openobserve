@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
             <q-item v-bind="itemProps" dense style="padding: 0px 4px">
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-height: auto; padding: 0px 4px"
             >
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-height: auto; padding: 0px 4px"
             >
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-height: auto; padding: 0px 4px"
             >
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -485,6 +485,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
@@ -497,6 +498,7 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OIcon,
+    OCheckbox,
 },
   props: {
     chartType: {

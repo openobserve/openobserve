@@ -44,11 +44,9 @@
 
               <q-item v-else v-ripple clickable @click="toggleOption(opt)">
                 <q-item-section side>
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="selected"
                     @update:model-value="() => toggleOption(opt)"
-                    dense
-                    class="q-ma-none"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -108,6 +106,7 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";

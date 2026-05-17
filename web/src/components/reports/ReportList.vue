@@ -138,14 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:header="props">
                   <q-tr :props="props">
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         size="sm"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-table-checkbox-dark'
-                            : 'o2-table-checkbox-light'
-                        "
                         class="o2-table-checkbox"
                       />
                     </q-th>
@@ -162,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-selection="scope">
-                  <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                  <OCheckbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
                 </template>
 
                 <!-- Name column: badges for type/preview -->
@@ -346,6 +341,7 @@ import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),

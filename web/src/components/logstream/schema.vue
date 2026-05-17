@@ -412,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-slot:header="props">
                     <q-tr :props="props">
                       <q-th>
-                        <q-checkbox size="xs" v-model="props.selected" color="primary" />
+                        <OCheckbox size="xs" v-model="props.selected" />
                       </q-th>
                       <q-th
                         v-for="col in props.cols"
@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:header-selection="scope">
                     <q-td class="text-center">
-                      <q-checkbox
+                      <OCheckbox
                         v-if="
                           !(
                             scope.name == store.state.zoConfig.timestamp_column ||
@@ -450,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template v-slot:body-selection="scope">
-                    <q-checkbox
+                    <OCheckbox
                       v-if="
                         !(
                           scope.row.name ==
@@ -458,7 +458,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           scope.row.name == allFieldsName
                         )
                       "
-                      dense
                       :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
                       v-model="scope.selected"
                       size="xs"
@@ -797,7 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dense
                   >
                     <template v-slot:header-selection="scope">
-                        <q-checkbox
+                        <OCheckbox
                           :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
                           v-model="scope.selected"
                           size="xs"
@@ -806,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Body Slot for Selection -->
                     <template v-slot:body-selection="scope">
-                        <q-checkbox
+                        <OCheckbox
                           :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
                           v-model="scope.selected"
                           size="xs"
@@ -1057,6 +1056,7 @@ import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -1104,6 +1104,7 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
+    OCheckbox,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
