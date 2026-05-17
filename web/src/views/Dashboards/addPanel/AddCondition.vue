@@ -56,10 +56,7 @@
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
                       <div class="flex column" style="height: 220px">
-                        <q-select
-                          dense
-                          borderless
-                          hide-bottom-space
+                        <OSelect
                           v-model="condition.operator"
                           :options="operators"
                           :label="t('common.operator')"
@@ -81,9 +78,7 @@
                       </div>
                     </OTabPanel>
                     <OTabPanel name="list">
-                      <q-select
-                        dense
-                        borderless
+                      <OSelect
                         v-model="condition.values"
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
@@ -132,7 +127,7 @@
                             </q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                     </OTabPanel>
                   </OTabPanels>
                 </div>

@@ -131,10 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
                     <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                       <div style="width: 100%" class="q-pr-sm">
-                        <q-file
+                        <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
-                          filled
                           bottom-slots
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
@@ -151,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </template>
                           <template v-slot:hint> .json files only </template>
-                        </q-file>
+                        </OFile>
                       </div>
                     </div>
                   </slot>
@@ -227,6 +226,7 @@ import AppTabs from "./AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 
 export default defineComponent({
   name: "BaseImport",
@@ -237,6 +237,7 @@ export default defineComponent({
     AppTabs,
     OButton,
     OIcon,
+    OFile,
 },
   props: {
     // Title for the import page

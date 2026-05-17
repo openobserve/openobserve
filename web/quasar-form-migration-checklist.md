@@ -778,7 +778,7 @@ Legend: `[ ]` = not done · `✅` = done
 
 ### q-checkbox → OCheckbox / OCheckboxGroup
 
-- [ ] src/components/AppTable.vue
+- ✅ src/components/AppTable.vue
 - ✅ src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/alerts/AlertList.vue
 - ✅ src/components/alerts/AlertsDestinationList.vue
@@ -792,7 +792,7 @@ Legend: `[ ]` = not done · `✅` = done
 - ✅ src/components/alerts/steps/AlertSettings.vue
 - ✅ src/components/anomaly_detection/steps/AnomalyAlerting.vue
 - ✅ src/components/common/DualListSelector.vue
-- [ ] src/components/common/FieldValuesPanel.vue
+- ✅ src/components/common/FieldValuesPanel.vue
 - ✅ src/components/dashboards/AddDashboardFromGitHub.vue
 - ✅ src/components/dashboards/OverrideConfigPopup.vue
 - ✅ src/components/dashboards/addPanel/AddAnnotation.vue
@@ -830,14 +830,14 @@ Legend: `[ ]` = not done · `✅` = done
 - ✅ src/components/settings/Nodes.vue
 - ✅ src/components/settings/RegexPatternList.vue
 - ✅ src/components/shared/filter/FilterCreatorPopup.vue
-- [ ] src/enterprise/components/EvalTemplateList.vue
-- [ ] src/plugins/correlation/CorrelatedLogsTable.vue
+- ✅ src/enterprise/components/EvalTemplateList.vue
+- ✅ src/plugins/correlation/CorrelatedLogsTable.vue
 - ✅ src/plugins/correlation/TelemetryCorrelationDashboard.vue
 - ✅ src/plugins/traces/ServiceGraphNodeSidePanel.vue
 - ✅ src/plugins/traces/metrics/TracesAnalysisDashboard.vue
 - ✅ src/views/Dashboards/Dashboards.vue
 - ✅ src/views/Dashboards/addPanel/AddCondition.vue
-- [ ] src/views/LogStream.vue
+- ✅ src/views/LogStream.vue
 
 ---
 
@@ -971,7 +971,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/promql/components/OperationsList.vue
 - ✅ src/components/promql/components/PromQLBuilderOptions.vue
 - ✅ src/components/queries/RunningQueries.vue
-- [T] src/components/reports/CreateReport.vue *(mixed — normal + autogrow fields)*
+- ✅ src/components/reports/CreateReport.vue *(mixed — normal + autogrow fields)*
 - ✅ src/components/reports/ReportList.vue
 - ✅ src/components/rum/PlayerEventsSidebar.vue
 - ✅ src/components/settings/AddRegexPattern.vue
@@ -1047,9 +1047,9 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 ### q-select → OSelect / OFormSelect
 
-- [ ] src/components/CustomDateTimePicker.vue
-- [ ] src/components/DateTime.vue
-- [ ] src/components/DateTimePicker.vue
+- ✅ src/components/CustomDateTimePicker.vue
+- ✅ src/components/DateTime.vue
+- ✅ src/components/DateTimePicker.vue
 - ✅ src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/actionScripts/EditScript.vue
 - ✅ src/components/ai_toolsets/AddAiToolset.vue
@@ -1163,7 +1163,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
 - ✅ src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - ✅ src/components/pipeline/NodeForm/Stream.vue
-- [ ] src/components/reports/CreateReport.vue
+- ✅ src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
 - ✅ src/components/rum/VideoPlayer.vue
 - ✅ src/components/settings/OrganizationSettings.vue
@@ -1223,7 +1223,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/pipeline/StreamSelection.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - ✅ src/components/pipelines/EditBackfillJobDialog.vue
-- [ ] src/components/reports/CreateReport.vue
+- ✅ src/components/reports/CreateReport.vue
 - ✅ src/components/settings/AddRegexPattern.vue
 - ✅ src/components/settings/General.vue
 - ✅ src/plugins/metrics/AddToDashboard.vue
@@ -1264,17 +1264,17 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 > Files with `range` mode (date range selection) require a paired-input solution — see audit gap notes.
 
-- [ ] src/components/DateTime.vue
-- [ ] src/components/DateTimePicker.vue
-- [ ] src/components/reports/CreateReport.vue
+- ✅ src/components/DateTime.vue
+- ✅ src/components/DateTimePicker.vue
+- ✅ src/components/reports/CreateReport.vue
 
 ---
 
 ### q-time → OTime / OFormTime
 
-- [ ] src/components/DateTime.vue
-- [ ] src/components/DateTimePicker.vue
-- [ ] src/components/reports/CreateReport.vue
+- ✅ src/components/DateTime.vue
+- ✅ src/components/DateTimePicker.vue
+- ✅ src/components/reports/CreateReport.vue
 
 ---
 

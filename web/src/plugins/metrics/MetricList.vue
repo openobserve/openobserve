@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <q-select
+    <OSelect
       data-test="log-search-index-list-select-stream"
       v-model="selectedMetric"
       :label="selectedMetric ? '' : t('search.selectIndex')"
@@ -27,9 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-cy="index-dropdown"
       input-debounce="0"
       behavior="menu"
-      filled
-      borderless
-      dense
       use-input
       hide-selected
       fill-input
@@ -74,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
         </q-item>
       </template>
-    </q-select>
+    </OSelect>
     <div class="metric-list">
       <div class="metrics-label-table q-mt-xs">
         <q-table
@@ -105,7 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template v-else>
                   <q-expansion-item
-                    dense
                     switch-toggle-side
                     :label="props.row.name"
                     expand-icon-class="field-expansion-icon"
@@ -289,13 +285,14 @@ import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
-  components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
+  components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading, OSelect,
     OIcon,
 },
   props: ["modelValue", "metricsList"],

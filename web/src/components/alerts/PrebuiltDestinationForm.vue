@@ -152,15 +152,11 @@ limitations under the License.
       </div>
       <!-- CC and Subject fields hidden - not supported by backend Email struct -->
       <!-- <div class="col-6 q-py-xs">
-        <q-input
+        <OInput
           v-model="credentials.ccRecipients"
           data-test="email-cc-input"
           label="CC Recipients (optional)"
           class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
           tabindex="0"
         >
           <template v-slot:hint>
@@ -168,18 +164,14 @@ limitations under the License.
               Comma-separated CC email addresses
             </span>
           </template>
-        </q-input>
+        </OInput>
       </div>
       <div class="col-6 q-py-xs">
-        <q-input
+        <OInput
           v-model="credentials.subject"
           data-test="email-subject-input"
           label="Email Subject (optional)"
           class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          hide-bottom-space
           tabindex="0"
         >
           <template v-slot:hint>
@@ -187,7 +179,7 @@ limitations under the License.
               Custom subject line (defaults to alert name)
             </span>
           </template>
-        </q-input>
+        </OInput>
       </div> -->
     </template>
 

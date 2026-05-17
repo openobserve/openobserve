@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div class="step-content tw:px-3 tw:py-4">
-      <q-form ref="formRef" @submit.prevent>
+      <OForm ref="formRef" @submit.prevent>
         <!-- Query Mode Tabs -->
         <div class="tw:mb-4">
           <OToggleGroup
@@ -58,11 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
             >
-              <q-select
+              <OSelect
                 v-model="filter.field"
                 :options="filteredStreamFields"
-                dense
-                borderless
                 use-input
                 fill-input
                 hide-selected
@@ -86,20 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
-              <q-select
+              </OSelect>
+              <OSelect
                 v-model="filter.operator"
                 :options="filterOperators"
-                dense
-                borderless
                 class="alert-v3-select"
                 style="width: 110px"
               />
-              <q-input
+              <OInput
                 v-if="operatorNeedsValue(filter.operator)"
                 v-model="filter.value"
-                dense
-                borderless
                 :placeholder="t('alerts.placeholders.value')"
                 class="alert-v3-input"
                 style="max-width: 160px"
@@ -199,27 +193,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-select
+              <OSelect
                 v-model="config.detection_function"
                 :options="detectionFunctions"
-                dense
-                borderless
-                hide-bottom-space
                 :rules="[(v) => !!v || 'Detection function is required']"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
                 style="width: 110px"
                 @update:model-value="onDetectionFunctionChange"
               />
-              <q-select
+              <OSelect
                 v-if="
                   config.detection_function &&
                   config.detection_function !== 'count'
                 "
                 v-model="config.detection_function_field"
                 :options="filteredDetectionFields"
-                dense
-                borderless
                 use-input
                 input-debounce="200"
                 :placeholder="
@@ -229,7 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :loading="loadingFields"
                 :rules="[(v) => !!v || 'Field is required']"
-                hide-bottom-space
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
                 style="width: 140px"
@@ -246,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
+              </OSelect>
             </div>
           </div>
           <!-- Detection Resolution -->
@@ -272,25 +260,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <OInput
                   v-model.number="config.histogram_interval_value"
                   type="number"
-                  dense
-                  borderless
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-histogram-interval-value"
                 />
-                <q-select
+                <OSelect
                   v-model="config.histogram_interval_unit"
                   :options="intervalUnits"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  dense
-                  borderless
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-histogram-interval-unit"
@@ -335,25 +319,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div>
             <div class="tw:flex tw:items-center tw:gap-0">
-              <q-input
+              <OInput
                 v-model.number="config.histogram_interval_value"
                 type="number"
-                dense
-                borderless
                 min="1"
                 class="alert-v3-input"
                 style="width: 87px"
                 data-test="anomaly-histogram-interval-value"
               />
-              <q-select
+              <OSelect
                 v-model="config.histogram_interval_unit"
                 :options="intervalUnits"
                 option-label="label"
                 option-value="value"
                 emit-value
                 map-options
-                dense
-                borderless
                 class="alert-v3-select"
                 style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
@@ -397,25 +377,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <OInput
                   v-model.number="config.schedule_interval_value"
                   type="number"
-                  dense
-                  borderless
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-schedule-interval-value"
                 />
-                <q-select
+                <OSelect
                   v-model="config.schedule_interval_unit"
                   :options="intervalUnits"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  dense
-                  borderless
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-schedule-interval-unit"
@@ -456,25 +432,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <OInput
                   v-model.number="config.detection_window_value"
                   type="number"
-                  dense
-                  borderless
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-detection-window-value"
                 />
-                <q-select
+                <OSelect
                   v-model="config.detection_window_unit"
                   :options="intervalUnits"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  dense
-                  borderless
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-detection-window-unit"
@@ -520,12 +492,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div class="tw:flex tw:flex-col">
-              <q-input
+              <OInput
                 v-model.number="config.training_window_days"
                 type="number"
-                dense
-                borderless
-                hide-bottom-space
                 :min="1"
                 :rules="[(v) => v >= 1 || 'Minimum 1 day']"
                 data-test="anomaly-training-window"
@@ -567,15 +536,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <q-select
+            <OSelect
               v-model="config.retrain_interval_days"
               :options="retrainIntervalOptions"
               option-label="label"
               option-value="value"
               emit-value
               map-options
-              dense
-              borderless
               data-test="anomaly-retrain-interval"
               class="alert-v3-select"
               style="max-width: 200px"
@@ -711,7 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-form>
+      </OForm>
     </div>
   </div>
 </template>
@@ -740,6 +707,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -752,6 +722,9 @@ export default defineComponent({
     OToggleGroupItem,
     OIcon,
     OTooltip,
+    OInput,
+    OSelect,
+    OForm,
 },
 
   props: {

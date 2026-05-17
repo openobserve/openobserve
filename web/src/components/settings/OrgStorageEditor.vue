@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Stepper -->
     <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 q-px-md tw:overflow-auto">
     <div style="max-width: 720px;">
-      <q-form ref="storageForm" @submit="submitStorage">
+      <OForm ref="storageForm" @submit="submitStorage">
         <q-stepper
           v-model="step"
           ref="stepper"
@@ -131,67 +131,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="q-gutter-sm">
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
-                <q-input
+                <OInput
                   v-if="!isCloud"
                   data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
                   label="Server URL"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-region-input"
                   v-model="formData.region"
                   label="Region"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode || !!cloudRegion"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                   :rules="[
                     (val: any) =>
                       !!val?.trim() || t('storage_settings.bucketNameRequired'),
                   ]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-access-key-input"
                   v-model="formData.access_key"
                   label="Access Key *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :rules="[
                     (val: any) =>
                       !!val?.trim() || t('storage_settings.accessKeyRequired'),
                   ]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-secret-key-input"
                   v-model="formData.secret_key"
                   label="Secret Key *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   type="password"
                   :rules="[
                     (val: any) =>
@@ -202,91 +187,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
-                <q-input
+                <OInput
                   data-test="storage-settings-access-key-input"
                   v-model="formData.storage_account"
                   label="Storage Account Name *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.storageAccountRequired')]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-secret-key-input"
                   v-model="formData.secret_key"
                   label="Secret Key *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   type="password"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.secretKeyRequired')]"
                 />
-                <q-input
+                <OInput
                   v-if="!isCloud"
                   data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
                   label="Server URL"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                 />
               </template>
 
               <!-- GcpCredentials Fields -->
               <template v-if="selectedProvider === 'GcpCredentials'">
-                <q-input
+                <OInput
                   data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-access-key-input"
                   v-model="formData.access_key"
                   label="Access Key *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.accessKeyRequired')]"
                 />
-                <q-input
+                <OInput
                   v-if="!isCloud"
                   data-test="storage-settings-server-url-input"
                   v-model="formData.server_url"
                   label="Server URL"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                 />
               </template>
@@ -309,50 +273,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </div>
-                <q-input
+                <OInput
                   data-test="storage-settings-bucket-name-input"
                   v-model="formData.bucket_name"
                   label="Bucket Name *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-region-input"
                   v-model="formData.region"
                   label="Region *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :disable="isEditMode || !!cloudRegion"
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.regionRequired')]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-role-arn-input"
                   v-model="formData.role_arn"
                   label="Role ARN *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.roleARNRequired')]"
                 />
-                <q-input
+                <OInput
                   data-test="storage-settings-role-external-id-input"
                   v-model="formData.external_id"
                   label="External Id *"
                   class="no-border showLabelOnTop"
-                  borderless
-                  dense
                   flat
-                  stack-label
                   :rules="[(val: any) => !!val?.trim() || t('storage_settings.externalIdRequired')]"
                 />
               </template>
@@ -434,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-      </q-form>
+      </OForm>
     </div>
     </div>
   </div>
@@ -452,6 +404,8 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 
 const props = defineProps<{
   action: "add" | "edit";

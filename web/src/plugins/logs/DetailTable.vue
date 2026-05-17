@@ -119,7 +119,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rows-per-page-options="[0]"
             class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
-            dense
           >
             <template v-slot:body-cell-field="props">
               <q-td
@@ -363,12 +362,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("common.noOfRecords") }}
           </div>
           <div class="tw:min-w-[70px]">
-            <q-select
+            <OSelect
               v-model="selectedRelativeValue"
               :options="recordSizeOptions"
-              dense
               class="select-noof-records"
-            ></q-select>
+            ></OSelect>
           </div>
           <div class="">
             <OButton
@@ -424,6 +422,7 @@ import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -435,6 +434,7 @@ export default defineComponent({
   components: {
     OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
     OIcon,
+    OSelect,
 },
   emits: [
     "showPrevDetail",

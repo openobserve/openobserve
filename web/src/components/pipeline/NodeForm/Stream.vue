@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="alert-stream-type o2-input q-mr-sm full-width"
               style="padding-top: 0"
             >
-              <q-select
+              <OSelect
                 v-model="stream_name"
                 :options="filteredStreams"
                 option-label="label"
@@ -67,11 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isFetchingStreams"
                 :popup-content-style="{ textTransform: 'lowercase' }"
                 color="input-border"
-                bg-color="input-bg"
                 class="q-py-sm showLabelOnTop no-case full-width"
-                filled
-                stack-label
-                dense
                 use-input
                 hide-selected
                 fill-input

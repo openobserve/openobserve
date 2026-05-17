@@ -1,19 +1,16 @@
 <template>
   <div>
     <div>
-      <q-select
+      <OSelect
         ref="streamFieldSelect"
-        filled
         v-model="displayValue"
         :options="filteredOptions"
-        dense
         label="Select Field"
         use-input
         input-debounce="0"
         behavior="menu"
         hide-selected
         fill-input
-        borderless
         @filter="filterFields"
         data-test="stream-field-select"
         class="o2-custom-select-dashboard"
@@ -42,7 +39,7 @@
             </template>
           </q-expansion-item>
         </template>
-      </q-select>
+      </OSelect>
     </div>
   </div>
 </template>
@@ -51,6 +48,7 @@
 import { defineComponent, ref, watch, PropType, inject } from "vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export interface OptionChild {
   label: string;
@@ -77,6 +75,8 @@ export default defineComponent({
   },
 
   emits: ["update:modelValue"],
+
+  components: { OSelect },
 
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(

@@ -43,7 +43,7 @@
           data-test="alert-conditions-operator-select"
           class="q-ml-none o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.type"
             :options="fieldTypes"
             :popup-content-style="{ textTransform: 'capitalize' }"
@@ -64,7 +64,7 @@
           data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.index_type"
             :options="streamIndexType"
             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -96,7 +96,7 @@
           data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.type"
             :options="dataTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -155,6 +155,7 @@ import { useStore } from "vuex";
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({

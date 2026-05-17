@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div class="scrollable-content">
-        <q-form greedy ref="addVariableForm" @submit="onSubmit" class="tw:px-0.5">
+        <OForm greedy ref="addVariableForm" @submit="onSubmit" class="tw:px-0.5">
           <div class="q-mt-md">
             <div class="q-mb-md">
             <OSelect
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OSwitch>
           </div>
-        </q-form>
+        </OForm>
       </div>
       <div class="sticky-footer">
         <OButton
@@ -568,6 +568,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -585,7 +586,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip,
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip, OForm,
     OIcon,
 },
   emits: ["close", "save"],

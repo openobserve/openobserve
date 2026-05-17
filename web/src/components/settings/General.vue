@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:mx-4">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="tw:w-full tw:flex tw:flex-col">
-        <q-form @submit.stop="onSubmit.execute">
+        <OForm @submit.stop="onSubmit.execute">
           <!-- scape interval section -->
           <div class="settings-grid-item">
             <span class="individual-setting-title">
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.save") }}
             </OButton>
           </div>
-        </q-form>
+        </OForm>
       </div>
     </div>
     <div
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
-            <q-file
+            <OFile
               data-test="setting_ent_custom_logo_img_file_upload"
               v-model="filesLight"
               :label="t('settings.dragDropUpload')"
@@ -267,14 +267,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              dense
-              borderless
               class="q-mx-none o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
-            </q-file>
+            </OFile>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
               <OButton
                 type="button"
@@ -335,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div v-else class="tw:flex tw:items-center tw:gap-3">
-            <q-file
+            <OFile
               data-test="setting_ent_custom_logo_dark_img_file_upload"
               v-model="filesDark"
               :label="t('settings.dragDropUpload')"
@@ -343,14 +341,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              dense
-              borderless
               class="q-mx-none o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
-            </q-file>
+            </OFile>
             <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
               <OButton
                 type="button"
@@ -431,6 +427,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -454,6 +452,9 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OInput,
+    OFile,
+    OForm,
 },
   setup() {
     const { t } = useI18n();

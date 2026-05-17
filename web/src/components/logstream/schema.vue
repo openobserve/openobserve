@@ -407,7 +407,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     width: '100%'
                   }"
                   :rows-per-page-options="[]"
-                  dense
                 >
                   <template v-slot:header="props">
                     <q-tr :props="props">
@@ -507,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:body-cell-index_type="props">
                     <q-td data-test="schema-stream-index-select">
-                        <q-select
+                        <OSelect
                         v-if="
                           !(
                             props.row.name ==
@@ -521,7 +520,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         option-value="value"
                         :popup-content-style="{ textTransform: 'capitalize' }"
                         color="input-border"
-                        bg-color="input-bg"
                         class="mini-select"
                         input-class="mini-select"
                         :option-disable="
@@ -532,8 +530,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         map-options
                         emit-value
                         autoclose
-                        borderless
-                        dense
                         input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
                         style="width: 190px;"
                         @update:model-value="val => updateIndexType(props, val)"
@@ -562,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         side="top"
                         :content="streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
                       />
-                      </q-select>
+                      </OSelect>
                     </q-td>
                   </template>
                   <!-- here we will render the number of regex patterns associated with the specific field -->
@@ -793,7 +789,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
                     style="height: calc(100vh - 403px);"
                     :rows-per-page-options="[]"
-                    dense
                   >
                     <template v-slot:header-selection="scope">
                         <OCheckbox

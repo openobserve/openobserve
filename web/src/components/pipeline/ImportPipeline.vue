@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-source-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
@@ -107,11 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           textTransform: 'lowercase',
                         }"
                         color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
                         use-input
                         hide-selected
                         fill-input
@@ -136,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                     </div>
                   </span>
                   <!-- source stream type should be one of the valid stream types -->

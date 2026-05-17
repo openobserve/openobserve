@@ -22,14 +22,10 @@
               <q-menu class="q-pa-md">
                 <div style="width: 350px">
                   <!-- Label Selection -->
-                  <q-select
+                  <OSelect
                     v-model="label.label"
                     :options="filteredLabelOptions"
                     label="Label"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
                     class="label-filter-label-select showLabelOnTop tw:normal-case! q-mb-sm"
                     input-class="tw:normal-case!"
                     use-input
@@ -52,7 +48,7 @@
                         </q-item-section>
                       </q-item>
                     </template>
-                  </q-select>
+                  </OSelect>
 
                   <!-- Operator Selection -->
                   <OSelect
@@ -64,14 +60,10 @@
                   />
 
                   <!-- Value Selection -->
-                  <q-select
+                  <OSelect
                     v-model="label.value"
                     :options="getLabelValueOptions(label.label)"
                     label="Value"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
                     class="label-filter-value-select showLabelOnTop"
                     input-class="tw:normal-case!"
                     use-input
@@ -118,7 +110,7 @@
                     <template v-slot:hint>
                       {{ getOperatorHint(label.op) }}
                     </template>
-                  </q-select>
+                  </OSelect>
                 </div>
               </q-menu>
             </OButton>
