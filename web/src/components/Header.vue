@@ -253,24 +253,21 @@ size="xs" class="warning" />{{
                     <!-- Search input for filtering organizations -->
                     <template #top>
                       <div class="full-width">
-                        <q-input
+                        <OInput
                           data-test="organization-search-input"
                           :model-value="searchQuery"
                           @update:model-value="
                             (val) => $emit('update:searchQuery', val)
                           "
-                          data-cy="index-field-search-input"
-                          borderless
-                          dense
                           clearable
-                          debounce="1"
+                          :debounce="1"
                           autofocus
                           :placeholder="'Search Organization'"
                         >
                           <template #prepend>
                             <OIcon name="search" size="sm" />
                           </template>
-                        </q-input>
+                        </OInput>
                       </div>
                     </template>
 
@@ -570,6 +567,7 @@ import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -580,6 +578,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
+    OInput,
   },
   props: {
     // Store instance

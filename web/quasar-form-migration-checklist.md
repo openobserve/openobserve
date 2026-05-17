@@ -849,10 +849,10 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - [ ] src/components/CustomDateTimePicker.vue
 - [ ] src/components/DateTime.vue
 - [ ] src/components/DateTimePicker.vue
-- [ ] src/components/Header.vue
+- ✅ src/components/Header.vue
 - ✅ src/components/NLModeQueryBar.vue
-- [ ] src/components/O2AIChat.vue
-- [ ] src/components/QueryEditor.vue
+- ✅ src/components/O2AIChat.vue
+- ✅ src/components/QueryEditor.vue
 - ✅ src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/actionScripts/EditScript.vue
 - ✅ src/components/actionScripts/ScriptToolbar.vue
@@ -1235,7 +1235,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
 ### q-file → OFile / OFormFile
 
-- [ ] src/components/actionScripts/EditScript.vue
+- ✅ src/components/actionScripts/EditScript.vue
 - ✅ src/components/alerts/ImportAlert.vue
 - ✅ src/components/alerts/ImportSemanticGroups.vue
 - ✅ src/components/alerts/ImportSemanticGroupsDrawer.vue

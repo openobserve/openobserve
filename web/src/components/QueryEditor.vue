@@ -28,19 +28,17 @@
       </div>
       <!-- Normal input when not generating -->
       <div v-else class="tw:flex tw:items-center tw:gap-2">
-        <q-input
+        <OInput
           v-model="aiInputText"
-          dense
-          borderless
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
           :class="aiInputFieldClass"
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
         >
-          <template v-slot:prepend>
+          <template #prepend>
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
           </template>
-        </q-input>
+        </OInput>
         <!-- Send Button -->
         <OButton
           variant="ai-gradient"
@@ -116,6 +114,7 @@ import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';

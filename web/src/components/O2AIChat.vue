@@ -52,17 +52,15 @@
                 <!-- History menu with search -->
                 <div class="history-menu-container">
                   <div class="search-history-bar-sticky">
-                    <q-input
+                    <OInput
                       v-model="historySearchTerm"
                       placeholder="Search chat history"
-                      dense
-                      borderless
                       class="tw:mt-1"
                     >
                       <template #prepend>
                         <OIcon name="search" size="sm" />
                       </template>
-                    </q-input>
+                    </OInput>
                   </div>
                   <div class="history-list-container">
                     <q-list
@@ -210,10 +208,8 @@
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
-        <q-input
+        <OInput
           v-model="editingTitle"
-          dense
-          borderless
           autofocus
           @keyup.enter="saveEditedTitle"
           placeholder="Enter chat title"
@@ -1352,6 +1348,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1398,6 +1395,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OInput,
 },
   props: {
     isOpen: {
