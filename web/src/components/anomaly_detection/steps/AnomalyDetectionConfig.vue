@@ -651,15 +651,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center"
                 >
-                  <q-range
-                    ref="sliderRef"
+                  <ORange
                     v-model="thresholdRange"
                     :min="0"
                     :max="100"
                     :step="1"
                     vertical
                     reverse
-                    color="primary"
                     label-always
                     markers
                     :marker-labels="[
@@ -710,6 +708,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import ORange from "@/lib/forms/Range/ORange.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -725,6 +724,7 @@ export default defineComponent({
     OInput,
     OSelect,
     OForm,
+    ORange,
 },
 
   props: {
@@ -1418,48 +1418,11 @@ export default defineComponent({
   margin-top: 14px;
   height: 145px !important;
 
-  --slider-accent: color-mix(
-    in srgb,
-    var(--q-primary) 55%,
-    var(--o2-primary-background)
-  );
-
-  // Selection track
-  :deep(.q-slider__selection) {
-    background: var(--slider-accent) !important;
-  }
-
-  // Thumbs
-  :deep(.q-slider__thumb) {
-    color: var(--slider-accent) !important;
-
-    circle {
-      stroke: var(--slider-accent) !important;
-      fill: var(--slider-accent) !important;
-    }
-  }
-
-  // Value labels (number plates)
-  :deep(.q-slider__pin-value-marker-bg) {
-    background: var(--slider-accent) !important;
-  }
-
-  :deep(.q-slider__pin-value-marker) {
-    color: white !important;
-    font-size: 10px !important;
-  }
-
-  // Ruler tick marks — light grey
-  :deep(.q-slider__markers) {
-    color: var(--o2-border) !important;
-    opacity: 0.8;
-  }
-
-  // Marker labels (scale numbers)
-  :deep(.q-slider__marker-labels-container) {
-    color: var(--o2-text-secondary);
-    font-size: 9px;
-  }
+  // Override ORange design tokens with the primary action color
+  --color-slider-track-fill: var(--o2-primary-color);
+  --color-slider-thumb: var(--o2-primary-color);
+  --color-slider-thumb-border: white;
+  --color-slider-value: var(--o2-text-secondary);
 }
 
 // Reuse alerts wizard frequency toggle button styles
