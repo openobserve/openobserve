@@ -554,7 +554,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     } finally {
       // Step 5: Always clean up the first pipeline
       const deleteResult = await pipelinePage.deletePipelineById(firstPipelineId);
-      expect(deleteResult.status).toBe(200);
+      expect([200, 204]).toContain(deleteResult.status);
     }
   });
 

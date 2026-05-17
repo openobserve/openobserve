@@ -2323,7 +2323,6 @@ export class PipelinesPage {
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
         await searchInput.click();
         await searchInput.fill(searchText);
-        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info(`Field list searched for: "${searchText}"`);
     }
 
@@ -2332,16 +2331,26 @@ export class PipelinesPage {
      * @returns {Promise<number>}
      */
     async getPipelineFieldCount() {
-        // Wait for at least one field label to appear in the table
-        const fieldLabel = this.page.locator(
-            '[data-test="log-search-index-list-fields-table"] .field_label'
-        ).first();
-        await fieldLabel.waitFor({ state: 'visible', timeout: 15000 });
+        const fieldTable = this.page.locator(
+            '[data-test="log-search-index-list-fields-table"]'
+        );
+        await fieldTable.waitFor({ state: 'visible', timeout: 15000 });
 
-        const count = await this.page.locator(
+        // Wait for at least one field label to appear, then count.
+        // Zero-match queries are a valid state — timeout means count is 0, not an error.
+        const fieldLocator = this.page.locator(
             '[data-test="log-search-index-list-fields-table"] .field_label'
-        ).count();
-        testLogger.info(`Pipeline field count: ${count}`);
+        );
+        const hasFields = await fieldLocator.first().waitFor({ state: 'visible', timeout: 10000 })
+            .then(() => true)
+            .catch(() => false);
+
+        const count = hasFields ? await fieldLocator.count() : 0;
+        if (count === 0) {
+            testLogger.info('Pipeline field count: 0 (no matching fields)');
+        } else {
+            testLogger.info(`Pipeline field count: ${count}`);
+        }
         return count;
     }
 
@@ -2368,7 +2377,6 @@ export class PipelinesPage {
             '[data-test="log-search-index-list-field-search-input"]'
         );
         await searchInput.fill('');
-        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info('Field list search cleared');
     }
 
