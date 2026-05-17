@@ -56,10 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-px-lg q-my-md"
           style="width: 1024px"
         >
-          <OForm
+          <form
             class="create-report-form"
-            ref="addReportFormRef"
-            @submit="onSubmit"
+            @submit.prevent="onSubmit"
           >
             <div
               class="tw:flex tw:items-start tw:gap-4 q-px-sm"
@@ -857,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-stepper-navigation>
               </q-step>
             </q-stepper>
-          </OForm>
+          </form>
         </div>
       </div>
     </div>
@@ -902,7 +901,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -935,7 +934,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
-import OForm from "@/lib/forms/Form/OForm.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getFoldersListByType } from "@/utils/commons";
@@ -1003,8 +1001,6 @@ const isCachedReport = ref(false);
 const showInfoTooltip = ref(false);
 
 const originalReportData: Ref<string> = ref("");
-
-const addReportFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
@@ -1482,15 +1478,8 @@ const saveReport = async () => {
   if (isCachedReport.value) reportPayload.destinations = [];
 
   // Check if all report input fields are valid
-  try {
-    validateReportData();
-    await nextTick();
-    await nextTick();
-    const isValidForm = await addReportFormRef.value.validate();
-    if (!isValidForm) return;
-  } catch (err) {
-    console.log(err);
-  }
+  const isValidForm = await validateReportData();
+  if (!isValidForm) return;
 
   // This is unitil we support multiple dashboards and tabs
   if (reportPayload.dashboards[0]?.tabs)
@@ -1559,20 +1548,20 @@ const saveReport = async () => {
   });
 };
 
-const validateReportData = async () => {
+const validateReportData = async (): Promise<boolean> => {
   if (!formData.value.dashboards[0].folder) {
     step.value = 1;
-    return;
+    return false;
   }
 
   if (!formData.value.dashboards[0].dashboard) {
     step.value = 1;
-    return;
+    return false;
   }
 
   if (!formData.value.dashboards[0].tabs) {
     step.value = 1;
-    return;
+    return false;
   }
 
   if (formData.value.dashboards[0].timerange) {
@@ -1581,7 +1570,7 @@ const validateReportData = async () => {
       !formData.value.dashboards[0].timerange.period
     ) {
       step.value = 1;
-      return;
+      return false;
     }
 
     if (
@@ -1592,7 +1581,7 @@ const validateReportData = async () => {
       )
     ) {
       step.value = 1;
-      return;
+      return false;
     }
   }
 
@@ -1606,23 +1595,23 @@ const validateReportData = async () => {
       validateFrequency();
     } catch (err) {
       cronError.value = "Invalid cron expression!";
-      return;
+      return false;
     }
   }
 
   if (formData.value.frequency.type === "cron" && cronError.value) {
     step.value = 2;
-    return;
+    return false;
   }
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
     step.value = 2;
-    return;
+    return false;
   }
 
   if (!formData.value.start || !formData.value.timezone) {
     step.value = 2;
-    return;
+    return false;
   }
 
   if (
@@ -1632,8 +1621,10 @@ const validateReportData = async () => {
     )
   ) {
     step.value = 3;
-    return;
+    return false;
   }
+
+  return true;
 };
 
 const validateFrequency = () => {

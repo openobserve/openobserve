@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formData.destination_type &&
                 formData.destination_type !== 'custom'
               "
+              ref="prebuiltFormRef"
               :key="`${formData.destination_type}-${isUpdatingDestination}`"
               v-model="prebuiltCredentials"
               :destination-type="formData.destination_type"
@@ -616,6 +617,7 @@ const {
 
 // Prebuilt destinations state
 const prebuiltCredentials = ref<Record<string, any>>({});
+const prebuiltFormRef = ref<{ validate: () => boolean } | null>(null);
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
@@ -1036,6 +1038,7 @@ const showPreview = async () => {
 const saveDestination = async () => {
   // Handle prebuilt destinations (both create and update)
   if (isPrebuiltDestination.value) {
+    if (prebuiltFormRef.value && !prebuiltFormRef.value.validate()) return;
     try {
       // Build custom headers object from apiHeaders array
       const customHeaders: Headers = {};

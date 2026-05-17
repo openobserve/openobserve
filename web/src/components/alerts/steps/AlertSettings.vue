@@ -417,9 +417,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    // Form ref
-    const alertSettingsForm = ref(null);
-
     // Field refs for focus manager
     const periodFieldRef = ref(null);
     const thresholdFieldRef = ref(null);
@@ -972,7 +969,6 @@ export default defineComponent({
       validateFrequency,
       // Validation
       validate,
-      alertSettingsForm,
       // Field refs for focus manager
       periodFieldRef,
       thresholdFieldRef,

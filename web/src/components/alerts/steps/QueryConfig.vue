@@ -996,7 +996,6 @@ export default defineComponent({
     const localTab = ref(props.tab);
     const columnSelectError = ref(false);
     const viewSqlEditor = ref(false);
-    const customConditionsForm = ref(null);
     const showMultiWindowDialog = ref(false);
 
     // Field-level error refs (replaces Quasar :rules validation)

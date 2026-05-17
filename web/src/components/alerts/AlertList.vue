@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSwitch
                   data-test="alert-list-search-across-folders-toggle"
                   v-model="searchAcrossFolders"
-                  :label="t('dashboard.allFolders') || 'All Folders'"
+                  :label="t('dashboard.allFolders')"
                 />
               </OTooltip>
             </div>

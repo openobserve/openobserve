@@ -24,6 +24,8 @@ limitations under the License.
           label="Slack Webhook URL *"
           hint="Get your webhook URL from Slack App settings"
           tabindex="0"
+          :error="!!fieldErrors.webhookUrl"
+          :error-message="fieldErrors.webhookUrl"
         />
       </div>
       <div class="col-6 q-py-xs">
@@ -46,6 +48,8 @@ limitations under the License.
           label="Discord Webhook URL *"
           hint="Get your webhook URL from Discord channel settings"
           tabindex="0"
+          :error="!!fieldErrors.webhookUrl"
+          :error-message="fieldErrors.webhookUrl"
         />
       </div>
       <div class="col-6 q-py-xs">
@@ -68,6 +72,8 @@ limitations under the License.
           label="Microsoft Teams Webhook URL *"
           hint="Get your webhook URL from Teams channel connectors"
           tabindex="0"
+          :error="!!fieldErrors.webhookUrl"
+          :error-message="fieldErrors.webhookUrl"
         />
       </div>
     </template>
@@ -82,6 +88,8 @@ limitations under the License.
           type="password"
           hint="Get your integration key from PagerDuty service settings"
           tabindex="0"
+          :error="!!fieldErrors.integrationKey"
+          :error-message="fieldErrors.integrationKey"
         />
       </div>
       <div class="col-6 q-py-xs">
@@ -107,6 +115,8 @@ limitations under the License.
           label="ServiceNow Instance URL *"
           hint="https://your-instance.service-now.com/api/now/table/incident"
           tabindex="0"
+          :error="!!fieldErrors.instanceUrl"
+          :error-message="fieldErrors.instanceUrl"
         />
       </div>
       <div class="col-6 q-py-xs">
@@ -116,6 +126,8 @@ limitations under the License.
           label="Username *"
           hint="ServiceNow username with incident creation permissions"
           tabindex="0"
+          :error="!!fieldErrors.username"
+          :error-message="fieldErrors.username"
         />
       </div>
       <div class="col-6 q-py-xs">
@@ -126,6 +138,8 @@ limitations under the License.
           type="password"
           hint="ServiceNow password or API token"
           tabindex="0"
+          :error="!!fieldErrors.password"
+          :error-message="fieldErrors.password"
         />
       </div>
       <div class="col-12 q-py-xs">
@@ -148,6 +162,8 @@ limitations under the License.
           label="Recipient Email Addresses *"
           hint="Comma-separated email addresses"
           tabindex="0"
+          :error="!!fieldErrors.recipients"
+          :error-message="fieldErrors.recipients"
         />
       </div>
       <!-- CC and Subject fields hidden - not supported by backend Email struct -->
@@ -193,6 +209,8 @@ limitations under the License.
           type="password"
           hint="Get your API key from Opsgenie integration settings"
           tabindex="0"
+          :error="!!fieldErrors.apiKey"
+          :error-message="fieldErrors.apiKey"
         />
       </div>
       <div class="col-6 q-py-xs">
@@ -250,12 +268,14 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import type { PropType } from 'vue';
+import { getPrebuiltConfig } from '@/utils/prebuilt-templates';
+import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
 
 const props = defineProps({
   destinationType: {
@@ -284,6 +304,29 @@ const credentials = computed({
   set: (value) => emit('update:modelValue', value)
 });
 
+const fieldErrors = reactive<Record<string, string>>({});
+
+function validate(): boolean {
+  Object.keys(fieldErrors).forEach((k) => delete fieldErrors[k]);
+  const config = getPrebuiltConfig(props.destinationType as PrebuiltTypeId);
+  if (!config) return true;
+  for (const field of config.credentialFields) {
+    const value = credentials.value[field.key];
+    if (field.required && (!value || value.toString().trim() === '')) {
+      fieldErrors[field.key] = `${field.label} is required`;
+      continue;
+    }
+    if (!field.required && (!value || value.toString().trim() === '')) continue;
+    if (field.validator && value) {
+      const result = field.validator(value.toString());
+      if (result !== true) fieldErrors[field.key] = result as string;
+    }
+  }
+  return Object.keys(fieldErrors).length === 0;
+}
+
+defineExpose({ validate });
+
 // PagerDuty severity options
 const severityOptions = [
   { label: 'Critical', value: 'critical' },
@@ -300,13 +343,6 @@ const priorityOptions = [
   { label: 'P4 (Low)', value: 'P4' },
   { label: 'P5 (Informational)', value: 'P5' }
 ];
-
-// Email validation function
-const validateEmailList = (emails: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const emailList = emails.split(',').map(e => e.trim());
-  return emailList.every(email => emailRegex.test(email));
-};
 </script>
 
 <style lang="scss" scoped>

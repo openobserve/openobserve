@@ -188,10 +188,6 @@ describe("AlertSettings.vue", () => {
       expect(wrapper.vm.localIsAggregationEnabled).toBe(false);
     });
 
-    it("should render form element", () => {
-      const form = wrapper.findComponent({ ref: "alertSettingsForm" });
-      expect(form.exists()).toBe(true);
-    });
   });
 
   describe("Props", () => {
@@ -1078,10 +1074,6 @@ describe("AlertSettings.vue", () => {
   });
 
   describe("Form Refs", () => {
-    it("should have alertSettingsForm ref", () => {
-      expect(wrapper.vm.alertSettingsForm).toBeDefined();
-    });
-
     it("should have field refs for focus management", () => {
       expect(wrapper.vm.periodFieldRef).toBeDefined();
       expect(wrapper.vm.thresholdFieldRef).toBeDefined();
