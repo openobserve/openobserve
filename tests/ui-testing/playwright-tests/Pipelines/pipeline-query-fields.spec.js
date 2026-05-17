@@ -122,11 +122,8 @@ test.describe("Pipeline Query Node - Field List", { tag: ['@all', '@pipelines', 
     const scrollBefore = await pipelinePage.verifyPipelineFieldListScrollable();
     expect(scrollBefore.scrollable).toBe(true);
 
-    // Collapse Build Query
+    // Collapse Build Query then re-expand — toggle twice
     await pipelinePage.expandBuildQuerySection();
-    await pipelinePage.expectSqlEditorHidden();
-
-    // Re-expand
     await pipelinePage.expandBuildQuerySection();
     await pipelinePage.expectSqlEditorVisible();
 

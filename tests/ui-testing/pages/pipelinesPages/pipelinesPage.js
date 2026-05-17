@@ -1514,7 +1514,9 @@ export class PipelinesPage {
                 method: 'DELETE',
                 headers,
             });
-            const data = await response.json();
+            const data = response.status !== 204
+                ? await response.json()
+                : { code: 204, message: 'Pipeline deleted' };
             testLogger.info('Delete pipeline response', { status: response.status, data });
             return { status: response.status, data };
         } catch (error) {
@@ -2206,9 +2208,7 @@ export class PipelinesPage {
      * Wait for SQL editor to be hidden (e.g., after collapsing Build Query)
      */
     async expectSqlEditorHidden() {
-        await this.scheduledPipelineSqlEditor.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
-            testLogger.warn('SQL editor did not hide within timeout');
-        });
+        await this.scheduledPipelineSqlEditor.waitFor({ state: 'hidden', timeout: 5000 });
         testLogger.info('SQL editor is hidden');
     }
 
@@ -2292,11 +2292,7 @@ export class PipelinesPage {
         const tableScrollable =
             tableInfo &&
             (tableInfo.overflowY === 'auto' || tableInfo.overflowY === 'scroll');
-        const contentOverflows =
-            wrapperInfo.scrollHeight > wrapperInfo.clientHeight ||
-            (tableInfo && tableInfo.scrollHeight > tableInfo.clientHeight);
-
-        const isScrollable = wrapperScrollable || tableScrollable || contentOverflows;
+        const isScrollable = wrapperScrollable || tableScrollable;
 
         testLogger.info('Pipeline field list scroll check', {
             wrapperOverflowY: wrapperInfo.overflowY,
@@ -2307,7 +2303,6 @@ export class PipelinesPage {
             tableClientHeight: tableInfo?.clientHeight,
             wrapperScrollable,
             tableScrollable,
-            contentOverflows,
             isScrollable,
         });
 

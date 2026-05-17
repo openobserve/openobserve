@@ -534,7 +534,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
       DUPLICATE_TEST_STREAM
     );
     expect(firstResult.status).toBe(200);
-    const firstPipelineId = firstResult.data.id;
+    const firstPipelineId = firstResult.data.pipeline_id || firstResult.data.id;
 
     // Step 3: Attempt duplicate for same stream
     const duplicateResult = await pipelinePage.createRealtimePipeline(
