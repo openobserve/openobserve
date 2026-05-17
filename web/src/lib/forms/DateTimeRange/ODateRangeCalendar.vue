@@ -1,5 +1,10 @@
-// Copyright 2026 OpenObserve Inc.
 <script setup lang="ts">
+// Copyright 2026 OpenObserve Inc.
+
+import type {
+  DateRangeCalendarProps,
+  DateRangeCalendarEmits,
+} from "./ODateRangeCalendar.types";
 import { computed } from "vue";
 import {
   RangeCalendarRoot,
@@ -18,22 +23,8 @@ import {
 import type { DateRange } from "reka-ui";
 import { parseDate } from "@internationalized/date";
 
-const props = defineProps<{
-  /** Start date in YYYY/MM/DD format */
-  startDate?: string;
-  /** End date in YYYY/MM/DD format */
-  endDate?: string;
-  /** Min selectable date in YYYY/MM/DD format */
-  minDate?: string;
-  /** Max selectable date in YYYY/MM/DD format */
-  maxDate?: string;
-  disabled?: boolean;
-}>();
-
-const emit = defineEmits<{
-  "update:startDate": [value: string];
-  "update:endDate": [value: string];
-}>();
+const props = defineProps<DateRangeCalendarProps>();
+const emit = defineEmits<DateRangeCalendarEmits>();
 
 function tryParseDate(s: string) {
   try {
@@ -83,6 +74,7 @@ function handleRangeChange(value: DateRange | undefined) {
     :max-value="calendarMaxDate"
     :disabled="disabled"
     week-start-on="0"
+    data-test="daterangecalendar-root"
     @update:model-value="handleRangeChange"
   >
     <template #default="{ weekDays, grid }">
@@ -91,6 +83,7 @@ function handleRangeChange(value: DateRange | undefined) {
       >
         <RangeCalendarPrev
           class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+          data-test="daterangecalendar-prev"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -108,9 +101,11 @@ function handleRangeChange(value: DateRange | undefined) {
         </RangeCalendarPrev>
         <RangeCalendarHeading
           class="tw:text-sm tw:font-medium tw:text-datepicker-heading-text"
+          data-test="daterangecalendar-heading"
         />
         <RangeCalendarNext
           class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+          data-test="daterangecalendar-next"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -153,6 +148,7 @@ function handleRangeChange(value: DateRange | undefined) {
               <RangeCalendarCellTrigger
                 :day="d"
                 :month="month.value"
+                :data-test="`daterangecalendar-cell-${d.toString()}`"
                 class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-highlighted:bg-datepicker-day-range-bg tw:data-highlighted:text-datepicker-day-range-text tw:data-selection-start:bg-datepicker-day-selected-bg tw:data-selection-start:text-datepicker-day-selected-text tw:data-selection-end:bg-datepicker-day-selected-bg tw:data-selection-end:text-datepicker-day-selected-text"
                 >{{ d.day }}</RangeCalendarCellTrigger
               >
