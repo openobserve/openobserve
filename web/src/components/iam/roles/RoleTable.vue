@@ -30,7 +30,7 @@ const columns: OTableColumnDef[] = [
     size: 40,
     minSize: 32,
     maxSize: 50,
-    meta: { compactPadding: true, align: "center" },
+    meta: { compactPadding: true, align: "left" },
   },
   {
     id: "role_name",
@@ -44,10 +44,10 @@ const columns: OTableColumnDef[] = [
     header: t("common.actions"),
     isAction: true,
     pinned: "right",
-    size: 64,
-    minSize: 52,
-    maxSize: 80,
-    meta: { align: "center" },
+    size: 80,
+    minSize: 64,
+    maxSize: 100,
+    meta: { align: "left" },
   },
 ];
 </script>
