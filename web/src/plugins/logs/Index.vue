@@ -491,7 +491,7 @@ import { createLogsContextProvider } from "@/composables/contextProviders/logsCo
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSplitter from "@/lib/Splitter";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   saveLogsStream,
   restoreLogsStream,

@@ -41,7 +41,6 @@
       :style="separatorStyle"
       :tabindex="disable ? -1 : 0"
       @mousedown="!disable && onMouseDown($event)"
-      @keydown="!disable && handleKeyDown($event)"
       role="separator"
       :aria-orientation="horizontal ? 'horizontal' : 'vertical'"
       :aria-label="`${horizontal ? 'Horizontal' : 'Vertical'} splitter`"
@@ -99,6 +98,7 @@ const { value: currentValue, isResizing, onMouseDown } = useResizer({
   containerRef,
   invert: props.horizontal, // For horizontal splitters, invert the direction
   onResize: (newValue: number) => {
+    console.log("new value", newValue);
     emit('update:modelValue', newValue)
   }
 })
@@ -122,41 +122,42 @@ const afterStyle = computed(() => {
 })
 
 // Keyboard navigation support
-const handleKeyDown = (event: KeyboardEvent) => {
-  if (props.disable) return
+// const handleKeyDown = (event: KeyboardEvent) => {
+//   if (props.disable) return
 
-  const step = props.unit === '%' ? 5 : 20 // 5% or 20px steps
-  let newValue = currentValue.value
+//   const step = props.unit === '%' ? 5 : 20 // 5% or 20px steps
+//   let newValue = currentValue.value
 
-  switch (event.key) {
-    case 'ArrowUp':
-    case 'ArrowLeft':
-      newValue = Math.max(minValue.value, currentValue.value - step)
-      break
-    case 'ArrowDown':
-    case 'ArrowRight':
-      newValue = Math.min(maxValue.value, currentValue.value + step)
-      break
-    case 'Home':
-      newValue = minValue.value
-      break
-    case 'End':
-      newValue = maxValue.value
-      break
-    default:
-      return
-  }
+//   switch (event.key) {
+//     case 'ArrowUp':
+//     case 'ArrowLeft':
+//       newValue = Math.max(minValue.value, currentValue.value - step)
+//       break
+//     case 'ArrowDown':
+//     case 'ArrowRight':
+//       newValue = Math.min(maxValue.value, currentValue.value + step)
+//       break
+//     case 'Home':
+//       newValue = minValue.value
+//       break
+//     case 'End':
+//       newValue = maxValue.value
+//       break
+//     default:
+//       return
+//   }
 
-  event.preventDefault()
-  emit('update:modelValue', newValue)
-  nextTick(() => {
-    currentValue.value = newValue
-  })
-}
+//   event.preventDefault()
+//   emit('update:modelValue', newValue)
+//   nextTick(() => {
+//     currentValue.value = newValue
+//   })
+// }
 
 // Watch for external prop changes
 import { watch } from 'vue'
 watch(() => props.modelValue, (newValue) => {
+  console.log("new value", newValue);
   currentValue.value = newValue
 }, { immediate: true })
 </script>
