@@ -184,9 +184,6 @@ const createWrapper = (props = {}, options = {}) => {
         QTooltip: {
           template: '<div data-test-stub="q-tooltip"><slot></slot></div>',
         },
-        QBadge: {
-          template: '<span data-test-stub="q-badge"><slot></slot></span>',
-        },
         QColor: {
           template: '<div data-test-stub="q-color"></div>',
           props: ['modelValue'],

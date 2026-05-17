@@ -55,14 +55,6 @@ describe("CrossLinkManager Component", () => {
               '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
             emits: ["click"],
           },
-          "q-chip": {
-            template:
-              '<span class="q-chip"><slot /></span>',
-          },
-          "q-badge": {
-            template:
-              '<span class="q-badge">{{ $attrs.label }}</span>',
-          },
         },
       },
     });

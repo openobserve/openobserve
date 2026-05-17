@@ -119,12 +119,6 @@ const QIconStub = {
   template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
 };
 
-const QBadgeStub = {
-  name: "QBadge",
-  props: ["color", "textColor", "label"],
-  template: `<span data-test="q-badge" :data-color="color" :data-label="label">{{ label }}</span>`,
-};
-
 const OBadgeStub = {
   name: "OBadge",
   props: ["variant"],
@@ -149,7 +143,6 @@ function mountDialog(props: Record<string, unknown> = {}) {
         OButton: OButtonStub,
         "q-input": QInputStub,
         "OIcon": QIconStub,
-        "q-badge": QBadgeStub,
         OBadge: OBadgeStub,
       },
     },
@@ -240,8 +233,7 @@ describe("TestModelMatchDialog", () => {
             OButton: OButtonStub,
             "q-input": QInputStub,
             "OIcon": QIconStub,
-            "q-badge": QBadgeStub,
-        OBadge: OBadgeStub,
+            OBadge: OBadgeStub,
           },
         },
       });

@@ -57,7 +57,6 @@ describe("proPlan.vue", () => {
         provide: { store },
         stubs: {
           "q-card": true,
-          "q-chip": true,
           "q-separator": true,
           "OIcon": true,
           "q-btn": {
