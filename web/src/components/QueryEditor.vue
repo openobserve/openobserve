@@ -23,7 +23,7 @@
           class="ai-stop-button"
         >
           <OIcon name="stop" size="sm" />
-          <q-tooltip>{{ t('common.stopGenerating') }}</q-tooltip>
+          <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
       </div>
       <!-- Normal input when not generating -->
@@ -51,12 +51,8 @@
           class="ai-send-button"
         >
           <OIcon name="send" size="sm" />
-          <q-tooltip v-if="props.disableAi && props.disableAiReason">
-            {{ props.disableAiReason }}
-          </q-tooltip>
-          <q-tooltip v-else-if="!aiInputText.trim()">
-            {{ props.aiTooltip || t("search.enterPrompt") }}
-          </q-tooltip>
+          <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
+          <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
         </OButton>
         <!-- Close Button -->
         <OButton
@@ -67,7 +63,7 @@
           class="ai-close-button"
         >
           <OIcon name="close" size="sm" />
-          <q-tooltip>{{ t('common.close') }}</q-tooltip>
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
     </div>
@@ -107,7 +103,7 @@
         class="ai-floating-button"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
-        <q-tooltip>{{ props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle') }}</q-tooltip>
+        <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>
   </div>
@@ -119,6 +115,7 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';

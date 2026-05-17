@@ -205,12 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.zoConfig.custom_logo_text ||
                 t("settings.noTextAvailable")
               }}
-              <q-tooltip
+              <OTooltip
                 v-if="store.state.zoConfig.custom_logo_text.length > 20"
-                class="tw:text-center tw:text-[12px] tw:max-w-[250px]"
-              >
-                {{ store.state.zoConfig.custom_logo_text }}
-              </q-tooltip>
+                side="top"
+                align="center"
+                max-width="250px"
+                :content="store.state.zoConfig.custom_logo_text"
+              />
             </span>
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
@@ -452,6 +453,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
+    OTooltip,
 },
   setup() {
     const { t } = useI18n();

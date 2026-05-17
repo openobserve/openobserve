@@ -1301,21 +1301,21 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 
 #### components/
 
-- [ ] src/components/AutoRefreshInterval.vue
-- [ ] src/components/CodeQueryEditor.vue
-- [ ] src/components/DateTime.vue
-- [ ] src/components/EnterpriseUpgradeDialog.vue
-- [ ] src/components/Header.vue
-- [ ] src/components/JsonPreview.vue
+- ✅ src/components/AutoRefreshInterval.vue
+- ✅ src/components/CodeQueryEditor.vue
+- ✅ src/components/DateTime.vue
+- ✅ src/components/EnterpriseUpgradeDialog.vue
+- ✅ src/components/Header.vue
+- ✅ src/components/JsonPreview.vue
 - ✅ src/components/NLModeQueryBar.vue
-- [ ] src/components/O2AIChat.vue
-- [ ] src/components/QueryEditor.vue
-- [ ] src/components/QueryPlanDialog.vue
-- [ ] src/components/TelemetryCorrelationPanel.vue
-- [ ] src/components/ThemeSwitcher.vue
+- ✅ src/components/O2AIChat.vue
+- ✅ src/components/QueryEditor.vue
+- ✅ src/components/QueryPlanDialog.vue
+- ✅ src/components/TelemetryCorrelationPanel.vue
+- ✅ src/components/ThemeSwitcher.vue
 - ✅ src/components/actionScripts/ActionScripts.vue
 - ✅ src/components/actionScripts/EditScript.vue
-- [ ] src/components/actionScripts/ScriptEditor.vue
+- ✅ src/components/actionScripts/ScriptEditor.vue
 - ✅ src/components/actionScripts/ScriptToolbar.vue
 - ✅ src/components/alerts/AddAlert.vue
 - ✅ src/components/alerts/AlertHistory.vue
@@ -1396,7 +1396,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/promql/components/LabelFilterEditor.vue
 - ✅ src/components/promql/components/OperationsList.vue
 - ✅ src/components/promql/components/PromQLBuilderOptions.vue
-- [ ] src/components/reports/CreateReport.vue
+- ✅ src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
 - ✅ src/components/rum/FrustrationBadge.vue
 - ✅ src/components/rum/FrustrationEventBadge.vue

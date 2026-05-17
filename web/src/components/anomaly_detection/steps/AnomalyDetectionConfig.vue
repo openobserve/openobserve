@@ -262,15 +262,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.detectionResolutionTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.detectionResolutionTooltip')"
+                />
               </OIcon>
             </div>
             <div>
@@ -328,15 +325,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
+              <OTooltip
+                side="right"
+                align="center"
                 max-width="300px"
-              >
-                <span style="font-size: 14px">{{
-                  t("alerts.anomaly.detectionResolutionTooltip")
-                }}</span>
-              </q-tooltip>
+                :content="t('alerts.anomaly.detectionResolutionTooltip')"
+              />
             </OIcon>
           </div>
           <div>
@@ -393,15 +387,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.checkEveryTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.checkEveryTooltip')"
+                />
               </OIcon>
             </div>
             <div>
@@ -455,15 +446,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.lookBackWindowTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.lookBackWindowTooltip')"
+                />
               </OIcon>
             </div>
             <div>
@@ -522,17 +510,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="300px"
-                >
-                  <span style="font-size: 14px">
+                <OTooltip side="right" align="center" max-width="300px">
+                  <template #content><span style="font-size: 14px">
                     How many days of historical data to use for training. Min 1
                     day. Seasonality is auto-detected: &lt;7 days → hour-of-day;
                     ≥7 days → hour-of-day + day-of-week.
-                  </span>
-                </q-tooltip>
+                  </span></template>
+                </OTooltip>
               </OIcon>
             </div>
             <div class="tw:flex tw:flex-col">
@@ -575,15 +559,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.retrainEveryTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.retrainEveryTooltip')"
+                />
               </OIcon>
             </div>
             <q-select
@@ -617,15 +598,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
-              >
-                <span style="font-size: 14px">{{
-                  t("alerts.anomaly.sensitivityTooltip")
-                }}</span>
-              </q-tooltip>
+                <OTooltip
+                  side="right"
+                  align="center"
+                  max-width="300px"
+                  :content="t('alerts.anomaly.sensitivityTooltip')"
+                />
             </OIcon>
           </div>
           <div style="width: calc(100% - 190px)">
@@ -655,15 +633,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="loadPreview"
                 >
                   {{ t("alerts.anomaly.loadData") }}
-                  <q-tooltip v-if="!config.stream_name">{{
-                    t("alerts.anomaly.selectStreamFirstTooltip")
-                  }}</q-tooltip>
-                  <q-tooltip
-                    v-else-if="
-                      config.query_mode === 'custom_sql' && !config.custom_sql
-                    "
-                    >{{ t("alerts.anomaly.enterSqlFirst") }}</q-tooltip
-                  >
+                  <OTooltip v-if="!config.stream_name" :content="t('alerts.anomaly.selectStreamFirstTooltip')" />
+                  <OTooltip
+                    v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql"
+                    :content="t('alerts.anomaly.enterSqlFirst')"
+                  />
                 </OButton>
               </div>
 
@@ -765,6 +739,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -776,6 +751,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OIcon,
+    OTooltip,
 },
 
   props: {

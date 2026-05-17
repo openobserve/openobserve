@@ -102,34 +102,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="'period_' + item_index"
                   >
                     {{ item }}
-                    <q-tooltip
-                      style="z-index: 10001; font-size: 14px"
-                      anchor="center right"
-                      self="center left"
+                    <OTooltip
+                      side="right"
+                      align="center"
                       max-width="300px"
                       v-if="
                         relativeDatesInHour[period.value][item_index] >
                           queryRangeRestrictionInHour &&
                         queryRangeRestrictionInHour > 0
                       "
-                    >
-                      {{ queryRangeRestrictionMsg }}
-                    </q-tooltip>
+                      :content="queryRangeRestrictionMsg"
+                    />
                   </OButton>
                 </div>
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
                 <div class="relative-period-name">{{ t("common.custom") }}</div>
-                <q-tooltip
-                  style="z-index: 10001; font-size: 14px"
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
                   v-if="queryRangeRestrictionInHour > 0"
-                >
-                  {{ queryRangeRestrictionMsg }}
-                </q-tooltip>
+                  :content="queryRangeRestrictionMsg"
+                />
 
                 <div class="row q-gutter-sm">
                   <div class="col">
@@ -170,16 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanel>
           <OTabPanel name="absolute">
             <div class="date-time-table">
-              <q-tooltip
-                anchor="center right"
-                self="center left"
+              <OTooltip
+                side="right"
+                align="center"
                 max-width="300px"
                 v-if="queryRangeRestrictionInHour > 0"
-              >
-                <span style="font-size: 14px">
-                  {{ queryRangeRestrictionMsg }}</span
-                ></q-tooltip
-              >
+                :content="queryRangeRestrictionMsg"
+              />
               <div class="flex justify-center q-pa-none">
                 <!-- here add -->
                 <q-date
@@ -336,6 +329,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 // @ts-nocheck
 import {
   ref,
@@ -363,6 +357,7 @@ import { toZonedTime } from "date-fns-tz";
 export default defineComponent({
   components: { OTabPanels, OTabPanel, OButton,
     OIcon,
+    OTooltip,
 },
   props: {
     defaultType: {

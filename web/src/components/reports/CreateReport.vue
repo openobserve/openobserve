@@ -141,15 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="cursor-pointer q-ml-sm"
                 size="sm"
               >
-                <q-tooltip
-                  v-model="showInfoTooltip"
-                  anchor="center end"
-                  self="center left"
-                  class="tw:text-[12px]"
+                <OTooltip
+                  side="right"
+                  align="center"
                 >
-                  Note: Cached reports are stored for quick access to
-                  dashboards; sharing is disabled for these reports.</q-tooltip
-                >
+                  <template #content>Note: Cached reports are stored for quick access to
+                  dashboards; sharing is disabled for these reports.</template>
+                </OTooltip>
               </OIcon>
             </div>
 
@@ -586,8 +584,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'text-grey-7'
                             "
                           >
-                            <q-tooltip anchor="center right" self="center left">
-                              <span style="font-size: 14px">
+                            <OTooltip side="right" align="center">
+                              <template #content><span style="font-size: 14px">
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
@@ -601,8 +599,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 daily. It specifies second, minute, hour, day of
                                 month, month, and day of week,
                                 respectively.</span
-                              >
-                            </q-tooltip>
+                              ></template>
+                            </OTooltip>
                           </OIcon>
                         </div>
                         <q-input
@@ -679,16 +677,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="cursor-pointer q-ml-sm"
                         size="sm"
                       >
-                        <q-tooltip
-                          anchor="center end"
-                          self="center left"
-                          class="tw:text-[12px]"
-                        >
-                          "Schedule Now" will schedule the report using the
+                        <OTooltip side="right" align="center">
+                          <template #content>"Schedule Now" will schedule the report using the
                           current date, time, and timezone.<br />
                           In "Schedule Later" you can customize the date, time,
-                          and timezone.
-                        </q-tooltip>
+                          and timezone.</template>
+                        </OTooltip>
                       </OIcon>
                     </div>
 
@@ -975,11 +969,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="cursor-pointer q-ml-sm"
                       size="sm"
                     >
-                      <q-tooltip max-width="320px">
-                        Captures a PNG screenshot of the dashboard and embeds it
+                      <OTooltip max-width="320px">
+                        <template #content>Captures a PNG screenshot of the dashboard and embeds it
                         inline in the email body alongside the PDF attachment
-                        for a quick visual preview.
-                      </q-tooltip>
+                        for a quick visual preview.</template>
+                      </OTooltip>
                     </OIcon>
                   </div>
                 </div>
@@ -1070,6 +1064,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
 const props = defineProps({
