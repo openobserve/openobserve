@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script>
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
-
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default {
   props: {
     nodeTypes: Array,
     hasInputType: Boolean,
   },
-  components: { OButton },
+  components: { OButton, OTooltip },
   setup(props) {
     const { onDragStart, pipelineObj } = useDragAndDrop();
     return { node_types: props.nodeTypes, onDragStart, pipelineObj };
@@ -49,20 +49,14 @@ export default {
         @dragstart="onDragStart($event, node)"
         v-if="node.isSectionHeader==false"
       >
-        <q-tooltip
-          anchor="center right"
-          self="center left"
-          :offset="[10, 0]"
-          class="custom-tooltip-nodes"
-          transition-show="scale"
-          transition-hide="scale"
-          :delay="300"
-        >
-          <div class="tooltip-content">
-            <div class="tooltip-title">{{ node.label }}</div>
-            <div class="tooltip-description">{{ node.tooltip }}</div>
-          </div>
-        </q-tooltip>
+        <OTooltip side="right" :side-offset="10">
+          <template #content>
+            <div class="tooltip-content">
+              <div class="tooltip-title">{{ node.label }}</div>
+              <div class="tooltip-description">{{ node.tooltip }}</div>
+            </div>
+          </template>
+        </OTooltip>
         <div class="node-content">
           <div class="node-icon-section">
             <OIcon size="1.3em" :name="node.icon" />

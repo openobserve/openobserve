@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div style="width: 130px">
                         {{ t("pipeline.trigger") }}
                         <OIcon
-                          name="info_outline"
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -153,8 +153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTooltip side="right" max-width="300px">
                             <template #content>
                               <span style="font-size: 14px"
-                                >Based upon the condition of trigger the pipeline
-                                will get trigger <br />
+                                >Based upon the condition of trigger the
+                                pipeline will get trigger <br />
                                 e.g. if the trigger value is >100 and the query
                                 returns a value of 101 then the pipeline will
                                 trigger.</span
@@ -242,7 +242,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :error="!!groupByErrors[index]"
                                 :error-message="groupByErrors[index]"
                                 style="width: 200px"
-                                @update:model-value="(val: any) => { groupByErrors[index] = ''; updateTrigger(); }"
+                                @update:model-value="
+                                  (val: any) => {
+                                    groupByErrors[index] = '';
+                                    updateTrigger();
+                                  }
+                                "
                               />
                             </div>
                             <OButton
@@ -279,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.threshold") + " *" }}
 
                         <OIcon
-                          name="info_outline"
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -344,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 @update:model-value="updateAggregation"
                               />
                             </div>
-                              <div class="flex items-center q-mt-sm">
+                            <div class="flex items-center q-mt-sm">
                               <div
                                 data-test="scheduled-pipeline-threshold-value-input"
                                 style="width: 250px; margin-left: 0 !important"
@@ -384,7 +389,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OSelect
                                 v-model="triggerData.operator"
                                 :options="triggerOperators"
-                                style="width: 88px; border: 1px solid rgba(0, 0, 0, 0.05);"
+                                style="
+                                  width: 88px;
+                                  border: 1px solid rgba(0, 0, 0, 0.05);
+                                "
                                 @update:model-value="updateTrigger"
                               />
                             </div>
@@ -448,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("alerts.crontitle") + " *" }}
                         <OIcon
-                          name="info_outline"
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -497,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("alerts.frequency") + " *" }}
                         <OIcon
-                          name="info_outline"
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -512,23 +520,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 style="font-size: 14px"
                                 v-if="triggerData.frequency_type == 'minutes'"
                                 >How often the task should be executed.<br />
-                                e.g., 2 minutes means that the task will run every
-                                2 minutes and will be processed based on the other
-                                parameters provided.</span
+                                e.g., 2 minutes means that the task will run
+                                every 2 minutes and will be processed based on
+                                the other parameters provided.</span
                               >
                               <span style="font-size: 14px" v-else>
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                                [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
+                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
+                                Sunday].
                                 <br />
                                 Use '*' to represent any value, 'L' for the last
                                 day/weekday.
                                 <br />
                                 Example: 0 0 12 * * ? - Triggers at 12:00 PM
                                 daily. It specifies second, minute, hour, day of
-                                month, month, and day of week, respectively.</span
+                                month, month, and day of week,
+                                respectively.</span
                               >
                             </template>
                           </OTooltip>
@@ -549,7 +559,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'tw:text-orange-500'
                             "
                           >
-                            <OTooltip side="right" content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually." />
+                            <OTooltip
+                              side="right"
+                              content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                            />
                           </OIcon>
                         </template>
                       </div>
@@ -572,7 +585,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               v-if="triggerData.frequency_type == 'minutes'"
                               v-model="triggerData.frequency"
                               type="number"
-                              :min="Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 1"
+                              :min="
+                                Math.ceil(
+                                  store.state?.zoConfig
+                                    ?.min_auto_refresh_interval / 60,
+                                ) || 1
+                              "
                               @update:model-value="updateFrequency"
                             />
                             <div
@@ -641,7 +659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("alerts.period") + " *" }}
                         <OIcon
-                          name="info_outline"
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -654,10 +672,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <template #content>
                               <span style="font-size: 14px"
                                 >Period for which the query should run.<br />
-                                e.g. 10 minutes means that whenever the query will
-                                run it will use the last 10 minutes of data. If
-                                the query runs at 4:00 PM then it will use the
-                                data from 3:50 PM to 4:00 PM.</span
+                                e.g. 10 minutes means that whenever the query
+                                will run it will use the last 10 minutes of
+                                data. If the query runs at 4:00 PM then it will
+                                use the data from 3:50 PM to 4:00 PM.</span
                               >
                             </template>
                           </OTooltip>
@@ -680,8 +698,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               v-model="triggerData.period"
                               type="number"
                               :min="1"
-                              :readonly="triggerData.frequency_type == 'minutes'"
-                              :disabled="triggerData.frequency_type == 'minutes'"
+                              :readonly="
+                                triggerData.frequency_type == 'minutes'
+                              "
+                              :disabled="
+                                triggerData.frequency_type == 'minutes'
+                              "
                               @update:model-value="updateTrigger"
                             />
                           </div>
@@ -733,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("pipeline.delay") + " *" }}
                         <OIcon
-                          name="info_outline"
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -747,8 +769,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <span style="font-size: 14px"
                                 >Delay for which the pipeline is scheduled to
                                 run.<br />
-                                e.g. 10 minutes delay means that the pipeline will
-                                run 10 minutes after its scheduled time.</span
+                                e.g. 10 minutes delay means that the pipeline
+                                will run 10 minutes after its scheduled
+                                time.</span
                               >
                             </template>
                           </OTooltip>
@@ -905,7 +928,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
+                      <OIcon
+                        name="info"
+                        size="md"
+                        class="tw:align-middle tw:mr-1"
+                      />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -920,8 +947,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <OIcon name="info"
-size="md" />
+                      <OIcon name="info" size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -962,7 +988,7 @@ size="md" />
                     @mousedown.prevent
                     @click="$emit('cancel:form')"
                   >
-                    {{ t('alerts.cancel') }}
+                    {{ t("alerts.cancel") }}
                   </OButton>
                   <OButton
                     data-test="stream-routing-query-save-btn"
@@ -974,8 +1000,8 @@ size="md" />
                   >
                     {{
                       validatingSqlQuery
-                        ? t('pipeline.validating')
-                        : t('pipeline.validateAndClose')
+                        ? t("pipeline.validating")
+                        : t("pipeline.validateAndClose")
                     }}
                   </OButton>
                 </div>

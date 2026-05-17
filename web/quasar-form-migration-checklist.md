@@ -969,7 +969,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - ✅ src/components/promql/components/OperationsList.vue
-- [ ] src/components/promql/components/PromQLBuilderOptions.vue
+- ✅ src/components/promql/components/PromQLBuilderOptions.vue
 - ✅ src/components/queries/RunningQueries.vue
 - [T] src/components/reports/CreateReport.vue *(mixed — normal + autogrow fields)*
 - ✅ src/components/reports/ReportList.vue
@@ -992,8 +992,8 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/settings/OrganizationSettings.vue
 - ✅ src/components/settings/RegexPatternList.vue
 - ✅ src/components/settings/TestModelMatchDialog.vue
-- [ ] src/components/shared/grid/Pagination.vue
-- [ ] src/components/shared/grid/Table.vue
+- ✅ src/components/shared/grid/Pagination.vue
+- ✅ src/components/shared/grid/Table.vue
 - [T] src/enterprise/components/EvalTemplateEditor.vue *(mixed — normal + autogrow fields)*
 - [ ] src/enterprise/components/EvalTemplateList.vue
 - ✅ src/plugins/correlation/DimensionFilterEditor.vue
@@ -1131,18 +1131,18 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/promql/components/LabelFilterEditor.vue
 - [ ] src/components/promql/components/MetricSelector.vue
 - ✅ src/components/promql/components/OperationsList.vue
-- [ ] src/components/promql/components/PromQLBuilderOptions.vue
+- ✅ src/components/promql/components/PromQLBuilderOptions.vue
 - ✅ src/components/queries/RunningQueries.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/rum/PlayerEventsSidebar.vue
-- [ ] src/components/rum/VideoPlayer.vue
+- ✅ src/components/rum/VideoPlayer.vue
 - ✅ src/components/settings/BuiltInPatternsTab.vue
 - ✅ src/components/settings/DiscoveredServices.vue
 - ✅ src/components/settings/DomainManagement.vue
 - ✅ src/components/settings/ModelPricingEditor.vue
 - ✅ src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/components/shared/filter/FilterCreatorPopup.vue
-- [ ] src/components/shared/grid/Pagination.vue
+- ✅ src/components/shared/grid/Pagination.vue
 - ✅ src/enterprise/components/EvalTemplateEditor.vue
 - ✅ src/enterprise/components/billings/Billing.vue
 - ✅ src/plugins/correlation/DimensionFiltersBar.vue
@@ -1202,7 +1202,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/pipeline/NodeForm/Stream.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
-- [ ] src/components/rum/VideoPlayer.vue
+- ✅ src/components/rum/VideoPlayer.vue
 - ✅ src/components/settings/OrganizationSettings.vue
 - ✅ src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/plugins/logs/DetailTable.vue
@@ -1261,7 +1261,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
 - ✅ src/components/pipelines/EditBackfillJobDialog.vue
 - [ ] src/components/reports/CreateReport.vue
-- [ ] src/components/settings/AddRegexPattern.vue
+- ✅ src/components/settings/AddRegexPattern.vue
 - ✅ src/components/settings/General.vue
 - ✅ src/plugins/metrics/AddToDashboard.vue
 - ✅ src/views/Dashboards/ImportDashboard.vue
@@ -1423,7 +1423,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/logstream/schema.vue
 - ✅ src/components/pipeline/NodeForm/Query.vue
 - ✅ src/components/pipeline/NodeForm/ScheduledPipeline.vue
-- [ ] src/components/pipeline/NodeSidebar.vue
+- ✅ src/components/pipeline/NodeSidebar.vue
 - ✅ src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
 - ✅ src/components/pipelines/BackfillJobsList.vue
@@ -1432,7 +1432,7 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/pipelines/PipelineHistory.vue
 - ✅ src/components/promql/components/LabelFilterEditor.vue
 - ✅ src/components/promql/components/OperationsList.vue
-- [ ] src/components/promql/components/PromQLBuilderOptions.vue
+- ✅ src/components/promql/components/PromQLBuilderOptions.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
 - [ ] src/components/rum/FrustrationBadge.vue
@@ -1664,7 +1664,7 @@ Full keyboard navigation (Up/Down, Enter, Escape) is built in.
 - [ ] `src/views/Dashboards/addPanel/AddCondition.vue`
 - [ ] `src/components/dashboards/addPanel/DrilldownPopUp.vue`
 - [ ] `src/components/dashboards/settings/AddSettingVariable.vue`
-- [ ] `src/components/promql/components/PromQLBuilderOptions.vue`
+- [ ] `src/components/promql/components/PromQLBuilderOptions.vue` ✅
 - [ ] `src/components/dashboards/addPanel/ConfigPanel.vue`
 - [ ] `src/components/dashboards/addPanel/ColorBySeriesPopUp.vue`
 - [ ] `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` — remove dead import only

@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
+  <div
+    class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -77,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                   "
                 >
-                  <OTooltip side="right" max-width="300px" :content="t('modelPricing.modelNameTooltip')" />
+                  <OTooltip
+                    side="right"
+                    max-width="300px"
+                    :content="t('modelPricing.modelNameTooltip')"
+                  />
                 </OIcon>
               </div>
               <OInput
@@ -97,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ t("modelPricing.matchPatternField") }}
                   <OIcon
-                    name="info_outline"
+                    name="info"
                     size="xs"
                     class="q-ml-xs cursor-pointer"
                     :class="
@@ -106,7 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'text-grey-7'
                     "
                   >
-                    <OTooltip side="right" max-width="300px" :content="t('modelPricing.matchPatternTooltip')" />
+                    <OTooltip
+                      side="right"
+                      max-width="300px"
+                      :content="t('modelPricing.matchPatternTooltip')"
+                    />
                   </OIcon>
                 </div>
                 <OInput
@@ -126,19 +135,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="showExamples = true"
               >
                 <OIcon name="lightbulb-outline" size="xs" />
-                <OTooltip side="top" align="end" :side-offset="4" :content="t('modelPricing.patternExamplesBtn')" />
+                <OTooltip
+                  side="top"
+                  align="end"
+                  :side-offset="4"
+                  :content="t('modelPricing.patternExamplesBtn')"
+                />
               </OButton>
 
               <!-- Pattern Examples Dialog -->
-              <ODialog data-test="model-pricing-editor-examples-dialog" v-model:open="showExamples" size="sm"
+              <ODialog
+                data-test="model-pricing-editor-examples-dialog"
+                v-model:open="showExamples"
+                size="sm"
                 :title="t('modelPricing.patternExamplesTitle')"
                 :sub-title="t('modelPricing.patternExamplesDesc')"
               >
                 <div class="examples-table">
                   <div class="examples-table-head">
-                    <span>{{
-                      t("modelPricing.patternExamplesModelCol")
-                    }}</span>
+                    <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                     <span>{{
                       t("modelPricing.patternExamplesPatternCol")
                     }}</span>
@@ -149,9 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="examples-table-row"
                   >
                     <span class="examples-model-name">{{ ex.name }}</span>
-                    <code class="examples-pattern">{{
-                      ex.match_pattern
-                    }}</code>
+                    <code class="examples-pattern">{{ ex.match_pattern }}</code>
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -159,11 +172,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="copyPattern(ex.match_pattern)"
                     >
                       <OIcon
-                        :name="copiedPattern === ex.match_pattern ? 'check' : 'content-copy'"
+                        :name="
+                          copiedPattern === ex.match_pattern
+                            ? 'check'
+                            : 'content-copy'
+                        "
                         size="12px"
-                        :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
+                        :class="
+                          copiedPattern === ex.match_pattern
+                            ? 'text-positive'
+                            : ''
+                        "
                       />
-                      <OTooltip :side-offset="4" :content="copiedPattern === ex.match_pattern ? t('modelPricing.copied') : t('modelPricing.copyPattern')" />
+                      <OTooltip
+                        :side-offset="4"
+                        :content="
+                          copiedPattern === ex.match_pattern
+                            ? t('modelPricing.copied')
+                            : t('modelPricing.copyPattern')
+                        "
+                      />
                     </OButton>
                   </div>
                 </div>
@@ -260,7 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="applyTemplate(tier, tpl.keys)"
                   >
                     <template #icon-left>
-                      <span class="pricing-chip-dot" :style="{ background: tpl.color }" />
+                      <span
+                        class="pricing-chip-dot"
+                        :style="{ background: tpl.color }"
+                      />
                     </template>
                     {{ tpl.name }}
                     <span
