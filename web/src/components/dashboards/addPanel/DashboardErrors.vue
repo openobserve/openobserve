@@ -18,20 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="props.errors.errors.length" :data-test="`dashboard-error`">
     <q-separator />
     <div>
-      <q-bar class="row q-pa-sm expand-bar">
-        <div style="flex: 1" @click="onDropDownClick">
-          <OIcon
-            flat
-            :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm"
-            text-color="black"
-            class="q-mr-sm"
-          />
-          <span class="text-subtitle2 text-weight-bold" style="color: red"
-            >Errors ({{ props.errors.errors.length }})</span
-          >
-          <q-space />
-        </div>
-      </q-bar>
+      <div
+        class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:cursor-pointer expand-bar"
+        @click="onDropDownClick"
+      >
+        <OIcon
+          :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'"
+          size="sm"
+          class="tw:mr-1"
+        />
+        <span class="tw:text-sm tw:font-semibold tw:text-red-500">
+          Errors ({{ props.errors.errors.length }})
+        </span>
+      </div>
     </div>
     <div
       class="row"

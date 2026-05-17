@@ -23,10 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test-panel-id="props.data.id"
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
-      <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
-        dense
-        class="q-px-xs"
+      <div
+        :class="store.state.theme == 'dark' ? 'dark-mode' : ''"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
         data-test="dashboard-panel-bar"
       >
@@ -38,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
-        <q-space />
+        <div class="tw:flex-1" />
         <OIcon
           v-if="
             !viewOnly &&
@@ -259,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.createAlert") }}
           </ODropdownItem>
         </ODropdown>
-      </q-bar>
+      </div>
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->

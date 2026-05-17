@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-toolbar class="tw:min-h-10">
+  <div class="tw:flex tw:flex-nowrap tw:items-center tw:min-h-10 tw:w-full">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <q-toolbar-title></q-toolbar-title>
+    <div class="tw:flex-1 tw:min-w-0" aria-hidden="true" />
 
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
@@ -577,7 +577,7 @@ name="exit-to-app" class="padding-none" />
 
     <!-- Enterprise Upgrade Dialog -->
     <EnterpriseUpgradeDialog v-model="showEnterpriseDialog" />
-  </q-toolbar>
+  </div>
 </template>
 
 <script lang="ts">
