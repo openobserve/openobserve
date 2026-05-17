@@ -84,7 +84,7 @@ if (typeof window !== "undefined" && !(window as any).__o2LLMUIInstalled) {
     } catch {
       // No-op if storage write fails; user will see the same message.
     }
-    // eslint-disable-next-line no-console
+     
     console.info(
       "[openobserve] LLM Observability UI enabled — reloading the page.",
     );
@@ -96,7 +96,7 @@ if (typeof window !== "undefined" && !(window as any).__o2LLMUIInstalled) {
     } catch {
       // No-op
     }
-    // eslint-disable-next-line no-console
+     
     console.info(
       "[openobserve] LLM Observability UI disabled — reloading the page.",
     );
