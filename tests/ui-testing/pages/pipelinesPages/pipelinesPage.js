@@ -2230,7 +2230,7 @@ export class PipelinesPage {
     async selectStreamType(type) {
         testLogger.info(`Selecting stream type: ${type}`);
         await this.streamTypeLabel.click();
-        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole("option", { name: type, exact: true }).click();
         testLogger.info(`Stream type '${type}' selected`);
     }
@@ -2243,7 +2243,7 @@ export class PipelinesPage {
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
-        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.streamNameLabel.fill(streamName);
         await this.page.getByRole("option", { name: streamName, exact: true }).waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole("option", { name: streamName, exact: true }).click();
@@ -2323,7 +2323,7 @@ export class PipelinesPage {
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
         await searchInput.click();
         await searchInput.fill(searchText);
-        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info(`Field list searched for: "${searchText}"`);
     }
 
@@ -2336,9 +2336,7 @@ export class PipelinesPage {
         const fieldLabel = this.page.locator(
             '[data-test="log-search-index-list-fields-table"] .field_label'
         ).first();
-        await fieldLabel.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
-            testLogger.warn('Field labels did not appear in time');
-        });
+        await fieldLabel.waitFor({ state: 'visible', timeout: 15000 });
 
         const count = await this.page.locator(
             '[data-test="log-search-index-list-fields-table"] .field_label'
@@ -2370,7 +2368,7 @@ export class PipelinesPage {
             '[data-test="log-search-index-list-field-search-input"]'
         );
         await searchInput.fill('');
-        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 });
         testLogger.info('Field list search cleared');
     }
 

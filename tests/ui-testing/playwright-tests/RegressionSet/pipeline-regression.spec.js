@@ -535,24 +535,27 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     );
     expect(firstResult.status).toBe(200);
     const firstPipelineId = firstResult.data.pipeline_id || firstResult.data.id;
+    expect(firstPipelineId).toBeTruthy();
 
-    // Step 3: Attempt duplicate for same stream
-    const duplicateResult = await pipelinePage.createRealtimePipeline(
-      'e2e_dup_pipeline_second',
-      DUPLICATE_TEST_STREAM
-    );
+    try {
+      // Step 3: Attempt duplicate for same stream
+      const duplicateResult = await pipelinePage.createRealtimePipeline(
+        'e2e_dup_pipeline_second',
+        DUPLICATE_TEST_STREAM
+      );
 
-    // Step 4: Verify API rejected with StreamInUse
-    expect(duplicateResult.status).toBe(400);
-    expect(duplicateResult.data.message).toContain(
-      'A realtime pipeline with same source stream already exists'
-    );
+      // Step 4: Verify API rejected with StreamInUse
+      expect(duplicateResult.status).toBe(400);
+      expect(duplicateResult.data.message).toContain(
+        'A realtime pipeline with same source stream already exists'
+      );
 
-    // Step 5: Clean up via page object
-    const deleteResult = await pipelinePage.deletePipelineById(firstPipelineId);
-    expect(deleteResult.status).toBe(200);
-
-    testLogger.info('Test passed: duplicate realtime pipeline correctly rejected');
+      testLogger.info('Test passed: duplicate realtime pipeline correctly rejected');
+    } finally {
+      // Step 5: Always clean up the first pipeline
+      const deleteResult = await pipelinePage.deletePipelineById(firstPipelineId);
+      expect(deleteResult.status).toBe(200);
+    }
   });
 
   // ======================================================================
