@@ -794,6 +794,7 @@ import {
   onBeforeMount,
   nextTick,
   computed,
+  provide,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -857,6 +858,15 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import {
+  TRACE_SERVICE_DETECTION_KEY,
+  useSpanServiceDetection,
+} from "@/utils/traces/useSpanServiceDetection";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
+import {
+  useServiceCorrelation,
+  type KeyFieldsConfig,
+} from "@/composables/useServiceCorrelation";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // Import FlameGraphView
@@ -977,6 +987,10 @@ export default defineComponent({
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
   setup(props, { emit }) {
+    const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
+    provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
+    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
+
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
     const activeTab = ref("waterfall");
@@ -989,6 +1003,8 @@ export default defineComponent({
       navigateToLogs,
       navigateToCorrelatedLogs,
     } = useTraces();
+
+    const { loadKeyFields } = useServiceCorrelation();
 
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
@@ -1557,8 +1573,12 @@ export default defineComponent({
       await getTraceMeta();
     };
 
-    onMounted(() => {
+    onMounted(async () => {
       setupContextProvider();
+
+      const keyFields: KeyFieldsConfig = await loadKeyFields();
+      serviceDetectionConfig.value = keyFields["traces"]?.service_detection ?? null;
+
       const params = router.currentRoute.value.query;
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
@@ -1987,7 +2007,8 @@ export default defineComponent({
       buildServiceTree();
       flatSpans.value = useTraceProcessing(
         treeForFlameGraph as any,
-        spanMap as any
+        spanMap as any,
+        serviceDetectionConfig,
       ).flatSpans.value;
 
       // After the tree is built, scroll the pre-selected span into view (e.g.
