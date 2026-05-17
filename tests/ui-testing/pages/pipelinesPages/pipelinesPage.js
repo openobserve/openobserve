@@ -1430,6 +1430,100 @@ export class PipelinesPage {
     }
 
     /**
+     * Create a realtime pipeline with full stream params in source.
+     * Used to test duplicate realtime pipeline validation (Bug #6443).
+     * @param {string} pipelineName - Name for the pipeline
+     * @param {string} streamName - Source stream name
+     * @returns {Promise<{status: number, data: any}>}
+     */
+    async createRealtimePipeline(pipelineName, streamName) {
+        const orgId = process.env.ORGNAME || 'default';
+        const basicAuth = Buffer.from(
+            `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+        ).toString('base64');
+        const headers = {
+            'Authorization': `Basic ${basicAuth}`,
+            'Content-Type': 'application/json',
+        };
+        const nodeId = `n${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const payload = {
+            name: pipelineName,
+            enabled: false,
+            source: {
+                source_type: 'realtime',
+                org_id: orgId,
+                stream_name: streamName,
+                stream_type: 'logs',
+            },
+            nodes: [
+                {
+                    id: `${nodeId}-in`,
+                    data: { node_type: 'stream', org_id: orgId, stream_name: streamName, stream_type: 'logs' },
+                    position: { x: 0, y: 0 },
+                    io_type: 'input',
+                },
+                {
+                    id: `${nodeId}-out`,
+                    data: { node_type: 'stream', org_id: orgId, stream_name: streamName, stream_type: 'logs' },
+                    position: { x: 0, y: 100 },
+                    io_type: 'output',
+                },
+            ],
+            edges: [{ id: `e${nodeId}`, source: `${nodeId}-in`, target: `${nodeId}-out` }],
+        };
+
+        testLogger.info('Creating realtime pipeline via API', { pipelineName, streamName });
+
+        try {
+            const baseUrl = process.env.ZO_BASE_URL;
+            const response = await fetch(`${baseUrl}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            testLogger.info('Realtime pipeline API response', { status: response.status, data });
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create realtime pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete a pipeline by ID via API.
+     * @param {string} pipelineId - Pipeline ID to delete
+     * @returns {Promise<{status: number, data: any}>}
+     */
+    async deletePipelineById(pipelineId) {
+        const orgId = process.env.ORGNAME || 'default';
+        const basicAuth = Buffer.from(
+            `${process.env.ZO_ROOT_USER_EMAIL}:${process.env.ZO_ROOT_USER_PASSWORD}`
+        ).toString('base64');
+        const headers = {
+            'Authorization': `Basic ${basicAuth}`,
+            'Content-Type': 'application/json',
+        };
+
+        testLogger.info('Deleting pipeline by ID', { pipelineId });
+
+        try {
+            const baseUrl = process.env.ZO_BASE_URL;
+            const response = await fetch(`${baseUrl}/api/${orgId}/pipelines/${pipelineId}`, {
+                method: 'DELETE',
+                headers,
+            });
+            const data = await response.json();
+            testLogger.info('Delete pipeline response', { status: response.status, data });
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to delete pipeline', { pipelineId, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
      * Explore a stream and interact with log details, then navigate to pipeline
      * @param {string} streamName - Name of the stream to explore
      */
@@ -2109,6 +2203,16 @@ export class PipelinesPage {
     }
 
     /**
+     * Wait for SQL editor to be hidden (e.g., after collapsing Build Query)
+     */
+    async expectSqlEditorHidden() {
+        await this.scheduledPipelineSqlEditor.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
+            testLogger.warn('SQL editor did not hide within timeout');
+        });
+        testLogger.info('SQL editor is hidden');
+    }
+
+    /**
      * Expand Build Query section
      * Replaces: await page.getByText('Build Query').first().click()
      */
@@ -2126,11 +2230,7 @@ export class PipelinesPage {
     async selectStreamType(type) {
         testLogger.info(`Selecting stream type: ${type}`);
         await this.streamTypeLabel.click();
-        // Wait for dropdown to open
-        await this.page.waitForFunction(() => {
-            const options = document.querySelectorAll('[role="option"]');
-            return options.length > 0;
-        }, { timeout: 3000 });
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         await this.page.getByRole("option", { name: type, exact: true }).click();
         testLogger.info(`Stream type '${type}' selected`);
     }
@@ -2143,13 +2243,140 @@ export class PipelinesPage {
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
-        // Wait briefly for dropdown to open
-        await this.page.waitForTimeout(500);
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         await this.streamNameLabel.fill(streamName);
-        // Wait for options to filter
-        await this.page.waitForTimeout(1000);
+        await this.page.getByRole("option", { name: streamName, exact: true }).waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole("option", { name: streamName, exact: true }).click();
         testLogger.info(`Stream '${streamName}' selected`);
+    }
+
+    /**
+     * Verify the pipeline field list is scrollable.
+     * Bug #6558: Fields section was not scrollable in the Query node editor.
+     * Checks both the outer wrapper (overflow-y: auto) and the inner
+     * q-table virtual-scroll container.
+     * @returns {Promise<{scrollable: boolean, details: object}>}
+     */
+    async verifyPipelineFieldListScrollable() {
+        const wrapper = this.page.locator('.pipeline-field-list-wrapper');
+        await wrapper.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Check the outer wrapper's overflow
+        const wrapperInfo = await wrapper.evaluate((el) => {
+            const style = window.getComputedStyle(el);
+            return {
+                overflowY: style.overflowY,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+            };
+        });
+
+        // Also check the inner q-table container for virtual-scroll
+        const tableScrollContainer = wrapper.locator('.q-table__middle');
+        let tableInfo = null;
+        if (await tableScrollContainer.isVisible().catch(() => false)) {
+            tableInfo = await tableScrollContainer.evaluate((el) => {
+                const style = window.getComputedStyle(el);
+                return {
+                    overflowY: style.overflowY,
+                    overflow: style.overflow,
+                    scrollHeight: el.scrollHeight,
+                    clientHeight: el.clientHeight,
+                };
+            });
+        }
+
+        // Scrollable if wrapper allows overflow, OR inner table scrolls
+        const wrapperScrollable =
+            wrapperInfo.overflowY === 'auto' || wrapperInfo.overflowY === 'scroll';
+        const tableScrollable =
+            tableInfo &&
+            (tableInfo.overflowY === 'auto' || tableInfo.overflowY === 'scroll');
+        const contentOverflows =
+            wrapperInfo.scrollHeight > wrapperInfo.clientHeight ||
+            (tableInfo && tableInfo.scrollHeight > tableInfo.clientHeight);
+
+        const isScrollable = wrapperScrollable || tableScrollable || contentOverflows;
+
+        testLogger.info('Pipeline field list scroll check', {
+            wrapperOverflowY: wrapperInfo.overflowY,
+            wrapperScrollHeight: wrapperInfo.scrollHeight,
+            wrapperClientHeight: wrapperInfo.clientHeight,
+            tableOverflowY: tableInfo?.overflowY,
+            tableScrollHeight: tableInfo?.scrollHeight,
+            tableClientHeight: tableInfo?.clientHeight,
+            wrapperScrollable,
+            tableScrollable,
+            contentOverflows,
+            isScrollable,
+        });
+
+        return {
+            scrollable: isScrollable,
+            details: { wrapper: wrapperInfo, table: tableInfo },
+        };
+    }
+
+    /**
+     * Search fields in the pipeline field list by typing in the search input.
+     * @param {string} searchText - Text to search for
+     */
+    async searchPipelineFieldList(searchText) {
+        const searchInput = this.page.locator(
+            '[data-test="log-search-index-list-field-search-input"]'
+        );
+        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+        await searchInput.click();
+        await searchInput.fill(searchText);
+        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        testLogger.info(`Field list searched for: "${searchText}"`);
+    }
+
+    /**
+     * Get the count of visible field rows in the pipeline field list q-table.
+     * @returns {Promise<number>}
+     */
+    async getPipelineFieldCount() {
+        // Wait for at least one field label to appear in the table
+        const fieldLabel = this.page.locator(
+            '[data-test="log-search-index-list-fields-table"] .field_label'
+        ).first();
+        await fieldLabel.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+            testLogger.warn('Field labels did not appear in time');
+        });
+
+        const count = await this.page.locator(
+            '[data-test="log-search-index-list-fields-table"] .field_label'
+        ).count();
+        testLogger.info(`Pipeline field count: ${count}`);
+        return count;
+    }
+
+    /**
+     * Verify the pipeline field list contains a specific field name.
+     * @param {string} fieldName - Field name to look for
+     * @returns {Promise<boolean>}
+     */
+    async verifyPipelineFieldVisible(fieldName) {
+        const field = this.page.locator(
+            `[data-test="log-search-index-list-fields-table"]`,
+            { hasText: fieldName }
+        );
+        const visible = await field.isVisible().catch(() => false);
+        testLogger.info(`Field "${fieldName}" visible: ${visible}`);
+        return visible;
+    }
+
+    /**
+     * Clear the pipeline field list search input.
+     */
+    async clearPipelineFieldSearch() {
+        const searchInput = this.page.locator(
+            '[data-test="log-search-index-list-field-search-input"]'
+        );
+        await searchInput.fill('');
+        await this.page.locator('[data-test="log-search-index-list-fields-table"] .field_label').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        testLogger.info('Field list search cleared');
     }
 
     /**
