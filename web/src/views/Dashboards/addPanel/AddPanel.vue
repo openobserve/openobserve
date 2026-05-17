@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw:px-4 tw:pt-4">
+      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"

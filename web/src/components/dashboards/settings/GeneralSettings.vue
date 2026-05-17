@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="column full-height">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
-    <div class="tw:flex tw:flex-col tw:gap-3">
+    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">
         <OInput
           v-model="dashboardData.title"
           :label="t('dashboard.name') + ' *'"
