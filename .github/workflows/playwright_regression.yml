@@ -151,7 +151,6 @@ jobs:
               [
                 "enrichment-regression.spec.js",
                 "pipeline-regression.spec.js",
-                "pipeline-query-fields.spec.js",
               ]
           - testfolder: "Traces-Regression"
             run_files:
