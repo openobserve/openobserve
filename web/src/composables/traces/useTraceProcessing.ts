@@ -15,14 +15,22 @@ import {
   type TraceMetadata,
   type ServiceBreakdown,
 } from "@/ts/interfaces/traces/trace.types";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
+import { useSpanServiceDetection } from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 /**
  * Composable for trace data processing
  * @param spans - Either flat Span[] or nested tree with spans
+ * @param spanMap - Map of spans for service detection
+ * @param serviceDetectionConfig - Configuration for span service detection
  */
-export function useTraceProcessing(spans: Ref<Span[] | any[]>, spanMap: Ref<{[key:string]: Span[] | any[]}>) {
+export function useTraceProcessing(
+  spans: Ref<Span[] | any[]>,
+  spanMap: Ref<{ [key: string]: Span[] | any[] }>,
+  serviceDetectionConfig: Ref<ServiceDetectionConfig | null>,
+) {
+  const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
   /**
    * Convert old tree format to EnrichedSpan format and flatten
    * Handles tree nodes with 'spans' property (children) and 'depth' or calculates depth
