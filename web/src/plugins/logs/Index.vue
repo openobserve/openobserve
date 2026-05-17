@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="secondLevel"
       class="full-height"
     >
-      <q-splitter
-        class="logs-horizontal-splitter full-height"
+      <OSplitter
+        class="full-height"
         v-model="splitterModel"
-        horizontal
+        :horizontal="true"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -356,7 +356,7 @@ size="md" />
             />
           </div>
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
     <div v-show="showSearchHistory">
       <search-history
@@ -491,6 +491,7 @@ import { createLogsContextProvider } from "@/composables/contextProviders/logsCo
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/Splitter";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -521,6 +522,7 @@ export default defineComponent({
       () => import("@/plugins/logs/SearchHistory.vue"),
     ),
     OIcon,
+    OSplitter,
 },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
