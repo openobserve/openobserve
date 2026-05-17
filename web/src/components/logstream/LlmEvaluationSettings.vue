@@ -195,14 +195,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 }}
               </span>
             </div>
-            <q-slider
+            <OSlider
               v-model="samplingRate"
               :min="0"
               :max="1"
               :step="0.01"
-              color="primary"
-              label
-              :label-value="samplingRatePercent + '%'"
               data-test="stream-llm-eval-sampling-rate"
               @update:model-value="markDirty"
             />
@@ -277,10 +274,11 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSlider from "@/lib/forms/Slider/OSlider.vue";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
-  components: { OButton, OSpinner, OSwitch, OSelect, OInput },
+  components: { OButton, OSpinner, OSwitch, OSelect, OInput, OSlider },
 
   props: {
     streamName: {

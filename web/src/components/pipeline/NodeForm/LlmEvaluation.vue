@@ -101,14 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("pipeline.samplingRate") }}:
             {{ (samplingRate * 100).toFixed(0) }}%
           </div>
-          <q-slider
+          <OSlider
             v-model="samplingRate"
             :min="0"
             :max="1"
             :step="0.01"
-            color="primary"
-            label
-            :label-value="(samplingRate * 100).toFixed(0) + '%'"
             data-test="llm-evaluation-sampling-rate-slider"
           />
         </div>
@@ -161,10 +158,11 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSlider from "@/lib/forms/Slider/OSlider.vue";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog, OButton, ODrawer, OInput, OSelect, OSwitch },
+  components: { ConfirmDialog, OButton, ODrawer, OInput, OSelect, OSwitch, OSlider },
   props: {
     open: {
       type: Boolean,
