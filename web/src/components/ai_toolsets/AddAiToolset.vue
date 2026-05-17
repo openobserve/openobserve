@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="header.visible = !header.visible"
                 />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               variant="ghost-destructive"
               size="icon-xs-sq"
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="env.visible = !env.visible"
                 />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               variant="ghost-destructive"
               size="icon-xs-sq"
