@@ -911,7 +911,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { Braces, Table2 } from "lucide-vue-next";
 import { cloneDeep } from "lodash-es";
 import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
-import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
@@ -956,7 +956,10 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import {
+  TRACE_SERVICE_DETECTION_KEY,
+  useSpanServiceDetection,
+} from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 export default defineComponent({
@@ -1028,6 +1031,8 @@ export default defineComponent({
     "update:activeTab",
   ],
   setup(props, { emit }) {
+    const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
+    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
