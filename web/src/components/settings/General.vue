@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     primary-button-label="Close"
     @click:primary="showColorPicker = false"
   >
-    <q-color v-model="tempColor" @update:model-value="updateCustomColor" />
+    <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
   </ODialog>
 </template>
 
@@ -429,6 +429,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -455,6 +456,7 @@ export default defineComponent({
     OInput,
     OFile,
     OForm,
+    OColor,
 },
   setup() {
     const { t } = useI18n();
