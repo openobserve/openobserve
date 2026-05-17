@@ -223,23 +223,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-pa-md">
           <!-- Radio Button Options -->
-          <div class="q-mb-xs">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-          
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
+          <ORadioGroup v-model="domain.allowAllUsers" orientation="vertical">
+            <div class="q-mb-xs">
+              <ORadio
+                :val="true"
+                :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
+              />
+            </div>
+            <div class="q-mb-md">
+              <ORadio
+                :val="false"
+                :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
+              />
+            </div>
+          </ORadioGroup>
 
           <!-- Info message for all users -->
           <div 
@@ -331,6 +328,8 @@ import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 
 interface Domain {
   name: string;

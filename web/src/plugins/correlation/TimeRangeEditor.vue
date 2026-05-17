@@ -56,48 +56,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="tw:space-y-2">
-        <q-radio
-          v-model="selectedWindow"
-          val="1min"
-          :label="t('correlation.logs.timeRange.minute1')"
-          @update:model-value="applyPreset"
-          data-test="window-1min"
-        />
-        <q-radio
-          v-model="selectedWindow"
-          val="5min"
-          :label="t('correlation.logs.timeRange.minute5')"
-          @update:model-value="applyPreset"
-          data-test="window-5min"
-        />
-        <q-radio
-          v-model="selectedWindow"
-          val="15min"
-          :label="t('correlation.logs.timeRange.minute15')"
-          @update:model-value="applyPreset"
-          data-test="window-15min"
-        />
-        <q-radio
-          v-model="selectedWindow"
-          val="30min"
-          :label="t('correlation.logs.timeRange.minute30')"
-          @update:model-value="applyPreset"
-          data-test="window-30min"
-        />
-        <q-radio
-          v-model="selectedWindow"
-          val="1hour"
-          :label="t('correlation.logs.timeRange.hour1')"
-          @update:model-value="applyPreset"
-          data-test="window-1hour"
-        />
-        <q-radio
-          v-model="selectedWindow"
-          val="custom"
-          :label="t('correlation.logs.timeRange.custom')"
-          @update:model-value="selectedWindow = 'custom'"
-          data-test="window-custom"
-        />
+        <ORadioGroup
+          :model-value="selectedWindow"
+          orientation="vertical"
+          @update:model-value="onWindowSelect"
+        >
+          <ORadio
+            val="1min"
+            :label="t('correlation.logs.timeRange.minute1')"
+            data-test="window-1min"
+          />
+          <ORadio
+            val="5min"
+            :label="t('correlation.logs.timeRange.minute5')"
+            data-test="window-5min"
+          />
+          <ORadio
+            val="15min"
+            :label="t('correlation.logs.timeRange.minute15')"
+            data-test="window-15min"
+          />
+          <ORadio
+            val="30min"
+            :label="t('correlation.logs.timeRange.minute30')"
+            data-test="window-30min"
+          />
+          <ORadio
+            val="1hour"
+            :label="t('correlation.logs.timeRange.hour1')"
+            data-test="window-1hour"
+          />
+          <ORadio
+            val="custom"
+            :label="t('correlation.logs.timeRange.custom')"
+            data-test="window-custom"
+          />
+        </ORadioGroup>
       </div>
     </div>
 
@@ -174,6 +168,8 @@ import { date } from "quasar";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 
 interface Props {
   modelValue: boolean;
@@ -194,6 +190,11 @@ const { t } = useI18n();
 
 // State
 const selectedWindow = ref<string>("5min");
+
+function onWindowSelect(val: string) {
+  selectedWindow.value = val;
+  if (val !== "custom") applyPreset();
+}
 const pendingStartTime = ref<number>(props.currentRange.startTime);
 const pendingEndTime = ref<number>(props.currentRange.endTime);
 const customStartTime = ref<string>("");
