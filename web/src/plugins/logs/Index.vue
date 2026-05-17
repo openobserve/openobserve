@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-            <q-splitter
+            <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               class="full-height tw:w-full logs-splitter-smooth"
@@ -316,7 +316,7 @@ size="md" />
                   </div>
                 </div>
               </template>
-            </q-splitter>
+            </OSplitter>
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
