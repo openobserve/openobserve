@@ -167,18 +167,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="queryRangeRestrictionInHour > 0"
                 :content="queryRangeRestrictionMsg"
               />
-                <div class="tw:flex tw:gap-4 justify-center q-pa-none">
-                  <ODate
-                    v-model="selectedDate.from"
-                    size="sm"
-                    :label="t('common.startDate')"
-                  />
-                  <ODate
-                    v-model="selectedDate.to"
-                    size="sm"
-                    :label="t('common.endDate')"
-                  />
-                </div>
+              <ODateRangeCalendar
+                :start-date="selectedDate.from"
+                :end-date="selectedDate.to"
+                :min-date="calendarMinDate"
+                :max-date="calendarMaxDate"
+                @update:start-date="selectedDate.from = $event"
+                @update:end-date="selectedDate.to = $event"
+              />
               <div class="notePara">* You can choose multiple date</div>
               <q-separator v-if="!disableRelative" class="q-my-sm" />
 
@@ -268,8 +264,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODate from "@/lib/forms/Date/ODate.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
+import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 // @ts-nocheck
 import {
   ref,
@@ -295,14 +291,17 @@ import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
-  components: { OTabPanels, OTabPanel, OButton,
+  components: {
+    OTabPanels,
+    OTabPanel,
+    OButton,
     OIcon,
     OTooltip,
     OInput,
     OSelect,
-    ODate,
     OTime,
-},
+    ODateRangeCalendar,
+  },
   props: {
     defaultType: {
       type: String,
@@ -477,6 +476,19 @@ export default defineComponent({
     const dateLocale = {
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
+
+    const calendarMinDate = computed(() => {
+      if (props.disableRelative && props.minDate) return props.minDate;
+      return "1999/01/01";
+    });
+
+    const calendarMaxDate = computed(() => {
+      return timestampToTimezoneDate(
+        new Date().getTime(),
+        store.state.timezone,
+        "yyyy/MM/dd",
+      );
+    });
 
     onMounted(() => {
       // updateDisplayValue();
@@ -1069,6 +1081,8 @@ export default defineComponent({
       showOnlyAbsolute,
       onShow,
       onHide,
+      calendarMinDate,
+      calendarMaxDate,
     };
   },
   computed: {
