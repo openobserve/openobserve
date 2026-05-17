@@ -15,84 +15,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-deduplication"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="step-content card-container">
       <div class="section-header">
         <div class="section-header-accent" />
-        <span class="section-header-title">{{ t('alerts.steps.deduplication') }}</span>
+        <span class="section-header-title">{{
+          t("alerts.steps.deduplication")
+        }}</span>
       </div>
       <div class="tw:px-3 tw:py-2">
-      <!-- Fingerprint Fields -->
-      <div class="tw:mb-4">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t("alerts.deduplication.fingerprintFields") }}
-          <OIcon
-            name="info_outline"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-          >
-            <OTooltip :content="t('alerts.deduplication.fingerprintFieldsTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div
-          class="tw:text-sm tw:mb-2"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
-        >
-          {{ t("alerts.deduplication.fingerprintFieldsHint") }}
-        </div>
-        <div class="tw:relative">
-          <OSelect
-            v-model="localDeduplication.fingerprint_fields"
-            :options="props.columns || []"
-            multiple
-            creatable
-            class="tw:max-w-[600px] tw:min-w-[300px]"
-            helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
-            @update:model-value="emitUpdate"
-            @create="addFingerprintField"
-          />
-          <OTooltip v-if="localDeduplication.fingerprint_fields?.length > 0" :content="localDeduplication.fingerprint_fields.join(', ')" max-width="400px" />
-        </div>
-      </div>
-
-      <!-- Time Window -->
-      <div class="tw:mb-4">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t("alerts.deduplication.timeWindow") }}
-          <OIcon
-            name="info_outline"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-          >
-            <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
-          </OIcon>
-        </div>
-        <div
-          class="tw:text-sm tw:mb-2"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
-        >
-          {{ t("alerts.deduplication.timeWindowHint") }}
-        </div>
-        <div class="tw:flex tw:items-center">
-          <div class="tw:w-[210px] tw:ml-0">
-            <OInput
-              v-model="localDeduplication.time_window_minutes"
-              type="number"
-              min="1"
-              :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-              @update:model-value="emitUpdate"
-            />
+        <!-- Fingerprint Fields -->
+        <div class="tw:mb-4">
+          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+            {{ t("alerts.deduplication.fingerprintFields") }}
+            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OTooltip
+                :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
+                side="right"
+              />
+            </OIcon>
           </div>
           <div
-            style="min-width: 90px; margin-left: 0 !important; height: 28px; font-weight: normal"
-            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
-            class="flex justify-center items-center"
+            class="tw:text-sm tw:mb-2"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-600'
+            "
           >
-            {{ t("alerts.minutes") }}
+            {{ t("alerts.deduplication.fingerprintFieldsHint") }}
+          </div>
+          <div class="tw:relative">
+            <OSelect
+              v-model="localDeduplication.fingerprint_fields"
+              :options="props.columns || []"
+              multiple
+              creatable
+              class="tw:max-w-[600px] tw:min-w-[300px]"
+              helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
+              @update:model-value="emitUpdate"
+              @create="addFingerprintField"
+            />
+            <OTooltip
+              v-if="localDeduplication.fingerprint_fields?.length > 0"
+              :content="localDeduplication.fingerprint_fields.join(', ')"
+              max-width="400px"
+            />
+          </div>
+        </div>
+
+        <!-- Time Window -->
+        <div class="tw:mb-4">
+          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+            {{ t("alerts.deduplication.timeWindow") }}
+            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OTooltip
+                :content="t('alerts.deduplication.timeWindowTooltip')"
+                side="right"
+              />
+            </OIcon>
+          </div>
+          <div
+            class="tw:text-sm tw:mb-2"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-600'
+            "
+          >
+            {{ t("alerts.deduplication.timeWindowHint") }}
+          </div>
+          <div class="tw:flex tw:items-center">
+            <div class="tw:w-[210px] tw:ml-0">
+              <OInput
+                v-model="localDeduplication.time_window_minutes"
+                type="number"
+                min="1"
+                :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
+                @update:model-value="emitUpdate"
+              />
+            </div>
+            <div
+              style="
+                min-width: 90px;
+                margin-left: 0 !important;
+                height: 28px;
+                font-weight: normal;
+              "
+              :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+              class="flex justify-center items-center"
+            >
+              {{ t("alerts.minutes") }}
+            </div>
           </div>
         </div>
       </div>
-      </div><!-- end tw:px-3 tw:py-2 -->
+      <!-- end tw:px-3 tw:py-2 -->
     </div>
   </div>
 </template>
@@ -131,7 +152,8 @@ export default defineComponent({
     const localDeduplication = ref({
       enabled: (props.deduplication?.fingerprint_fields?.length ?? 0) > 0,
       fingerprint_fields: props.deduplication?.fingerprint_fields || [],
-      time_window_minutes: props.deduplication?.time_window_minutes || undefined,
+      time_window_minutes:
+        props.deduplication?.time_window_minutes || undefined,
     });
 
     // Watch for prop changes
@@ -147,7 +169,7 @@ export default defineComponent({
           };
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     const sanitizeTimeWindow = (val: any): number | undefined => {
@@ -161,7 +183,9 @@ export default defineComponent({
       emit("update:deduplication", {
         enabled: hasFields,
         fingerprint_fields: localDeduplication.value.fingerprint_fields,
-        time_window_minutes: sanitizeTimeWindow(localDeduplication.value.time_window_minutes),
+        time_window_minutes: sanitizeTimeWindow(
+          localDeduplication.value.time_window_minutes,
+        ),
       });
     };
 
@@ -204,9 +228,15 @@ export default defineComponent({
       background-color: #212121;
       border: 1px solid #343434;
     }
-    .section-header { border-bottom: 1px solid #343434; }
-    .section-header-title { color: #e0e0e0; }
-    .section-header-accent { background: var(--q-primary); }
+    .section-header {
+      border-bottom: 1px solid #343434;
+    }
+    .section-header-title {
+      color: #e0e0e0;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
+    }
   }
 
   &.light-mode {
@@ -214,9 +244,15 @@ export default defineComponent({
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
     }
-    .section-header { border-bottom: 1px solid #eeeeee; }
-    .section-header-title { color: #374151; }
-    .section-header-accent { background: var(--q-primary); }
+    .section-header {
+      border-bottom: 1px solid #eeeeee;
+    }
+    .section-header-title {
+      color: #374151;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
+    }
   }
 }
 
