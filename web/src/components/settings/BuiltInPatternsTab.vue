@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-12 col-md-4">
           <OSelect
             v-model="selectedTags"
-            :options="availableTags"
-            :label="t('regex_patterns.filter_by_tag')"
+            :options="tagOptions"
+            :placeholder="t('regex_patterns.filter_by_tag')"
             multiple
             clearable
             data-test="built-in-pattern-tag-filter"
@@ -241,6 +241,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -265,9 +266,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner,
-    OIcon,
-},
+  components: { OButton, ODialog, OSpinner, OIcon, OSelect },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -290,6 +289,10 @@ export default defineComponent({
       });
       return Array.from(tags).sort();
     });
+
+    const tagOptions = computed(() =>
+      availableTags.value.map((tag) => ({ label: tag, value: tag }))
+    );
 
     const filteredPatterns = computed(() => {
       let filtered = patterns.value;
@@ -454,6 +457,7 @@ export default defineComponent({
       searchQuery,
       selectedTags,
       availableTags,
+      tagOptions,
       filteredPatterns,
       selectedCount,
       showPreview,

@@ -384,7 +384,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
   <ODialog data-test="general-delete-image-dialog"
     v-model:open="confirmDeleteImage"
-    size="xs"
+    size="sm"
+    :title="t('settings.deleteLogoTitle')"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
     @click:secondary="cancelConfirmDialog"
