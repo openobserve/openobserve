@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-add"
               icon-left="add"
             >
-              <q-tooltip>{{ t("panel.add") }}</q-tooltip>
+              <OTooltip :content="t('panel.add')" />
             </OButton>
             <!-- <DateTimePicker 
             class="q-ml-sm"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-cancel-btn"
               icon-left="cancel"
             >
-              <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+              <OTooltip :content="t('panel.cancel')" />
             </OButton>
             <OButton
               v-else
@@ -155,13 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               icon-left="refresh"
             >
-              <q-tooltip>
-                {{
-                  isVariablesChanged
-                    ? "Refresh to apply latest variable changes"
-                    : "Refresh"
-                }}
-              </q-tooltip>
+              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" />
             </OButton>
 
             <ExportDashboard
@@ -186,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openSettingsDialog"
               icon-left="settings"
             >
-              <q-tooltip>{{ t("dashboard.setting") }}</q-tooltip>
+              <OTooltip :content="t('dashboard.setting')" />
             </OButton>
             <OButton
               variant="outline"
@@ -198,11 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ><OIcon
                   :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
-              <q-tooltip>{{
-                store.state.printMode === true
-                  ? t("common.close")
-                  : t("dashboard.print")
-              }}</q-tooltip>
+              <OTooltip :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')" />
             </OButton>
             <OButton
               v-show="store.state.printMode !== true"
@@ -219,11 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'fullscreen'
                   " size="sm"
               /></template>
-              <q-tooltip>{{
-                quasar.fullscreen.isActive
-                  ? t("dashboard.exitFullscreen")
-                  : t("dashboard.fullscreen")
-              }}</q-tooltip>
+              <OTooltip :content="quasar.fullscreen.isActive ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" />
             </OButton>
             <OButton
               v-if="!isFullscreen"
@@ -236,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left
                 ><OIcon name="description" size="sm"
               /></template>
-              <q-tooltip>{{ t("dashboard.scheduledDashboards") }}</q-tooltip>
+              <OTooltip :content="t('dashboard.scheduledDashboards')" />
             </OButton>
             <OButton
               v-if="!isFullscreen"
@@ -247,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openJsonEditor"
               icon-left="code"
             >
-              <q-tooltip>{{ t("dashboard.editJson") }}</q-tooltip>
+              <OTooltip :content="t('dashboard.editJson')" />
             </OButton>
           </div>
         </div>
@@ -374,6 +360,7 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
@@ -416,6 +403,7 @@ export default defineComponent({
     OButton,
     OSpinner,
     OIcon,
+    OTooltip,
 },
   setup() {
     const { t } = useI18n();
