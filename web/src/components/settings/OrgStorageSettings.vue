@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="hero-page__inline-logo-wrap"
               >
                 <img :src="p.image" :alt="p.label" class="hero-page__inline-logo" />
-                <q-tooltip>{{ p.label }}</q-tooltip>
+                <OTooltip :content="p.label" />
               </div>
             </div>
           </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ent-empty__logo-wrap"
           >
             <img :src="p.image" :alt="p.label" class="ent-empty__logo" />
-            <q-tooltip>{{ p.label }}</q-tooltip>
+            <OTooltip :content="p.label" />
           </div>
         </div>
       </div>
@@ -276,6 +276,7 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();

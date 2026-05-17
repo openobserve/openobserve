@@ -21,13 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="export-dashboard"
     icon-left="download"
   >
-    <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
+    <OTooltip :content="t('dashboard.export')" />
   </OButton>
 </template>
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
@@ -35,7 +36,7 @@ import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "ExportDashboard",
-  components: { OButton },
+  components: { OButton, OTooltip },
   props: ["dashboardId"],
   setup(props, { emit }) {
     const { t } = useI18n();

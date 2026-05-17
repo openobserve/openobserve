@@ -29,17 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("aiToolset.header") }}
         </div>
         <div class="col-auto flex">
-          <q-input
+          <OInput
             v-model="filterQuery"
-            borderless
-            dense
             class="q-ml-auto no-border o2-search-input"
             :placeholder="t('aiToolset.search')"
           >
             <template #prepend>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
           <OButton
             class="q-ml-sm"
             data-test="ai-toolsets-add-btn"
@@ -161,6 +159,7 @@ import { useQuasar, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -184,6 +183,7 @@ export default defineComponent({
     AddAiToolset,
     OButton,
     OIcon,
+    OInput,
 },
   setup() {
     const store = useStore();

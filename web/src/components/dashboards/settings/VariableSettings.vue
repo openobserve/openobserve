@@ -88,13 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="item-name-text">
                   {{ variable.name }}
                 </span>
-                <q-tooltip
+                <OTooltip
                   v-if="variable.name.length > 30"
-                  style="word-wrap: break-word; white-space: normal"
-                  class="variable-name-tooltip"
-                >
-                  {{ variable.name }}
-                </q-tooltip>
+                  :content="variable.name"
+                />
               </div>
               <div>
                 {{ getVariableTypeLabel(variable.type) }}
@@ -127,28 +124,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ variable.panels?.length || 0 }} Panels
                   </q-badge>
 
-                  <q-tooltip
-                    v-if="
-                      getScopeType(variable) === 'tabs' && variable.tabs?.length
-                    "
+                  <OTooltip
+                    v-if="getScopeType(variable) === 'tabs' && variable.tabs?.length"
                   >
-                    <div>Applied to tabs:</div>
-                    <div v-for="tabId in variable.tabs" :key="tabId">
-                      {{ getTabName(tabId) }}
-                    </div>
-                  </q-tooltip>
+                    <template #content>
+                      <div>Applied to tabs:</div>
+                      <div v-for="tabId in variable.tabs" :key="tabId">{{ getTabName(tabId) }}</div>
+                    </template>
+                  </OTooltip>
 
-                  <q-tooltip
-                    v-if="
-                      getScopeType(variable) === 'panels' &&
-                      variable.panels?.length
-                    "
+                  <OTooltip
+                    v-if="getScopeType(variable) === 'panels' && variable.panels?.length"
                   >
-                    <div>Applied to panels:</div>
-                    <div v-for="panelId in variable.panels" :key="panelId">
-                      {{ getPanelName(panelId) }}
-                    </div>
-                  </q-tooltip>
+                    <template #content>
+                      <div>Applied to panels:</div>
+                      <div v-for="panelId in variable.panels" :key="panelId">{{ getPanelName(panelId) }}</div>
+                    </template>
+                  </OTooltip>
                 </div>
               </div>
               <div class="item-actions">
@@ -221,6 +213,7 @@ import {
   updateDashboard,
 } from "../../../utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import NoData from "../../shared/grid/NoData.vue";
@@ -243,6 +236,7 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
+    OTooltip,
   },
   emits: ["save"],
   setup(props, { emit }) {
