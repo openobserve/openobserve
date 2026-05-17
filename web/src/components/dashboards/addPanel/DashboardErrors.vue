@@ -63,6 +63,9 @@ import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "DashboardErrorsComponent",
+  components: {
+    OIcon,
+  },
   props: ["errors"],
 
   setup(props, { emit }) {

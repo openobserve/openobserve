@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
-              <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
+              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="text-caption">{{ anomalyConfig.status }}</OBadge>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="tw:text-[11px] tw:whitespace-nowrap"
@@ -454,6 +454,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -500,6 +501,10 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
+    OBadge,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);

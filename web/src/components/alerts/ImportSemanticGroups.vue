@@ -80,19 +80,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container q-pa-sm q-mb-sm">
             <div class="row items-center q-col-gutter-sm">
               <div class="col-auto">
-                <q-chip dense color="positive" text-color="white" class="summary-chip">
+                <OBadge variant="success" class="summary-chip">
                   <strong>{{ diffData.additions.length }}</strong>&nbsp;New
-                </q-chip>
+                </OBadge>
               </div>
               <div class="col-auto">
-                <q-chip dense color="warning" text-color="white" class="summary-chip">
+                <OBadge variant="warning" class="summary-chip">
                   <strong>{{ diffData.modifications.length }}</strong>&nbsp;Modified
-                </q-chip>
+                </OBadge>
               </div>
               <div class="col-auto">
-                <q-chip dense color="grey-6" text-color="white" class="summary-chip">
+                <OBadge variant="default" class="summary-chip">
                   {{ diffData.unchanged.length }} Unchanged
-                </q-chip>
+                </OBadge>
               </div>
               <div class="col">
                 <OButtonGroup class="float-right">
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
                     <q-item-label caption lines="1">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <q-badge v-if="group.normalize" color="blue" label="norm" class="q-ml-xs" />
+                      <OBadge v-if="group.normalize" variant="primary" class="q-ml-xs">norm</OBadge>
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -248,19 +248,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div>
       <div class="text-subtitle2 q-mb-sm">Fields ({{ selectedGroup?.fields.length }})</div>
-      <q-chip
+      <OBadge
         v-for="field in selectedGroup?.fields"
         :key="field"
-        dense
-        color="primary"
-        text-color="white"
+        variant="primary"
         class="q-ma-xs"
       >
         {{ field }}
-      </q-chip>
+      </OBadge>
       <div class="q-mt-md">
-        <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
-        <q-badge v-else color="grey" label="Not Normalized" />
+        <OBadge v-if="selectedGroup?.normalize" variant="primary">Normalized</OBadge>
+        <OBadge v-else variant="default">Not Normalized</OBadge>
       </div>
     </div>
   </ODialog>
@@ -279,34 +277,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
         <div class="text-caption q-mb-xs">{{ selectedModification?.current.fields.length }} fields</div>
         <div class="field-chips-container">
-          <q-chip
+          <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            dense
-            color="grey-4"
+            variant="default"
             size="sm"
             class="q-ma-xs"
           >
             {{ field }}
-          </q-chip>
+          </OBadge>
         </div>
       </div>
       <div class="col-6">
         <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
         <div class="text-caption q-mb-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
         <div class="field-chips-container">
-          <q-chip
+          <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            dense
-            :color="isNewField(field) ? 'positive' : 'grey-4'"
-            :text-color="isNewField(field) ? 'white' : 'black'"
+            :variant="isNewField(field) ? 'success' : 'default'"
             size="sm"
             class="q-ma-xs"
           >
             {{ field }}
             <OIcon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
-          </q-chip>
+          </OBadge>
         </div>
       </div>
     </div>
@@ -317,6 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useRouter } from "vue-router";
@@ -658,11 +654,6 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 
 .summary-chip {
   font-size: 14px !important;
-
-  :deep(.q-chip__content) {
-    padding: 6px 12px;
-    font-weight: 500;
-  }
 
   :deep(strong) {
     font-size: 15px;

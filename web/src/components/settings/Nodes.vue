@@ -596,14 +596,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-slot:body-cell-region="props"
           >
             <q-td :props="props">
-              <q-badge class="badge-region q-mr-xs"
+              <OBadge variant="default" class="badge-region q-mr-xs"
                 >{{ props.row.region }}
                 <OTooltip :content="t('nodes.region')" />
-              </q-badge>
-              <q-badge class="badge-cluster"
+              </OBadge>
+              <OBadge variant="default" class="badge-cluster"
                 >{{ props.row.cluster }}
                 <OTooltip :content="t('nodes.cluster')" />
-              </q-badge>
+              </OBadge>
             </q-td>
           </template>
           <template v-slot:body-cell-tcp="props">
@@ -681,6 +681,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -693,6 +694,7 @@ export default defineComponent({
     OCheckbox,
     OTooltip,
     OIcon,
+    OBadge,
 },
   setup() {
     const store = useStore();

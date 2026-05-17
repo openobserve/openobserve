@@ -150,10 +150,10 @@ describe("CrossLinkManager Component", () => {
       );
     });
 
-    it("should display field chips", () => {
+    it("should display field badges", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      const chips = wrapper.findAll(".q-chip");
-      expect(chips.length).toBeGreaterThan(0);
+      const badges = wrapper.findAllComponents({ name: "OBadge" });
+      expect(badges.length).toBeGreaterThan(0);
     });
   });
 

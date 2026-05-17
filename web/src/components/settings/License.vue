@@ -99,13 +99,13 @@
                       {{ t("about.status_lbl") }}
                     </td>
                     <td>
-                      <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                      <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                         {{
                           licenseData?.expired
                             ? t("about.expired_lbl")
                             : t("about.active_lbl")
                         }}
-                      </q-badge>
+                      </OBadge>
                     </td>
                   </tr>
                   <tr>
@@ -445,6 +445,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -459,6 +460,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
+    OBadge,
 },
   setup() {
     const $q = useQuasar();

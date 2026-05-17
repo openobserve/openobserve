@@ -55,21 +55,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="summary-bar q-mb-md">
           <div class="row q-col-gutter-sm items-center">
             <div class="col-auto">
-              <q-chip dense color="positive" text-color="white">
+              <OBadge variant="success">
                 <strong>{{ diffData.additions.length }}</strong
                 >&nbsp;New
-              </q-chip>
+              </OBadge>
             </div>
             <div class="col-auto">
-              <q-chip dense color="warning" text-color="white">
+              <OBadge variant="warning">
                 <strong>{{ diffData.modifications.length }}</strong
                 >&nbsp;Modified
-              </q-chip>
+              </OBadge>
             </div>
             <div class="col-auto">
-              <q-chip dense color="grey-6" text-color="white">
+              <OBadge variant="default">
                 {{ diffData.unchanged.length }} Unchanged
-              </q-chip>
+              </OBadge>
             </div>
           </div>
         </div>
@@ -260,15 +260,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-subtitle2 q-mb-sm">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
-      <q-chip
+      <OBadge
         v-for="field in selectedGroup?.fields"
         :key="field"
-        color="primary"
-        text-color="white"
+        variant="primary"
         class="q-ma-xs"
       >
         {{ field }}
-      </q-chip>
+      </OBadge>
     </div>
   </ODialog>
 
@@ -288,15 +287,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ selectedModification?.current.fields.length }} fields
         </div>
         <div class="field-chips-container">
-          <q-chip
+          <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            color="grey-4"
+            variant="default"
             size="sm"
             class="q-ma-xs"
           >
             {{ field }}
-          </q-chip>
+          </OBadge>
         </div>
       </div>
       <div class="col-6">
@@ -305,11 +304,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
         <div class="field-chips-container">
-          <q-chip
+          <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :color="isNewField(field) ? 'positive' : 'grey-4'"
-            :text-color="isNewField(field) ? 'white' : 'black'"
+            :variant="isNewField(field) ? 'success' : 'default'"
             size="sm"
             class="q-ma-xs"
           >
@@ -320,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               class="q-ml-xs"
             />
-          </q-chip>
+          </OBadge>
         </div>
       </div>
     </div>
@@ -331,6 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";

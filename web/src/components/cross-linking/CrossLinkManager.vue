@@ -33,12 +33,13 @@
             <!-- Name -->
             <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
               {{ link.name }}
-              <q-badge
+              <OBadge
                 v-if="link._source"
-                :color="link._source === 'stream' ? 'primary' : 'grey'"
-                :label="link._source === 'stream' ? 'Stream' : 'Global'"
+                :variant="link._source === 'stream' ? 'primary' : 'default'"
                 class="q-ml-xs"
-              />
+              >
+                {{ link._source === 'stream' ? 'Stream' : 'Global' }}
+              </OBadge>
             </div>
             <!-- URL -->
             <div class="text-caption tw:truncate q-mt-xs" :title="link.url" style="color: var(--o2-text-muted)">
@@ -46,14 +47,13 @@
             </div>
             <!-- Fields -->
             <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 q-mt-xs">
-              <q-chip
+              <OBadge
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
-                dense
                 class="tw:max-w-[200px]"
               >
                 <span class="tw:truncate text-caption" :title="field.name">{{ field.name }}</span>
-              </q-chip>
+              </OBadge>
             </div>
           </div>
           <!-- Actions -->
@@ -104,6 +104,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OBadge from '@/lib/core/Badge/OBadge.vue';
 
 
 export interface CrossLink {
@@ -115,7 +116,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton },
+  components: { CrossLinkDialog, OButton, OBadge },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,

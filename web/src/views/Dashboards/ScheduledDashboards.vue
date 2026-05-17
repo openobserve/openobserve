@@ -120,6 +120,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 
 const props = defineProps({
   open: {

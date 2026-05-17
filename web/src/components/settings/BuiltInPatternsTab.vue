@@ -115,19 +115,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-label>
               <q-item-label caption lines="2">
                 <div class="q-mb-xs">
-                  <q-chip
+                  <OBadge
                     v-for="tag in pattern.tags.slice(0, 3)"
                     :key="tag"
                     size="sm"
-                    color="primary"
-                    text-color="white"
-                    dense
+                    variant="primary"
                   >
                     {{ tag }}
-                  </q-chip>
-                  <q-chip v-if="pattern.tags.length > 3" size="sm" dense>
+                  </OBadge>
+                  <OBadge v-if="pattern.tags.length > 3" size="sm">
                     +{{ pattern.tags.length - 3 }}
-                  </q-chip>
+                  </OBadge>
                 </div>
                 <div class="pattern-preview">
                   {{ pattern.pattern.substring(0, 100)
@@ -198,15 +196,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-mb-md">
           <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.tags') }}</div>
-          <q-chip
+          <OBadge
             v-for="tag in previewedPattern?.tags"
             :key="tag"
-            color="primary"
-            text-color="white"
-            dense
+            variant="primary"
           >
             {{ tag }}
-          </q-chip>
+          </OBadge>
         </div>
 
         <div class="q-mb-md">
@@ -248,6 +244,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
@@ -271,6 +268,7 @@ export default defineComponent({
   name: "BuiltInPatternsTab",
   components: { OButton, ODialog, OSpinner,
     OIcon,
+    OBadge,
 },
   emits: ["import-patterns"],
   setup(props, { emit }) {

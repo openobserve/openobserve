@@ -304,21 +304,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-else-if="col.name === 'status'">
                         <template v-if="props.row.status && props.row.status !== '--'">
-                          <q-badge
-                            :color="
+                          <OBadge
+                            :variant="
                               props.row.status === 'failed'
-                                ? 'negative'
+                                ? 'error'
                                 : props.row.status === 'active'
-                                  ? 'positive'
+                                  ? 'success'
                                   : props.row.status === 'training'
                                     ? 'warning'
                                     : props.row.status === 'disabled'
-                                      ? 'grey'
-                                      : 'positive'
+                                      ? 'default'
+                                      : 'success'
                             "
-                            :label="props.row.status"
                             style="text-transform: capitalize; cursor: default"
                           >
+                            {{ props.row.status }}
                             <q-tooltip
                               v-if="
                                 props.row.status === 'failed' &&
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{ props.row.last_error }}
                             </q-tooltip>
-                          </q-badge>
+                          </OBadge>
                         </template>
                         <span v-else class="tw:block">--</span>
                       </template>
@@ -866,6 +866,7 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -890,6 +891,7 @@ export default defineComponent({
     OIcon,
     ODialog,
     OSpinner,
+    OBadge,
   },
   emits: [
     "update:changeRecordPerPage",
@@ -1670,6 +1672,57 @@ export default defineComponent({
         filterAlertsByTab();
       }
     });
+    const showAddUpdateFn = async (props: any) => {
+      //made this async because we need to wait for the router to navigate
+      //so that we can get the alert_type from the query params
+      formData.value = props.row;
+      let action;
+      try {
+        if (!props.row) {
+          isUpdated.value = false;
+          action = "Add Alert";
+          await router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              action: "add",
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+              alert_type: activeTab.value,
+            },
+          });
+        } else {
+          isUpdated.value = true;
+          action = "Update Alert";
+          await router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              alert_id: props.row.id,
+              action: "update",
+              name: props.row.name,
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+        }
+        addAlert();
+        if (config.enableAnalytics == "true") {
+          segment.track("Button Click", {
+            button: action,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Alerts",
+          });
+        }
+        track("Button Click", {
+          button: action,
+          page: "Add Alert",
+        });
+      } catch (error) {
+        console.error("Navigation failed:", error);
+      }
+    };
     watch(
       () => router.currentRoute.value.query.action,
       async (action) => {
@@ -1942,57 +1995,6 @@ export default defineComponent({
           message: e.data.message,
           timeout: 2000,
         });
-      }
-    };
-    const showAddUpdateFn = async (props: any) => {
-      //made this async because we need to wait for the router to navigate
-      //so that we can get the alert_type from the query params
-      formData.value = props.row;
-      let action;
-      try {
-        if (!props.row) {
-          isUpdated.value = false;
-          action = "Add Alert";
-          await router.push({
-            name: "alertList",
-            query: {
-              ...router.currentRoute.value.query,
-              action: "add",
-              org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
-              alert_type: activeTab.value,
-            },
-          });
-        } else {
-          isUpdated.value = true;
-          action = "Update Alert";
-          await router.push({
-            name: "alertList",
-            query: {
-              ...router.currentRoute.value.query,
-              alert_id: props.row.id,
-              action: "update",
-              name: props.row.name,
-              org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
-            },
-          });
-        }
-        addAlert();
-        if (config.enableAnalytics == "true") {
-          segment.track("Button Click", {
-            button: action,
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Alerts",
-          });
-        }
-        track("Button Click", {
-          button: action,
-          page: "Add Alert",
-        });
-      } catch (error) {
-        console.error("Navigation failed:", error);
       }
     };
     const refreshList = async (folderId?: string) => {
@@ -2895,6 +2897,7 @@ export default defineComponent({
       folders,
       splitterModel,
       alertStateLoadingMap,
+      toggleAlertState,
       templates,
       routeTo,
       refreshDestination,

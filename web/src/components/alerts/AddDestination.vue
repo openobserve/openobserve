@@ -92,12 +92,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-body2">{{
                     getDestinationTypeName(formData.destination_type)
                   }}</span>
-                  <q-chip
+                  <OBadge
                     size="sm"
-                    color="grey-3"
-                    text-color="grey-8"
+                    variant="default"
                     class="q-ml-sm"
-                    >{{ t("alert_destinations.readonly") }}</q-chip
+                    >{{ t("alert_destinations.readonly") }}</OBadge
                   >
                 </div>
               </div>
@@ -600,6 +599,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type {
   Template,
   DestinationData,

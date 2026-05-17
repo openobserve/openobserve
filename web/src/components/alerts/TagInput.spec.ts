@@ -170,9 +170,9 @@ describe("TagInput", () => {
       },
     });
 
-    // Find the first QChip component and trigger its remove event
-    const chips = wrapper.findAllComponents({ name: "QChip" });
-    await chips[0].vm.$emit("remove");
+    // Click the remove button inside the first OBadge tag
+    const removeButtons = wrapper.findAll('[data-test^="tag-chip-"] button');
+    await removeButtons[0].trigger("click");
 
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     const emittedValue = wrapper.emitted("update:modelValue")?.[0]?.[0];

@@ -54,14 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #body-cell-correlation_reason="props">
         <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
-          <q-badge
+          <OBadge
             data-test="correlation-reason-badge"
-            :color="getReasonColor(props.row.correlation_reason)"
-            :label="getReasonLabel(props.row.correlation_reason)"
-            outline
+            :variant="getReasonVariant(props.row.correlation_reason)"
           >
+            {{ getReasonLabel(props.row.correlation_reason) }}
             <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
-          </q-badge>
+          </OBadge>
         </q-td>
       </template>
 
@@ -84,6 +83,8 @@ import { useI18n } from "vue-i18n";
 import { date } from "quasar";
 import type { QTableProps } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 interface IncidentAlert {
   incident_id: string;
@@ -98,6 +99,7 @@ export default defineComponent({
   name: "IncidentAlertTriggersTable",
   components: {
     QTablePagination,
+    OBadge,
   },
   props: {
     triggers: {
@@ -158,18 +160,18 @@ export default defineComponent({
       return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
     };
 
-    const getReasonColor = (reason: string) => {
+    const getReasonVariant = (reason: string): BadgeVariant => {
       switch (reason) {
         case "service_discovery":
-          return "blue";
+          return "primary-outline";
         case "primary_match":
-          return "purple";
+          return "primary-outline";
         case "secondary_match":
-          return "orange";
+          return "warning-outline";
         case "alert_id":
-          return "grey";
+          return "default-outline";
         default:
-          return "grey";
+          return "default-outline";
       }
     };
 
@@ -218,7 +220,7 @@ export default defineComponent({
       perPageOptions,
       columns,
       formatTimestamp,
-      getReasonColor,
+      getReasonVariant,
       getReasonLabel,
       getReasonTooltip,
       changePagination,

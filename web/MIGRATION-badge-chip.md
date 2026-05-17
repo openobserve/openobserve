@@ -185,6 +185,7 @@ The vast majority of usages map cleanly:
 | ⬜ | Not started |
 | 🔄 | In progress |
 | ✅ | Done |
+| ⛔ | Excluded |
 | ⚠️ | Special case — read note |
 
 ---
@@ -195,106 +196,106 @@ The vast majority of usages map cleanly:
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/alerts/AddAlert.vue` | 58 | 1 | `primary` (anomaly status, dynamic color) | ⬜ |
-| `src/components/alerts/AlertList.vue` | 318 | 1 | dynamic status → `success`/`error`/`warning` | ⬜ |
-| `src/components/alerts/AlertsDestinationList.vue` | 132, 147 | 2 | dynamic status | ⬜ |
-| `src/components/alerts/ImportSemanticGroups.vue` | 149, 269, 270 | 3 | `primary`, `default` | ⬜ |
-| `src/components/alerts/IncidentDetailDrawer.vue` | 73, 89, 104, 929 | 4 | `*-outline` (lines 73–104), `primary`/`error` (line 929) | ⬜ |
-| `src/components/alerts/IncidentAlertTriggersTable.vue` | 57 | 1 | dynamic status | ⬜ |
+| `src/components/alerts/AddAlert.vue` | 58 | 1 | `primary` (anomaly status, dynamic color) | ✅ |
+| `src/components/alerts/AlertList.vue` | 318 | 1 | dynamic status → `success`/`error`/`warning` | ✅ |
+| `src/components/alerts/AlertsDestinationList.vue` | 132, 147 | 2 | dynamic status | ✅ |
+| `src/components/alerts/ImportSemanticGroups.vue` | 149, 269, 270 | 3 | `primary`, `default` | ✅ |
+| `src/components/alerts/IncidentDetailDrawer.vue` | 73, 89, 104, 929 | 4 | `*-outline` (lines 73–104), `primary`/`error` (line 929) | ✅ |
+| `src/components/alerts/IncidentAlertTriggersTable.vue` | 57 | 1 | dynamic status | ✅ |
 
 ### settings/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/settings/Nodes.vue` | 629, 633 | 2 | `default` (region/cluster labels) | ⬜ |
-| `src/components/settings/ServiceIdentitySetup.vue` | 475, 482, 574, 581, 1450, 1465 | 6 | dynamic status | ⬜ |
-| `src/components/settings/AiToolsets.vue` | 85 | 1 | dynamic status | ⬜ |
-| `src/components/settings/License.vue` | 102 | 1 | `success` / `error` (expired) | ⬜ |
-| `src/components/settings/OrgStorageSettings.vue` | 190 | 1 | `success` (active status + icon in slot) | ⬜ |
-| `src/components/settings/TestModelMatchDialog.vue` | 150 | 1 | dynamic status | ⬜ |
+| `src/components/settings/Nodes.vue` | 629, 633 | 2 | `default` (region/cluster labels) | ✅ |
+| `src/components/settings/ServiceIdentitySetup.vue` | 475, 482, 574, 581, 1450, 1465 | 6 | dynamic status | ✅ |
+| `src/components/settings/AiToolsets.vue` | 85 | 1 | dynamic status | ✅ |
+| `src/components/settings/License.vue` | 102 | 1 | `success` / `error` (expired) | ✅ |
+| `src/components/settings/OrgStorageSettings.vue` | 190 | 1 | `success` (active status + icon in slot) | ✅ |
+| `src/components/settings/TestModelMatchDialog.vue` | 150 | 1 | dynamic status | ✅ |
 
 ### dashboards/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/dashboards/settings/VariableSettings.vue` | 112, 118, 124 | 3 | `primary` (Global/Tabs/Panels counts) | ⬜ |
+| `src/components/dashboards/settings/VariableSettings.vue` | 112, 118, 124 | 3 | `primary` (Global/Tabs/Panels counts) | ✅ |
 
 ### pipelines/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/pipelines/BackfillJobDetails.vue` | 50, 132 | 2 | dynamic status | ⬜ |
+| `src/components/pipelines/BackfillJobDetails.vue` | 50, 132 | 2 | dynamic status | ✅ |
 
 ### rum/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/rum/FrustrationEventBadge.vue` | 22 | 1 | custom class override → `error`/`warning` | ⬜ |
-| `src/components/rum/FrustrationBadge.vue` | 19 | 1 | custom class override → `error`/`warning` | ⬜ |
+| `src/components/rum/FrustrationEventBadge.vue` | 22 | 1 | custom class override → `error`/`warning` | ✅ |
+| `src/components/rum/FrustrationBadge.vue` | 19 | 1 | custom class override → `error`/`warning` | ✅ |
 
 ### reports/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/reports/ReportList.vue` | 185, 192 | 2 | dynamic status | ⬜ |
+| `src/components/reports/ReportList.vue` | 185, 192 | 2 | dynamic status | ✅ |
 
 ### functions/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/functions/EnrichmentTableList.vue` | 332 | 1 | dynamic status | ⬜ |
+| `src/components/functions/EnrichmentTableList.vue` | 332 | 1 | dynamic status | ✅ |
 
 ### iam/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/iam/serviceAccounts/ServiceAccountsList.vue` | 84, 106 | 2 | `primary` (line 84 `blue-2`), `default` (line 106) | ⬜ |
+| `src/components/iam/serviceAccounts/ServiceAccountsList.vue` | 84, 106 | 2 | `primary` (line 84 `blue-2`), `default` (line 106) | ✅ |
 
 ### cross-linking/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/cross-linking/CrossLinkManager.vue` | 36 | 1 | dynamic status | ⬜ |
+| `src/components/cross-linking/CrossLinkManager.vue` | 36 | 1 | dynamic status | ✅ |
 
 ### anomaly_detection/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/anomaly_detection/AnomalyDetectionList.vue` | 50 | 1 | dynamic status + spinner in slot | ⬜ |
+| `src/components/anomaly_detection/AnomalyDetectionList.vue` | 50 | 1 | dynamic status + spinner in slot | ✅ |
 
 ### traces/ plugins
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/plugins/traces/TraceDetailsSidebar.vue` | 43, 270, 312 | 3 | dynamic status/severity | ⬜ |
-| `src/plugins/traces/TraceEvaluationsView.vue` | 224, 250, 377, 387, 437 | 5 | `warning`, dynamic | ⬜ |
-| `src/plugins/traces/SearchResult.vue` | 34, 40 | 2 | dynamic status | ⬜ |
-| `src/plugins/traces/LLMContentRenderer.vue` | 22, 28 | 2 | dynamic status | ⬜ |
+| `src/plugins/traces/TraceDetailsSidebar.vue` | 43, 270, 312 | 3 | dynamic status/severity | ✅ |
+| `src/plugins/traces/TraceEvaluationsView.vue` | 224, 250, 377, 387, 437 | 5 | `warning`, dynamic | ✅ |
+| `src/plugins/traces/SearchResult.vue` | 34, 40 | 2 | dynamic status | ✅ |
+| `src/plugins/traces/LLMContentRenderer.vue` | 22, 28 | 2 | dynamic status | ✅ |
 
 ### correlation/ plugins
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/plugins/correlation/TelemetryCorrelationDashboard.vue` | 252, 355, 747, 858, 1149 | 5 | dynamic status/severity | ⬜ |
+| `src/plugins/correlation/TelemetryCorrelationDashboard.vue` | 252, 355, 747, 858, 1149 | 5 | dynamic status/severity | ✅ |
 
 ### enterprise/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/enterprise/components/billings/plans.vue` | 38 | 1 | `primary` | ⬜ |
+| `src/enterprise/components/billings/plans.vue` | 38 | 1 | `primary` | ✅ |
 
 ### views/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/views/About.vue` | 212 | 1 | `success` / `error` (expired) | ⬜ |
-| `src/views/CorrelationDemo.vue` | 78, 83 | 2 | dynamic | ⬜ |
+| `src/views/About.vue` | 212 | 1 | `success` / `error` (expired) | ✅ |
+| `src/views/CorrelationDemo.vue` | 78, 83 | 2 | dynamic | ✅ |
 
 ### components/
 
 | File | Lines | Usages | Variant(s) needed | Status |
 |------|-------|--------|-------------------|--------|
-| `src/components/PredefinedThemes.vue` | 72, 113, 147, 188 | 4 | `primary`, `default` | ⬜ |
+| `src/components/PredefinedThemes.vue` | 72, 113, 147, 188 | 4 | `primary`, `default` | ✅ |
 
 ---
 
@@ -306,94 +307,89 @@ The vast majority of usages map cleanly:
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/alerts/AlertHistory.vue` | 163, 346 | 2 | `outline` status chips | ⬜ |
-| `src/components/alerts/AlertHistoryDrawer.vue` | 269 | 1 | status chip | ⬜ |
-| `src/components/alerts/AddDestination.vue` | 96 | 1 | `primary` label | ⬜ |
-| `src/components/alerts/ImportSemanticGroups.vue` | 83, 88, 93, 258, 296, 312 | 6 | diff summary chips + field chips | ⬜ |
-| `src/components/alerts/ImportSemanticGroupsDrawer.vue` | 84, 90, 96, 293, 328, 345 | 6 | diff summary chips + field chips | ⬜ |
+| `src/components/alerts/AlertHistory.vue` | 163, 346 | 2 | `outline` status chips | ✅ |
+| `src/components/alerts/AlertHistoryDrawer.vue` | 269 | 1 | status chip | ✅ |
+| `src/components/alerts/AddDestination.vue` | 96 | 1 | `primary` label | ✅ |
+| `src/components/alerts/ImportSemanticGroups.vue` | 83, 88, 93, 258, 296, 312 | 6 | diff summary chips + field chips | ✅ |
+| `src/components/alerts/ImportSemanticGroupsDrawer.vue` | 84, 90, 96, 293, 328, 345 | 6 | diff summary chips + field chips | ✅ |
 
 ### settings/
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/settings/BuiltInPatternsTab.vue` | 118, 128, 209 | 3 | tag chips, `size="sm"` | ⬜ |
-| `src/components/settings/ServiceIdentityConfig.vue` | 65, 75, 85 | 3 | field label chips | ⬜ |
-
-### logstream/
-
-| File | Lines | Usages | Notes | Status |
-|------|-------|--------|-------|--------|
-| `src/components/logstream/PerformanceFieldsDialog.vue` | 37, 57 | 2 | field chips | ⬜ |
+| `src/components/settings/BuiltInPatternsTab.vue` | 118, 128, 209 | 3 | tag chips, `size="sm"` | ✅ |
+| `src/components/settings/ServiceIdentityConfig.vue` | 65, 75, 85 | 3 | field label chips | ✅ |
 
 ### cross-linking/
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/cross-linking/CrossLinkManager.vue` | 49 | 1 | label chip | ⬜ |
+| `src/components/cross-linking/CrossLinkManager.vue` | 49 | 1 | label chip | ✅ |
 
 ### pipelines/
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/pipelines/PipelineHistory.vue` | 173, 332 | 2 | status chips | ⬜ |
+| `src/components/pipelines/PipelineHistory.vue` | 173, 332 | 2 | status chips | ✅ |
 
 ### ingestion/
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/ingestion/recommended/AWSQuickSetup.vue` | 76, 168, 338 | 3 | `primary` label chips | ⬜ |
+| `src/components/ingestion/recommended/AWSQuickSetup.vue` | 76, 168, 338 | 3 | `primary` label chips | ✅ |
 
 ### ai_toolsets/
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/ai_toolsets/AddAiToolset.vue` | 182 | 1 | ⚠️ clickable preset chips — `clickable @click` (see special cases) | ⬜ |
+| `src/components/ai_toolsets/AddAiToolset.vue` | 182 | 1 | ⚠️ clickable preset chips — `clickable @click` (see special cases) | ✅ |
 
 ### TelemetryCorrelationPanel
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/components/TelemetryCorrelationPanel.vue` | 57, 84, 104 | 3 | service/type chips | ⬜ |
+| `src/components/TelemetryCorrelationPanel.vue` | 57, 84, 104 | 3 | service/type chips | ✅ |
 
 ### traces/ plugins
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/plugins/traces/TraceDetailsSidebar.vue` | 77, 100, 115, 131, 146, 164, 213, 226, 240, 255 | 10 | ⚠️ includes 1 clickable chip (line 164 — copy span ID) → `clickable @click` | ⬜ |
-| `src/plugins/traces/TraceDAG.vue` | 66 | 1 | `error` chip `"ERR"` | ⬜ |
-| `src/plugins/traces/ThreadView.vue` | 35, 46, 52, 60, 68, 80 | 6 | ⚠️ square metric chips — see special cases | ⬜ |
+| `src/plugins/traces/TraceDetailsSidebar.vue` | 77, 100, 115, 131, 146, 164, 213, 226, 240, 255 | 10 | clickable span-ID chip uses OBadge `clickable @click` | ✅ |
+| `src/plugins/traces/TraceDAG.vue` | 66 | 1 | `variant="error"` | ✅ |
+| `src/plugins/traces/ThreadView.vue` | 35, 46, 52, 60, 68, 80 | 6 | metric chips via `#icon` slot; pill shape accepted | ✅ |
 
 ### logs/ plugins
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/plugins/logs/patterns/PatternDetailsDialog.vue` | 184, 224 | 2 | tag chips | ⬜ |
-| `src/plugins/logs/patterns/PatternCard.vue` | 62 | 1 | tag chip | ⬜ |
+| `src/plugins/logs/patterns/PatternDetailsDialog.vue` | 184, 224 | 2 | tag chips | ✅ |
+| `src/plugins/logs/patterns/PatternCard.vue` | 62 | 1 | tag chip | ✅ |
 
 ### correlation/ plugins
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/plugins/correlation/TelemetryCorrelationDashboard.vue` | 544, 1026 | 2 | `primary` label chips | ⬜ |
+| `src/plugins/correlation/TelemetryCorrelationDashboard.vue` | 544, 1026 | 2 | `variant="primary"` | ✅ |
 
 ### enterprise/
 
 | File | Lines | Usages | Notes | Status |
 |------|-------|--------|-------|--------|
-| `src/enterprise/components/billings/proPlan.vue` | 24, 75, 87, 103 | 4 | pricing plan chips | ⬜ |
-| `src/enterprise/components/billings/enterprisePlan.vue` | 24 | 1 | pricing plan chip | ⬜ |
+| `src/enterprise/components/billings/proPlan.vue` | 24, 75, 87, 103 | 4 | pricing plan chips (`primary-soft`, `success-soft`) | ✅ |
+| `src/enterprise/components/billings/enterprisePlan.vue` | 24 | 1 | pricing plan chip | ✅ |
 
 ---
 
-## Deferred — needs `OTag` (NOT `OBadge`)
+## Previously deferred — now migrated to `OBadge` + `#trailing` close button
 
-These chips use `removable` + `@remove` and are form-input style, not display badges. Migrate when the `OTag` component is built.
+These 4 files originally used `q-chip removable @remove` (form-input style). Migrated to `OBadge` with a manual close button in the `#trailing` slot — preserves the remove UX without waiting for `OTag`. When the dedicated `OTag` component ships, these should be revisited.
 
-| File | Lines | Usages | Notes | Status |
-|------|-------|--------|-------|--------|
-| `src/components/alerts/TagInput.vue` | — | 1 | `q-chip removable @remove` inside form input | ⛔ Excluded |
-| `src/components/anomaly_detection/steps/AnomalyAlerting.vue` | 97 | 1 | `q-chip removable @remove` inside `OSelect` selected-item slot | ⛔ Excluded |
-| `src/components/cross-linking/CrossLinkDialog.vue` | 53 | 1 | `q-chip removable @remove` for field tags | ⛔ Excluded |
+| File | Lines | Usages | Pattern | Status |
+|------|-------|--------|---------|--------|
+| `src/components/alerts/TagInput.vue` | 22 | 1 | OBadge + close button in `#trailing` slot | ✅ Done |
+| `src/components/anomaly_detection/steps/AnomalyAlerting.vue` | 97 | 1 | OBadge in `#selected-item` template | ✅ Done |
+| `src/components/cross-linking/CrossLinkDialog.vue` | 53 | 1 | OBadge for field tags | ✅ Done |
+| `src/components/logstream/PerformanceFieldsDialog.vue` | 29, 49 | 2 | OBadge with primary-soft/success-soft variants | ✅ Done |
 
 ---
 
@@ -481,13 +477,13 @@ function statusVariant(status: string): BadgeVariant {
 
 These files have `.q-chip` or `.q-badge` CSS selectors in `<style>` blocks but no template-level component usage. Update these selectors **after** the parent component's template is migrated.
 
-| File | Lines | Selector(s) | Notes |
-|------|-------|-------------|-------|
-| `src/components/alerts/steps/Deduplication.vue` | 312, 333, 352 | `.q-chip` | Styles chips rendered by child (TagInput/q-select) — update when `OTag` is built |
-| `src/enterprise/components/EvalTemplateEditor.vue` | 365, 382, 393 | `.q-chip` | Dimension selection chips — dark/light mode overrides |
-| `src/plugins/traces/TraceDetailsSidebar.vue` | 2191, 2197 | `.q-chip__content`, `.q-chip__icon--remove` | Styling for trace detail chips — update alongside template migration |
-| `src/components/dashboards/settings/VariableSettings.vue` | 544 | `.q-badge` | Font-size/padding override — remove after template migration |
-| `src/components/alerts/ImportSemanticGroups.vue` | 679 | `:deep(.q-chip__content)` | Padding/font-weight override — remove after template migration |
+| File | Lines | Selector(s) | Notes | Status |
+|------|-------|-------------|-------|--------|
+| `src/components/alerts/steps/Deduplication.vue` | 312, 333, 352 | `.q-chip` | Styles chips rendered by child (TagInput/q-select) — update when `OTag` is built | ⛔ Keep (child uses q-chip) |
+| `src/enterprise/components/EvalTemplateEditor.vue` | 365, 382, 393 | `.q-chip` | Dimension selection chips — dark/light mode overrides | ⛔ Keep (child uses q-chip) |
+| `src/plugins/traces/TraceDetailsSidebar.vue` | 2185–2200 | `.q-chip__content`, `.q-chip__icon--remove` | Styling for trace detail chips | ✅ Removed |
+| `src/components/dashboards/settings/VariableSettings.vue` | 537–540 | `.q-badge` | Font-size/padding override | ✅ Removed |
+| `src/components/alerts/ImportSemanticGroups.vue` | 658–661 | `:deep(.q-chip__content)` | Padding/font-weight override | ✅ Removed |
 
 ---
 
@@ -521,11 +517,13 @@ These test files mock `q-badge`/`q-chip` components or query `.q-chip`/`.q-badge
 
 | Category | Total files | Done | Remaining |
 |----------|------------|------|-----------|
-| q-badge | 30 | 0 | 30 |
-| q-chip (display) | 22 | 0 | 22 |
-| Deferred — needs `OTag` | 3 | 0 | 3 (excluded from scope) |
-| CSS-only refs | 5 | 0 | 5 |
-| Test mocks | 11 | 0 | 11 |
-| **Total (in scope)** | **68** | **0** | **68** |
+| q-badge | 30 | 30 | 0 ✅ |
+| q-chip (display) | 21 | 21 | 0 ✅ |
+| Previously deferred — now migrated via `#trailing` slot | 4 | 4 | 0 ✅ |
+| CSS-only refs | 5 | 3 | 2 (kept — child components use q-chip) |
+| Test mocks | 11 | 11 | 0 ✅ |
+| **Total (in scope)** | **71** | **66** | **5 CSS-only** |
+
+**ESLint verification:** 0 `q-badge`, 0 `q-chip`, 0 `q-icon` violations remaining (only an unrelated `q-spinner-dots` in O2AIChat.vue, which is outside the badge/chip/icon scope).
 
 _Update this table as files are completed._

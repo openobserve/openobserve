@@ -22,12 +22,12 @@ describe("OBadge", () => {
     expect(wrapper.find("img").attributes("src")).toBe("/chrome.svg");
   });
 
-  it("renders icon prop as material-icons span", () => {
+  it("renders icon prop as material-icons-outlined span", () => {
     const wrapper = mount(OBadge, {
       props: { icon: "check_circle" },
       slots: { default: "Verified" },
     });
-    const iconSpan = wrapper.find(".material-icons");
+    const iconSpan = wrapper.find(".material-icons-outlined");
     expect(iconSpan.exists()).toBe(true);
     expect(iconSpan.text()).toBe("check_circle");
   });
@@ -40,14 +40,14 @@ describe("OBadge", () => {
         default: "Label",
       },
     });
-    // The custom slot image should render, not the material-icons span
+    // The custom slot image should render, not the material-icons-outlined span
     expect(wrapper.find("[data-testid='custom-icon']").exists()).toBe(true);
-    expect(wrapper.find(".material-icons").exists()).toBe(false);
+    expect(wrapper.find(".material-icons-outlined").exists()).toBe(false);
   });
 
   it("does not render icon area when neither icon prop nor #icon slot is set", () => {
     const wrapper = mount(OBadge, { slots: { default: "Label" } });
-    expect(wrapper.find(".material-icons").exists()).toBe(false);
+    expect(wrapper.find(".material-icons-outlined").exists()).toBe(false);
   });
 
   it("renders count prop in trailing segment", () => {
@@ -266,7 +266,7 @@ describe("OBadge", () => {
       props: { icon: "check" },
       slots: { default: "x" },
     });
-    const iconSpan = wrapper.find(".material-icons");
+    const iconSpan = wrapper.find(".material-icons-outlined");
     expect(iconSpan.attributes("aria-hidden")).toBe("true");
   });
 });

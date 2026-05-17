@@ -29,11 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
           <!-- Status and Actions -->
           <div class="flex items-center justify-between">
-            <q-badge
-              :color="getStatusColor(job.status, job.deletion_status)"
-              :label="getStatusLabel(job.status, job.deletion_status)"
+            <OBadge
+              :variant="getStatusColor(job.status, job.deletion_status)"
               class="text-lg q-pa-sm"
-            />
+            >
+              {{ getStatusLabel(job.status, job.deletion_status) }}
+            </OBadge>
             <OButton
               v-if="canCancelJob"
               variant="outline-destructive"
@@ -109,10 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
                   <div>
-                    <q-badge
-                      :color="getDeletionStatusColor(job.deletion_status)"
-                      :label="getDeletionStatusLabel(job.deletion_status)"
-                    />
+                    <OBadge
+                      :variant="getDeletionStatusColor(job.deletion_status)"
+                    >
+                      {{ getDeletionStatusLabel(job.deletion_status) }}
+                    </OBadge>
                   </div>
                 </div>
                 <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
@@ -218,6 +220,8 @@ import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 interface Props {
   modelValue: boolean;
@@ -418,24 +422,24 @@ const getBackfillStartTime = computed(() => {
 });
 
 // Helper functions
-const getStatusColor = (status: string, deletionStatus?: any) => {
+const getStatusColor = (status: string, deletionStatus?: any): BadgeVariant => {
   if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "negative";
+    return "error";
   }
 
   switch (status) {
     case "running":
-      return "positive";
+      return "success";
     case "completed":
-      return "positive";
+      return "success";
     case "failed":
-      return "negative";
+      return "error";
     case "pending":
       return "warning";
     case "canceled":
-      return "grey";
+      return "default";
     default:
-      return "grey";
+      return "default";
   }
 };
 
@@ -454,13 +458,13 @@ const getProgressColor = (deletionStatus?: any) => {
   return "positive";
 };
 
-const getDeletionStatusColor = (status?: any) => {
-  if (!status) return "grey";
-  if (typeof status === "object" && "failed" in status) return "negative";
-  if (status === "completed") return "positive";
-  if (status === "in_progress") return "blue";
+const getDeletionStatusColor = (status?: any): BadgeVariant => {
+  if (!status) return "default";
+  if (typeof status === "object" && "failed" in status) return "error";
+  if (status === "completed") return "success";
+  if (status === "in_progress") return "primary";
   if (status === "pending") return "warning";
-  return "grey";
+  return "default";
 };
 
 const getDeletionStatusLabel = (status?: any) => {

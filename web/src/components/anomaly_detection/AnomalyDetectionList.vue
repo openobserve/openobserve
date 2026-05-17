@@ -46,16 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <q-badge
-            :color="statusColor(props.row)"
-            :label="statusLabel(props.row)"
-          >
+          <OBadge :variant="statusColor(props.row)">
+            {{ statusLabel(props.row) }}
             <OSpinner
               v-if="props.row.status === 'training'"
               size="xs"
               class="q-ml-xs"
             />
-          </q-badge>
+          </OBadge>
           <q-tooltip v-if="props.row.status === 'failed'">
             {{ props.row.last_error || t("alerts.anomalyStatus.failed") }}
           </q-tooltip>
@@ -253,10 +251,12 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, OIcon, OSpinner },
+  components: { OButton, ODialog, OIcon, OSpinner, OBadge },
 
   props: {
     org_identifier: {
@@ -298,14 +298,14 @@ export default defineComponent({
       { name: "actions",        label: t("alerts.actions"),        field: "actions",             align: "center", style: "width: 140px" },
     ];
 
-    const statusColor = (row: any) => {
-      if (!row.enabled) return "grey";
+    const statusColor = (row: any): BadgeVariant => {
+      if (!row.enabled) return "default";
       switch (row.status) {
-        case "ready":     return "positive";
-        case "training":  return "info";
-        case "failed":    return "negative";
-        case "waiting":   return "grey";
-        default:          return "grey";
+        case "ready":     return "success";
+        case "training":  return "primary";
+        case "failed":    return "error";
+        case "waiting":   return "default";
+        default:          return "default";
       }
     };
 

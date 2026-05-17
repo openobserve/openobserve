@@ -132,6 +132,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "Step5Deduplication",
+  components: {
+    OIcon,
+  },
   props: {
     deduplication: {
       type: Object as PropType<any>,

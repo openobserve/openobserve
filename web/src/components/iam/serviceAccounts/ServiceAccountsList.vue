@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-td :props="props">
                 <template v-if="props.row.is_system">
                   <span class="text-weight-medium">AI SRE Agent</span>
-                  <q-badge color="blue-2" text-color="blue-8" label="system" class="q-ml-sm q-px-xs" style="font-size: 10px;" />
+                  <OBadge variant="primary-soft" size="sm" class="q-ml-sm">system</OBadge>
                 </template>
                 <template v-else>{{ props.row.email }}</template>
               </q-td>
@@ -101,9 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #body-cell-actions="props">
               <q-td :props="props" side>
                 <template v-if="props.row.is_system">
-                <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
+                <OBadge variant="default">
+                    {{ t('serviceAccounts.systemManaged', 'System Managed') }}
                     <OTooltip v-if="props.row.description" :content="props.row.description" />
-                  </q-badge>
+                  </OBadge>
                 </template>
                 <template v-else>
                   <OButton
@@ -283,6 +284,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps, date } from "quasar";
@@ -309,7 +311,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OCheckbox },
+  components: { QTablePagination, NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OCheckbox, OBadge },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

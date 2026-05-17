@@ -125,6 +125,12 @@ const QBadgeStub = {
   template: `<span data-test="q-badge" :data-color="color" :data-label="label">{{ label }}</span>`,
 };
 
+const OBadgeStub = {
+  name: "OBadge",
+  props: ["variant"],
+  template: `<span data-test="o-badge" :data-variant="variant"><slot /></span>`,
+};
+
 const OButtonStub = {
   name: "OButton",
   props: ["variant", "size"],
@@ -144,6 +150,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         "q-input": QInputStub,
         "OIcon": QIconStub,
         "q-badge": QBadgeStub,
+        OBadge: OBadgeStub,
       },
     },
     props: {
@@ -234,6 +241,7 @@ describe("TestModelMatchDialog", () => {
             "q-input": QInputStub,
             "OIcon": QIconStub,
             "q-badge": QBadgeStub,
+        OBadge: OBadgeStub,
           },
         },
       });
@@ -701,24 +709,24 @@ describe("TestModelMatchDialog", () => {
       expect(vm.sourceLabel({})).toBe("Your Org");
     });
 
-    it("returns secondary/Global for meta_org source", () => {
+    it("returns default-outline/Global for meta_org source", () => {
       wrapper = mountDialog({ modelValue: true });
       const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "meta_org" })).toBe("secondary");
+      expect(vm.sourceColor({ source: "meta_org" })).toBe("default-outline");
       expect(vm.sourceLabel({ source: "meta_org" })).toBe("Global");
     });
 
-    it("returns grey-8/Built-in for built_in source", () => {
+    it("returns default/Built-in for built_in source", () => {
       wrapper = mountDialog({ modelValue: true });
       const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "built_in" })).toBe("grey-8");
+      expect(vm.sourceColor({ source: "built_in" })).toBe("default");
       expect(vm.sourceLabel({ source: "built_in" })).toBe("Built-in");
     });
 
-    it("returns grey-8/Built-in for any other source", () => {
+    it("returns default/Built-in for any other source", () => {
       wrapper = mountDialog({ modelValue: true });
       const vm: any = wrapper.vm;
-      expect(vm.sourceColor({ source: "something" })).toBe("grey-8");
+      expect(vm.sourceColor({ source: "something" })).toBe("default");
       expect(vm.sourceLabel({ source: "something" })).toBe("Built-in");
     });
   });
@@ -846,10 +854,10 @@ describe("TestModelMatchDialog", () => {
         tier: "Default",
       };
       await nextTick();
-      const badge = wrapper.find('[data-test="q-badge"]');
+      const badge = wrapper.find('[data-test="o-badge"]');
       expect(badge.exists()).toBe(true);
-      expect(badge.attributes("data-label")).toBe("Global");
-      expect(badge.attributes("data-color")).toBe("secondary");
+      expect(badge.text()).toBe("Global");
+      expect(badge.attributes("data-variant")).toBe("default-outline");
     });
   });
 });

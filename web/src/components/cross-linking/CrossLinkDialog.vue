@@ -49,17 +49,26 @@
               {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
-              <q-chip
+              <OBadge
                 v-for="(field, idx) in form.fields"
                 :key="idx"
-                removable
-                dense
+                variant="default"
+                size="sm"
                 class="tw:max-w-[250px]"
-                @remove="form.fields.splice(idx, 1)"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
                 <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
-              </q-chip>
+                <template #trailing>
+                  <button
+                    type="button"
+                    :aria-label="`Remove ${field.name}`"
+                    class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                    @click="form.fields.splice(idx, 1)"
+                  >
+                    <OIcon name="close" size="xs" />
+                  </button>
+                </template>
+              </OBadge>
             </div>
             <div class="tw:flex tw:gap-2 tw:items-center">
               <q-select
@@ -122,6 +131,8 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface CrossLink {
   name: string;
@@ -131,7 +142,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, ODialog, },
+  components: { CrossLinkUserGuide, OButton, ODialog, OBadge, OIcon, },
   props: {
     modelValue: {
       type: Boolean,

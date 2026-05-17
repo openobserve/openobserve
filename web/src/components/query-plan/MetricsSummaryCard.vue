@@ -61,6 +61,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "MetricsSummaryCard",
+  components: {
+    OIcon,
+  },
   props: {
     metrics: {
       type: Object as PropType<SummaryMetrics>,

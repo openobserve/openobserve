@@ -94,15 +94,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filter="filterDestinations"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
-                <q-chip
+                <OBadge
                   v-if="index < visibleChipCount"
-                  dense
-                  removable
-                  class="tw:text-[13px]"
-                  @remove="removeAtIndex(index)"
+                  variant="default"
+                  size="sm"
                 >
                   {{ typeof opt === "object" ? opt.name : opt }}
-                </q-chip>
+                  <template #trailing>
+                    <button
+                      type="button"
+                      aria-label="Remove"
+                      class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                      @click="removeAtIndex(index)"
+                    >
+                      <OIcon name="close" size="xs" />
+                    </button>
+                  </template>
+                </OBadge>
                 <span
                   v-if="
                     index === visibleChipCount &&
@@ -186,11 +194,13 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "AnomalyAlerting",
   components: { OButton,
     OIcon,
+    OBadge,
 },
 
   props: {

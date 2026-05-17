@@ -182,20 +182,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:body-cell-name="props">
                   <q-td :props="props">
                     <span>{{ props.row.name }}</span>
-                    <q-badge
+                    <OBadge
                       v-if="props.row.dashboards?.[0]?.report_type === 'png'"
-                      color="teal"
+                      variant="primary-outline"
                       class="q-ml-xs"
-                      label="PNG"
-                      outline
-                    />
-                    <q-badge
+                    >
+                      PNG
+                    </OBadge>
+                    <OBadge
                       v-if="props.row.imagePreview"
-                      color="blue-grey"
+                      variant="default-outline"
                       class="q-ml-xs"
-                      label="Preview"
-                      outline
-                    />
+                    >
+                      Preview
+                    </OBadge>
                   </q-td>
                 </template>
 
@@ -356,6 +356,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),

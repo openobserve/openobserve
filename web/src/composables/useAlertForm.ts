@@ -38,6 +38,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import useStreams from "@/composables/useStreams";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 import {
   getUUID,
@@ -235,16 +236,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyRetraining = ref(false);
   const anomalySaving = ref(false);
 
-  const anomalyStatusColor = computed(() => {
+  const anomalyStatusVariant = computed<BadgeVariant>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
-        return "positive";
+        return "success";
       case "training":
-        return "info";
+        return "primary";
       case "failed":
-        return "negative";
+        return "error";
       default:
-        return "grey";
+        return "default";
     }
   });
 
@@ -2715,7 +2716,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     anomalyEditMode,
     anomalyRetraining,
     anomalySaving,
-    anomalyStatusColor,
+    anomalyStatusVariant,
     anomalyFormatTs,
     anomalyTriggerRetrain,
     isAnomalyMode,

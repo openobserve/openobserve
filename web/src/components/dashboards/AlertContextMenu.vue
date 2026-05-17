@@ -56,6 +56,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: 'AlertContextMenu',
+  components: {
+    OIcon,
+  },
   props: {
     visible: {
       type: Boolean,

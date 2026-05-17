@@ -82,11 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot:body-cell-kind="props">
           <q-td :props="props">
-            <q-badge
-              :color="kindBadgeColor(props.row.kind)"
-              :label="props.row.kind.toUpperCase()"
-              class="tw:text-xs"
-            />
+            <OBadge
+              :variant="kindBadgeVariant(props.row.kind)"
+              size="sm"
+            >{{ props.row.kind.toUpperCase() }}</OBadge>
           </q-td>
         </template>
 
@@ -161,6 +160,7 @@ import { useQuasar, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -168,11 +168,11 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
 
-const KIND_COLORS: Record<string, string> = {
-  mcp: "blue-7",
-  cli: "green-7",
-  skill: "purple-7",
-  generic: "grey-7",
+const KIND_VARIANTS: Record<string, string> = {
+  mcp: "primary",
+  cli: "success",
+  skill: "primary-soft",
+  generic: "default",
 };
 
 export default defineComponent({
@@ -184,6 +184,7 @@ export default defineComponent({
     AddAiToolset,
     OButton,
     OIcon,
+    OBadge,
 },
   setup() {
     const store = useStore();
@@ -388,7 +389,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
-    const kindBadgeColor = (kind: string) => KIND_COLORS[kind] ?? "grey-6";
+    const kindBadgeVariant = (kind: string) => KIND_VARIANTS[kind] ?? "default";
 
     return {
       t,
@@ -415,7 +416,7 @@ export default defineComponent({
       confirmDeleteToolset,
       cancelDelete,
       deleteToolset,
-      kindBadgeColor,
+      kindBadgeVariant,
     };
   },
 });

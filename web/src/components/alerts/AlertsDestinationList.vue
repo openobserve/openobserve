@@ -127,12 +127,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-2">
               <!-- Prebuilt Destination Badge -->
               <template v-if="getPrebuiltTypeName(props.row)">
-                <q-badge
+                <OBadge
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(props.row)?.toLowerCase()}`"
-                  :color="'primary'"
+                  variant="primary"
                   class="tw:text-xs"
-                  :label="getPrebuiltTypeName(props.row)"
-                />
+                >{{ getPrebuiltTypeName(props.row) }}</OBadge>
                 <OIcon
                   name="auto-awesome"
                   size="sm"
@@ -141,12 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <!-- Custom Destination -->
               <template v-else>
-                <q-badge
+                <OBadge
                   data-test="destination-type-badge-custom"
-                  color="grey-6"
+                  variant="default"
                   class="tw:text-xs"
-                  :label="getCustomDestinationLabel(props.row)"
-                />
+                >{{ getCustomDestinationLabel(props.row) }}</OBadge>
                 <OIcon
                   name="settings"
                   size="sm"
@@ -279,6 +277,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OBadge from '@/lib/core/Badge/OBadge.vue';
 
 interface ConformDelete {
   visible: boolean;
@@ -296,6 +295,7 @@ export default defineComponent({
     OButton,
     OInput,
     OCheckbox,
+    OBadge,
   },
   setup() {
     const qTable = ref();

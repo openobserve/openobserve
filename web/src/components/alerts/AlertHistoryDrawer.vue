@@ -250,22 +250,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template v-else-if="col.name === 'status'">
-                        <q-chip
-                          dense
+                        <OBadge
                           size="sm"
                           :icon="getStatusChipIcon(props.row.status)"
-                          :label="formatStatus(props.row.status)"
-                          :color="getStatusChipColor(props.row.status)"
-                          :text-color="getStatusChipTextColor(props.row.status)"
+                          :variant="getStatusChipVariant(props.row.status)"
                           class="tw:cursor-default"
                           data-test="alert-history-status-chip"
                         >
+                          {{ formatStatus(props.row.status) }}
                           <OTooltip
                             v-if="props.row.error"
                             :max-width="'300px'"
                             :content="props.row.error"
                           />
-                        </q-chip>
+                        </OBadge>
                       </template>
                       <template v-else-if="col.name === 'timestamp'">
                         <span class="tw:text-[13px]">{{
@@ -512,6 +510,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
@@ -768,41 +767,22 @@ const getStatusChipIcon = (status: string) => {
   }
 };
 
-const getStatusChipColor = (status: string) => {
+const getStatusChipVariant = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
     case "error":
     case "anomaly":
-      return "red-1";
+      return "error-soft";
     case "ok":
     case "success":
     case "normal":
-      return "green-1";
+      return "success-soft";
     case "skipped":
-      return "amber-1";
+      return "warning-soft";
     case "pending":
-      return "blue-1";
+      return "primary-soft";
     default:
-      return "grey-3";
-  }
-};
-
-const getStatusChipTextColor = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "red-9";
-    case "ok":
-    case "success":
-    case "normal":
-      return "green-9";
-    case "skipped":
-      return "amber-9";
-    case "pending":
-      return "blue-9";
-    default:
-      return "grey-8";
+      return "default-soft";
   }
 };
 

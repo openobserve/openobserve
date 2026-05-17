@@ -178,19 +178,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-caption text-grey-6"
                 >{{ t("aiToolset.presets") }}:</span
               >
-              <q-chip
+              <OBadge
                 v-for="preset in CLI_PRESETS"
                 :key="preset.id"
                 clickable
-                dense
-                color="blue-1"
-                text-color="blue-9"
+                variant="primary-soft"
                 class="tw:cursor-pointer"
                 :data-test="`cli-preset-${preset.id}`"
                 @click="applyPreset(preset)"
               >
                 {{ preset.label }}
-              </q-chip>
+              </OBadge>
             </div>
           </div>
           <div class="o2-input tw:mb-4">
@@ -408,6 +406,7 @@ import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 
 const QueryEditor = defineAsyncComponent(
@@ -418,6 +417,7 @@ export default defineComponent({
   name: "AddAiToolset",
   components: { QueryEditor, OButton,
     OIcon,
+    OBadge,
 },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
