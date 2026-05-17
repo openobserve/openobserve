@@ -188,7 +188,7 @@ For interactive elements (OButton with click handler) inside the label, use `#la
   <template #label>
     {{ t('dashboard.myLabel') }}
     <OButton variant="ghost" size="icon" @click.stop>
-      <template #icon-left><q-icon name="info_outline" /></template>
+      <template #icon-left><q-icon name="info" /></template>
       <q-tooltip ...>...</q-tooltip>
     </OButton>
   </template>
@@ -467,7 +467,7 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 **Quality checks — run after every OTooltip migration:**
 
 **1. Info icons must use the outline variant.**
-`OTooltip` is always paired with an info icon. That icon must never use the filled `"info"` name — always use `"info_outline"`:
+`OTooltip` is always paired with an info icon. That icon must never use the filled `"info"` name — always use `"info"`:
 ```vue
 <!-- ❌ WRONG — filled icon -->
 <q-icon name="info" size="18px">
@@ -475,7 +475,7 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 </q-icon>
 
 <!-- ✅ CORRECT — outline icon -->
-<q-icon name="info_outline" size="18px">
+<q-icon name="info" size="18px">
   <OTooltip content="..." />
 </q-icon>
 ```
@@ -485,7 +485,7 @@ This applies to standalone icons too:
 <q-icon name="info" /><OTooltip content="..." />
 
 <!-- ✅ CORRECT -->
-<q-icon name="info_outline" /><OTooltip content="..." />
+<q-icon name="info" /><OTooltip content="..." />
 ```
 
 **2. Never add font-size via `contentClass`.**
@@ -960,9 +960,9 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/logstream/StreamFieldInputs.vue
 - ✅ src/components/logstream/schema.vue
 - ✅ src/components/pipeline/ImportPipeline.vue
-- [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
+- ✅ src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
-- [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
+- ✅ src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - ✅ src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
 - ✅ src/components/pipeline/StreamSelection.vue
@@ -985,7 +985,7 @@ All others use **OInput** (or **OFormInput** / **OFormTextarea** when inside `<O
 - ✅ src/components/settings/ImportModelPricing.vue
 - ✅ src/components/settings/ImportRegexPattern.vue
 - [T] src/components/settings/License.vue
-- [ ] src/components/settings/ModelPricingEditor.vue
+- ✅ src/components/settings/ModelPricingEditor.vue
 - ✅ src/components/settings/ModelPricingList.vue
 - ✅ src/components/settings/Nodes.vue
 - ✅ src/components/settings/OrganizationManagement.vue
@@ -1036,7 +1036,7 @@ These spec files import or declare a `q-input-stub`. Change stubs to reference `
 Wrap all sibling `<q-radio>` elements in a single `<ORadioGroup v-model="...">`.
 Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 
-- [ ] src/components/ResumePipelineDialog.vue
+- ✅ src/components/ResumePipelineDialog.vue
 - ✅ src/components/dashboards/settings/TabsDeletePopUp.vue
 - ✅ src/components/functions/FunctionsToolbar.vue
 - ✅ src/components/logstream/AssociatedRegexPatterns.vue
@@ -1120,10 +1120,10 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/logstream/schema.vue
 - ✅ src/components/pipeline/ImportPipeline.vue
 - ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
-- [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
+- ✅ src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - ✅ src/components/pipeline/NodeForm/ExternalDestination.vue
 - ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
-- [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
+- ✅ src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - ✅ src/components/pipeline/NodeForm/Stream.vue
 - ✅ src/components/pipeline/StreamSelection.vue
 - ✅ src/components/pipelines/BackfillJobsList.vue
@@ -1139,8 +1139,8 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/settings/BuiltInPatternsTab.vue
 - ✅ src/components/settings/DiscoveredServices.vue
 - ✅ src/components/settings/DomainManagement.vue
-- [ ] src/components/settings/ModelPricingEditor.vue
-- [ ] src/components/settings/ServiceIdentitySetup.vue
+- ✅ src/components/settings/ModelPricingEditor.vue
+- ✅ src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/components/shared/filter/FilterCreatorPopup.vue
 - [ ] src/components/shared/grid/Pagination.vue
 - ✅ src/enterprise/components/EvalTemplateEditor.vue
@@ -1195,16 +1195,16 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/logstream/LlmEvaluationSettings.vue
 - ✅ src/components/logstream/schema.vue
 - ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
-- [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
+- ✅ src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - ✅ src/components/pipeline/NodeForm/ExternalDestination.vue
 - ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
-- [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
+- ✅ src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - ✅ src/components/pipeline/NodeForm/Stream.vue
 - [ ] src/components/reports/CreateReport.vue
 - ✅ src/components/reports/ReportList.vue
 - [ ] src/components/rum/VideoPlayer.vue
 - ✅ src/components/settings/OrganizationSettings.vue
-- [ ] src/components/settings/ServiceIdentitySetup.vue
+- ✅ src/components/settings/ServiceIdentitySetup.vue
 - ✅ src/plugins/logs/DetailTable.vue
 - ✅ src/plugins/logs/FunctionSelector.vue
 - ✅ src/plugins/logs/IndexList.vue
@@ -1240,7 +1240,7 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/dashboards/settings/GeneralSettings.vue
 - ✅ src/components/dashboards/tabs/AddTab.vue
 - ✅ src/components/functions/AddEnrichmentTable.vue
-- [ ] src/components/functions/AddFunction.vue
+- ✅ src/components/functions/AddFunction.vue
 - ✅ src/components/functions/FunctionsToolbar.vue
 - ✅ src/components/functions/TestFunction.vue
 - ✅ src/components/iam/organizations/AddUpdateOrganization.vue
@@ -1252,10 +1252,10 @@ Replace each `<q-radio :val="x" label="y">` → `<ORadio value="x" label="y">`.
 - ✅ src/components/logstream/AddStream.vue
 - ✅ src/components/logstream/schema.vue
 - ✅ src/components/pipeline/NodeForm/AssociateFunction.vue
-- [ ] src/components/pipeline/NodeForm/Condition.vue
-- [ ] src/components/pipeline/NodeForm/CreateDestinationForm.vue
+- ✅ src/components/pipeline/NodeForm/Condition.vue
+- ✅ src/components/pipeline/NodeForm/CreateDestinationForm.vue
 - ✅ src/components/pipeline/NodeForm/LlmEvaluation.vue
-- [ ] src/components/pipeline/NodeForm/Query.vue
+- ✅ src/components/pipeline/NodeForm/Query.vue
 - ✅ src/components/pipeline/NodeForm/Stream.vue
 - ✅ src/components/pipeline/StreamSelection.vue
 - ✅ src/components/pipelines/CreateBackfillJobDialog.vue
@@ -1421,8 +1421,8 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - [ ] src/components/ingestion/recommended/AzureIntegrationTile.vue
 - ✅ src/components/ingestion/recommended/KubernetesConfig.vue
 - ✅ src/components/logstream/schema.vue
-- [ ] src/components/pipeline/NodeForm/Query.vue
-- [ ] src/components/pipeline/NodeForm/ScheduledPipeline.vue
+- ✅ src/components/pipeline/NodeForm/Query.vue
+- ✅ src/components/pipeline/NodeForm/ScheduledPipeline.vue
 - [ ] src/components/pipeline/NodeSidebar.vue
 - ✅ src/components/pipeline/PipelineEditor.vue
 - ✅ src/components/pipeline/PipelinesList.vue
@@ -1442,12 +1442,12 @@ Replace every `<q-tooltip>` with `<OTooltip>` and add the import. See **Migratio
 - ✅ src/components/settings/DiscoveredServices.vue
 - ✅ src/components/settings/DomainManagement.vue
 - ✅ src/components/settings/General.vue
-- [ ] src/components/settings/ModelPricingEditor.vue
+- ✅ src/components/settings/ModelPricingEditor.vue
 - ✅ src/components/settings/ModelPricingList.vue
 - ✅ src/components/settings/Nodes.vue
 - [ ] src/components/settings/OrgStorageSettings.vue
 - ✅ src/components/settings/OrganizationManagement.vue
-- [ ] src/components/settings/ServiceIdentitySetup.vue
+- ✅ src/components/settings/ServiceIdentitySetup.vue
 
 #### enterprise/
 

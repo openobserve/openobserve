@@ -52,8 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:before>
             <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
-              <q-form id="addFunctionForm" ref="addJSTransformForm">
-                <div class="add-function-name-input q-pb-sm o2-input">
+              <div class="add-function-name-input q-pb-sm o2-input">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -110,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </q-form>
+              </div>
             </div>
           </template>
           <template v-slot:after>
@@ -214,8 +213,7 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
-    const disableColor: any = ref("");
+    const addJSTransformForm: any = ref(null);    const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
       function: "",
@@ -406,7 +404,6 @@ export default defineComponent({
                 formData.value = { ...defaultValue() };
 
                 emit("update:list", _formData);
-                addJSTransformForm?.value?.resetValidation();
 
                 loadingNotification();
                 $q.notify({
@@ -574,7 +571,6 @@ export default defineComponent({
       disableColor,
       beingUpdated,
       formData,
-      addJSTransformForm,
       store,
       compilationErr,
       indexOptions,
