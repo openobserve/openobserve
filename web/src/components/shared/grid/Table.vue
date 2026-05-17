@@ -25,17 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @row-click="editTicket"
   >
     <template #top-right>
-      <q-input
+      <OInput
         v-model="filterQuery"
-        filled
-        borderless
-        dense
         :placeholder="t('ticket.search')"
       >
         <template #append>
           <OIcon name="search" size="sm" class="cursor-pointer" />
         </template>
-      </q-input>
+      </OInput>
       <OButton
         class="q-ml-sm"
         variant="primary"
@@ -60,6 +57,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const { t } = useI18n();
 

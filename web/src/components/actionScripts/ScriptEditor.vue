@@ -22,14 +22,7 @@
           class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
           size="sm"
         >
-          <q-tooltip
-            anchor="center right"
-            self="center left"
-            :offset="[10, 10]"
-            class="tw:text-[12px]"
-          >
-            {{ error }}
-          </q-tooltip>
+          <OTooltip side="right" align="center" :sideOffset="10" :content="error" />
         </OIcon>
       </template>
     </FullViewContainer>
@@ -58,6 +51,7 @@ import axios from "axios";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps({
   loading: {

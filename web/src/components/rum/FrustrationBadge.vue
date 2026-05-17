@@ -24,15 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="tooltipText"
       :data-test="`frustration-badge-${severity}`"
     >
-      <q-tooltip
-        anchor="top middle"
-        self="bottom middle"
-        :offset="[0, 8]"
-        class="bg-grey-8"
+      <OTooltip
+        side="top"
+        align="center"
+        :sideOffset="8"
+        :content="tooltipText"
         data-test="frustration-badge-tooltip"
-      >
-        {{ tooltipText }}
-      </q-tooltip>
+      />
     </q-badge>
     <span v-else class="text-grey-6" data-test="frustration-badge-none">—</span>
   </div>
@@ -40,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   count: number;

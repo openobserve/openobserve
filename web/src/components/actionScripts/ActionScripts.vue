@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
         </template>
-            <q-form id="action-script-clone-form" @submit="submitForm">
+            <div id="action-script-clone-form">
               <OInput
                 data-test="to-be-clone-action-name"
                 v-model="toBeCloneAlertName"
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="streamNames"
                 @update:model-value="updateStreamName"
               />
-            </q-form>
+            </div>
         </ODialog>
       </template>
   </div>

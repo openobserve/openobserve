@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="drawer-content q-pa-md">
       <!-- File Upload -->
       <div class="q-mb-md">
-        <q-file
+        <OFile
           v-model="jsonFile"
-          dense
-          filled
           label="Select JSON file"
           accept=".json"
           @update:model-value="loadFile"
@@ -40,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="cursor-pointer"
             />
           </template>
-        </q-file>
+        </OFile>
       </div>
 
       <!-- Loading State -->
@@ -332,6 +330,7 @@ import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OFile from "@/lib/forms/File/OFile.vue";
 import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

@@ -41,11 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Search input -->
-            <q-input
+            <OInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
               :placeholder="
                 searchAcrossFolders
@@ -58,28 +56,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
 
             <!-- All Folders toggle -->
             <div class="tw:ml-2">
-              <q-toggle
-                data-test="report-list-search-across-folders-toggle"
-                v-model="searchAcrossFolders"
-                label="All Folders"
-                class="tw:h-[32px] tw:mr-3 o2-toggle-button-lg all-folders-toggle"
-                size="lg"
-              />
-              <q-tooltip
-                class="q-mt-lg"
-                anchor="top middle"
-                self="bottom middle"
-              >
-                {{
-                  searchAcrossFolders
-                    ? t("dashboard.searchSelf")
-                    : t("dashboard.searchAll")
-                }}
-              </q-tooltip>
+              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                <OSwitch
+                  data-test="report-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  :label="t('dashboard.allFolders') || 'All Folders'"
+                />
+              </OTooltip>
             </div>
 
             <OButton
@@ -151,14 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-slot:header="props">
                   <q-tr :props="props">
                     <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         size="sm"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-table-checkbox-dark'
-                            : 'o2-table-checkbox-light'
-                        "
                         class="o2-table-checkbox"
                       />
                     </q-th>
@@ -175,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-selection="scope">
-                  <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+                  <OCheckbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
                 </template>
 
                 <!-- Name column: badges for type/preview -->
@@ -354,8 +336,12 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),

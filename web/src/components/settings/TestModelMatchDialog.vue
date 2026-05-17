@@ -27,14 +27,10 @@
             <div class="tmm-label-hint">
               {{ t("modelPricing.modelNameHint") }}
             </div>
-            <q-input
+            <OInput
               ref="modelInputRef"
               v-model="testModelName"
-              dense
-              borderless
               placeholder="e.g. gpt-4-turbo"
-              spellcheck="false"
-              autocomplete="off"
               class="tmm-model-input"
               data-test="test-match-model-input"
             >
@@ -53,7 +49,7 @@
                   <OIcon name="close" size="xs" />
                 </OButton>
               </template>
-            </q-input>
+            </OInput>
           </div>
         </div>
 
@@ -255,6 +251,7 @@ import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

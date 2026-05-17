@@ -37,10 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container q-pa-sm q-mb-sm">
           <div class="row items-center">
             <div class="col-12 col-md-8">
-              <q-file
+              <OFile
                 v-model="jsonFile"
-                dense
-                filled
                 label="Select JSON file"
                 accept=".json"
                 @update:model-value="loadFile"
@@ -59,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="cursor-pointer"
                   />
                 </template>
-              </q-file>
+              </OFile>
             </div>
             <div class="col-12 col-md-4 text-right q-pl-sm">
               <OButton
@@ -128,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item
                   v-for="group in diffData.additions"
                   :key="group.id"
-                  dense
                   clickable
                   @click="toggleAddition(group.id)"
                   class="compact-item"
@@ -169,7 +166,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <q-item
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
-                  dense
                   clickable
                   @click="toggleModification(mod.proposed.id)"
                   class="compact-item"
@@ -202,7 +198,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unchanged (Collapsed) -->
             <div v-if="diffData.unchanged.length > 0">
               <q-expansion-item
-                dense
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check_circle"
                 header-class="text-grey-7 q-pa-xs"
@@ -211,7 +206,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-item
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    dense
                     class="compact-item"
                   >
                     <q-item-section>
@@ -251,7 +245,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-chip
         v-for="field in selectedGroup?.fields"
         :key="field"
-        dense
         color="primary"
         text-color="white"
         class="q-ma-xs"
@@ -282,7 +275,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-chip
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            dense
             color="grey-4"
             size="sm"
             class="q-ma-xs"
@@ -298,7 +290,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-chip
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            dense
             :color="isNewField(field) ? 'positive' : 'grey-4'"
             :text-color="isNewField(field) ? 'white' : 'black'"
             size="sm"
@@ -319,6 +310,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";

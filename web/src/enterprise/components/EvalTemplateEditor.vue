@@ -44,14 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
             <OIcon name="info" size="xs" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipName") }}</q-tooltip>
+              <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
             </OIcon>
           </div>
           <div class="o2-input" :class="{ 'field-error': errors.name }">
-            <q-input
+            <OInput
               v-model="form.name"
-              borderless
-              dense
               @update:model-value="errors.name = false"
             />
           </div>
@@ -60,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="field-label-row">
             <label class="textarea-label">{{ t("common.description") }}</label>
             <OIcon name="info" size="xs" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipDescription") }}</q-tooltip>
+              <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
             </OIcon>
           </div>
           <div class="o2-input">
-            <q-input v-model="form.description" borderless dense />
+            <OInput v-model="form.description" />
           </div>
         </div>
       </div>
@@ -75,18 +73,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
             <OIcon name="info" size="xs" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipResponseType") }}</q-tooltip>
+              <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
             </OIcon>
           </div>
-          <div class="o2-input">
-            <q-select
+          <div class="o2-input" :class="{ 'field-error': errors.response_type }">
+            <OSelect
               v-model="form.response_type"
               :options="responseTypes"
-              emit-value
-              map-options
-              borderless
-              dense
-              :rules="[(val) => !!val || t('evalTemplate.responseTypeRequired')]"
+              labelKey="label"
+              valueKey="value"
+              @update:model-value="errors.response_type = false"
             />
           </div>
         </div>
@@ -94,33 +90,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
             <OIcon name="info" size="xs" class="field-info-icon">
-              <q-tooltip>{{ t("evalTemplate.tooltipDimensions") }}</q-tooltip>
+              <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
             </OIcon>
           </div>
-          <q-select
-            v-model="dimensionsInput"
-            :options="filteredDimensionOptions"
-            color="input-border"
-            bg-color="input-bg"
-            class="no-case dimensions-select tw:w-full"
-            dense
-            borderless
-            multiple
-            use-chips
-            use-input
-            input-debounce="300"
-            new-value-mode="add-unique"
-            no-error-icon
-            @filter="filterDimensions"
-            :rules="[
-              (val) =>
-                (val && val.length > 0) || t('evalTemplate.dimensionRequired'),
-            ]"
-          >
-            <q-tooltip v-if="dimensionsInput.length >= 5" anchor="top middle" self="bottom middle">
-              {{ dimensionsInput.join(", ") }}
-            </q-tooltip>
-          </q-select>
+          <div :class="{ 'field-error': errors.dimensions }">
+            <OSelect
+              v-model="dimensionsInput"
+              :options="defaultDimensionOptions"
+              class="no-case dimensions-select tw:w-full"
+              multiple
+              searchable
+              creatable
+              @update:model-value="errors.dimensions = false"
+            />
+          </div>
+          <OTooltip v-if="dimensionsInput.length >= 5" :content="dimensionsInput.join(', ')" side="top" />
         </div>
       </div>
 
@@ -129,19 +113,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="field-label-row">
           <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
           <OIcon name="info" size="xs" class="field-info-icon">
-            <q-tooltip>{{ t("evalTemplate.tooltipPromptTemplate") }}</q-tooltip>
+            <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
           </OIcon>
         </div>
-        <div class="textarea-border" style="flex: 1; display: flex; flex-direction: column">
-          <q-input
+        <div class="textarea-border" :class="{ 'field-error': errors.content }" style="flex: 1; display: flex; flex-direction: column">
+          <OTextarea
             v-model="form.content"
-            borderless
-            dense
-            type="textarea"
             class="prompt-input"
-            no-error-icon
-            :rules="[(val) => !!val || t('evalTemplate.contentRequired')]"
-            input-style="resize: none; height: 100%"
+            style="resize: none; height: 100%"
+            @update:model-value="errors.content = false"
           />
         </div>
       </div>
@@ -180,6 +160,10 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OTextarea from '@/lib/forms/Input/OTextarea.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 
@@ -244,11 +228,16 @@ const cancel = () => {
 };
 
 const saveTemplate = async () => {
+  errors.value.name = !form.value.name;
+  errors.value.response_type = !form.value.response_type;
+  errors.value.content = !form.value.content;
+  errors.value.dimensions = !dimensionsInput.value.length;
+
   if (
-    !form.value.name ||
-    !form.value.response_type ||
-    !form.value.content ||
-    !dimensionsInput.value.length
+    errors.value.name ||
+    errors.value.response_type ||
+    errors.value.content ||
+    errors.value.dimensions
   ) {
     q.notify({ type: "warning", message: t("evalTemplate.saveRequiredFields") });
     return;

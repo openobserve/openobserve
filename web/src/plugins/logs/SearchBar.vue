@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
-            size="sm"
+            size="lg"
           >
             <template #label>
               <OIcon name="bar-chart" size="xs" />
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
             :disabled="isSqlModeDisabled"
-            size="sm"
+            size="lg"
           >
             <template #label>
               <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
@@ -5453,7 +5453,7 @@ export default defineComponent({
 
 // Toolbar Icon and Toggle Styles
 .toolbar-toggle-container {
-  padding: 0 0.175rem; // 0 ~2.8px
+  padding: 0.25rem 0.375rem; // 4px 6px
   margin-left: 0.25rem; // 8px
   display: flex;
   align-items: center;

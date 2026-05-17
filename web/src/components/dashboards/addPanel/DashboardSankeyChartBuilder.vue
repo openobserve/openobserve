@@ -21,9 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ t("panel.source") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -76,7 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-source-item-${sourceLabel}`"
           >
             {{ sourceLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-source-item-${sourceLabel}-menu`"
@@ -143,9 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ t("panel.target") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -198,7 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-target-item-${targetLabel}`"
           >
             {{ targetLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-target-item-${targetLabel}-menu`"
@@ -265,9 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ t("panel.value") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -320,7 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-value-item-${valueLabel}`"
           >
             {{ valueLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-value-item-${valueLabel}-menu`"
@@ -416,6 +416,7 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
@@ -428,7 +429,8 @@ export default defineComponent({
     DynamicFunctionPopUp,
     DashboardJoinsOption,
     OIcon,
-},
+    OTooltip,
+  },
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

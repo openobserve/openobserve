@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="getReasonLabel(props.row.correlation_reason)"
             outline
           >
-            <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
+            <OTooltip :content="getReasonTooltip(props.row.correlation_reason)" side="top" />
           </q-badge>
         </q-td>
       </template>
@@ -84,6 +84,7 @@ import { useI18n } from "vue-i18n";
 import { date } from "quasar";
 import type { QTableProps } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface IncidentAlert {
   incident_id: string;
@@ -98,6 +99,7 @@ export default defineComponent({
   name: "IncidentAlertTriggersTable",
   components: {
     QTablePagination,
+    OTooltip,
   },
   props: {
     triggers: {

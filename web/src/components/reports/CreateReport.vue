@@ -56,25 +56,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-px-lg q-my-md"
           style="width: 1024px"
         >
-          <q-form
+          <form
             class="create-report-form"
-            ref="addReportFormRef"
-            @submit="onSubmit"
+            @submit.prevent="onSubmit"
           >
             <div
               class="tw:flex tw:items-start tw:gap-4 q-px-sm"
               style="padding-top: 12px"
             >
               <div data-test="add-report-name-input" class="o2-input">
-                <q-input
+                <OInput
                   v-model.trim="formData.name"
                   :label="t('alerts.name') + ' *'"
                   color="input-border"
-                  bg-color="input-bg"
                   class="showLabelOnTop"
-                  stack-label
-                  borderless
-                  dense
                   v-bind:readonly="isEditingReport"
                   v-bind:disable="isEditingReport"
                   :rules="[
@@ -90,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-slot:hint>
                     Characters like :, ?, /, #, and spaces are not allowed.
                   </template>
-                </q-input>
+                </OInput>
               </div>
 
               <div
@@ -114,26 +109,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-report-description-input"
               class="report-name-input o2-input q-px-sm"
             >
-              <q-input
+              <OInput
                 v-model="formData.description"
                 :label="t('reports.description')"
                 color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
                 tabindex="0"
                 style="width: 600px"
               />
             </div>
 
             <div class="tw:flex tw:items-center tw:pt-4">
-              <q-toggle
+              <OSwitch
                 data-test="report-cached-toggle-btn"
                 v-model="isCachedReport"
                 size="lg"
-                class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
                 :label="t('reports.cachedReport')"
               />
               <OIcon
@@ -141,15 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="cursor-pointer q-ml-sm"
                 size="sm"
               >
-                <q-tooltip
-                  v-model="showInfoTooltip"
-                  anchor="center end"
-                  self="center left"
-                  class="tw:text-[12px]"
+                <OTooltip
+                  side="right"
+                  align="center"
                 >
-                  Note: Cached reports are stored for quick access to
-                  dashboards; sharing is disabled for these reports.</q-tooltip
-                >
+                  <template #content>Note: Cached reports are stored for quick access to
+                  dashboards; sharing is disabled for these reports.</template>
+                </OTooltip>
               </OIcon>
             </div>
 
@@ -181,19 +169,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="o2-input q-mr-sm"
                       style="padding-top: 0; width: 30%"
                     >
-                      <q-select
+                      <OSelect
                         v-model="dashboard.folder"
                         :options="folderOptions"
                         :label="t('reports.dashboardFolder') + ' *'"
                         :loading="isFetchingFolders"
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        borderless
-                        stack-label
                         map-options
-                        dense
                         emit-value
                         use-input
                         hide-selected
@@ -220,20 +204,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="o2-input q-mr-sm"
                       style="padding-top: 0; width: 30%"
                     >
-                      <q-select
+                      <OSelect
                         v-model="dashboard.dashboard"
                         :options="dashboardOptions"
                         :label="t('reports.dashboard') + ' *'"
                         :loading="isFetchingDashboard || isFetchingFolders"
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        borderless
                         emit-value
                         map-options
-                        stack-label
-                        dense
                         use-input
                         hide-selected
                         fill-input
@@ -259,20 +239,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="o2-input"
                       style="padding-top: 0; width: 30%"
                     >
-                      <q-select
+                      <OSelect
                         v-model="dashboard.tabs"
                         :options="dashboardTabOptions"
                         :label="t('reports.dashboardTab') + ' *'"
                         :loading="isFetchingDashboard || isFetchingFolders"
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop"
-                        borderless
                         emit-value
                         map-options
-                        stack-label
-                        dense
                         use-input
                         hide-selected
                         fill-input
@@ -349,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="col-auto o2-input"
                           data-test="add-report-type-select"
                         >
-                          <q-select
+                          <OSelect
                             v-model="dashboard.report_type"
                             :options="[
                               { label: 'PDF (default)', value: 'pdf' },
@@ -358,13 +334,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ]"
                             emit-value
                             map-options
-                            borderless
-                            dense
                             :label="t('reports.reportType')"
                             color="input-border"
-                            bg-color="input-bg"
                             class="showLabelOnTop"
-                            stack-label
                             style="min-width: 180px"
                           />
                         </div>
@@ -375,20 +347,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="col-auto o2-input"
                           data-test="add-report-attachment-type-select"
                         >
-                          <q-select
+                          <OSelect
                             v-model="dashboard.email_attachment_type"
                             :options="
                               attachmentTypeOptions(dashboard.report_type)
                             "
                             emit-value
                             map-options
-                            borderless
-                            dense
                             :label="t('reports.attachmentType')"
                             color="input-border"
-                            bg-color="input-bg"
                             class="showLabelOnTop"
-                            stack-label
                             style="min-width: 200px"
                           >
                             <template v-slot:option="scope">
@@ -410,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </q-item-section>
                               </q-item>
                             </template>
-                          </q-select>
+                          </OSelect>
                         </div>
                       </div>
 
@@ -421,7 +389,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-png-note"
                       >
                         <q-banner
-                          dense
                           rounded
                           class="bg-orange-1 text-orange-9"
                           style="font-size: 13px"
@@ -464,44 +431,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="row q-col-gutter-md q-pt-sm"
                         >
                           <div class="col-auto o2-input">
-                            <q-input
+                            <OInput
                               :model-value="
                                 dashboard.attachment_dimensions?.width ?? ''
                               "
                               @update:model-value="
                                 (v) => setDimension(dashboard, 'width', v)
                               "
-                              borderless
-                              dense
                               type="number"
                               min="1"
                               :label="t('reports.dimensionWidth')"
                               color="input-border"
-                              bg-color="input-bg"
                               class="showLabelOnTop"
-                              stack-label
                               style="min-width: 120px"
                               placeholder="e.g. 1440"
                               data-test="add-report-dimension-width"
                             />
                           </div>
                           <div class="col-auto o2-input">
-                            <q-input
+                            <OInput
                               :model-value="
                                 dashboard.attachment_dimensions?.height ?? ''
                               "
                               @update:model-value="
                                 (v) => setDimension(dashboard, 'height', v)
                               "
-                              borderless
-                              dense
                               type="number"
                               min="1"
                               :label="t('reports.dimensionHeight')"
                               color="input-border"
-                              bg-color="input-bg"
                               class="showLabelOnTop"
-                              stack-label
                               style="min-width: 120px"
                               placeholder="e.g. 900"
                               data-test="add-report-dimension-height"
@@ -586,8 +545,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'text-grey-7'
                             "
                           >
-                            <q-tooltip anchor="center right" self="center left">
-                              <span style="font-size: 14px">
+                            <OTooltip side="right" align="center">
+                              <template #content><span style="font-size: 14px">
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
@@ -601,15 +560,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 daily. It specifies second, minute, hour, day of
                                 month, month, and day of week,
                                 respectively.</span
-                              >
-                            </q-tooltip>
+                              ></template>
+                            </OTooltip>
                           </OIcon>
                         </div>
-                        <q-input
-                          filled
+                        <OInput
                           v-model="frequency.cron"
                           color="input-border"
-                          bg-color="input-bg"
                           type="text"
                           outlined
                           :rules="[
@@ -620,14 +577,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   : true
                                 : 'Field is required!',
                           ]"
-                          dense
                           style="width: 100%"
                           debounce="400"
                           @update:model-value="validateFrequency"
                         />
                       </div>
                       <div class="o2-input">
-                        <q-select
+                        <OSelect
                           data-test="add-report-schedule-start-timezone-select"
                           v-model="scheduling.timezone"
                           :options="filteredTimezone"
@@ -641,7 +597,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           use-input
                           @filter="timezoneFilterFn"
                           input-debounce="0"
-                          dense
                           emit-value
                           fill-input
                           hide-selected
@@ -649,8 +604,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :display-value="`Timezone: ${timezone}`"
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           class="timezone-select showLabelOnTop"
-                          stack-label
-                          borderless
                           style="width: 300px"
                         />
                       </div>
@@ -679,16 +632,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="cursor-pointer q-ml-sm"
                         size="sm"
                       >
-                        <q-tooltip
-                          anchor="center end"
-                          self="center left"
-                          class="tw:text-[12px]"
-                        >
-                          "Schedule Now" will schedule the report using the
+                        <OTooltip side="right" align="center">
+                          <template #content>"Schedule Now" will schedule the report using the
                           current date, time, and timezone.<br />
                           In "Schedule Later" you can customize the date, time,
-                          and timezone.
-                        </q-tooltip>
+                          and timezone.</template>
+                        </OTooltip>
                       </OIcon>
                     </div>
 
@@ -701,17 +650,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input q-mr-sm"
                         style="padding-top: 0; width: 160px"
                       >
-                        <q-input
-                          filled
+                        <OInput
                           v-model="frequency.custom.interval"
                           label="Repeat every *"
                           color="input-border"
-                          bg-color="input-bg"
                           class="showLabelOnTop"
-                          stack-label
                           type="number"
-                          borderless
-                          dense
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           style="width: 100%"
                         />
@@ -722,18 +666,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="o2-input"
                         style="padding-top: 0; width: 160px"
                       >
-                        <q-select
+                        <OSelect
                           v-model="frequency.custom.period"
                           :options="customFrequencyOptions"
                           :label="'Frequency *'"
                           :popup-content-style="{ textTransform: 'capitalize' }"
                           color="input-border"
-                          bg-color="input-bg"
                           class="q-pt-sm q-pb-none showLabelOnTop no-case"
-                          borderless
                           emit-value
-                          stack-label
-                          dense
                           behavior="menu"
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           style="width: 100% !important"
@@ -750,91 +690,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-schedule-start-date-input"
                         class="o2-input q-mr-sm"
                       >
-                        <q-input
-                          borderless
+                        <ODate
                           v-model="scheduling.date"
-                          label="Start Date *"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          :rules="[
-                            (val: any) =>
-                              /^(0[1-9]|[12]\d|3[01])-(0[1-9]|1[0-2])-\d{4}$/.test(
-                                val,
-                              ) || 'Date format is incorrect!',
-                          ]"
-                          stack-label
-                          dense
-                          style="width: 160px"
-                        >
-                          <template v-slot:append>
-                            <OIcon name="event" size="sm" class="cursor-pointer">
-                              <q-popup-proxy
-                                cover
-                                transition-show="scale"
-                                transition-hide="scale"
-                              >
-                                <q-date
-                                  v-model="scheduling.date"
-                                  mask="DD-MM-YYYY"
-                                >
-                                  <div class="row items-center justify-end">
-                                    <OButton
-                                      v-close-popup="true"
-                                      variant="outline"
-                                      size="sm-action"
-                                    >
-                                      Close
-                                    </OButton>
-                                  </div>
-                                </q-date>
-                              </q-popup-proxy>
-                            </OIcon>
-                          </template>
-                        </q-input>
+                          :label="'Start Date *'"
+                          data-test="add-report-schedule-start-date-field"
+                        />
                       </div>
                       <div
                         data-test="add-report-schedule-start-time-input"
                         class="o2-input q-mr-sm"
                       >
-                        <q-input
+                        <OTime
                           v-model="scheduling.time"
-                          label="Start Time *"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          mask="time"
-                          :rules="['time']"
-                          stack-label
-                          borderless
-                          dense
-                          style="width: 160px"
-                        >
-                          <template v-slot:append>
-                            <OIcon name="access-time" size="sm" class="cursor-pointer">
-                              <q-popup-proxy
-                                cover
-                                transition-show="scale"
-                                transition-hide="scale"
-                              >
-                                <q-time v-model="scheduling.time">
-                                  <div class="row items-center justify-end">
-                                    <OButton
-                                      v-close-popup="true"
-                                      variant="outline"
-                                      size="sm-action"
-                                    >
-                                      Close
-                                    </OButton>
-                                  </div>
-                                </q-time>
-                              </q-popup-proxy>
-                            </OIcon>
-                          </template>
-                        </q-input>
+                          :label="'Start Time *'"
+                          data-test="add-report-schedule-start-time-field"
+                        />
                       </div>
                       <div class="o2-input">
-                        <q-select
+                        <OSelect
                           data-test="add-report-schedule-start-timezone-select"
                           v-model="scheduling.timezone"
                           :options="filteredTimezone"
@@ -848,7 +721,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           use-input
                           @filter="timezoneFilterFn"
                           input-debounce="0"
-                          dense
                           emit-value
                           fill-input
                           hide-selected
@@ -856,8 +728,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :display-value="`Timezone: ${timezone}`"
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           class="timezone-select showLabelOnTop"
-                          stack-label
-                          borderless
                           style="width: 300px"
                         />
                       </div>
@@ -902,15 +772,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-share-title-input"
                     class="report-name-input o2-input"
                   >
-                    <q-input
+                    <OInput
                       v-model="formData.title"
                       :label="t('reports.title') + ' *'"
                       color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      borderless
-                      dense
                       :rules="[
                         (val: any) => !!val.trim() || 'Field is required!',
                       ]"
@@ -923,15 +789,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-report-share-recipients-input"
                     class="report-name-input o2-input"
                   >
-                    <q-input
+                    <OInput
                       v-model="emails"
                       :label="t('reports.recipients') + ' *'"
                       color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      borderless
-                      dense
                       :rules="[
                         (val: any) =>
                           /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/.test(
@@ -949,9 +811,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div data-test="add-report-share-message-input">
-                      <q-input
+                      <OInput
                         v-model="formData.message"
-                        filled
                         type="textarea"
                       />
                     </div>
@@ -963,10 +824,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:items-center tw:pt-4"
                     data-test="add-report-image-preview-section"
                   >
-                    <q-toggle
+                    <OSwitch
                       v-model="formData.imagePreview"
                       size="lg"
-                      class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
@@ -975,11 +835,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="cursor-pointer q-ml-sm"
                       size="sm"
                     >
-                      <q-tooltip max-width="320px">
-                        Captures a PNG screenshot of the dashboard and embeds it
+                      <OTooltip max-width="320px">
+                        <template #content>Captures a PNG screenshot of the dashboard and embeds it
                         inline in the email body alongside the PDF attachment
-                        for a quick visual preview.
-                      </q-tooltip>
+                        for a quick visual preview.</template>
+                      </OTooltip>
                     </OIcon>
                   </div>
                 </div>
@@ -996,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-stepper-navigation>
               </q-step>
             </q-stepper>
-          </q-form>
+          </form>
         </div>
       </div>
     </div>
@@ -1041,7 +901,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from "vue";
+import { ref } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -1070,6 +930,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ODate from "@/lib/forms/Date/ODate.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getFoldersListByType } from "@/utils/commons";
 
 const props = defineProps({
@@ -1135,8 +1001,6 @@ const isCachedReport = ref(false);
 const showInfoTooltip = ref(false);
 
 const originalReportData: Ref<string> = ref("");
-
-const addReportFormRef: Ref<any> = ref(null);
 
 const step = ref(1);
 
@@ -1614,15 +1478,8 @@ const saveReport = async () => {
   if (isCachedReport.value) reportPayload.destinations = [];
 
   // Check if all report input fields are valid
-  try {
-    validateReportData();
-    await nextTick();
-    await nextTick();
-    const isValidForm = await addReportFormRef.value.validate();
-    if (!isValidForm) return;
-  } catch (err) {
-    console.log(err);
-  }
+  const isValidForm = await validateReportData();
+  if (!isValidForm) return;
 
   // This is unitil we support multiple dashboards and tabs
   if (reportPayload.dashboards[0]?.tabs)
@@ -1691,20 +1548,20 @@ const saveReport = async () => {
   });
 };
 
-const validateReportData = async () => {
+const validateReportData = async (): Promise<boolean> => {
   if (!formData.value.dashboards[0].folder) {
     step.value = 1;
-    return;
+    return false;
   }
 
   if (!formData.value.dashboards[0].dashboard) {
     step.value = 1;
-    return;
+    return false;
   }
 
   if (!formData.value.dashboards[0].tabs) {
     step.value = 1;
-    return;
+    return false;
   }
 
   if (formData.value.dashboards[0].timerange) {
@@ -1713,7 +1570,7 @@ const validateReportData = async () => {
       !formData.value.dashboards[0].timerange.period
     ) {
       step.value = 1;
-      return;
+      return false;
     }
 
     if (
@@ -1724,7 +1581,7 @@ const validateReportData = async () => {
       )
     ) {
       step.value = 1;
-      return;
+      return false;
     }
   }
 
@@ -1738,23 +1595,23 @@ const validateReportData = async () => {
       validateFrequency();
     } catch (err) {
       cronError.value = "Invalid cron expression!";
-      return;
+      return false;
     }
   }
 
   if (formData.value.frequency.type === "cron" && cronError.value) {
     step.value = 2;
-    return;
+    return false;
   }
 
   if (!formData.value.frequency.interval || !formData.value.frequency.type) {
     step.value = 2;
-    return;
+    return false;
   }
 
   if (!formData.value.start || !formData.value.timezone) {
     step.value = 2;
-    return;
+    return false;
   }
 
   if (
@@ -1764,8 +1621,10 @@ const validateReportData = async () => {
     )
   ) {
     step.value = 3;
-    return;
+    return false;
   }
+
+  return true;
 };
 
 const validateFrequency = () => {

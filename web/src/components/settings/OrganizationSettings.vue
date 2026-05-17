@@ -11,79 +11,48 @@
       data-test="add-role-rolename-input-btn"
       class="trace-id-field-name o2-input q-mb-sm"
     >
-      <q-input
+      <OInput
         v-model.trim="traceIdFieldName"
         :label="t('settings.traceIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
         class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidTraceField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
+        :error="!!traceIdFieldNameError"
+        :error-message="traceIdFieldNameError"
+        help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
+        @update:model-value="updateFieldName('trace'); traceIdFieldNameError = ''"
+      />
     </div>
 
     <div
       data-test="add-role-rolename-input-btn"
       class="span-id-field-name o2-input"
     >
-      <q-input
+      <OInput
         v-model.trim="spanIdFieldName"
         :label="t('settings.spanIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
         class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidSpanField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-        @update:model-value="updateFieldName('span')"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
+        :error="!!spanIdFieldNameError"
+        :error-message="spanIdFieldNameError"
+        help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
+        @update:model-value="updateFieldName('span'); spanIdFieldNameError = ''"
+      />
     </div>
 
     <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
-      <q-toggle
+      <OSwitch
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
-        stack-label
-        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-        size="lg"
-      >
-      </q-toggle>
+        class="q-mt-sm"
+      />
     </div>
 
     <div data-test="add-toggle-usage-stream" class="o2-input">
-      <q-toggle
+      <OSwitch
         data-test="add-toggle-usage-stream-btn"
         v-model="usageStreamEnabled"
         :label="t('settings.usageStreamEnabledLabel')"
-        stack-label
-        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-        size="lg"
-      >
-      </q-toggle>
+        class="q-mt-sm"
+      />
     </div>
 
     <!-- Cross-Linking Configuration -->
@@ -124,6 +93,8 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import config from "@/aws-exports";
 
 const { t } = useI18n();
@@ -142,6 +113,8 @@ const q = useQuasar();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);
+const traceIdFieldNameError = ref('');
+const spanIdFieldNameError = ref('');
 const toggleIngestionLogs = ref(
   store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
     false,
@@ -182,7 +155,27 @@ const updateFieldName = (fieldName: string) => {
     isValidTraceField.value = validateFieldName(traceIdFieldName.value);
 };
 
+const validateOrgSettings = () => {
+  let valid = true;
+  if (!traceIdFieldName.value) {
+    traceIdFieldNameError.value = t('common.nameRequired');
+    valid = false;
+  } else if (!isValidTraceField.value) {
+    traceIdFieldNameError.value = `Use alphanumeric and '+=,.@-_' characters only, without spaces.`;
+    valid = false;
+  }
+  if (!spanIdFieldName.value) {
+    spanIdFieldNameError.value = t('common.nameRequired');
+    valid = false;
+  } else if (!isValidSpanField.value) {
+    spanIdFieldNameError.value = `Use alphanumeric and '+=,.@-_' characters only, without spaces.`;
+    valid = false;
+  }
+  return valid;
+};
+
 const saveOrgSettings = async () => {
+  if (!validateOrgSettings()) return;
   try {
     const payload: any = {
       trace_id_field_name: traceIdFieldName.value,

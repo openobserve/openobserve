@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="cpuUsage.max"
                       />
                     </div>
-                    <q-range
+                    <ORange
                       data-test="nodes-filter-cpuusage-range-slider"
                       :model-value="cpuUsage"
                       @change="
@@ -325,8 +325,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxCPUUsage"
-                      label-side
-                      size="25px"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
@@ -359,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="memoryUsage.max"
                       />
                     </div>
-                    <q-range
+                    <ORange
                       data-test="nodes-filter-memoryusage-range-slider"
                       :model-value="memoryUsage"
                       @change="
@@ -369,8 +367,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxMemoryUsage"
-                      label-side
-                      size="25px"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
@@ -410,8 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="establishedUsage.max"
                       />
                     </div>
-                    <q-range
-                      :disable="!establishedToggle"
+                    <ORange
+                      :disabled="!establishedToggle"
                       data-test="nodes-filter-tcp-established-range-slider"
                       :model-value="establishedUsage"
                       @change="
@@ -421,8 +417,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxEstablished"
-                      label-side
-                      size="25px"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
 
@@ -453,8 +447,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="closewaitUsage.max"
                       />
                     </div>
-                    <q-range
-                      :disable="!closewaitToggle"
+                    <ORange
+                      :disabled="!closewaitToggle"
                       data-test="nodes-filter-tcp-closewait-range-slider"
                       :model-value="closewaitUsage"
                       @change="
@@ -464,8 +458,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxClosewait"
-                      label-side
-                      size="25px"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
 
@@ -496,8 +488,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="waittimeUsage.max"
                       />
                     </div>
-                    <q-range
-                      :disable="!waittimeToggle"
+                    <ORange
+                      :disabled="!waittimeToggle"
                       data-test="nodes-filter-tcp-waittime-range-slider"
                       :model-value="waittimeUsage"
                       @change="
@@ -507,8 +499,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxWaittime"
-                      label-side
-                      size="25px"
                       class="tw:w-[85%] q-mt-md q-ml-md"
                     />
                   </q-card-section>
@@ -678,6 +668,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORange from "@/lib/forms/Range/ORange.vue";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -692,6 +683,7 @@ export default defineComponent({
     OInput,
     OCheckbox,
     OTooltip,
+    ORange,
     OIcon,
 },
   setup() {

@@ -63,10 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
             <!-- Search for Alerts -->
-            <q-input
+            <OInput
               v-model="dynamicQueryModel"
-              dense
-              borderless
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
@@ -84,47 +82,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
               <template v-if="isCompactToolbar" #append>
-                <q-toggle
-                  data-test="alert-list-search-across-folders-toggle"
-                  v-model="searchAcrossFolders"
-                  class="o2-toggle-button-xs"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-toggle-button-xs-dark'
-                      : 'o2-toggle-button-xs-light'
-                  "
-                  size="xs"
-                >
-                  <q-tooltip>
-                    {{
-                      searchAcrossFolders
-                        ? t('dashboard.searchSelf')
-                        : t('dashboard.searchAll')
-                    }}
-                  </q-tooltip>
-                </q-toggle>
+                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="bottom">
+                  <OSwitch
+                    data-test="alert-list-search-across-folders-toggle"
+                    v-model="searchAcrossFolders"
+                  />
+                </OTooltip>
               </template>
-            </q-input>
+            </OInput>
             <!-- All Folders toggle (normal resolution) -->
             <div v-if="!isCompactToolbar" class="tw:ml-2">
-              <q-toggle
-                data-test="alert-list-search-across-folders-toggle"
-                v-model="searchAcrossFolders"
-                label="All Folders"
-                class="tw:h-[32px] tw:mr-3 o2-toggle-button-lg all-folders-toggle"
-                size="lg"
-              />
-              <q-tooltip
-                class="q-mt-lg"
-                anchor="top middle"
-                self="bottom middle"
-              >
-                {{
-                  searchAcrossFolders
-                    ? t("dashboard.searchSelf")
-                    : t("dashboard.searchAll")
-                }}
-              </q-tooltip>
+              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                <OSwitch
+                  data-test="alert-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  :label="t('dashboard.allFolders')"
+                />
+              </OTooltip>
             </div>
           </div>
           <!-- Import button -->
@@ -142,9 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="upload-file"
           >
             <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-            <q-tooltip v-if="isCompactToolbar">
-              {{ t("dashboard.import") }}
-            </q-tooltip>
+            <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
           </OButton>
           <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
           <OButton
@@ -205,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-tr :props="props">
                     <!-- Adding this block to render the select-all checkbox -->
                     <q-th auto-width>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         data-test="alert-list-select-all-checkbox"
                         size="sm"
@@ -231,10 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template v-slot:body-selection="scope">
-                  <q-checkbox
+                  <OCheckbox
                     v-model="scope.selected"
                     size="sm"
-                    color="secondary"
                   />
                 </template>
                 <template v-slot:body="props">
@@ -245,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="triggerExpand(props)"
                   >
                     <q-td>
-                      <q-checkbox
+                      <OCheckbox
                         v-model="props.selected"
                         size="sm"
                         class="o2-table-checkbox"
@@ -276,21 +247,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                           <span>{{ computedName(props.row[col.field]) }}</span>
                         </div>
-                        <q-tooltip
+                        <OTooltip
                           v-if="props.row[col.field]?.length > 30"
-                          class="alert-name-tooltip"
-                        >
-                          {{ props.row[col.field] }}
-                        </q-tooltip>
+                          :content="props.row[col.field]"
+                          side="top"
+                        />
                       </template>
                       <template v-else-if="col.name === 'owner'">
                         {{ computedOwner(props.row[col.field]) }}
-                        <q-tooltip
+                        <OTooltip
                           v-if="props.row[col.field]?.length > 15"
-                          class="alert-name-tooltip"
-                        >
-                          {{ props.row[col.field] }}
-                        </q-tooltip>
+                          :content="props.row[col.field]"
+                          side="top"
+                        />
                       </template>
                       <template
                         v-else-if="
@@ -319,17 +288,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :label="props.row.status"
                             style="text-transform: capitalize; cursor: default"
                           >
-                            <q-tooltip
-                              v-if="
-                                props.row.status === 'failed' &&
-                                props.row.last_error
-                              "
-                              max-width="400px"
-                              anchor="top middle"
-                              self="bottom middle"
-                            >
-                              {{ props.row.last_error }}
-                            </q-tooltip>
+                            <OTooltip
+                              v-if="props.row.status === 'failed' && props.row.last_error"
+                              :content="props.row.last_error"
+                              side="top"
+                            />
                           </q-badge>
                         </template>
                         <span v-else class="tw:block">--</span>
@@ -572,12 +535,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template v-slot:body-cell-function="props">
                   <q-td :props="props">
-                    <q-tooltip>
+                    <OTooltip side="top">
+                      <template #trigger><pre style="white-space: break-spaces">{{ props.row.sql }}</pre></template>
                       <pre>{{ props.row.sql }}</pre>
-                    </q-tooltip>
-                    <pre style="white-space: break-spaces">{{
-                      props.row.sql
-                    }}</pre>
+                    </OTooltip>
                   </q-td>
                 </template>
 
@@ -740,43 +701,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
         </template>
-        <q-form @submit="submitForm">
-          <q-input
+        <div>
+          <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
             label="Alert Name"
-            class="showLabelOnTop"
-            stack-label
-            hide-bottom-space
-            borderless
-            dense
           />
-          <q-select
+          <OSelect
             data-test="to-be-clone-stream-type"
             v-model="toBeClonestreamType"
             label="Stream Type"
             :options="streamTypes"
             @update:model-value="updateStreams()"
-            borderless
-            dense
-            class="showLabelOnTop no-case tw:mt-[1px]"
+            class="tw:mt-1"
           />
-          <q-select
+          <OSelect
             data-test="to-be-clone-stream-name"
             v-model="toBeClonestreamName"
-            :loading="isFetchingStreams"
-            :disable="!toBeClonestreamType"
+            :disabled="!toBeClonestreamType"
             label="Stream Name"
-            :options="streamNames"
-            @change="updateStreamName"
-            @filter="filterStreams"
-            use-input
-            fill-input
-            hide-selected
-            :input-debounce="400"
-            borderless
-            dense
-            class="showLabelOnTop no-case tw:mt-[1px] q-mb-sm"
+            :options="indexOptions"
+            searchable
+            @update:model-value="updateStreamName"
+            class="tw:mt-1 tw:mb-2"
           />
           <div class="q-mb-lg">
             <SelectFolderDropDown
@@ -785,7 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :activeFolderId="folderIdToBeCloned"
             />
           </div>
-        </q-form>
+        </div>
       </ODialog>
       <MoveAcrossFolders
         v-model:open="showMoveAlertDialog"
@@ -866,6 +813,11 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -890,6 +842,10 @@ export default defineComponent({
     OIcon,
     ODialog,
     OSpinner,
+    OInput,
+    OSelect,
+    OSwitch,
+    OTooltip,
   },
   emits: [
     "update:changeRecordPerPage",

@@ -35,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="layout-name">
             {{ currentXLabel }}
             <OIcon name="info-outline" size="sm" class="q-ml-xs">
-              <q-tooltip>
-                {{ xAxisHint }}
-              </q-tooltip>
+              <OTooltip :content="xAxisHint" />
             </OIcon>
           </div>
           <span class="layout-separator">:</span>
@@ -200,23 +198,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : t("panel.breakdown")
             }}
             <OIcon name="info-outline" size="sm" class="q-ml-xs">
-              <q-tooltip>
-                <span v-if="dashboardPanelData.data.type == 'table'">
-                  {{ t("panel.pivotFieldTooltip") }}
-                </span>
-                <span
-                  v-else-if="
-                    dashboardPanelData.data.type == 'h-bar' ||
-                    dashboardPanelData.data.type == 'h-stacked'
-                  "
-                >
-                  {{ t("panel.breakdownTooltipHBar") }}
-                </span>
-
-                <span v-else>
-                  {{ t("panel.breakdownTooltipDefault") }}
-                </span>
-              </q-tooltip>
+              <OTooltip side="top" align="center">
+                <template #content>
+                  <span v-if="dashboardPanelData.data.type == 'table'">{{
+                    t("panel.pivotFieldTooltip")
+                  }}</span>
+                  <span
+                    v-else-if="
+                      dashboardPanelData.data.type == 'h-bar' ||
+                      dashboardPanelData.data.type == 'h-stacked'
+                    "
+                    >{{ t("panel.breakdownTooltipHBar") }}</span
+                  >
+                  <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
+                </template>
+              </OTooltip>
             </OIcon>
           </div>
           <span class="layout-separator">:</span>
@@ -363,9 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ currentYLabel }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ yAxisHint }}
-          </q-tooltip>
+          <OTooltip :content="yAxisHint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -431,7 +425,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-y-item-${itemY?.alias}`"
             >
               {{ yLabel[index] }}
-              <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+              <template #icon-right
+                ><OIcon name="arrow-drop-down" size="sm"
+              /></template>
               <q-menu
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
                 class="field-function-menu-popup"
@@ -513,9 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
           }}
           <OIcon name="info-outline" size="sm" class="q-ml-xs">
-            <q-tooltip>
-              {{ zAxisHint }}
-            </q-tooltip>
+            <OTooltip :content="zAxisHint" />
           </OIcon>
         </div>
         <span class="layout-separator">:</span>
@@ -721,6 +715,7 @@ import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -739,7 +734,8 @@ export default defineComponent({
     OperationsList,
     PromQLBuilderOptions,
     OIcon,
-},
+    OTooltip,
+  },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],
   setup(props) {

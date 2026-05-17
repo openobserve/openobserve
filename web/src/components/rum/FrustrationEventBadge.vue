@@ -27,21 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="frustration-event-badge"
       :data-test="`frustration-event-badge-${type}`"
     >
-      <q-tooltip
-        anchor="top middle"
-        self="bottom middle"
-        :offset="[0, 8]"
-        class="bg-grey-8"
+      <OTooltip
+        side="top"
+        align="center"
+        :sideOffset="8"
+        :content="getTooltipText(type)"
         data-test="frustration-event-badge-tooltip"
-      >
-        {{ getTooltipText(type) }}
-      </q-tooltip>
+      />
     </q-badge>
   </span>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   frustrationTypes: string[];

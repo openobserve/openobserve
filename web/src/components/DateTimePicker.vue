@@ -97,23 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div class="row q-gutter-sm">
                 <div class="col">
-                  <q-input
+                  <OInput
                     v-model="data.selectedDate.relative.value"
                     type="number"
-                    dense
-                    filled
-                    min="1"
+                    :min="1"
                     @change="calculateMaxValue"
-                  ></q-input>
+                  />
                 </div>
                 <div class="col">
-                  <q-select
+                  <OSelect
                     v-model="data.selectedDate.relative.period"
                     :options="relativePeriods"
-                    dense
-                    filled
-                    @update:modelValue="onCustomPeriodSelect"
-                  ></q-select>
+                    @update:model-value="onCustomPeriodSelect"
+                  />
                 </div>
               </div>
             </div>
@@ -121,16 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="absolute">
           <div class="date-time-table">
-            <div class="flex justify-center q-pa-none">
-              <q-date
-                v-model="data.selectedDate.absolute.date"
-                class="absolute-calendar"
-                range
-                :locale="{
-                  daysShort: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
-                }"
-              />
-            </div>
+            <ODateRangeCalendar
+              :start-date="data.selectedDate.absolute.date.from"
+              :end-date="data.selectedDate.absolute.date.to"
+              :max-date="calendarMaxDate"
+              @update:start-date="data.selectedDate.absolute.date.from = $event"
+              @update:end-date="data.selectedDate.absolute.date.to = $event"
+            />
             <div class="notePara">{{ t("common.datetimeMessage") }}</div>
             <q-separator class="q-my-sm" />
 
@@ -141,64 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </tr>
               <tr>
                 <td>
-                  <q-input
-                    v-model="data.selectedDate.absolute.startTime"
-                    dense
-                    filled
-                    mask="time"
-                    :rules="['time']"
-                  >
-                    <template #append>
-                      <OIcon name="access-time" size="sm" class="cursor-pointer">
-                        <q-popup-proxy
-                          transition-show="scale"
-                          transition-hide="scale"
-                        >
-                          <q-time
-                            v-model="data.selectedDate.absolute.startTime"
-                          >
-                            <div class="row items-center justify-end">
-                              <OButton
-                                v-close-popup="true"
-                                variant="ghost-primary"
-                                size="xs"
-                                >{{ t("common.close") }}</OButton
-                              >
-                            </div>
-                          </q-time>
-                        </q-popup-proxy>
-                      </OIcon>
-                    </template>
-                  </q-input>
+                  <OTime v-model="data.selectedDate.absolute.startTime" />
                 </td>
                 <td>
-                  <q-input
-                    v-model="data.selectedDate.absolute.endTime"
-                    dense
-                    filled
-                    mask="time"
-                    :rules="['time']"
-                  >
-                    <template #append>
-                      <OIcon name="access-time" size="sm" class="cursor-pointer">
-                        <q-popup-proxy
-                          transition-show="scale"
-                          transition-hide="scale"
-                        >
-                          <q-time v-model="data.selectedDate.absolute.endTime">
-                            <div class="row items-center justify-end">
-                              <OButton
-                                v-close-popup="true"
-                                variant="ghost-primary"
-                                size="xs"
-                                >{{ t("common.close") }}</OButton
-                              >
-                            </div>
-                          </q-time>
-                        </q-popup-proxy>
-                      </OIcon>
-                    </template>
-                  </q-input>
+                  <OTime v-model="data.selectedDate.absolute.endTime" />
                 </td>
               </tr>
             </table>
@@ -210,10 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+// @ts-nocheck
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
+import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";
@@ -221,9 +165,16 @@ import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "DateTimePicker",
-  components: { OTabPanels, OTabPanel, OButton,
+  components: {
+    OTabPanels,
+    OTabPanel,
+    OButton,
     OIcon,
-},
+    OInput,
+    OSelect,
+    OTime,
+    ODateRangeCalendar,
+  },
   props: {
     modelValue: {
       type: Object,
@@ -401,6 +352,13 @@ export default defineComponent({
       displayValue,
       calculateMaxValue,
       getImageURL,
+      calendarMaxDate: computed(() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, "0");
+        const d = String(today.getDate()).padStart(2, "0");
+        return `${y}/${m}/${d}`;
+      }),
     };
   },
 });

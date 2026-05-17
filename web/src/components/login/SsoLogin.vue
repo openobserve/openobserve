@@ -42,31 +42,23 @@
       >
 
       <div v-show="showLoginInput" class="o2-input login-inputs q-pt-lg">
-        <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
-          <q-input
+        <div class="q-gutter-md">
+          <OInput
             v-model="name"
             data-cy="login-user-id"
             data-test="login-user-id"
-            outlined
             :label="`${t('login.userEmail')} *`"
             placeholder="Email"
-            class="showLabelOnTop no-case"
-            dense
-            stack-label
-            filled
+            type="email"
           />
 
-          <q-input
+          <OInput
             v-model="password"
             data-cy="login-password"
             data-test="login-password"
-            outlined
             :label="`${t('login.password')} *`"
             placeholder="Password"
-            class="showLabelOnTop no-case"
-            dense
-            stack-label
-            filled
+            type="password"
           />
 
           <div class="q-mt-lg q-mb-xl">
@@ -82,7 +74,7 @@
               {{ t('login.signIn') }}
             </OButton>
           </div>
-        </q-form>
+        </div>
       </div>
     </div>
   </div>
@@ -94,6 +86,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 
 const store = useStore();
 
