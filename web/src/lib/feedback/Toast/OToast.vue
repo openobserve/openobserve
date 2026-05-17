@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { ToastProps, ToastEmits } from "./OToast.types"
 import { computed } from "vue"
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   ToastRoot,
   ToastTitle,
@@ -24,14 +25,6 @@ import {
   ToastAction,
   ToastClose,
 } from "reka-ui"
-import {
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Info,
-  Loader2,
-  X,
-} from "lucide-vue-next"
 
 defineOptions({ inheritAttrs: false })
 
@@ -113,26 +106,16 @@ const screenReaderTitle = computed(() =>
       :class="['tw:mt-0.5 tw:shrink-0', iconColorClasses[variant ?? 'default']]"
       aria-hidden="true"
     >
-      <Loader2
-        v-if="variant === 'loading'"
-        class="tw:size-5 tw:animate-spin"
-      />
-      <CheckCircle2
-        v-else-if="variant === 'success'"
-        class="tw:size-5"
-      />
-      <XCircle
-        v-else-if="variant === 'error'"
-        class="tw:size-5"
-      />
-      <AlertTriangle
-        v-else-if="variant === 'warning'"
-        class="tw:size-5"
-      />
-      <Info
-        v-else-if="variant === 'info'"
-        class="tw:size-5"
-      />
+      <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
+        class="tw:size-5 tw:animate-spin" />
+      <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'"
+        class="tw:size-5" />
+      <OIcon name="cancel" size="sm" v-else-if="variant === 'error'"
+        class="tw:size-5" />
+      <OIcon name="warning" size="sm" v-else-if="variant === 'warning'"
+        class="tw:size-5" />
+      <OIcon name="info" size="sm" v-else-if="variant === 'info'"
+        class="tw:size-5" />
     </div>
 
     <!-- Content -->
@@ -176,7 +159,7 @@ const screenReaderTitle = computed(() =>
       class="tw:shrink-0 tw:mt-0.5 tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border"
       aria-label="Dismiss notification"
     >
-      <X class="tw:size-4" aria-hidden="true" />
+      <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
     </ToastClose>
   </ToastRoot>
 </template>

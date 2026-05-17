@@ -12,7 +12,7 @@
             :placeholder="t('regex_patterns.search')"
           >
           <template #prepend>
-            <q-icon class="o2-search-input-icon"  name="search" />
+            <OIcon class="o2-search-input-icon"  name="search" size="sm" />
           </template>
         </OInput>
           <OButton
@@ -105,27 +105,24 @@
                   size="icon-xs-sq"
                   title="Export Regex Pattern"
                   @click.stop="exportRegexPattern(props.row)"
-                >
-                  <template #icon-left><Download class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                  icon-left="download"
+                />
                 <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-update-regex-pattern`"
                   variant="ghost"
                   size="icon-xs-sq"
                   :title="t('regex_patterns.edit')"
                   @click.stop="editRegexPattern(props.row)"
-                >
-                  <template #icon-left><Pencil class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                  icon-left="edit"
+                />
                 <OButton
                   :data-test="`regex-pattern-list-${props.row.id}-delete-regex-pattern`"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   :title="t('regex_patterns.delete')"
                   @click.stop="confirmDeleteRegexPattern(props.row)"
-                >
-                  <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                  icon-left="delete"
+                />
               </div>
             </template>
           </q-td>
@@ -143,8 +140,8 @@
               variant="outline"
               size="sm-action"
               @click="openBulkDeleteDialog"
+              icon-left="delete"
             >
-              <template #icon-left><Trash2 class="tw:size-3.5 tw:shrink-0" /></template>
               Delete
             </OButton>
             <QTablePagination
@@ -206,9 +203,8 @@
     import ImportRegexPattern from "./ImportRegexPattern.vue";
     import config from "@/aws-exports";
     import NoData from "@/components/shared/grid/NoData.vue";
-    import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-    import OButton from "@/lib/core/Button/OButton.vue";
-    import { Pencil, Trash2, Download } from "lucide-vue-next";
+        import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
     import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     import OInput from "@/lib/forms/Input/OInput.vue";
     import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -223,13 +219,11 @@
             ImportRegexPattern,
             NoData,
             OButton,
-            Pencil,
-            Trash2,
-            Download,
             OSpinner,
             OInput,
             OCheckbox,
-        },
+            OIcon,
+},
     setup() {
 
     const regexPatternListTableRef = ref(null);
@@ -569,7 +563,7 @@
         closeAddRegexPatternDialog,
         visibleRows,
         hasVisibleRows,
-        outlinedDelete,
+        "delete": "delete",
         selectedPatterns,
         confirmBulkDelete,
         openBulkDeleteDialog,

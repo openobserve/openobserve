@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="semantic-groups-import-file-drawer"
         >
           <template v-slot:prepend>
-            <q-icon name="cloud_upload" />
+            <OIcon name="cloud-upload" size="sm" />
           </template>
           <template v-slot:append>
-            <q-icon
+            <OIcon
               v-if="jsonFile"
-              name="close"
+              name="close" size="sm"
               @click.stop="clearFile"
               class="cursor-pointer"
             />
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="q-mb-md">
             <div class="section-header text-positive q-pa-sm">
-              <q-icon name="add_circle" size="sm" />
+              <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click.stop="viewGroup(group)"
                   >
-                    <q-icon name="visibility" />
+                    <OIcon name="visibility" size="sm" />
                   </OButton>
                 </q-item-section>
               </q-item>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="q-mb-md">
             <div class="section-header text-warning q-pa-sm">
-              <q-icon name="edit" size="sm" />
+              <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click.stop="viewModification(mod)"
                   >
-                    <q-icon name="compare" />
+                    <OIcon name="compare" size="sm" />
                   </OButton>
                 </q-item-section>
               </q-item>
@@ -209,10 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty State -->
       <div v-else class="empty-state text-center q-pa-lg">
-        <q-icon
-          name="cloud_upload"
+        <OIcon
+          name="cloud-upload"
           size="64px"
-          color="grey-5"
           class="q-mb-md"
         />
         <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
@@ -315,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ma-xs"
           >
             {{ field }}
-            <q-icon
+            <OIcon
               v-if="isNewField(field)"
               name="add"
               size="xs"
@@ -337,6 +336,7 @@ import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface SemanticGroup {
   id: string;

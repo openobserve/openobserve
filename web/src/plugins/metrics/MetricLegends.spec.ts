@@ -50,8 +50,8 @@ describe("MetricLegends", () => {
           'q-btn': { 
             template: '<button class="q-btn" data-cy="metric-legends-button"><slot /></button>' 
           },
-          'q-icon': { 
-            template: '<i class="q-icon" :class="name"><slot /></i>',
+          'OIcon': { 
+            template: '<i class="OIcon" :class="name"><slot /></i>',
             props: ['name']
           },
           'q-menu': { 
@@ -179,7 +179,7 @@ describe("MetricLegends", () => {
     });
 
     it("should render category icon in button", () => {
-      const icon = wrapper.find('.q-icon.category');
+      const icon = wrapper.find('.OIcon.category');
       expect(icon.exists()).toBe(true);
     });
 
@@ -258,7 +258,7 @@ describe("MetricLegends", () => {
     it("should render icon for each legend item", () => {
       const legendItems = wrapper.findAll('.legend-item');
       legendItems.forEach(item => {
-        const icon = item.find('.q-icon');
+        const icon = item.find('.OIcon');
         expect(icon.exists()).toBe(true);
       });
     });
@@ -267,7 +267,7 @@ describe("MetricLegends", () => {
       const legendItems = wrapper.findAll('.legend-item');
       const summaryItem = legendItems.find(item => item.text().includes('Summary'));
       if (summaryItem) {
-        const icon = summaryItem.find('.q-icon');
+        const icon = summaryItem.find('.OIcon');
         expect(icon.classes()).toContain('description');
       }
     });
@@ -276,7 +276,7 @@ describe("MetricLegends", () => {
       const legendItems = wrapper.findAll('.legend-item');
       const gaugeItem = legendItems.find(item => item.text().includes('Gauge'));
       if (gaugeItem) {
-        const icon = gaugeItem.find('.q-icon');
+        const icon = gaugeItem.find('.OIcon');
         expect(icon.classes()).toContain('speed');
       }
     });
@@ -285,7 +285,7 @@ describe("MetricLegends", () => {
       const legendItems = wrapper.findAll('.legend-item');
       const histogramItem = legendItems.find(item => item.text().includes('Histogram'));
       if (histogramItem) {
-        const icon = histogramItem.find('.q-icon');
+        const icon = histogramItem.find('.OIcon');
         expect(icon.classes()).toContain('bar_chart');
       }
     });
@@ -294,7 +294,7 @@ describe("MetricLegends", () => {
       const legendItems = wrapper.findAll('.legend-item');
       const counterItem = legendItems.find(item => item.text().includes('Counter'));
       if (counterItem) {
-        const icon = counterItem.find('.q-icon');
+        const icon = counterItem.find('.OIcon');
         expect(icon.classes()).toContain('pin');
       }
     });
@@ -559,7 +559,7 @@ describe("MetricLegends", () => {
       const legendItems = wrapper.findAll('.legend-item');
       
       legendItems.forEach(item => {
-        const icon = item.find('.q-icon');
+        const icon = item.find('.OIcon');
         const text = item.text();
         
         expect(icon.exists()).toBe(true);
@@ -568,7 +568,7 @@ describe("MetricLegends", () => {
     });
 
     it("should have consistent spacing classes", () => {
-      const categoryIcon = wrapper.find('.q-icon.category');
+      const categoryIcon = wrapper.find('.OIcon.category');
       expect(categoryIcon.classes()).toContain('q-mr-sm');
     });
   });

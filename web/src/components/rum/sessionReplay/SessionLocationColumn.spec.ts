@@ -63,7 +63,7 @@ describe("SessionLocationColumn", () => {
           store,
         },
         stubs: {
-          "q-icon": {
+          "OIcon": {
             template:
               '<i data-test="icon" :class="name" :style="`font-size: ${size}`"></i>',
             props: ["name", "size"],

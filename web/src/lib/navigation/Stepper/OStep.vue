@@ -3,8 +3,8 @@ import type { OStepProps, OStepSlots } from './OStep.types'
 import type { StepperContext, StepperRegisterAPI } from './OStepper.types'
 import { computed, inject, onMounted, onUnmounted, watch, type ComputedRef, type Component } from 'vue'
 import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from './OStepper.types'
-import { Check, AlertCircle } from 'lucide-vue-next'
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = withDefaults(defineProps<OStepProps>(), {
   done: false,
   error: false,
@@ -133,8 +133,8 @@ const triggerClasses = computed<string>(() => {
         :title="title"
         @click="handleClick"
       >
-        <Check v-if="done && !error" class="tw:size-4" :stroke-width="2.5" />
-        <AlertCircle v-else-if="error" class="tw:size-4" :stroke-width="2.5" />
+        <OIcon name="check" size="sm" v-if="done && !error" class="tw:size-4" :stroke-width="2.5" />
+        <OIcon name="error-outline" size="sm" v-else-if="error" class="tw:size-4" :stroke-width="2.5" />
         <component :is="icon as Component" v-else-if="icon" class="tw:size-4" />
         <span v-else aria-hidden="true">{{ name }}</span>
       </button>

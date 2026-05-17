@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('function.searchEnrichmentTable')"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
               </OInput>
               <OButton
@@ -91,11 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Url
                         <span v-if="props.row.urlJobs.length > 1" class="text-grey-7"> ({{ props.row.urlJobs.length }})</span>
                       </span>
-                      <q-icon
+                      <OIcon
                         v-if="props.row.aggregateStatus === 'completed'"
-                        name="check_circle"
-                        color="positive"
-                        size="18px"
+                        name="check-circle"
+                        size="sm"
                       >
                         <OTooltip>
                           <template #content>
@@ -107,12 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </template>
                         </OTooltip>
-                      </q-icon>
-                      <q-icon
+                      </OIcon>
+                      <OIcon
                         v-else-if="props.row.aggregateStatus === 'processing'"
                         name="sync"
-                        color="primary"
-                        size="18px"
+                        size="sm"
                         class="rotate-animation"
                       >
                         <OTooltip>
@@ -125,12 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </template>
                         </OTooltip>
-                      </q-icon>
-                      <q-icon
+                      </OIcon>
+                      <OIcon
                         v-else-if="props.row.aggregateStatus === 'failed'"
                         name="warning"
-                        color="negative"
-                        size="18px"
+                        size="sm"
                         class="cursor-pointer"
                         @click="showUrlJobsDialog(props.row)"
                       >
@@ -144,12 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </template>
                         </OTooltip>
-                      </q-icon>
-                      <q-icon
+                      </OIcon>
+                      <OIcon
                         v-else-if="props.row.aggregateStatus === 'pending'"
                         name="schedule"
-                        color="grey-7"
-                        size="18px"
+                        size="sm"
                       >
                         <OTooltip>
                           <template #content>
@@ -161,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                           </template>
                         </OTooltip>
-                      </q-icon>
+                      </OIcon>
                     </template>
                   </div>
                 </q-td>
@@ -175,9 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="exploreEnrichmentTable(props)"
-                  >
-                    <Search :size="14" />
-                  </OButton>
+                    icon-left="search"
+                  />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
                   <OButton
@@ -186,9 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="listSchema(props)"
-                  >
-                    <List :size="14" />
-                  </OButton>
+                    icon-left="format-list-bulleted"
+                  />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
                   <OButton
@@ -197,9 +191,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    icon-left="edit"
+                  />
 
                   <!-- Delete button - always visible -->
                   <OButton
@@ -207,9 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost-destructive"
                     size="icon-sm"
                     @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
+                    icon-left="delete"
+                  />
                 </q-td>
               </template>
 
@@ -236,9 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm-action"
                       class="q-mr-sm"
-                      @click="openBulkDeleteDialog"
+                      icon-left="delete"
                     >
-                      <Trash2 :size="14" class="tw:mr-1" />
                       Delete
                     </OButton>
                   </div>
@@ -366,17 +357,16 @@ import {
   verifyOrganizationStatus,
 } from "../../utils/zincutils";
 import streamService from "@/services/stream";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -392,12 +382,8 @@ export default defineComponent({
     OInput,
     OTooltip,
     OCheckbox,
-    Search,
-    List,
-    Pencil,
-    Trash2,
-    X,
-  },
+    OIcon,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -655,17 +641,17 @@ export default defineComponent({
       {
         label: t("function.filterAll"),
         value: "all",
-        icon: LayoutList,
+        icon: "format-list-bulleted",
       },
       {
         label: t("function.filterFile"),
         value: "uploaded",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: t("function.filterUrl"),
         value: "file_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
 
@@ -991,7 +977,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
-      outlinedDelete,
+      "delete": "delete",
       filterQuery,
       filterData,
       getImageURL,

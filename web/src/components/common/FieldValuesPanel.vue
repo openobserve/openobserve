@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="valueSearchTerm = ''"
         >
           <template #prepend>
-            <q-icon name="search" size="0.875rem" />
+            <OIcon name="search" size="0.875rem" />
           </template>
         </OInput>
       </div>
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
         >
-          <q-icon name="close" size="0.6rem" />
+          <OIcon name="close" size="0.6rem" />
         </OButton>
       </div>
       <div
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          <OIcon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
             <EqualIcon />
-          </q-icon>
+          </OIcon>
         </OButton>
         <OButton
           :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
@@ -85,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <q-icon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
+          <OIcon class="tw:h-[0.6rem]! tw:w-[0.6rem]! tw:m-[0.1rem]!">
             <NotEqualIcon />
-          </q-icon>
+          </OIcon>
         </OButton>
       </div>
     </div>
@@ -191,6 +191,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -496,11 +497,11 @@ defineExpose({ reset });
     height: 1.65rem !important;
   }
 
-  &:deep(.q-field__append .q-icon) {
+  &:deep(.q-field__append .OIcon) {
     font-size: 0.875rem;
   }
 
-  .q-icon {
+  .OIcon {
     line-height: 1.3;
   }
 }

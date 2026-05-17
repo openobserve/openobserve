@@ -268,9 +268,9 @@ describe("ValueMappingPopUp", () => {
       expect(wrapper.vm.dragOptions).toEqual({ animation: 200 });
     });
 
-    it("should expose outlinedCancel icon", () => {
+    it("should expose "cancel" icon", () => {
       wrapper = createWrapper();
-      expect(typeof wrapper.vm.outlinedCancel).toBe("string");
+      expect(typeof wrapper.vm."cancel").toBe("string");
     });
   });
 

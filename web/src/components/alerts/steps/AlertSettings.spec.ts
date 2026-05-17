@@ -786,7 +786,7 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should have info tooltips", () => {
-      const infoIcons = wrapper.findAll(".q-icon");
+      const infoIcons = wrapper.findAll(".OIcon");
       const hasInfoIcon = infoIcons.some((icon) =>
         icon.html().includes("info")
       );

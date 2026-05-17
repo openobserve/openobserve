@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="note-heading">Condition value Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     >To check for an empty value, use
                     <span class="highlight">""</span>. Example:
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     >To check for an Null value, use
                     <span class="highlight">null</span>. Example:
@@ -79,21 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     >To add a custom column, type column name and press
                     <span class="highlight">Enter</span>.</span
                   >
                 </div>
                 <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <OIcon name="warning" size="sm" class="q-mr-sm" />
                   <span
                     >If conditions are not met, the record will be
                     dropped.</span
                   >
                 </div>
                 <div>
-                  <q-icon name="warning" color="red" class="q-mr-sm" />
+                  <OIcon name="warning" size="sm" class="q-mr-sm" />
                   <span
                     >If the record does not have the specified field, it will be
                     dropped.</span
@@ -159,6 +159,7 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";

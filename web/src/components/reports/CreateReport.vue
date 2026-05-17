@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Go Back"
             @click="router.back()"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
           <div
             v-if="isEditingReport"
@@ -136,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pl-0 o2-toggle-button-lg tw:h-[36px] tw:ml-1"
                 :label="t('reports.cachedReport')"
               />
-              <q-icon
-                name="info_outline"
+              <OIcon
+                name="info-outline"
                 class="cursor-pointer q-ml-sm"
-                size="16px"
+                size="sm"
               >
                 <q-tooltip
                   v-model="showInfoTooltip"
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Note: Cached reports are stored for quick access to
                   dashboards; sharing is disabled for these reports.</q-tooltip
                 >
-              </q-icon>
+              </OIcon>
             </div>
 
             <q-stepper
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-report-select-dashboard-step"
                 :name="1"
                 title="Select Dashboard"
-                :icon="outlinedDashboard"
+                icon="dashboard"
                 :done="step > 1"
               >
                 <template
@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="font-size: 13px"
                         >
                           <template v-slot:avatar>
-                            <q-icon name="info" color="orange-7" />
+                            <OIcon name="info" size="sm" />
                           </template>
                           PNG captures only the first visible page of the
                           dashboard. Use PDF if the dashboard spans multiple
@@ -446,11 +446,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="font-size: 14px; color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
-                          <q-icon
+                          <OIcon
                             :name="
                               showCustomDimensions
-                                ? 'expand_less'
-                                : 'expand_more'
+                                ? 'expand-less'
+                                : 'expand-more'
                             "
                             size="18px"
                             class="q-mr-xs"
@@ -539,7 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="q-my-sm q-px-sm">
                   <!-- <div class="flex justify-start items-center q-py-sm">
-                <q-icon name="event" class="q-mr-sm" />
+                <OIcon name="event" size="sm" class="q-mr-sm" />
                 <div style="font-size: 14px">
                   The report will be sent immediately after it is saved and will
                   be sent every hour.
@@ -576,8 +576,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div class="q-mb-xs text-bold text-grey-8">
                           {{ t("reports.cronExpression") + " *" }}
-                          <q-icon
-                            :name="outlinedInfo"
+                          <OIcon
+                            name="info"
                             size="17px"
                             class="q-ml-xs cursor-pointer"
                             :class="
@@ -603,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 respectively.</span
                               >
                             </q-tooltip>
-                          </q-icon>
+                          </OIcon>
                         </div>
                         <q-input
                           filled
@@ -674,10 +674,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OToggleGroup>
-                      <q-icon
-                        name="info_outline"
+                      <OIcon
+                        name="info-outline"
                         class="cursor-pointer q-ml-sm"
-                        size="16px"
+                        size="sm"
                       >
                         <q-tooltip
                           anchor="center end"
@@ -689,7 +689,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           In "Schedule Later" you can customize the date, time,
                           and timezone.
                         </q-tooltip>
-                      </q-icon>
+                      </OIcon>
                     </div>
 
                     <div
@@ -768,7 +768,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 160px"
                         >
                           <template v-slot:append>
-                            <q-icon name="event" class="cursor-pointer">
+                            <OIcon name="event" size="sm" class="cursor-pointer">
                               <q-popup-proxy
                                 cover
                                 transition-show="scale"
@@ -789,7 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </div>
                                 </q-date>
                               </q-popup-proxy>
-                            </q-icon>
+                            </OIcon>
                           </template>
                         </q-input>
                       </div>
@@ -811,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 160px"
                         >
                           <template v-slot:append>
-                            <q-icon name="access_time" class="cursor-pointer">
+                            <OIcon name="access-time" size="sm" class="cursor-pointer">
                               <q-popup-proxy
                                 cover
                                 transition-show="scale"
@@ -829,7 +829,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </div>
                                 </q-time>
                               </q-popup-proxy>
-                            </q-icon>
+                            </OIcon>
                           </template>
                         </q-input>
                       </div>
@@ -970,17 +970,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <q-icon
-                      name="info_outline"
+                    <OIcon
+                      name="info-outline"
                       class="cursor-pointer q-ml-sm"
-                      size="16px"
+                      size="sm"
                     >
                       <q-tooltip max-width="320px">
                         Captures a PNG screenshot of the dashboard and embeds it
                         inline in the email body alongside the PDF attachment
                         for a quick visual preview.
                       </q-tooltip>
-                    </q-icon>
+                    </OIcon>
                   </div>
                 </div>
                 <q-stepper-navigation>
@@ -1055,7 +1055,6 @@ import {
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
 import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
@@ -1064,11 +1063,11 @@ import reports from "@/services/reports";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getFoldersListByType } from "@/utils/commons";

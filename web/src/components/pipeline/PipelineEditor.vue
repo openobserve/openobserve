@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="hideOnPrintMode"
             data-test="pipeline-json-edit-btn"
             @click="openJsonEditor"
+            icon-left="code"
           >
-            <template #icon-left><Code2 class="tw:size-4 tw:shrink-0" /></template>
             <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
           </OButton>
           <OButton
@@ -203,7 +203,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { Code2, Maximize2, Minimize2 } from "lucide-vue-next";
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

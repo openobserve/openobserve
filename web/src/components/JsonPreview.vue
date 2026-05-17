@@ -8,7 +8,7 @@
       :class="copyButtonClass"
       @click="copyToClipboard"
     >
-      <q-icon name="content_copy" />
+      <OIcon name="content-copy" size="sm" />
       <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
     </OButton>
     <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
@@ -36,7 +36,7 @@
             class="q-ml-sm log-json-field-dropdown-btn"
             aria-label="Add icon"
           >
-            <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+            <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
           </OButton>
         </template>
         <div class="logs-table-list tw:min-w-[180px]">
@@ -80,6 +80,7 @@ import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default {

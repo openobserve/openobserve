@@ -33,9 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
       <div class="col-auto q-ml-sm">
-        <OButton variant="ghost" size="icon-sm" @click="dismissWarning">
-          <q-icon name="close" size="1rem" />
-        </OButton>
+        <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
       </div>
     </div>
   </div>

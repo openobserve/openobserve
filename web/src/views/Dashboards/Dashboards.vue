@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-search"
             >
               <template #icon-left>
-                <q-icon name="search" />
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
 
@@ -62,11 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- import dashboard button with dropdown -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="sm" data-test="dashboard-import">
+              <OButton variant="outline" size="sm" data-test="dashboard-import" icon-right="expand-more">
                 {{ t(`dashboard.import`) }}
-                <template #icon-right>
-                  <q-icon name="expand_more" size="xs" />
-                </template>
               </OButton>
             </template>
             <ODropdownItem
@@ -133,13 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="outline"
                         size="icon"
+                        icon-left="add"
                         class="tw:h-7 tw:w-8"
                         @click.stop="addFolder"
                         data-test="dashboard-new-folder-btn"
                         title="Add Folder"
-                      >
-                        <q-icon name="add" size="xs" />
-                      </OButton>
+                      />
                     </div>
                   </div>
                   <q-separator
@@ -156,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:w-full"
                     >
                       <template #icon-left>
-                        <q-icon name="search" />
+                        <OIcon name="search" size="sm" />
                       </template>
                     </OInput>
                     <div></div>
@@ -200,18 +196,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OButton
                                 size="icon"
                                 variant="ghost"
+                                icon-left="more-vert"
                                 class="tw:h-6 tw:w-6"
                                 data-test="dashboard-more-icon"
-                              >
-                                <q-icon name="more_vert" size="xs" />
-                              </OButton>
+                              />
                             </template>
                             <ODropdownItem
                               @select="editFolder(tab.folderId)"
                               data-test="dashboard-edit-folder-icon"
                             >
                               <template #icon-left>
-                                <q-icon :name="outlinedEdit" size="xs" />
+                                <OIcon name="edit" size="xs" />
                               </template>
                               Edit
                             </ODropdownItem>
@@ -220,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="dashboard-delete-folder-icon"
                             >
                               <template #icon-left>
-                                <q-icon :name="outlinedDelete" size="xs" />
+                                <OIcon name="delete" size="xs" />
                               </template>
                               Delete
                             </ODropdownItem>
@@ -350,20 +345,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="showMoveDashboardPanel(props.row)"
                         data-test="dashboard-move-to-another-folder"
                       >
-                        <q-icon :name="outlinedDriveFileMove" size="16px" />
+                        <OIcon name="drive-file-move" size="sm" />
                       </OButton>
                       <OButton
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.duplicate')"
                         size="icon"
+                        icon-left="content-copy"
                         variant="ghost"
                         @click.stop="
                           duplicateDashboard(props.row.id, props.row.folder_id)
                         "
                         data-test="dashboard-duplicate"
-                      >
-                        <q-icon name="content_copy" size="16px" />
-                      </OButton>
+                      />
                       <OButton
                         v-if="props.row.actions == 'true'"
                         :title="t('dashboard.delete')"
@@ -372,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="showDeleteDialogFn(props)"
                         data-test="dashboard-delete"
                       >
-                        <q-icon :name="outlinedDelete" size="16px" />
+                        <OIcon name="delete" size="sm" />
                       </OButton>
                     </div>
                   </q-td>
@@ -392,10 +386,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="q-mr-sm tw:h-9"
                         data-test="dashboard-list-move-across-folders-btn"
                         @click="moveMultipleDashboards"
+                        icon-left="drive-file-move"
                       >
-                        <template #icon-left>
-                          <q-icon :name="outlinedDriveFileMove" size="16px" />
-                        </template>
                         Move
                       </OButton>
                       <OButton
@@ -403,12 +395,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="sm"
                         class="q-mr-sm tw:h-9"
+                        icon-left="download"
                         data-test="dashboard-list-export-dashboards-btn"
                         @click="multipleExportDashboard"
                       >
-                        <template #icon-left>
-                          <q-icon name="download" size="16px" />
-                        </template>
                         Export
                       </OButton>
                       <OButton
@@ -416,12 +406,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline"
                         size="sm"
                         class="q-mr-sm tw:h-9"
+                        icon-left="delete"
                         data-test="dashboard-list-delete-dashboards-btn"
                         @click="openBulkDeleteDialog"
                       >
-                        <template #icon-left>
-                          <q-icon name="delete" size="16px" />
-                        </template>
                         Delete
                       </OButton>
                     </div>
@@ -529,6 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -566,11 +555,6 @@ import {
   getFoldersList,
   moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
-import {
-  outlinedDelete,
-  outlinedDriveFileMove,
-  outlinedEdit,
-} from "@quasar/extras/material-icons-outlined";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { filter, forIn } from "lodash-es";
@@ -598,6 +582,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
     OInput,
@@ -1394,9 +1379,6 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedEdit,
-      outlinedDriveFileMove,
       routeToViewD,
       showDeleteDialogFn,
       confirmDeleteDialog,

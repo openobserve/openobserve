@@ -16,7 +16,7 @@
         variant="outline"
         class="tw:mb-[0.375rem] q-mr-sm"
         @click="copyLogToClipboard"
-      ><q-icon name="content_copy" size="14px" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
@@ -25,7 +25,7 @@
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <q-icon name="link" size="14px" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
@@ -49,7 +49,7 @@
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><q-icon :name="outlinedAccountTree" size="14px" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><OIcon name="account-tree" size="xs" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
@@ -86,7 +86,7 @@
               class="q-ml-sm log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
-              <q-icon :name="dropdownOpenMap[key] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
             </OButton>
           </template>
           <ODropdownItem
@@ -120,8 +120,8 @@
           <ODropdownItem
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
+            icon-left="visibility"
           >
-            <template #icon-left><q-icon name="visibility" size="16px" /></template>
             {{ addOrRemoveLabel(key) }}
           </ODropdownItem>
           <!-- Cross-link options -->
@@ -132,8 +132,8 @@
               :key="crossLink.name"
               :data-test="`log-details-cross-link-${crossLink.name}`"
               @select.stop="openCrossLink(crossLink.resolvedUrl)"
+              icon-left="open-in-new"
             >
-              <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
@@ -197,7 +197,7 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy" size="xs" class="q-mr-sm" />
+          <OIcon name="content-copy" size="xs" class="q-mr-sm" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
@@ -245,7 +245,7 @@ import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -263,7 +263,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { AlignLeft, FileJson } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -316,6 +315,7 @@ export default {
     ChunkedContent,
     OButton,
     ODialog,
+    OIcon,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -375,12 +375,12 @@ export default {
       {
         value: "flattened",
         label: t("search.flattened"),
-        icon: AlignLeft,
+        icon: "align-left",
       },
       {
         value: "unflattened",
         label: t("search.original"),
-        icon: FileJson,
+        icon: "description",
       },
     ];
 
@@ -901,7 +901,6 @@ export default {
       getImageURL,
       addSearchTerm,
       addFieldToTable,
-      outlinedAccountTree,
       dropdownOpenMap,
       store,
       searchObj,

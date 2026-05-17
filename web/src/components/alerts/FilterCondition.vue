@@ -26,7 +26,7 @@
             class="tw:h-[26px] tw:flex-shrink-0 operator-toggle-btn"
             @click="toggleOperator"
           >
-            <q-icon name="restart_alt" />
+            <OIcon name="restart-alt" size="sm" />
             <OTooltip content="Toggle between and/or" />
           </OButton>
         </template>
@@ -144,8 +144,8 @@
 
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
   var triggerOperators: any = ref([
   "=",

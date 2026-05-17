@@ -27,6 +27,7 @@ import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constant
 
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
@@ -482,8 +483,8 @@ function getIcon(data, ioType) {
 
       <div class="icon-container " style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
+        <OIcon
+          :name="getIcon(data, io-type)"
           size="1.5em"
           class="q-my-sm q-mr-sm"
         />
@@ -514,7 +515,7 @@ function getIcon(data, ioType) {
         class="error-badge"
         @click.stop="navigateToFunction(data.name)"
       >
-        <q-icon name="error" size="sm" />
+        <OIcon name="error" size="sm" />
         <span v-if="pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]?.error_count" class="error-count">
           {{ pipelineObj.currentSelectedPipeline.last_error.node_errors[id].error_count }}
         </span>
@@ -542,7 +543,7 @@ function getIcon(data, ioType) {
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
         >
-          <q-icon name="delete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -573,8 +574,8 @@ function getIcon(data, ioType) {
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
+        <OIcon
+          :name="getIcon(data, io-type)"
            size="1.5em"
           class="q-my-sm q-mr-sm"
         />
@@ -621,7 +622,7 @@ function getIcon(data, ioType) {
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
         >
-          <q-icon name="delete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -651,8 +652,8 @@ function getIcon(data, ioType) {
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
+        <OIcon
+          :name="getIcon(data, io-type)"
           size="1.5em"
           class="q-my-sm q-mr-sm"
         />
@@ -686,7 +687,7 @@ function getIcon(data, ioType) {
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
         >
-          <q-icon name="delete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -716,8 +717,8 @@ function getIcon(data, ioType) {
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
+        <OIcon
+          :name="getIcon(data, io-type)"
           size="1.5em"
           class="q-my-sm q-mr-sm"
         />
@@ -752,7 +753,7 @@ function getIcon(data, ioType) {
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
         >
-          <q-icon name="delete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -780,8 +781,8 @@ function getIcon(data, ioType) {
 
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
+        <OIcon
+          :name="getIcon(data, io-type)"
           size="1.5em"
           class="q-my-sm q-mr-sm"
         />
@@ -816,7 +817,7 @@ function getIcon(data, ioType) {
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
         >
-          <q-icon name="delete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -844,8 +845,8 @@ function getIcon(data, ioType) {
     >
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon
-          :name="getIcon(data, io_type)"
+        <OIcon
+          :name="getIcon(data, io-type)"
           size="1.5em"
           class="q-my-sm q-mr-sm"
         />
@@ -902,7 +903,7 @@ function getIcon(data, ioType) {
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
         >
-          <q-icon name="delete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
         <div v-if="showDeleteTooltip" class="custom-tooltip delete-tooltip" style="left: 15px;">
           Delete Node
@@ -1036,7 +1037,7 @@ function getIcon(data, ioType) {
   color: var(--node-color) !important;
   transition: all 0.2s ease !important;
   
-  .q-icon {
+  .OIcon {
     font-size: 1.3em !important;
   }
   
@@ -1149,7 +1150,7 @@ function getIcon(data, ioType) {
     z-index: 20;
   }
 
-  .q-icon {
+  .OIcon {
     font-size: 0.9em !important;
     color: white !important;
   }

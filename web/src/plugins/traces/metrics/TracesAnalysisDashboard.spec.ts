@@ -585,7 +585,7 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       const tab = wrapper.vm.availableTabs[0];
       expect(tab.name).toBe("volume");
-      expect(tab.icon).toBe("trending_up");
+      expect(tab.icon).toBe("trending-up");
     });
 
     it("should include 'duration' tab with correct icon", async () => {
@@ -603,7 +603,7 @@ describe("TracesAnalysisDashboard", () => {
       await flushPromises();
       const tab = wrapper.vm.availableTabs[0];
       expect(tab.name).toBe("error");
-      expect(tab.icon).toBe("error_outline");
+      expect(tab.icon).toBe("error-outline");
     });
   });
 

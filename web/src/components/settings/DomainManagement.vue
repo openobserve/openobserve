@@ -54,8 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-muted"
             size="icon-xs-sq"
             @click="showVrlInfo = true"
+            icon-left="help-outline"
           >
-            <template #icon-left><q-icon name="help_outline" /></template>
             <OTooltip :content="t('settings.claimParserFunctionInfoTitle')" side="top" />
           </OButton>
         </div>
@@ -76,12 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div>
                   <OButton
+                    icon-left="close"
                     variant="ghost"
                     size="icon"
                     @click="showVrlInfo = false"
-                  >
-                    <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-                  </OButton>
+                />
                 </div>
               </div>
 
@@ -106,13 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
                     <div>
                       <OButton
+                        icon-left="refresh"
                         variant="ghost-muted"
                         size="icon-xs-sq"
                         @click="loadRecentErrors"
                         :loading="loadingErrors"
                       >
-                        <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-                        <OTooltip :content="t('common.refresh')" side="top" />
+                            <OTooltip :content="t('common.refresh')" side="top" />
                       </OButton>
                     </div>
                   </div>
@@ -132,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="error-item tw:p-2 tw:mb-1"
                     >
                       <div class="tw:flex tw:items-start tw:mb-1">
-                        <q-icon name="error" color="negative" size="xs" class="tw:mr-1 tw:mt-1" />
+                        <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
                         <div class="tw:flex-1">
                           <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
                           <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
@@ -144,13 +143,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Show More Button -->
                     <div class="tw:mt-2 tw:text-center">
                       <OButton
+                        icon-right="open-in-new"
                         variant="ghost-primary"
                         size="sm"
                         @click="viewAllErrors"
                       >
                         {{ t('common.showMore') }}
-                        <template #icon-right><ExternalLink class="tw:size-3.5 tw:shrink-0" /></template>
-                      </OButton>
+                          </OButton>
                     </div>
                   </div>
                 </div>
@@ -214,13 +213,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="domain-header row items-center justify-between q-px-md q-py-sm">
           <div class="text-body1 text-bold">{{ domain.name }}</div>
           <OButton
+            icon-left="close"
             variant="ghost-destructive"
             size="icon-xs-sq"
             @click="removeDomain(index)"
             :title="t('common.delete')"
-          >
-            <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+          />
         </div>
 
         <div class="q-pa-md">
@@ -281,13 +279,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="text-body2">{{ email }}</div>
                 <OButton
+                  icon-left="close"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   @click="removeEmail(domain, emailIndex)"
                   :title="t('common.delete')"
-                >
-                  <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                />
               </div>
             </div>
           </div>
@@ -325,7 +322,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { add, formatDistanceToNow } from "date-fns";

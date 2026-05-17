@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default {
   props: {
     nodeTypes: Array,
@@ -64,7 +65,7 @@ export default {
         </q-tooltip>
         <div class="node-content">
           <div class="node-icon-section">
-            <q-icon size="1.3em" :name="node.icon" />
+            <OIcon size="1.3em" :name="node.icon" />
             <q-separator vertical class="node-separator" />
           </div>
           <div class="node-label tw:w-[70px]">{{ node.label }}</div>

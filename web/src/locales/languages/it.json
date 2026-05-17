@@ -396,7 +396,8 @@
     "traces": "Tracce",
     "switchToLogs": "clicca per tornare a Logs",
     "patternNoValuesAvailable": "Nessun valore disponibile",
-    "selectLogStream": "Seleziona lo stream dei log"
+    "selectLogStream": "Seleziona lo stream dei log",
+    "noData": "Nessun dato disponibile"
   },
   "menu": {
     "home": "Home",

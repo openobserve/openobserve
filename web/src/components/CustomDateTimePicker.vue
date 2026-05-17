@@ -13,11 +13,11 @@
       @click="picker.showMenu = !picker.showMenu"
     >
       <template v-if="!changeStyle" #icon-left>
-        <q-icon name="schedule" />
+        <OIcon name="schedule" size="sm" />
       </template>
       {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
       <template #icon-right>
-        <q-icon name="arrow_drop_down" />
+        <OIcon name="arrow-drop-down" size="sm" />
       </template>
     </OButton>
     <q-menu
@@ -93,6 +93,7 @@
 
 <script setup>
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, reactive, watch, computed } from "vue";
@@ -262,10 +263,10 @@ const computedClass = computed(() => {
   min-width: auto;
   background: rgba(89, 96, 178, 0.2) !important;
 
-  .q-icon.on-right {
+  .OIcon.on-right {
     transition: transform 0.25s ease;
   }
-  &.isOpen .q-icon.on-right {
+  &.isOpen .OIcon.on-right {
     transform: rotate(180deg);
   }
 

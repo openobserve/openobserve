@@ -202,7 +202,7 @@ const createWrapper = (props = {}, options = {}) => {
           emits: ["update:modelValue"],
         },
         QIcon: {
-          template: "<span data-test-stub='q-icon' :title='title'></span>",
+          template: "<span data-test-stub='OIcon' :title='title'></span>",
           props: ["name", "size", "title"],
         },
         QItem: {

@@ -2,6 +2,7 @@
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
 import { computed } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 
@@ -287,8 +288,12 @@ function handleClick(event: MouseEvent): void {
     v-bind="$attrs"
     @click="handleClick"
   >
-    <slot name="icon-left" />
+    <slot name="icon-left">
+      <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
+    </slot>
     <slot />
-    <slot name="icon-right" />
+    <slot name="icon-right">
+      <OIcon v-if="iconRight" :name="iconRight" size="sm" />
+    </slot>
   </Primitive>
 </template>

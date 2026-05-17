@@ -18,7 +18,7 @@
               :data-test="`promql-label-filter-${index}`"
             >
               {{ computedLabel(label) }}
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
+              <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               <q-menu class="q-pa-md">
                 <div style="width: 350px">
                   <!-- Label Selection -->
@@ -127,8 +127,8 @@
               size="icon-chip"
               @click="removeLabel(index)"
               :data-test="`promql-label-filter-remove-${index}`"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </OButtonGroup>
         </div>
@@ -141,7 +141,7 @@
           class="add-filter-btn"
           data-test="promql-add-label-filter"
         >
-          <q-icon name="add" size="14px" />
+          <OIcon name="add" size="xs" />
           <OTooltip content="Add label filter" side="top" />
         </OButton>
       </div>
@@ -155,6 +155,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";

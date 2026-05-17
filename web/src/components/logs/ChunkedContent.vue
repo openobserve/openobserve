@@ -52,7 +52,7 @@ Usage:
         size="sm-action"
         @click="handleLoadMore"
       >
-        <q-icon name="expand_more" size="14px" class="q-mr-xs" />
+        <OIcon name="expand-more" size="xs" class="q-mr-xs" />
         Load more ({{ chunkInfo.loadedSizeKB }}KB / {{ chunkInfo.totalSizeKB }}KB)
       </OButton>
       <span class="tw-text-sm tw-font-medium" style="color: var(--q-primary)">
@@ -67,6 +67,7 @@ import { computed, onMounted, watch } from "vue";
 import { useChunkedContent } from "@/composables/useChunkedContent";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface ChunkedContentProps {
   data: any;

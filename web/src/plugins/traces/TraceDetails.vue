@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mr-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon name="arrow_back" size="16px" />
+              <OIcon name="arrow-back" size="sm" />
               <OTooltip :content="areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')" />
             </OButton>
 
@@ -90,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
 
                 <!-- Copy Trace ID Button -->
-                <q-icon
+                <OIcon
                   data-test="trace-details-copy-trace-id-btn"
-                  name="content_copy"
-                  size="12px"
+                  name="content-copy"
+                  size="xs"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
@@ -114,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ sessionId }}
                     </span>
                   </span>
-                  <q-icon
+                  <OIcon
                     data-test="trace-details-copy-session-id-btn"
-                    name="content_copy"
-                    size="12px"
+                    name="content-copy"
+                    size="xs"
                     class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
                     title="Copy Session ID"
                     @click="copySessionId"
@@ -125,12 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
-                <q-icon
+                <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
-                  size="14px"
-                  name="open_in_new"
+                  size="xs"
+                  name="open-in-new"
                   :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />
@@ -182,8 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><q-icon name="filter_alt"
-size="14px"
+                ><OIcon name="filter-alt"
+size="xs"
               /></template>
               <span class="tw:text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
@@ -198,7 +198,7 @@ size="14px"
               class="tw:ml-1.5"
               @click="handleExpandToFullView"
             >
-              <q-icon name="open_in_new" size="14px" />
+              <OIcon name="open-in-new" size="xs" />
               <OTooltip :content="t('traces.openInTraces')" />
             </OButton>
 
@@ -220,7 +220,7 @@ size="14px"
               class="tw:mx-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon name="close" size="14px" />
+              <OIcon name="close" size="xs" />
               <OTooltip :content="t('common.cancel')" />
             </OButton>
           </div>
@@ -243,28 +243,27 @@ size="14px"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
-                  ><AlignLeft class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="align-left" size="xs" class="tw:shrink-0"
                 /></template>
-                Waterfall
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left
-                  ><Flame class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="flame" size="sm" />
+                </template>
                 Flame Graph
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
-                  ><Network class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
 size="sm">
-                <template #icon-left
-                  ><GitBranch class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
                 DAG
               </OToggleGroupItem>
               <!--
@@ -282,7 +281,7 @@ size="sm">
                 data-test="trace-details-thread-tab"
               >
                 <template #icon-left
-                  ><MessageSquare class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="chat" size="xs" class="tw:shrink-0"
                 /></template>
                 Thread
               </OToggleGroupItem>
@@ -292,7 +291,7 @@ size="sm">
                 size="sm"
               >
                 <template #icon-left
-                  ><ClipboardCheck class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="assignment-turned-in" size="xs" class="tw:shrink-0"
                 /></template>
                 Evaluations
               </OToggleGroupItem>
@@ -319,7 +318,7 @@ size="sm">
                   @update:model-value="handleSearchQueryChange"
                 >
                   <template v-slot:prepend>
-                    <q-icon name="search" size="1rem" />
+                    <OIcon name="search" size="1rem" />
                   </template>
                 </OInput>
               </div>
@@ -343,7 +342,7 @@ size="sm">
                     size="icon"
                     @click="prevMatch"
                   >
-                    <q-icon name="keyboard_arrow_up" size="16px" />
+                    <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
                   <div class="button-separator"></div>
@@ -356,7 +355,7 @@ size="sm">
                     size="icon"
                     @click="nextMatch"
                   >
-                    <q-icon name="keyboard_arrow_down" size="16px" />
+                    <OIcon name="keyboard-arrow-down" size="sm" />
                     <OTooltip :content="t('traces.nextMatch')" />
                   </OButton>
                 </div>
@@ -389,8 +388,8 @@ size="sm">
                   @click="redirectToLogs"
                 >
                   <template #icon-left
-                    ><q-icon name="search"
-size="14px"
+                    ><OIcon name="search"
+size="xs"
                   /></template>
                   {{
                     searchObj.meta.redirectedFromLogs
@@ -408,7 +407,7 @@ size="14px"
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle"
+                  ><OIcon name="play-circle"
 size="14px"
                 /></template>
                 {{ t("rum.playSessionReplay") }}
@@ -697,8 +696,8 @@ size="14px"
                   padding: 40px;
                 "
               >
-                <q-icon
-                  name="table_chart"
+                <OIcon
+                  name="table-chart"
                   size="48px"
                   style="margin-bottom: 16px"
                 />
@@ -838,10 +837,6 @@ import {
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedInfo,
-  outlinedPlayCircle,
-} from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -862,14 +857,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import {
-  AlignLeft,
-  Flame,
-  Network,
-  GitBranch,
-  ClipboardCheck,
-  MessageSquare,
-} from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -974,12 +962,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     ODrawer,
-    AlignLeft,
-    Flame,
-    Network,
-    GitBranch,
-    ClipboardCheck,
-    MessageSquare,
+    OIcon,
     ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -2831,8 +2814,8 @@ export default defineComponent({
       sessionId,
       copySessionId,
       traceDetailsShareURL,
-      outlinedInfo,
-      outlinedPlayCircle,
+      "info": "info",
+      outlinedPlayCircle: "play-circle",
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
@@ -3005,7 +2988,7 @@ $traceChartCollapseHeight: 42px;
     background-color: var(--o2-primary-btn-bg);
     color: #ffffff;
 
-    .q-icon {
+    .OIcon {
       color: #ffffff !important;
     }
   }
@@ -3133,7 +3116,7 @@ html:has(.trace-details) {
   }
 
   .visual-selection-btn {
-    .q-icon {
+    .OIcon {
       padding-right: 5px;
       font-size: 15px;
     }
@@ -3175,7 +3158,7 @@ html:has(.trace-details) {
 
 .trace-copy-icon {
   &:hover {
-    &.q-icon {
+    &.OIcon {
       text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
     }
   }
@@ -3257,7 +3240,7 @@ html:has(.trace-details) {
       .q-field__marginal {
         height: 1.875rem !important;
 
-        .q-icon {
+        .OIcon {
           font-size: 1.125rem;
         }
       }
@@ -3359,7 +3342,7 @@ html:has(.trace-details) {
       border-radius: 0.125rem;
       transition: all 0.2s ease;
 
-      .q-icon {
+      .OIcon {
         font-size: 1.125rem;
       }
 

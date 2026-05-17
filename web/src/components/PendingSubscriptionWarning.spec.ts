@@ -58,7 +58,7 @@ describe('PendingSubscriptionWarning.vue', () => {
       global: {
         plugins: [currentStore, router, Quasar],
         stubs: {
-          'q-icon': true,
+          'OIcon': true,
           'q-btn': true,
           OButton: {
             template: '<button class="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>',
@@ -78,7 +78,7 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('displays warning icon', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('q-icon-stub');
+      const icon = wrapper.find('OIcon-stub');
       expect(icon.exists()).toBe(true);
       expect(icon.attributes('name')).toBe('warning');
       expect(icon.attributes('size')).toBe('80px');
@@ -296,7 +296,7 @@ describe('PendingSubscriptionWarning.vue', () => {
 
     it('has correct icon styling', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('q-icon-stub');
+      const icon = wrapper.find('OIcon-stub');
       
       expect(icon.attributes('size')).toBe('80px');
       expect(icon.attributes('color')).toContain('warning');

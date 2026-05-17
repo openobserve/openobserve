@@ -65,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`selected-chart-${item.id}-item`"
             class=""
           >
-            <q-icon
-              size="sm"
-              color="primary"
-              :name="item.image"
+            <img
+              :src="item.image.replace('img:', '')"
+              :alt="item.title"
               class="q-mx-auto q-my-sm"
+              style="width: 24px; height: 24px;"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
             <!-- <q-item-label
@@ -98,6 +98,7 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "ChartSelection",
   props: ["selectedChartType", "allowedchartstype"],

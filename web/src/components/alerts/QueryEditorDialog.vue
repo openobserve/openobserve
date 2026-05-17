@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('common.goBack')"
             @click="closeDialog"
           >
-            <q-icon name="arrow_back_ios_new" size="9px" />
+            <OIcon name="arrow-back-ios-new" size="9px" />
           </div>
           <span class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block">{{ t('alerts.addConditions') }}</span>
 
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="sql-status-bar" :class="[sqlStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']">
                     <div class="sql-status-bar__inner">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
-                        <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                        <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
                         <span class="sql-status-bar__msg">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
@@ -173,19 +173,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>Fetching results...</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
-                        <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                        <OIcon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
                         <span>Write a query to get started</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
-                        <q-icon name="play_arrow" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                        <OIcon name="play-arrow" size="xs" style="flex-shrink:0;opacity:0.7;" />
                         <span>Press Run Query to see results</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
-                        <q-icon name="search_off" size="12px" style="flex-shrink:0;" />
+                        <OIcon name="search-off" size="xs" style="flex-shrink:0;" />
                         <span>Query ran successfully — no matching events</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
-                        <q-icon name="check_circle" size="12px" style="flex-shrink:0;" />
+                        <OIcon name="check-circle" size="xs" style="flex-shrink:0;" />
                         <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
                       </template>
                     </div>
@@ -315,15 +315,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle: not yet run -->
                   <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon name="table_chart" size="48px" class="empty-state-icon" />
+                      <OIcon name="table-chart" size="48px" class="empty-state-icon" />
                       <span class="empty-state-text">{{ t('alerts.runQueryForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results after run -->
                   <div v-else-if="outputEvents == '' && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
-                      <span class="empty-state-text">{{ runPromqlError ? runPromqlError : t('search.noResultsFound') }}</span>
+                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -371,15 +370,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Idle -->
                   <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon name="data_object" size="48px" class="empty-state-icon" />
+                      <OIcon name="data-object" size="48px" class="empty-state-icon" />
                       <span class="empty-state-text">{{ t('alerts.applyVRLForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results -->
                   <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full no-output-before-run-query">
                     <div class="empty-state-placeholder">
-                      <q-icon :name="outlinedWarning" size="40px" class="tw:text-orange-400 tw:opacity-60" />
-                      <span class="empty-state-text">{{ t('search.noResultsFound') }}</span>
+                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
@@ -432,7 +430,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));

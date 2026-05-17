@@ -2935,7 +2935,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of error indicators
      */
     async getErrorIndicatorCount() {
-        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .q-icon[color="negative"]').all();
+        const errorIndicators = await this.page.locator('[data-test*="error"], .error-indicator, .text-negative, .OIcon[color="negative"]').all();
         return errorIndicators.length;
     }
 

@@ -4,6 +4,7 @@
  */
 
 import type { PrimitiveProps } from "reka-ui";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 /** Visual style variant — design is baked in, no style override props */
 export type ButtonVariant =
@@ -86,8 +87,16 @@ export interface ButtonProps extends PrimitiveProps {
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
   /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
-  block?: boolean;
-}
+  block?: boolean;  /**
+   * Renders an OIcon to the left of the label.
+   * If the #icon-left slot is also provided, the slot takes precedence.
+   */
+  iconLeft?: IconName;
+  /**
+   * Renders an OIcon to the right of the label.
+   * If the #icon-right slot is also provided, the slot takes precedence.
+   */
+  iconRight?: IconName;}
 
 export interface ButtonEmits {
   (e: "click", event: MouseEvent): void;

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="docs-btn"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
-          <q-icon name="description" />
+          <OIcon name="description" size="sm" />
           <q-tooltip>View Documentation</q-tooltip>
         </OButton>
       </div>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <q-icon name="chevron_right" color="primary" />
+            <OIcon name="chevron-right" size="sm" />
           </q-item-section>
         </q-item>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <q-icon name="chevron_right" color="primary" />
+            <OIcon name="chevron-right" size="sm" />
           </q-item-section>
         </q-item>
       </q-list>
@@ -146,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -167,7 +168,9 @@ import LinuxConfig from "./LinuxConfig.vue";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton, ODialog },
+  components: { OButton, ODialog,
+    OIcon,
+},
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,

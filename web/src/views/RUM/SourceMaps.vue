@@ -115,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-xs-sq"
                       :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
                     >
-                      <q-icon
-                        :name="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
+                      <OIcon
+                        :name="expandedRow !== getRowKey(props.row) ? 'expand-more' : 'expand-less'"
                         size="14px"
                       />
                     </OButton>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     title="Delete"
                     @click="confirmDeleteSourceMap(props.row)"
                   >
-                    <q-icon :name="outlinedDelete" size="16px" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                 </template>
                 <template v-else>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty State -->
       <template v-else>
         <div class="q-pa-xl text-center text-grey-7">
-          <q-icon name="code" size="4rem" color="grey-5" class="q-mb-md" />
+          <OIcon name="code" size="xl" class="q-mb-md" />
           <div class="text-h6 q-mb-sm">No Source Maps Found</div>
           <div class="text-body2">
             Upload source maps to enable stack trace translation
@@ -209,11 +209,11 @@ import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import sourcemapsService from "@/services/sourcemaps";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 

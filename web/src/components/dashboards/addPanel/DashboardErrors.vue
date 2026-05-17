@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <q-bar class="row q-pa-sm expand-bar">
         <div style="flex: 1" @click="onDropDownClick">
-          <q-icon
+          <OIcon
             flat
-            :name="!showErrors ? 'arrow_right' : 'arrow_drop_down'"
+            :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm"
             text-color="black"
             class="q-mr-sm"
           />
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "DashboardErrorsComponent",
   props: ["errors"],

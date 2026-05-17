@@ -74,7 +74,7 @@ const columns = ref([
     field: "",
     label: "",
     type: "action",
-    icon: "play_circle_filled",
+    icon: "play-circle-filled",
     style: { width: "3.5rem" },
   },
   {

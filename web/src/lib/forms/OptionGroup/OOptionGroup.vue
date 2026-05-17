@@ -12,6 +12,7 @@ import ORadio from "../Radio/ORadio.vue";
 import OCheckboxGroup from "../Checkbox/OCheckboxGroup.vue";
 import OCheckbox from "../Checkbox/OCheckbox.vue";
 import { computed, useAttrs } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -69,16 +70,16 @@ function handleCheckbox(val: (string | number)[]) {
       ]"
     >
       <slot name="label">{{ label }}</slot>
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         :class="[
           'tw:cursor-help',
           disabled ? 'tw:text-option-group-label-disabled' : 'tw:text-option-group-label',
         ]"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </div>
 
     <ORadioGroup

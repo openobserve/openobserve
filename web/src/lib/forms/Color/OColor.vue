@@ -18,6 +18,7 @@ import {
   colorToHex,
 } from "reka-ui";
 import type { Color } from "reka-ui";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -134,13 +135,13 @@ const wrapperClasses = computed(() => [
       class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-datepicker-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </label>
 
     <div :class="wrapperClasses">

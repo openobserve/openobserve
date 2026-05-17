@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="log-json-field-dropdown-btn"
                         aria-label="Add icon"
                       >
-                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+                        <OIcon :name="tableDropdownOpenMap[props.row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
                       </OButton>
                     </template>
                     <ODropdownItem
@@ -183,16 +183,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!searchObj.data.stream.selectedFields.includes(props.row.field.toString())"
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
+                      icon-left="visibility"
                     >
-                      <template #icon-left><q-icon name="visibility" size="16px" /></template>
                       {{ t("common.addFieldToTable") }}
                     </ODropdownItem>
                     <ODropdownItem
                       v-else
                       data-test="log-details-include-field-btn"
                       @select="addFieldToTable(props.row.field.toString())"
+                      icon-left="visibility-off"
                     >
-                      <template #icon-left><q-icon name="visibility_off" size="16px" /></template>
                       {{ t("common.removeFieldFromTable") }}
                     </ODropdownItem>
                     <!-- Cross-link options -->
@@ -203,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="crossLink.name"
                         :data-test="`log-details-cross-link-${crossLink.name}`"
                         @select.stop="openCrossLink(crossLink.resolvedUrl)"
+                        icon-left="open-in-new"
                       >
-                        <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
                         {{ crossLink.name }}
                       </ODropdownItem>
                     </template>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><q-icon name="navigate_before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+          ><OIcon name="navigate-before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<q-icon name="navigate_next" size="14px" class="tw:ml-1" /></OButton>
+          >{{ t('common.next') }}<OIcon name="navigate-next" size="14px" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -423,6 +423,7 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -432,7 +433,9 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
+    OIcon,
+},
   emits: [
     "showPrevDetail",
     "showNextDetail",

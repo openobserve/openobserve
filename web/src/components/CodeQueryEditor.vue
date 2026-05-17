@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <q-icon size="20px">
+      <OIcon size="20px">
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
-      </q-icon>
+      </OIcon>
       <q-tooltip>
         {{
           disableAiReason ||
@@ -81,9 +81,12 @@ import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   inheritAttrs: false,
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   props: {
     editorId: {
       type: String,

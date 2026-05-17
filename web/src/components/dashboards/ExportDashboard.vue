@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="icon-xs"
     @click="downloadDashboard()"
     data-test="export-dashboard"
+    icon-left="download"
   >
-    <template #icon-left><q-icon name="download" /></template>
     <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
   </OButton>
 </template>

@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="q-mt-sm"
         @click="addApiHeader"
+        icon-left="add"
       >
-        <template #icon-left><q-icon name="add" /></template>
         Add Condition
       </OButton>
     </template>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="deleteApiHeader(field)"
           >
-            <q-icon :name="outlinedDelete" />
+            <OIcon name="delete" size="sm" />
           </OButton>
           <OButton
             data-test="alert-conditions-add-condition-btn"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
           >
-            <q-icon name="add" />
+            <OIcon name="add" size="sm" />
           </OButton>
         </div>
       </div>
@@ -118,10 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, reactive } from "vue";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 
 const props = defineProps({
@@ -175,7 +175,7 @@ const addApiHeader = () => {
 
 <style lang="scss">
 .add-field {
-  .q-icon {
+  .OIcon {
     margin-right: 4px !important;
     font-size: 15px !important;
   }

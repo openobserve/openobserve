@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+<!-- right 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -61,12 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:items-center">
             <OButton
+              icon-left="close"
               variant="ghost"
               size="icon-sm"
               @click="goBack"
               data-test="inspector-close-button"
             >
-              <X :size="16" />
+              <OIcon name="close" size="sm" />
               <OTooltip content="Close" />
             </OButton>
           </div>
@@ -261,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="inspector-error-banner"
       >
         <template v-slot:avatar>
-          <q-icon name="error" />
+          <OIcon name="error" size="sm" />
         </template>
         {{ errorMessage }}
       </q-banner>
@@ -307,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Always reserve space for expand icon to keep alignment consistent -->
                   <div class="tree-icon-wrapper">
-                    <q-icon
+                    <OIcon
                       v-if="props.row.children && props.row.children.length > 0"
                       :name="
                         props.row.expanded
@@ -371,9 +372,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="copySql"
           data-test="inspector-copy-sql-btn"
         >
-          <Copy v-if="!copiedSql" :size="16" />
-              <Check v-else :size="16" />
-          <OTooltip :content="copiedSql ? 'Copied!' : 'Copy SQL'" />
+          <OIcon name="content-copy" size="sm" v-if="!copiedSql" />
+              <OIcon name="check" size="sm" v-else />
+          <OTooltip :content="copiedSql ? 'Copied!' : 'SQL'" />
         </OButton>
       </template>
       <div :class="['sql-query-container', store.state.theme === 'dark' ? 'sql-query-container--dark' : '']">
@@ -392,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           @click="copyTraceId"
-        ><Copy :size="14" class="tw:mr-1" />Copy</OButton>
+        ><OIcon name="content-copy" size="sm"  class="tw:mr-1" /></OButton>
       </div>
     </ODialog>
   </div>
@@ -406,9 +407,10 @@ import { useQuasar } from "quasar";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { X, Copy, Check } from "lucide-vue-next";
+
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
@@ -452,12 +454,10 @@ export default defineComponent({
     OButton,
     ODrawer,
     ODialog,
-    X,
-    Copy,
-    Check,
     OSpinner,
     OTooltip,
-  },
+    OIcon,
+},
   setup() {
     const router = useRouter();
     const route = useRoute();

@@ -84,8 +84,8 @@ describe("HomeView.vue", () => {
             template: '<a><slot /></a>',
             props: ["to"],
           },
-          "q-icon": {
-            template: '<span class="q-icon-stub"></span>',
+          "OIcon": {
+            template: '<span class="OIcon-stub"></span>',
             props: ["name", "size"],
           },
           OButton: {

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('pipeline_destinations.search')"
           >
             <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
           <OButton
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(props.row)"
               >
-                <q-icon name="edit" />
+                <OIcon name="edit" size="sm" />
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('alert_destinations.delete')"
                 @click="conformDeleteDestination(props.row)"
               >
-                <q-icon :name="outlinedDelete" />
+                <OIcon name="delete" size="sm" />
               </OButton>
             </div>
           </q-td>
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
+              <OIcon name="delete" size="sm" />
               <span class="tw:ml-2">Delete</span>
             </OButton>
             <QTablePagination
@@ -210,9 +210,9 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
@@ -228,6 +228,7 @@ export default defineComponent({
     ConfirmDialog,
     QTablePagination,
     OButton,
+    OIcon,
     OInput,
     OCheckbox,
   },
@@ -686,7 +687,6 @@ export default defineComponent({
       resultTotal,
       selectedPerPage,
       pagination,
-      outlinedDelete,
       routeTo,
       store,
       // Exposed helper functions for testing

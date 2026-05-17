@@ -45,8 +45,8 @@ describe("AutoRefreshInterval", () => {
           'q-btn-dropdown': {
             template: '<div class="q-btn-dropdown"><slot /><slot name="label" /></div>'
           },
-          'q-icon': {
-            template: '<div class="q-icon"></div>'
+          'OIcon': {
+            template: '<div class="OIcon"></div>'
           },
           'q-btn': {
             template: '<button @click="$emit(\'click\')" :disabled="disable"><slot /></button>',

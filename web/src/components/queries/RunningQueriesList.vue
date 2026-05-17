@@ -43,23 +43,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props">
           <OButton
+            icon-left="format-list-bulleted"
             variant="ghost"
             size="icon-sm"
             :title="t('queries.queryList')"
             data-test="queryList-btn"
             @click="listSchema(props)"
-          >
-            <List class="tw:size-4" />
-          </OButton>
+          />
           <OButton
+            icon-left="close"
             variant="ghost-destructive"
             size="icon-sm"
             :title="t('queries.cancelQuery')"
             data-test="cancelQuery-btn"
             @click="confirmDeleteAction(props)"
-          >
-            <X class="tw:size-4" />
-          </OButton>
+          />
         </q-td>
       </template>
       <template #body-cell-duration="props">
@@ -114,13 +112,12 @@ import { ref, type Ref, defineComponent, computed } from "vue";
 import { type QTableProps, QTable } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import { List, X } from 'lucide-vue-next';
+
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
@@ -129,7 +126,7 @@ import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, QTablePagination, NoData, OButton, List, X, ODrawer, OSpinner, OCheckbox },
+  components: { QueryList, QTablePagination, NoData, OButton, ODrawer, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -291,7 +288,7 @@ export default defineComponent({
       listSchema,
       showListSchemaDialog,
       changePagination,
-      outlinedCancel,
+      "cancel": "cancel",
       schemaData,
       loadingState,
       lastRefreshed,

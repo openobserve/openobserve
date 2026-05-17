@@ -49,7 +49,7 @@ describe('ScriptEditor.vue', () => {
             template: '<div class="spinner"></div>',
             props: ['size']
           },
-          'q-icon': {
+          'OIcon': {
             template: '<div class="icon"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
             props: ['name', 'size']
           },

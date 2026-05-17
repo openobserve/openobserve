@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left>
-              <Wrench v-if="tab.value === 'custom'" class="tw:size-3.5 tw:shrink-0" />
-              <Database v-else-if="tab.value === 'sql'" class="tw:size-3.5 tw:shrink-0" />
-              <ChartLine v-else-if="tab.value === 'promql'" class="tw:size-3.5 tw:shrink-0" />
+              <OIcon v-if="tab.value === 'custom'" name="build" size="sm" />
+              <OIcon v-else-if="tab.value === 'sql'" name="database" size="sm" />
+              <OIcon v-else-if="tab.value === 'promql'" name="show-chart" size="sm" />
             </template>
             {{ tab.label }}
           </OToggleGroupItem>
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteLogGroupByColumn(index)"
                       >
-                        <q-icon name="close" />
+                        <OIcon name="close" size="sm" />
                       </OButton>
                     </div>
                   </template>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="addLogGroupByColumn"
                   >
-                    <q-icon name="add" />
+                    <OIcon name="add" size="sm" />
                     <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                   </OButton>
                 </div>
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="tw:text-gray-400 hover:tw:text-red-500"
                         @click="deleteGroupByColumn(index)"
                       >
-                        <q-icon name="close" />
+                        <OIcon name="close" size="sm" />
                       </OButton>
                     </div>
                   </template>
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-circle-sm"
                     @click="addGroupByColumn"
                   >
-                    <q-icon name="add" />
+                    <OIcon name="add" size="sm" />
                     <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                   </OButton>
                 </div>
@@ -433,9 +433,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
                     @click="toggleFilters"
                   >
-                    <q-icon
-                      name="filter_alt"
-                      size="14px"
+                    <OIcon
+                      name="filter-alt"
+                      size="xs"
                       :class="filterCount > 0
                         ? 'tw:text-[var(--q-primary)]'
                         : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
@@ -451,8 +451,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                       {{ filterCount }}
                     </span>
-                    <q-icon
-                      :name="showFilters ? 'expand_more' : 'chevron_right'"
+                    <OIcon
+                      :name="showFilters ? 'expand-more' : 'chevron-right'"
                       size="14px"
                       :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                     />
@@ -509,9 +509,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
                 @click="toggleFilters"
               >
-                <q-icon
-                  name="filter_alt"
-                  size="14px"
+                <OIcon
+                  name="filter-alt"
+                  size="xs"
                   :class="filterCount > 0
                     ? 'tw:text-[var(--q-primary)]'
                     : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
@@ -527,8 +527,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
                   {{ filterCount }}
                 </span>
-                <q-icon
-                  :name="showFilters ? 'expand_more' : 'chevron_right'"
+                <OIcon
+                  :name="showFilters ? 'expand-more' : 'chevron-right'"
                   size="14px"
                   :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
                 />
@@ -669,16 +669,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="sql-status-bar__inner">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                <q-icon name="error_outline" size="12px" style="flex-shrink:0;" />
+                <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
                 <span class="sql-status-bar__msg">{{ sqlQueryErrorMsg }}</span>
                 <OTooltip side="top" style="font-size:11px;white-space:pre-wrap;word-break:break-word;">{{ sqlQueryErrorMsg }}</OTooltip>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                <q-icon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
+                <OIcon name="edit" size="11px" style="flex-shrink:0;opacity:0.6;" />
                 <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
-                <q-icon name="check_circle_outline" size="12px" style="flex-shrink:0;opacity:0.7;" />
+                <OIcon name="check-circle-outline" size="xs" style="flex-shrink:0;opacity:0.7;" />
                 <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>
@@ -891,7 +891,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { Wrench, Database, ChartLine } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -915,9 +915,7 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
-    Wrench,
-    Database,
-    ChartLine,
+    OIcon,
   },
   props: {
     tab: {

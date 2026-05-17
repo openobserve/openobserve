@@ -1,9 +1,8 @@
-import { markRaw, onActivated, onMounted, ref, Ref } from "vue";
+import { markRaw, onActivated, onMounted, ref, Ref, h } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import PipelineIcon from "@/components/icons/PipelineIcon.vue";
-import { Network } from "lucide-vue-next";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -19,7 +18,7 @@ const MainLayoutOpenSourceMixin = {
     const leftNavigationLinks = (linksList: any, t: any) => {
       linksList.value.splice(5, 0, {
         title: t("menu.pipeline"),
-        iconComponent: markRaw(Network),
+        iconComponent: markRaw(PipelineIcon),
         link: "/pipeline",
         name: "pipeline",
       });

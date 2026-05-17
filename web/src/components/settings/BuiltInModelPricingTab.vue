@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-model-pricing-search"
           >
             <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
           </OInput>
         </div>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <OIcon name="error" size="50px" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #no-data>
           <div class="full-width column flex-center q-pa-xl">
-            <q-icon name="search_off" size="50px" color="grey-5" />
+            <OIcon name="search-off" size="50px" />
             <div class="q-mt-md text-grey-6">
               {{ t("modelPricing.noModelsFound") }}
             </div>
@@ -192,6 +192,7 @@ import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -214,7 +215,9 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton, OSpinner, OInput, OCheckbox },
+  components: { OButton, OSpinner, OInput, OCheckbox,
+    OIcon,
+},
   emits: ["import-models"],
   setup(props, { emit }) {
     const { t } = useI18n();

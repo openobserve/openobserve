@@ -396,7 +396,8 @@
     "traces": "Des traces",
     "switchToLogs": "cliquez pour revenir à Logs",
     "patternNoValuesAvailable": "Aucune valeur disponible",
-    "selectLogStream": "Sélectionnez le flux de journaux"
+    "selectLogStream": "Sélectionnez le flux de journaux",
+    "noData": "Aucune donnée disponible"
   },
   "menu": {
     "home": "Accueil",

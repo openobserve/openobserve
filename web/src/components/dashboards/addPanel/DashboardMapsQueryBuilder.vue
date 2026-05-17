@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.mapname") }}
-        <q-icon name="info_outline" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-name-item-${nameLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
           <OButton
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-name-item-${nameLabel}`"
           >
             {{ nameLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -142,11 +142,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.mapvalue") }}
-        <q-icon name="info_outline" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs">
           <q-tooltip>
             {{ Hint }}
           </q-tooltip>
-        </q-icon>
+        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-drag`"
           >
             <template #icon-left>
-              <q-icon name="drag_indicator" size="13px" />
+              <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
           <OButton
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
           >
             {{ valueLabel }}
-            <template #icon-right><q-icon name="arrow_drop_down" /></template>
+            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
@@ -244,8 +244,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-chip"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -295,6 +295,7 @@ import useNotifications from "@/composables/useNotifications";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
@@ -307,7 +308,8 @@ export default defineComponent({
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
-  },
+    OIcon,
+},
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();
@@ -747,7 +749,7 @@ export default defineComponent({
         opacity: 0;
         right: 0;
 
-        .q-icon {
+        .OIcon {
           cursor: pointer;
         }
       }

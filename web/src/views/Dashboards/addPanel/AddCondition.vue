@@ -13,9 +13,9 @@
         variant="primary"
         size="chip-12"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
+        icon-right="arrow-drop-down"
       >
         {{ computedLabel(condition) }}
-        <template #icon-right><q-icon name="arrow_drop_down" /></template>
         <q-menu
           class="q-pa-md"
           @show="(e: any) => loadFilterItem(condition.column)"
@@ -32,10 +32,8 @@
               size="icon"
               @click="removeColumnName"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+              icon-left="close"
             >
-              <template #icon-left
-                ><q-icon name="close" size="18px"
-              /></template>
             </OButton>
           </div>
           <div style="height: 100%">
@@ -149,8 +147,8 @@
         size="icon-chip"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
     </OButtonGroup>
   </div>

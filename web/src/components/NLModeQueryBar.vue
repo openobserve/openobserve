@@ -48,9 +48,9 @@
             :disabled="disabled || (isAIMode && isGenerating)"
             @click="handleButtonClick"
           >
-            <q-icon
+            <OIcon
               v-if="showIcon"
-              :name="isAIMode ? 'auto_awesome' : 'search'"
+              :name="isAIMode ? 'auto-awesome' : 'search'" size="sm"
               class="q-mr-xs"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
@@ -67,7 +67,7 @@
                   class="tw:h-[29px] search-button-dropdown"
                   :class="dropdownClasses"
                 >
-                  <q-icon name="arrow_drop_down" size="18px" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                 </OButton>
               </template>
               <!-- Normal Mode: Refresh option -->
@@ -77,7 +77,7 @@
                   @select="$emit('refresh')"
                 >
                   <template #icon-left>
-                    <q-icon name="refresh" size="16px" />
+                    <OIcon name="refresh" size="sm" />
                   </template>
                   {{ t('search.refreshCacheAndRunQuery') }}
                 </ODropdownItem>
@@ -157,6 +157,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   // Query props

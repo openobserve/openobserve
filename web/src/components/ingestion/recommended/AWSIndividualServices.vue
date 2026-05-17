@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="aws-integration-search"
       >
         <template #prepend>
-          <q-icon name="search" />
+          <OIcon name="search" size="sm" />
         </template>
       </OInput>
     </div>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="filteredIntegrations.length === 0"
       class="tw:text-center tw:py-12 empty-state"
     >
-      <q-icon name="search_off" size="3rem" class="tw:mb-2" />
+      <OIcon name="search-off" size="3rem" class="tw:mb-2" />
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
@@ -73,6 +73,7 @@ import { defineComponent, ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import AWSIntegrationTile from "./AWSIntegrationTile.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "AWSIndividualServices",
@@ -80,7 +81,8 @@ export default defineComponent({
     OTabs, OTab,
     AWSIntegrationTile,
     OInput,
-  },
+    OIcon,
+},
   props: {
     initialSearch: {
       type: String,

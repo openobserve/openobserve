@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else-if="col.type === 'action'">
-              <q-icon :name="col.icon" size="24px" class="cursor-pointer" />
+              <OIcon :name="col.icon" size="24px" class="cursor-pointer" />
             </template>
             <template v-else>
               {{ col.value }}
@@ -170,6 +170,7 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { computed,watch  } from "vue";
 import NoData from "./shared/grid/NoData.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   columns: {
     type: Array,

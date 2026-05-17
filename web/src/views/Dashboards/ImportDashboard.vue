@@ -19,11 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
         <div class="col">
           <div class="flex">
-            <OButton variant="outline" size="icon-xs" @click="goBack()">
-              <template #icon-left
-                ><q-icon name="arrow_back_ios_new"
-              /></template>
-            </OButton>
+            <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
+
             <div class="text-h6 q-ml-md">
               {{ t("dashboard.importDashboard") }}
             </div>
@@ -140,11 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disable="!!isLoading"
                       >
                         <template v-slot:prepend>
-                          <q-icon name="cloud_upload" @click.stop.prevent />
+                          <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                         </template>
                         <template v-slot:append>
-                          <q-icon
-                            name="close"
+                          <OIcon
+                            name="close" size="sm"
                             @click.stop.prevent="jsonFiles = null"
                             class="cursor-pointer"
                           />
@@ -290,8 +287,9 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Upload, Link } from "lucide-vue-next";
+
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { defineAsyncComponent } from "vue";
@@ -326,12 +324,12 @@ export default defineComponent({
       {
         label: "File Upload / JSON",
         value: "import_json_file",
-        icon: Upload,
+        icon: "upload",
       },
       {
         label: "URL Import",
         value: "import_json_url",
-        icon: Link,
+        icon: "link",
       },
     ]);
     const activeTab = ref("import_json_file");
@@ -855,7 +853,9 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect },
+  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect,
+    OIcon,
+},
 });
 </script>
 

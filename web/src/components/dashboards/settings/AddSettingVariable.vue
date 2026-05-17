@@ -194,11 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Filters
                   </div>
-                  <q-icon
+                  <OIcon
                     class=""
                     style="margin-top: 25px; margin-left: 5px"
-                    size="20px"
-                    name="info_outline"
+                    size="md"
+                    name="info-outline"
                     data-test="dashboard-variables-setting-filter-info"
                   >
                     <OTooltip max-width="250px">
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="bg-highlight">$variableName</span>.
                       </template>
                     </OTooltip>
-                  </q-icon>
+                  </OIcon>
                 </div>
                 <div>
                   <div
@@ -283,8 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:flex-shrink-0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
+                      icon-left="close"
                     >
-                      <template #icon-left><q-icon name="close" /></template>
                     </OButton>
                   </div>
                 </div>
@@ -294,8 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     @click="addFilter"
                     data-test="dashboard-add-filter-btn"
+                    icon-left="add"
                   >
-                    <template #icon-left><q-icon name="add" /></template>
                     Add Filter
                   </OButton>
                 </div>
@@ -381,8 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="variableData?.options?.length === 1"
                   @click="removeField(index)"
                   :data-test="`dashboard-custom-variable-${index}-remove`"
+                  icon-left="cancel"
                 >
-                  <template #icon-left><q-icon name="cancel" /></template>
                 </OButton>
               </div>
             </div>
@@ -393,8 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:mt-3"
                 @click="addField()"
                 data-test="dashboard-add-option-btn"
+                icon-left="add"
               >
-                <template #icon-left><q-icon name="add" /></template>
                 Add Option
               </OButton>
             </div>
@@ -464,8 +464,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     @click="removeCustomValue(index)"
                     :data-test="`dashboard-variable-custom-close-${index}`"
+                    icon-left="close"
                   >
-                    <template #icon-left><q-icon name="close" /></template>
                   </OButton>
                 </div>
               </div>
@@ -481,8 +481,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:mt-3"
                   @click="addCustomValue"
                   data-test="dashboard-add-custom-value-btn"
+                  icon-left="add"
                 >
-                  <template #icon-left><q-icon name="add" /></template>
                 </OButton>
               </div>
             </div>
@@ -565,6 +565,7 @@ import { useRoute } from "vue-router";
 import { useLoading } from "../../../composables/useLoading";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -584,7 +585,9 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip },
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip,
+    OIcon,
+},
   emits: ["close", "save"],
   setup(props, { emit }) {
     // Store dashboard data

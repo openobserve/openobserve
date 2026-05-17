@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="user-password-field"
             >
               <template v-slot:append>
-                <q-icon
-                  :name="isPwd ? 'visibility_off' : 'visibility'"
+                <OIcon
+                  :name="isPwd ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"
                   @click="isPwd = !isPwd"
                 />
@@ -187,8 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="user-old-passoword-field"
             >
               <template v-slot:append>
-                <q-icon
-                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
+                <OIcon
+                  :name="isOldPwd ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"
                   @click="isOldPwd = !isOldPwd"
                 />
@@ -214,8 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="user-new-password-field"
             >
               <template v-slot:append>
-                <q-icon
-                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
+                <OIcon
+                  :name="isNewPwd ? 'visibility-off' : 'visibility'" size="sm"
                   class="cursor-pointer"
                   @click="isNewPwd = !isNewPwd"
                 />
@@ -300,6 +300,7 @@ import {
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -317,7 +318,9 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODialog, ODrawer },
+  components: { OButton, ODialog, ODrawer,
+    OIcon,
+},
   props: {
     open: {
       type: Boolean,

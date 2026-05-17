@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="primary"
       size="sm-action"
       class="tw:mt-[0.625rem] q-mt-sm"
+      icon-left="play-circle"
       :title="t('rum.viewSessionReplay')"
       @click="playSessionReplay"
     >
-      <PlayCircle class="tw:size-4 tw:mr-1" /> 
       {{ t("rum.playSessionReplay") }}
     </OButton>
   </div>
@@ -41,7 +41,6 @@ import ErrorTag from "./ErrorTag.vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { PlayCircle } from 'lucide-vue-next';
 
 const { t } = useI18n();
 

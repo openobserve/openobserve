@@ -32,9 +32,9 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedAdd: "add",
-  outlinedVisibility: "visibility",
-  outlinedVisibilityOff: "visibility_off",
+  "add": "add",
+  "visibility": "visibility",
+  "visibility-off": "visibility_off",
 }));
 
 const quasarStubs = {
@@ -48,7 +48,7 @@ const quasarStubs = {
   QIcon: {
     name: "QIcon",
     template:
-      '<span class="q-icon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click.stop="$emit(\'click\', $event)"></span>',
+      '<span class="OIcon-stub" :data-test="$attrs[\'data-test\']" :data-name="name" @click.stop="$emit(\'click\', $event)"></span>',
     props: ["name", "size", "title"],
     emits: ["click"],
   },

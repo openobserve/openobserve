@@ -94,7 +94,7 @@ describe("Billing Component", () => {
           'q-route-tab': true,
           'router-view': true,
           'q-select': true,
-          'q-icon': true,
+          'OIcon': true,
           'ConfirmDialog': true,
           'Usage': true,
           'AppTabs': {
@@ -199,7 +199,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -241,7 +241,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -310,7 +310,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -524,7 +524,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -558,7 +558,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {
@@ -592,7 +592,7 @@ describe("Billing Component", () => {
             'q-route-tab': true,
             'router-view': true,
             'q-select': true,
-            'q-icon': true,
+            'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
             'AppTabs': {

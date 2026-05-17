@@ -66,8 +66,8 @@ describe("ErrorSessionReplay Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "q-icon": {
-            template: '<i data-test="q-icon" :class="name"></i>',
+          "OIcon": {
+            template: '<i data-test="OIcon" :class="name"></i>',
             props: ["name", "size"],
           },
         },

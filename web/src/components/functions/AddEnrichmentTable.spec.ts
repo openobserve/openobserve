@@ -116,7 +116,7 @@ describe('AddEnrichmentTable.vue', () => {
           'q-separator': {
             template: '<hr />',
           },
-          'q-icon': {
+          'OIcon': {
             template: '<i></i>',
             props: ['name'],
           },

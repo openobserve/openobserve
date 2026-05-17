@@ -36,8 +36,8 @@
         variant="primary"
         size="icon-xs-circle"
         data-test="dashboard-add-condition-add"
+        icon-left="add"
       >
-        <template #icon-left><q-icon name="add" /></template>
         <q-menu v-model="showAddMenu">
           <q-list>
             <q-item clickable @click="emitAddCondition">
@@ -60,8 +60,8 @@
         size="icon"
         @click="$emit('remove-group')"
         data-test="dashboard-add-group-remove"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
     </div>
   </div>

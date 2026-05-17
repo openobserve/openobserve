@@ -61,8 +61,8 @@ describe("DashboardErrors", () => {
             template: "<div class='q-bar q-pa-sm expand-bar' :class='$attrs.class'><slot /></div>",
             inheritAttrs: false,
           },
-          "q-icon": {
-            template: "<div class='q-icon q-mr-sm' :name='name' :text-color='textColor' :flat='flat !== false ? \"true\" : \"false\"'></div>",
+          "OIcon": {
+            template: "<div class='OIcon q-mr-sm' :name='name' :text-color='textColor' :flat='flat !== false ? \"true\" : \"false\"'></div>",
             props: ["flat", "name", "textColor"],
           },
           "q-space": {
@@ -256,7 +256,7 @@ describe("DashboardErrors", () => {
 
     it("should start in collapsed state", () => {
       expect(wrapper.vm.showErrors).toBe(false);
-      const icon = wrapper.find(".q-icon");
+      const icon = wrapper.find(".OIcon");
       expect(icon.attributes("name")).toBe("arrow_right");
     });
 
@@ -269,7 +269,7 @@ describe("DashboardErrors", () => {
       await wrapper.vm.$nextTick();
       
       expect(wrapper.vm.showErrors).toBe(true);
-      const icon = wrapper.find(".q-icon");
+      const icon = wrapper.find(".OIcon");
       expect(icon.attributes("name")).toBe("arrow_drop_down");
     });
 
@@ -299,7 +299,7 @@ describe("DashboardErrors", () => {
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
       
-      const icon = wrapper.find(".q-icon");
+      const icon = wrapper.find(".OIcon");
       expect(icon.attributes("name")).toBe("arrow_drop_down");
     });
 
@@ -307,7 +307,7 @@ describe("DashboardErrors", () => {
       wrapper.vm.showErrors = false;
       await wrapper.vm.$nextTick();
       
-      const icon = wrapper.find(".q-icon");
+      const icon = wrapper.find(".OIcon");
       expect(icon.attributes("name")).toBe("arrow_right");
     });
   });
@@ -377,8 +377,8 @@ describe("DashboardErrors", () => {
       expect(qSpace.exists()).toBeTruthy();
     });
 
-    it("should have q-icon with correct properties", () => {
-      const icon = wrapper.find(".q-icon");
+    it("should have OIcon with correct properties", () => {
+      const icon = wrapper.find(".OIcon");
       expect(icon.exists()).toBeTruthy();
       expect(icon.attributes("flat")).toBe("true");
       expect(icon.attributes("text-color")).toBe("black");
@@ -658,12 +658,12 @@ describe("DashboardErrors", () => {
     });
 
     it("should update UI on state change", async () => {
-      expect(wrapper.find(".q-icon").attributes("name")).toBe("arrow_right");
+      expect(wrapper.find(".OIcon").attributes("name")).toBe("arrow_right");
       
       wrapper.vm.showErrors = true;
       await wrapper.vm.$nextTick();
       
-      expect(wrapper.find(".q-icon").attributes("name")).toBe("arrow_drop_down");
+      expect(wrapper.find(".OIcon").attributes("name")).toBe("arrow_drop_down");
     });
 
     it("should maintain cursor pointer style on expand bar", () => {

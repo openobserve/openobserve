@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('pipeline.search')"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
             <!-- Full buttons visible at wide widths -->
@@ -56,8 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="goToPipelineHistory"
               >
                 <template #icon-left
-                  ><History class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                  ><OIcon name="history" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t(`pipeline.history`) }}
               </OButton>
               <OButton
@@ -69,8 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="goToBackfillJobs"
               >
                 <template #icon-left
-                  ><RefreshCw class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                  ><OIcon name="refresh" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t("pipeline.backfill") }}
               </OButton>
               <OButton
@@ -81,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="routeToImportPipeline"
               >
                 <template #icon-left
-                  ><Upload class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                  ><OIcon name="upload" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
                 {{ t(`pipeline.import`) }}
               </OButton>
             </template>
@@ -104,10 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               data-test="pipeline-list-overflow-menu-btn"
+              icon-left="menu"
             >
-              <template #icon-left
-                ><Menu class="tw:size-3.5 tw:shrink-0"
-              /></template>
               <q-menu>
                 <q-list>
                   <q-item
@@ -183,15 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </q-td>
                 <q-td v-if="activeTab == 'scheduled'" auto-width>
-                  <OButton variant="ghost" size="icon-xs-sq">
-                    <template #icon-left>
-                      <ChevronDown
-                        v-if="expandedRow != props.row.pipeline_id"
-                        class="tw:size-3.5 tw:shrink-0"
-                      />
-                      <ChevronUp v-else class="tw:size-3.5 tw:shrink-0" />
-                    </template>
-                  </OButton>
+                  <OButton variant="ghost" size="icon-xs-sq"
+                    :icon-left="expandedRow != props.row.pipeline_id ? 'expand-more' : 'expand-less'"
+                  />
                 </q-td>
                 <q-td
                   v-for="col in filterColumns()"
@@ -215,35 +204,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? t('alerts.pause')
                             : t('alerts.start')
                         "
+                        :icon-left="props.row.enabled ? 'pause' : 'play-arrow'"
                         @click.stop="togglePipeline(props.row)"
-                      >
-                        <template #icon-left>
-                          <Pause
-                            v-if="props.row.enabled"
-                            class="tw:size-3.5 tw:shrink-0"
-                          />
-                          <Play v-else class="tw:size-3.5 tw:shrink-0" />
-                        </template>
-                      </OButton>
+                      />
                       <OButton
                         :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
                         variant="ghost"
                         size="icon-xs-sq"
-                        :title="t('pipeline.edit')"
                         @click.stop="editPipeline(props.row)"
-                      >
-                        <template #icon-left>
-                          <Pencil class="tw:size-3.5 tw:shrink-0" />
-                        </template>
-                      </OButton>
+                        icon-left="edit"
+                      />
                       <OButton
                         :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
                         variant="ghost"
                         size="icon-xs-sq"
                         :title="t('pipeline.view')"
+                        icon-left="visibility"
                       >
                         <template #icon-left>
-                          <Eye class="tw:size-3.5 tw:shrink-0" />
+                          <OIcon name="visibility" size="sm" />
                         </template>
                         <OTooltip>
                           <template #content><PipelineView :pipeline="props.row" /></template>
@@ -254,10 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon-xs-sq"
                         @click.stop
                         :data-test="`pipeline-list-${props.row.name}-more-options`"
+                        icon-left="more-vert"
                       >
-                        <template #icon-left>
-                          <MoreVertical class="tw:size-3.5 tw:shrink-0" />
-                        </template>
                         <q-menu>
                           <q-list style="min-width: 100px">
                             <q-item
@@ -267,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click="exportPipeline(props.row)"
                             >
                               <q-item-section dense avatar>
-                                <q-icon size="16px" name="download" />
+                                <OIcon size="sm" name="download" />
                               </q-item-section>
                               <q-item-section>{{
                                 t("pipeline.export")
@@ -290,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click="openBackfillDialog(props.row)"
                             >
                               <q-item-section dense avatar>
-                                <q-icon size="16px" name="refresh" />
+                                <OIcon size="sm" name="refresh" />
                               </q-item-section>
                               <q-item-section>Create Backfill</q-item-section>
                             </q-item>
@@ -302,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click="openDeleteDialog(props.row)"
                             >
                               <q-item-section dense avatar>
-                                <q-icon size="16px" :name="outlinedDelete" />
+                                <OIcon name="delete" size="sm" />
                               </q-item-section>
                               <q-item-section>{{
                                 t("pipeline.delete")
@@ -317,10 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click="showErrorDialog(props.row)"
                             >
                               <q-item-section dense avatar>
-                                <q-icon
-                                  size="16px"
+                                <OIcon
+                                  size="sm"
                                   name="error"
-                                  color="negative"
                                 />
                               </q-item-section>
                               <q-item-section>
@@ -416,10 +392,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm-action"
                     @click="exportBulkPipelines"
+                    icon-left="download"
                   >
-                    <template #icon-left>
-                      <Download class="tw:size-4 tw:shrink-0" />
-                    </template>
                     {{ t("pipeline_list.export") }}
                   </OButton>
                   <OButton
@@ -427,10 +401,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm-action"
                     @click="bulkTogglePipelines('pause')"
+                    icon-left="pause"
                   >
-                    <template #icon-left>
-                      <Pause class="tw:size-4 tw:shrink-0" />
-                    </template>
                     {{ t("pipeline_list.pause") }}
                   </OButton>
                   <OButton
@@ -438,10 +410,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm-action"
                     @click="bulkTogglePipelines('resume')"
+                    icon-left="play-arrow"
                   >
-                    <template #icon-left>
-                      <Play class="tw:size-4 tw:shrink-0" />
-                    </template>
                     {{ t("pipeline_list.resume") }}
                   </OButton>
                   <OButton
@@ -449,10 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm-action"
                     @click="openBulkDeleteDialog"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     Delete
                   </OButton>
                 </div>
@@ -542,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="closeErrorDialog"
   >
     <template #header-left>
-      <q-icon name="error" size="24px" class="error-icon" />
+      <OIcon name="error" size="md" class="error-icon" />
     </template>
 
     <div v-if="errorDialog.data" class="pipeline-error-content">
@@ -623,38 +591,12 @@ import type { QTableColumn } from "quasar";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedVisibility,
-  outlinedMoreVert,
-} from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
-import {
-  LayoutList,
-  CalendarClock,
-  Zap,
-  History,
-  RefreshCw,
-  Upload,
-  Plus,
-  Menu,
-  Pause,
-  Play,
-  Pencil,
-  Eye,
-  MoreVertical,
-  Download,
-  Trash2,
-  X,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import PipelineView from "./PipelineView.vue";
@@ -740,17 +682,17 @@ const tabs = reactive([
   {
     label: t("pipeline_list.tab_all"),
     value: "all",
-    icon: LayoutList,
+    icon: "format-list-bulleted",
   },
   {
     label: t("pipeline_list.tab_scheduled"),
     value: "scheduled",
-    icon: CalendarClock,
+    icon: "schedule",
   },
   {
     label: t("pipeline_list.tab_realtime"),
     value: "realtime",
-    icon: Zap,
+    icon: "bolt",
   },
 ]);
 const perPageOptions: any = [

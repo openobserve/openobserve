@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'pane-header-light'
                 "
               >
-                <q-icon name="code" size="20px" class="q-mr-sm" />
+                <OIcon name="code" size="md" class="q-mr-sm" />
                 <div class="text-subtitle1 text-weight-medium">SQL Query</div>
               </div>
               <q-separator />
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-else-if="error" class="q-pa-md">
                 <q-banner class="bg-negative text-white">
                   <template v-slot:avatar>
-                    <q-icon name="error" />
+                    <OIcon name="error" size="sm" />
                   </template>
                   {{ error }}
                 </q-banner>
@@ -188,6 +188,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -220,7 +221,8 @@ export default defineComponent({
     OButton,
     ODialog,
     OSpinner,
-  },
+    OIcon,
+},
   props: {
     modelValue: {
       type: Boolean,

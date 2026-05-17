@@ -193,7 +193,7 @@ function createWrapper(props = {}) {
         },
         QIcon: {
           name: "QIcon",
-          template: '<span class="q-icon-stub" v-bind="$attrs"></span>',
+          template: '<span class="OIcon-stub" v-bind="$attrs"></span>',
           props: ["name", "color", "size"],
         },
         QBtn: {

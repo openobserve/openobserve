@@ -16,7 +16,7 @@
           title="Go Back"
           @click="redirectToScripts"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
       <div class="tw:text-lg tw:w-full add-script-title q-mr-md">
@@ -37,16 +37,16 @@
             @blur="onUpdate"
             style="min-width: 300px"
           />
-          <q-icon
+          <OIcon
             :key="actionName"
             v-if="isValidMethodName() !== true && showInputError"
-            :name="outlinedInfo"
-            size="20px"
+            name="info"
+            size="md"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
             <OTooltip side="right" :content="String(isValidMethodName())" />
-          </q-icon>
+          </OIcon>
         </div>
       </div>
     </div>
@@ -57,7 +57,7 @@
         variant="outline"
         size="sm"
         @click="handleFullScreen"
-        ><q-icon name="fullscreen" size="18px" class="tw:mr-1" />{{
+        ><OIcon name="fullscreen" size="sm" class="tw:mr-1" />{{
           t("common.fullscreen")
         }}</OButton
       >
@@ -85,10 +85,10 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 

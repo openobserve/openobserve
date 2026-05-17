@@ -7,6 +7,7 @@ import type {
   TextareaSlots,
 } from "./OTextarea.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Forward the consumer's `data-test` from <OTextarea data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance.
@@ -105,13 +106,13 @@ const wrapperClasses = computed(() => [
       class="tw:text-xs tw:font-medium tw:text-input-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       {{ label }}
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-input-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </label>
 
     <!-- Textarea wrapper -->

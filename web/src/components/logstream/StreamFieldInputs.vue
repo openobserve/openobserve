@@ -8,10 +8,10 @@
         data-test="add-stream-add-field-btn"
         variant="outline"
         size="sm-action"
+        icon-left="add"
         class="q-mt-sm"
         @click="addApiHeader"
       >
-        <Plus :size="14" class="tw:mr-1" />
         {{ t("logStream.addField") }}
       </OButton>
     </template>
@@ -133,20 +133,16 @@
               field.name === '' || (fields.length === 1 && field.name == '')
             "
             :title="t('alert_templates.edit')"
-            @click="addApiHeader()"
-          >
-            <Plus :size="14" />
-          </OButton>
+            icon-left="add"
+            />
           <OButton
             data-test="add-stream-delete-field-btn"
             variant="outline-destructive"
             size="icon-sm"
             class="q-ml-xs"
             :title="t('alert_templates.edit')"
-            @click="deleteApiHeader(field, index)"
-          >
-            <Trash2 :size="14" />
-          </OButton>
+            icon-left="delete"
+            />
         </div>
       </div>
     </template>
@@ -155,12 +151,11 @@
 
 <script lang="ts" setup>
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { Plus, Trash2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   fields: {
@@ -329,7 +324,7 @@ defineExpose({
 
 <style lang="scss">
 .add-field {
-  .q-icon {
+  .OIcon {
     margin-right: 4px !important;
     font-size: 15px !important;
   }

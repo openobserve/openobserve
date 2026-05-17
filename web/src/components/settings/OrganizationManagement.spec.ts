@@ -272,8 +272,8 @@ describe("OrganizationManagement.vue", () => {
             props: ['modelValue', 'borderless', 'filled', 'dense', 'class', 'placeholder', 'outlined', 'type'],
             emits: ['update:modelValue']
           },
-          'q-icon': {
-            template: '<i class="q-icon"></i>',
+          'OIcon': {
+            template: '<i class="OIcon"></i>',
             props: ['name', 'class']
           },
           'NoData': {

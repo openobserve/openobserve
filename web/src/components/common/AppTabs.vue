@@ -31,7 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`tab-${tab.value}`"
     >
       <template v-if="tab.icon" #icon-left>
-        <component :is="tab.icon" class="tw:size-3.5 tw:shrink-0" />
+        <OIcon v-if="typeof tab.icon === 'string'" :name="(tab.icon as any)" size="sm" />
+        <component v-else :is="tab.icon" class="tw:size-3.5 tw:shrink-0" />
       </template>
       {{ tab.label }}
       <q-tooltip v-if="tab.tooltipLabel">{{ tab.tooltipLabel }}</q-tooltip>
@@ -44,6 +45,7 @@ import { computed } from "vue";
 import type { Component } from "vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { ToggleGroupItemSize } from "@/lib/core/ToggleGroup/OToggleGroupItem.types";
 
 interface Tab {
@@ -54,7 +56,7 @@ interface Tab {
   title?: string;
   tooltipLabel?: string;
   hide?: boolean;
-  icon?: Component;
+  icon?: Component | string;
 }
 
 const emit = defineEmits(["update:activeTab"]);

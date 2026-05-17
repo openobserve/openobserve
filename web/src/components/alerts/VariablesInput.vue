@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-muted"
               size="icon-sm"
             >
-              <q-icon name="info_outline" />
+              <OIcon name="info-outline" size="sm" />
               <OTooltip content="Variables are used to pass data from the alert to the destination." />
           </OButton>
         </div>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           @click="addVariable"
         >
-        <q-icon name="add" />
+        <OIcon name="add" size="sm" />
         <span>Add Variable</span>
       </OButton>
       </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="removeVariable(variable)"
           >
-            <q-icon :name="outlinedDelete" />
+            <OIcon name="delete" size="sm" />
           </OButton>
           <OButton
             data-test="alert-variables-add-variable-btn"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('alert_templates.edit')"
             @click="addVariable"
           >
-            <q-icon name="add" />
+            <OIcon name="add" size="sm" />
           </OButton>
         </div>
       </div>
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -130,7 +130,7 @@ const addVariable = () => {
 
 <style lang="scss">
 .add-variable {
-  .q-icon {
+  .OIcon {
     margin-right: 4px !important;
     font-size: 15px !important;
   }

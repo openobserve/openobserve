@@ -39,19 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="display: inline-block"
           >
             <span v-if="field.dataType" class="field-type-container">
-              <q-icon
+              <OIcon
                 class="field-expand-icon"
-                :name="isExpanded ? 'expand_more' : 'chevron_right'"
+                :name="isExpanded ? 'expand-more' : 'chevron-right'"
                 size="1rem"
               />
             </span>
             {{ field.name }}
           </div>
           <span class="float-right">
-            <q-icon
+            <OIcon
               :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
               v-if="showQuickMode"
-              :name="field.isInterestingField ? 'info' : 'info_outline'"
+              :name="field.isInterestingField ? 'info' : 'info-outline'"
               :class="theme === 'dark' ? '' : 'light-dimmed'"
               style="margin-right: 0.375rem"
               size="1.1rem"
@@ -71,31 +71,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-circle"
               @click.stop="$emit('add-to-filter', `${field.name}=''`)"
             >
-              <q-icon :name="outlinedAdd" size="12px" />
+              <OIcon name="add" size="xs" />
             </OButton>
           </span>
-          <q-icon
+          <OIcon
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
             v-if="!isFieldSelected"
-            :name="outlinedVisibility"
+            name="visibility"
             style="margin-right: 0.375rem"
             size="1.1rem"
             title="Add field to table"
             @click.stop="$emit('toggle-field', field)"
           />
-          <q-icon
+          <OIcon
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="isFieldSelected"
-            :name="outlinedVisibilityOff"
+            name="visibility-off"
             style="margin-right: 0.375rem"
             title="Remove field from table"
             size="1.1rem"
             @click.stop="$emit('toggle-field', field)"
           />
-          <q-icon
+          <OIcon
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
             v-if="showQuickMode"
-            :name="field.isInterestingField ? 'info' : 'info_outline'"
+            :name="field.isInterestingField ? 'info' : 'info-outline'"
             size="1.1rem"
             :title="
               field.isInterestingField
@@ -136,13 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import {
-  outlinedAdd,
-  outlinedVisibility,
-  outlinedVisibilityOff,
-} from "@quasar/extras/material-icons-outlined";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   field: any;

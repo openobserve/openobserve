@@ -24,23 +24,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="col-12 row">
           <div class="col-12 q-pb-sm text-caption">
-            <q-icon name="mail" size="1rem" class="q-pr-xs" />
+            <OIcon name="mail" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.user_email || "Unknown User" }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="schedule" size="1rem" class="q-pr-xs" />
+            <OIcon name="schedule" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.date }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="settings" size="1rem" class="q-pr-xs" />
+            <OIcon name="settings" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="language" size="1rem" class="q-pr-xs" />
+            <OIcon name="language" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.ip }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="location_on" size="1rem" class="q-pr-xs" />
+            <OIcon name="location-on" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -123,9 +123,10 @@ import { ref, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
-import { Navigation, Tag } from "lucide-vue-next";
+
 import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 
@@ -145,7 +146,7 @@ const tabs = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
-    icon: Navigation,
+    icon: "navigation",
     style: {
       width: "fit-content",
       padding: "0.5rem 0.625rem",
@@ -155,7 +156,7 @@ const tabs = [
   {
     label: t("rum.tags"),
     value: "tags",
-    icon: Tag,
+    icon: "label",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];

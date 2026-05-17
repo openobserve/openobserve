@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :alt="destType.label"
                 class="card-image"
               />
-              <q-icon
+              <OIcon
                 v-else
                 :name="destType.icon"
                 size="28px"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="check-icon"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
-                <q-icon name="check_circle" size="20px" color="positive" />
+                <OIcon name="check-circle" size="md" />
               </div>
             </div>
           </div>
@@ -486,11 +486,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
                   @click="deleteApiHeader(header)"
-                >
-                  <template #icon-left>
-                    <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                  </template>
-                </OButton>
+                  icon-left="delete"
+                />
                 <OButton
                   data-test="add-destination-add-header-btn"
                   v-if="index === apiHeaders.length - 1"
@@ -498,11 +495,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
                   @click="addApiHeader()"
-                >
-                  <template #icon-left>
-                    <Plus class="tw:size-3.5 tw:shrink-0" />
-                  </template>
-                </OButton>
+                  icon-left="add"
+                />
               </div>
             </div>
           </div>
@@ -531,10 +525,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <q-card-section>
               <div class="row items-center q-mb-sm">
-                <q-icon
+                <OIcon
                   name="info"
-                  color="primary"
-                  size="20px"
+                  size="md"
                   class="q-mr-sm"
                 />
                 <div class="text-subtitle2 text-weight-medium">
@@ -629,7 +622,7 @@ import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Trash2, Plus } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Props
 const props = defineProps<{
@@ -685,7 +678,7 @@ const destinationTypes = [
   {
     label: "Newrelic",
     value: "newrelic",
-    icon: "monitor_heart",
+    icon: "monitor-heart",
     image: getImageURL("images/pipeline/newrelic.png"),
   },
   {

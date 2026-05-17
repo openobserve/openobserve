@@ -16,10 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="row col-11 justify-center q-mt-xl">
-    <q-icon
+    <OIcon
       name="warning"
       size="80px"
-      color="warning row col-8 justify-center q-mt-lg"
     /><br />
     <h5>
       <b
@@ -42,10 +41,13 @@ import { useRouter } from "vue-router";
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PendingSubscriptionWarning",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   setup() {
     const router = useRouter();
     const store = useStore();

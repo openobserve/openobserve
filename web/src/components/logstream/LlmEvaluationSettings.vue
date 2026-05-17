@@ -133,9 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                 :loading="loadingTemplates"
                 :title="t('common.refresh')"
                 data-test="stream-llm-eval-template-refresh-btn"
-              >
-                <RefreshCw :size="14" />
-              </OButton>
+                icon-left="refresh"
+              />
             </div>
             <small
               class="llm-eval-settings__hint"
@@ -277,12 +276,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { RefreshCw } from "lucide-vue-next";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
-  components: { OButton, RefreshCw, OSpinner, OSwitch, OSelect, OInput },
+  components: { OButton, OSpinner, OSwitch, OSelect, OInput },
 
   props: {
     streamName: {

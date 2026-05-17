@@ -103,8 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-weight-medium text-grey-7" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
                     </div>
                     <div class="col-auto">
-                      <q-icon
-                        :name="job.status === 'completed' ? 'check_circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
+                      <OIcon
+                        :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
                         :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : job.status === 'processing' ? 'primary' : 'grey'"
                         size="16px"
                         :class="{'rotate-animation': job.status === 'processing'}"
@@ -228,6 +228,7 @@ import OFile from "@/lib/forms/File/OFile.vue";
 import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -241,7 +242,9 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "AddEnrichmentTable",
-  components: { OButton, OInput, OFile, OOptionGroup, OSwitch },
+  components: { OButton, OInput, OFile, OOptionGroup, OSwitch,
+    OIcon,
+},
   props: {
     modelValue: {
       type: Object,

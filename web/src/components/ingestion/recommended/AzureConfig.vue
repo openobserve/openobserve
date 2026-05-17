@@ -18,10 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="q-ma-md azure-config-page">
     <!-- Header -->
     <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
-      <q-icon
+      <OIcon
         name="cloud"
         size="2.5rem"
-        color="primary"
         class="tw:flex-shrink-0"
       />
       <div>
@@ -62,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="azure-activity-logs-deploy-btn"
           >
             <template #icon-left
-              ><q-icon name="rocket_launch" size="sm"
+              ><OIcon name="rocket-launch" size="sm"
             /></template>
             Deploy to Azure
           </OButton>
@@ -233,6 +232,7 @@ import { defineComponent, computed, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -265,7 +265,9 @@ const activityLogsIntegration = azureIntegrations.find(
 
 export default defineComponent({
   name: "AzureConfig",
-  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput },
+  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const q = useQuasar();

@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:bg-gray-50 tw:border-gray-200',
               ]"
             >
-              <q-icon
+              <OIcon
                 :name="
                   isAnomaly
-                    ? 'query_stats'
-                    : alertDetails.is_real_time
+                    ? 'query-stats'
+                    : alertDetails.is-real-time
                       ? 'bolt'
                       : 'schedule'
                 "
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-tab-history"
               >
                 <template #icon-left>
-                  <History class="tw:size-3.5 tw:shrink-0" />
+                  <OIcon name="history" size="sm" />
                 </template>
                 History
               </OToggleGroupItem>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-tab-condition"
               >
                 <template #icon-left>
-                  <Code2 class="tw:size-3.5 tw:shrink-0" />
+                  <OIcon name="code" size="sm" />
                 </template>
                 Condition
               </OToggleGroupItem>
@@ -177,8 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-gray-100'
                 "
               >
-                <q-icon
-                  name="history_toggle_off"
+                <OIcon
+                  name="history-toggle-off"
                   size="28px"
                   :color="store.state.theme === 'dark' ? 'grey-6' : 'grey-5'"
                 />
@@ -379,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     data-test="anomaly-details-copy-sql-btn"
                   >
-                    <q-icon name="content_copy" />
+                    <OIcon name="content-copy" size="sm" />
                     <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
@@ -447,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-xs-sq"
                     data-test="alert-details-copy-conditions-btn"
                   >
-                    <q-icon name="content_copy" />
+                    <OIcon name="content-copy" size="sm" />
                     <OTooltip :content="t('alerts.alertDetails.copy')" />
                   </OButton>
                 </div>
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-gray-500'
                 "
               >
-                <q-icon name="info_outline" size="13px" />
+                <OIcon name="info-outline" size="13px" />
                 {{ t("common.description") }}
               </div>
               <div
@@ -511,7 +511,7 @@ import { useQuasar, date } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { History, Code2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";

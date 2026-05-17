@@ -46,19 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-mr-sm"
             >
               <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                 {{ t("alerts.all") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><CalendarClock class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="schedule" size="sm" /></template>
                 {{ t("alerts.scheduled") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                <template #icon-left><Zap class="tw:size-3.5 tw:shrink-0" /></template>
+                <template #icon-left><OIcon name="bolt" size="sm" /></template>
                 {{ t("alerts.realTime") }}
               </OToggleGroupItem>
               <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
-                <template #icon-left><q-icon name="query_stats" size="14px" /></template>
+                <template #icon-left><OIcon name="query-stats" size="sm" /></template>
                 {{ t("alerts.anomalyDetection") }}
               </OToggleGroupItem>
             </OToggleGroup>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
               <template v-if="isCompactToolbar" #append>
                 <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="bottom">
@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="importAlert"
             data-test="alert-import"
+            icon-left="upload-file"
           >
-            <template #icon-left><q-icon name="file_upload" /></template>
             <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
             <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" />
           </OButton>
@@ -228,19 +228,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 :props="props">
                       <template v-if="col.name === 'name'">
                         <div class="tw:flex tw:items-center tw:gap-1.5">
-                          <q-icon
+                          <OIcon
                             v-if="props.row.is_real_time === 'anomaly'"
-                            name="query_stats"
+                            name="query-stats"
                             size="15px"
                             class="tw:text-blue-600 tw:shrink-0"
                           />
-                          <q-icon
+                          <OIcon
                             v-else-if="props.row.is_real_time"
                             name="bolt"
                             size="15px"
                             class="tw:text-orange-500 tw:shrink-0"
                           />
-                          <q-icon
+                          <OIcon
                             v-else
                             name="schedule"
                             size="15px"
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             @click.stop="toggleAlertState(props.row)"
                           >
-                            <q-icon :name="props.row.enabled ? outlinedPause : outlinedPlayArrow" />
+                            <OIcon :name="props.row.enabled ? 'pause' : 'play-arrow'" size="sm" />
                           </OButton>
                           <OButton
                             :data-test="`alert-list-${props.row.name}-update-alert`"
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :title="t('alerts.edit')"
                             @click.stop="editAlert(props.row)"
                           >
-                            <q-icon name="edit" />
+                            <OIcon name="edit" size="sm" />
                           </OButton>
                           <OButton
                             :title="t('alerts.clone')"
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="duplicateAlert(props.row)"
                             :data-test="`alert-list-${props.row.name}-clone-alert`"
                           >
-                            <q-icon name="content_copy" />
+                            <OIcon name="content-copy" size="sm" />
                           </OButton>
                           <span>
                             <OButton
@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="openMenu($event, props.row)"
                               :data-test="`alert-list-${props.row.name}-more-options`"
                             >
-                              <q-icon :name="outlinedMoreVert" />
+                              <OIcon name="more-vert" size="sm" />
                               <q-menu>
                                 <q-list style="min-width: 100px">
                                 <q-item
@@ -393,10 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="moveAlertToAnotherFolder(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDriveFileMove"
-                                    />
+                                    <OIcon name="drive-file-move" size="sm" />
                                   </q-item-section>
                                   <q-item-section>Move</q-item-section>
                                 </q-item>
@@ -408,10 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="showDeleteDialogFn(props)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
-                                      size="16px"
-                                      :name="outlinedDelete"
-                                    />
+                                    <OIcon name="delete" size="sm" />
                                   </q-item-section>
                                   <q-item-section>{{
                                     t("alerts.delete")
@@ -425,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="exportAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon size="16px" name="download" />
+                                    <OIcon size="sm" name="download" />
                                   </q-item-section>
                                   <q-item-section>Export</q-item-section>
                                 </q-item>
@@ -440,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     @click="triggerAlert(props.row)"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon
+                                      <OIcon
                                         size="16px"
                                         :name="symOutlinedSoundSampler"
                                       />
@@ -457,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     @click="retrainAnomaly(props.row)"
                                   >
                                     <q-item-section dense avatar>
-                                      <q-icon size="16px" name="replay" />
+                                      <OIcon size="sm" name="replay" />
                                     </q-item-section>
                                     <q-item-section>Re-train</q-item-section>
                                   </q-item>
@@ -472,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   @click="triggerAlert(props.row)"
                                 >
                                   <q-item-section dense avatar>
-                                    <q-icon
+                                    <OIcon
                                       size="16px"
                                       :name="symOutlinedSoundSampler"
                                     />
@@ -576,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="moveMultipleAlerts"
                     >
-                      <q-icon :name="outlinedDriveFileMove" size="16px" />
+                      <OIcon name="drive-file-move" size="sm" />
                       <span class="tw:ml-2">Move</span>
                     </OButton>
                     <OButton
@@ -587,7 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="multipleExportAlert"
                     >
-                      <q-icon name="download" size="16px" />
+                      <OIcon name="download" size="sm" />
                       <span class="tw:ml-2">Export</span>
                     </OButton>
                     <OButton
@@ -598,7 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('pause')"
                     >
-                      <q-icon name="pause" size="16px" />
+                      <OIcon name="pause" size="sm" />
                       <span class="tw:ml-2">Pause</span>
                     </OButton>
                     <OButton
@@ -609,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="bulkToggleAlerts('resume')"
                     >
-                      <q-icon name="play_arrow" size="16px" />
+                      <OIcon name="play-arrow" size="sm" />
                       <span class="tw:ml-2">Resume</span>
                     </OButton>
                     <OButton
@@ -620,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mr-sm"
                       @click="openBulkDeleteDialog"
                     >
-                      <q-icon name="delete" size="16px" />
+                      <OIcon name="delete" size="sm" />
                       <span class="tw:ml-2">Delete</span>
                     </OButton>
                     <QTablePagination
@@ -705,7 +699,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Go Back"
             @click="showForm = false"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
         </template>
         <div>
@@ -803,13 +797,7 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedDriveFileMove,
-  outlinedMoreVert,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
@@ -818,7 +806,6 @@ import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { LayoutList, CalendarClock, Zap, TrendingUp } from "lucide-vue-next";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
@@ -848,14 +835,11 @@ export default defineComponent({
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
-    LayoutList,
-    CalendarClock,
-    Zap,
-    TrendingUp,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,
     OButton,
+    OIcon,
     ODialog,
     OSpinner,
     OInput,
@@ -864,7 +848,6 @@ export default defineComponent({
     OTooltip,
   },
   emits: [
-    "updated:fields",
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
@@ -2850,7 +2833,6 @@ export default defineComponent({
       isFetchingStreams,
       isSubmitting,
       changeMaxRecordToReturn,
-      outlinedDelete,
       filterQuery,
       filterData(rows: any, terms: any) {
         var filtered = [];
@@ -2868,9 +2850,6 @@ export default defineComponent({
       verifyOrganizationStatus,
       folders,
       splitterModel,
-      outlinedPause,
-      outlinedPlayArrow,
-      toggleAlertState,
       alertStateLoadingMap,
       templates,
       routeTo,
@@ -2889,7 +2868,6 @@ export default defineComponent({
       editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
-      outlinedDriveFileMove,
       selectedAlertToMove,
       selectedAnomalyConfigsToMove,
       moveAlertToAnotherFolder,
@@ -2909,7 +2887,6 @@ export default defineComponent({
       allSelectedAlerts,
       copyToClipboard,
       openMenu,
-      outlinedMoreVert,
       getAlertsFn,
       multipleExportAlert,
       computedName,

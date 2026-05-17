@@ -396,7 +396,8 @@
     "traces": "トレース",
     "switchToLogs": "クリックしてログに戻る",
     "patternNoValuesAvailable": "使用可能な値はありません",
-    "selectLogStream": "ログストリームを選択"
+    "selectLogStream": "ログストリームを選択",
+    "noData": "データはありません"
   },
   "menu": {
     "home": "ホーム",

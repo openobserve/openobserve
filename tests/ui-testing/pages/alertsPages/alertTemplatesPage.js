@@ -157,7 +157,7 @@ export class AlertTemplatesPage {
             'button:has-text("Add Template")',
             '.q-table__control button',
             'button[data-test*="add"]',
-            'button:has(.q-icon):has-text("add")',
+            'button:has(.OIcon):has-text("add")',
             '.q-toolbar button:has-text("Add")',
             'button[data-o2-btn]:has-text("Add Template")'
         ];

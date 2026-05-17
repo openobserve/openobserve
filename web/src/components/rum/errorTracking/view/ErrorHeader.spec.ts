@@ -76,9 +76,9 @@ describe("ErrorHeader Component", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          "q-icon": {
+          "OIcon": {
             template:
-              '<i data-test="q-icon" :class="name" @click="$emit(\'click\')"></i>',
+              '<i data-test="OIcon" :class="name" @click="$emit(\'click\')"></i>',
             props: ["name", "size"],
             emits: ["click"],
           },
@@ -136,7 +136,7 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should render back arrow icon", () => {
-      const backIcon = wrapper.find('[data-test="q-icon"].arrow_back_ios_new');
+      const backIcon = wrapper.find('[data-test="OIcon"].arrow_back_ios_new');
       expect(backIcon.exists()).toBe(true);
     });
 
@@ -168,12 +168,12 @@ describe("ErrorHeader Component", () => {
     });
 
     it("should render copy icon for error ID", () => {
-      const copyIcon = wrapper.find('[data-test="q-icon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
       expect(copyIcon.exists()).toBe(true);
     });
 
     it("should copy error ID when copy icon is clicked", async () => {
-      const copyIcon = wrapper.find('[data-test="q-icon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
       await copyIcon.trigger("click");
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith("error-abc123");
@@ -335,7 +335,7 @@ describe("ErrorHeader Component", () => {
     it("should call copyErrorId with correct ID", async () => {
       const copyErrorIdSpy = vi.spyOn(wrapper.vm, "copyErrorId");
 
-      const copyIcon = wrapper.find('[data-test="q-icon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
       await copyIcon.trigger("click");
 
       expect(copyErrorIdSpy).toHaveBeenCalledWith("error-abc123");
@@ -349,7 +349,7 @@ describe("ErrorHeader Component", () => {
         },
       });
 
-      const copyIcon = wrapper.find('[data-test="q-icon"].content_copy');
+      const copyIcon = wrapper.find('[data-test="OIcon"].content_copy');
       await copyIcon.trigger("click");
 
       expect(mockCopyToClipboard).toHaveBeenCalledWith("different-error-id");

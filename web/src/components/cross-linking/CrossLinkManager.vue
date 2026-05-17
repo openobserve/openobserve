@@ -12,10 +12,10 @@
         v-if="!readonly"
         variant="outline"
         size="sm-action"
+        icon-left="add"
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >
-        <Plus class="tw:size-4 tw:mr-1" />
         {{ t('crossLinks.addCrossLink') }}
       </OButton>
     </div>
@@ -61,19 +61,17 @@
             <OButton
               variant="ghost"
               size="icon-sm"
+              icon-left="edit"
               @click="editLink(link)"
               :data-test="`cross-link-edit-${idx}`"
-            >
-              <Pencil class="tw:size-4" />
-            </OButton>
+            />
             <OButton
               variant="ghost-destructive"
               size="icon-sm"
+              icon-left="delete"
               @click="removeLink(link)"
               :data-test="`cross-link-delete-${idx}`"
-            >
-              <Trash2 class="tw:size-4" />
-            </OButton>
+            />
           </div>
         </div>
       </div>
@@ -106,7 +104,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Plus, Pencil, Trash2 } from 'lucide-vue-next';
+
 
 export interface CrossLink {
   name: string;
@@ -117,7 +115,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, Plus, Pencil, Trash2 },
+  components: { CrossLinkDialog, OButton },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,

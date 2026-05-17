@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-current_state="props">
         <q-td :props="props">
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-icon
+            <OIcon
               :name="getStateIcon(props.row.current_state)"
               :color="getStateColor(props.row.current_state)"
               size="18px"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #no-data>
         <div class="tw:w-full tw:text-center tw:py-8">
-          <q-icon name="history" size="48px" class="tw:text-gray-400" />
+          <OIcon name="history" size="xl" class="tw:text-gray-400" />
           <div class="tw:mt-2 tw:text-gray-600 dark:tw:text-gray-400">
             {{ t("alerts.noHistoryData") }}
           </div>
@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
 import { date } from "quasar";

@@ -64,7 +64,7 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
@@ -90,7 +90,7 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
@@ -124,7 +124,7 @@ describe("FieldExpansion.vue", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             EqualIcon: true,
             NotEqualIcon: true,
@@ -157,7 +157,7 @@ describe("FieldExpansion.vue", () => {
             "q-inner-loading": {
               template: "<div class='loading'>Fetching values...</div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
           },
         },
@@ -185,7 +185,7 @@ describe("FieldExpansion.vue", () => {
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
             "q-inner-loading": { template: "<div class='loading' />" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
           },
         },
@@ -213,7 +213,7 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
           },
         },
@@ -240,7 +240,7 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
           },
         },
@@ -263,8 +263,8 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": {
-              template: '<div class="q-icon" :name="name"></div>',
+            "OIcon": {
+              template: '<div class="OIcon" :name="name"></div>',
               props: ["name"],
             },
             "q-btn": true,
@@ -289,7 +289,7 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
@@ -318,7 +318,7 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
@@ -338,7 +338,7 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
@@ -360,7 +360,7 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
             },
@@ -387,8 +387,8 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": {
-              template: '<div class="q-icon" @click="$attrs.onClick"></div>',
+            "OIcon": {
+              template: '<div class="OIcon" @click="$attrs.onClick"></div>',
             },
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
@@ -397,7 +397,7 @@ describe("FieldExpansion.vue", () => {
         },
       });
 
-      const icons = wrapper.findAll(".q-icon");
+      const icons = wrapper.findAll(".OIcon");
       if (icons.length > 0) {
         await icons[0].trigger("click");
         expect(wrapper.emitted()).toBeDefined();
@@ -413,8 +413,8 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": {
-              template: '<div class="q-icon" @click="$attrs.onClick"></div>',
+            "OIcon": {
+              template: '<div class="OIcon" @click="$attrs.onClick"></div>',
             },
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
@@ -436,7 +436,7 @@ describe("FieldExpansion.vue", () => {
               template:
                 '<div class="q-expansion-item" @click="$emit(\'before-show\', {})"><slot name="header" /><slot /></div>',
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
@@ -464,7 +464,7 @@ describe("FieldExpansion.vue", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
             },
@@ -511,7 +511,7 @@ describe("FieldExpansion.vue", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": { template: "<button><slot /></button>" },
             EqualIcon: true,
             NotEqualIcon: true,
@@ -543,7 +543,7 @@ describe("FieldExpansion.vue", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": { template: "<button><slot /></button>" },
             EqualIcon: true,
             NotEqualIcon: true,
@@ -569,7 +569,7 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
@@ -592,7 +592,7 @@ describe("FieldExpansion.vue", () => {
             "q-expansion-item": {
               template: "<div><slot name='header' /><slot /></div>",
             },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
@@ -621,7 +621,7 @@ describe("FieldExpansion.vue", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             EqualIcon: true,
             NotEqualIcon: true,
@@ -648,7 +648,7 @@ describe("FieldExpansion.vue", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-item": { template: "<div><slot /></div>" },
-            "q-icon": true,
+            "OIcon": true,
             "q-btn": true,
             EqualIcon: true,
             NotEqualIcon: true,

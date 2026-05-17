@@ -77,7 +77,7 @@ const globalConfig = {
     "q-file": {
       template: '<div class="q-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
     },
-    "q-icon": { template: '<i :class="name" />', props: ["name"] },
+    "OIcon": { template: '<i :class="name" />', props: ["name"] },
     "q-separator": { template: "<hr />" },
   },
   plugins: [i18n],

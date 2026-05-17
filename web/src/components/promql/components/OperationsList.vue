@@ -23,7 +23,7 @@
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="13px" />
                   </template>
                   <OTooltip content="Drag to reorder" side="top" />
                 </OButton>
@@ -36,7 +36,7 @@
                 >
                   {{ computedLabel(element) }}
                   <template #icon-right
-                    ><q-icon name="arrow_drop_down"
+                    ><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
@@ -98,8 +98,8 @@
                   size="icon-chip"
                   @click="removeOperation(index)"
                   :data-test="`promql-operation-remove-${index}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -114,7 +114,7 @@
           class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
-          <q-icon name="add" size="14px" />
+          <OIcon name="add" size="xs" />
           <OTooltip content="Add operation" side="top" />
         </OButton>
       </div>
@@ -130,7 +130,7 @@
         clearable
       >
         <template v-slot:prepend>
-          <q-icon name="search" />
+          <OIcon name="search" size="sm" />
         </template>
       </OInput>
 
@@ -167,6 +167,7 @@
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

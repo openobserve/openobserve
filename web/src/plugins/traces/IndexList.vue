@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-sq"
               >
-                <q-icon :name="expandGroupRows[props.row.group] !== false ? 'expand_more' : 'chevron_right'" />
+                <OIcon :name="expandGroupRows[props.row.group] !== false ? 'expand-more' : 'chevron-right'" size="sm" />
               </OButton>
             </q-td>
           </q-tr>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:p-0 tw:pb-[0.375rem]"
           >
             <template #icon-left>
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
             </template>
           </OInput>
           <q-tr
@@ -152,6 +152,7 @@ import { applyCollapseFilter } from "@/utils/fieldCategories";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -165,7 +166,8 @@ export default defineComponent({
     OSelect,
     OInput,
     OSpinner,
-  },
+    OIcon,
+},
   emits: ["update:changeStream", "update:selectedFields"],
   props: {
     fieldList: {
@@ -475,7 +477,7 @@ export default defineComponent({
       display: flex;
       align-items: center;
 
-      .q-icon {
+      .OIcon {
         cursor: pointer;
         opacity: 0;
         margin: 0 1px;
@@ -583,7 +585,7 @@ export default defineComponent({
           .field_overlay {
             visibility: visible;
 
-            .q-icon {
+            .OIcon {
               opacity: 1;
             }
           }
@@ -602,7 +604,7 @@ export default defineComponent({
         .field_overlay {
           visibility: visible;
 
-          .q-icon {
+          .OIcon {
             opacity: 1;
           }
         }

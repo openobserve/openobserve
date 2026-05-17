@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md" class="q-mb-sm" />
+      <OIcon name="info" size="md" class="q-mb-sm" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -170,6 +170,7 @@ import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const { t } = useI18n();

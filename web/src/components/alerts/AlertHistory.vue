@@ -29,11 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="xs"
               variant="outline"
               size="icon-sm"
+              icon-left="arrow-back-ios-new"
               @click="goBack"
               data-test="alert-history-back-btn"
-            >
-              <q-icon name="arrow_back_ios_new" />
-            </OButton>
+            />
             <div
               class="q-table__title tw:font-[600] q-ml-sm"
               data-test="alerts-history-title"
@@ -70,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template #prepend>
-                <q-icon
+                <OIcon
                   class="o2-search-input-icon"
                   :class="
                     store.state.theme === 'dark'
                       ? 'o2-search-input-icon-dark'
                       : 'o2-search-input-icon-light'
                   "
-                  name="search"
+                  name="search" size="sm"
                 />
               </template>
               <template #empty>
@@ -90,23 +89,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSelect>
             <OButton
               variant="ghost"
+              icon-left="search"
               size="icon-sm"
               @click="manualSearch"
               data-test="alert-history-manual-search-btn"
               :disabled="loading"
               class="q-mr-sm"
             >
-              <q-icon name="search" />
+              <OIcon name="search" size="sm" />
               <OTooltip :content="t('common.search') || 'Search'" />
             </OButton>
             <OButton
               variant="ghost"
               size="icon-sm"
+              icon-left="refresh"
               @click="refreshData"
               data-test="alert-history-refresh-btn"
               :loading="loading"
             >
-              <q-icon name="refresh" />
+              <OIcon name="refresh" size="sm" />
               <OTooltip :content="t('common.refresh') || 'Refresh'" />
             </OButton>
           </div>
@@ -169,25 +170,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #body-cell-is_realtime="props">
             <q-td :props="props">
-              <q-icon
-                :name="props.row.is_realtime ? 'check_circle' : 'schedule'"
+              <OIcon
+                :name="props.row.is_realtime ? 'check-circle' : 'schedule'"
                 :color="props.row.is_realtime ? 'positive' : 'grey'"
                 size="xs"
               >
                 <OTooltip :content="props.row.is_realtime ? 'Real-time' : 'Scheduled'" />
-              </q-icon>
+              </OIcon>
             </q-td>
           </template>
 
           <template #body-cell-is_silenced="props">
             <q-td :props="props">
-              <q-icon
-                :name="props.row.is_silenced ? 'volume_off' : 'volume_up'"
+              <OIcon
+                :name="props.row.is_silenced ? 'volume-off' : 'volume-up'"
                 :color="props.row.is_silenced ? 'grey' : 'positive'"
                 size="20px"
               >
                 <OTooltip :content="props.row.is_silenced ? 'Silenced' : 'Not Silenced'" />
-              </q-icon>
+              </OIcon>
             </q-td>
           </template>
 
@@ -199,16 +200,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- <template #body-cell-error="props">
             <q-td :props="props">
-              <q-icon
+              <OIcon
                 v-if="props.row.error"
                 name="error"
-                color="negative"
                 size="sm"
                 class="cursor-pointer"
                 @click="showErrorDialog(props.row.error)"
               >
                 <q-tooltip>Click to view error</q-tooltip>
-              </q-icon>
+              </OIcon>
             </q-td>
           </template> -->
 
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Suppressed by deduplication -->
               <div v-else-if="props.row.dedup_suppressed" class="text-negative">
-                <q-icon name="block" size="sm" />
+                <OIcon name="block" size="sm" />
                 <OTooltip>
                   <template #content>
                     Suppressed by deduplication
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped notification -->
               <div v-else-if="props.row.grouped" class="text-primary flex items-center justify-center">
-                <q-icon name="group_work" size="sm" />
+                <OIcon name="group-work" size="md" />
                 <span class="text-caption q-ml-xs">×{{ props.row.group_size || 1 }}</span>
                 <OTooltip>
                   <template #content>
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Sent (passed dedup) -->
               <div v-else class="text-positive flex items-center justify-center">
-                <q-icon name="check_circle" size="sm" />
+                <OIcon name="check-circle" size="md" />
                 <span v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption q-ml-xs">
                   ×{{ props.row.dedup_count }}
                 </span>
@@ -269,10 +269,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-circle-sm"
+                icon-left="visibility"
                 @click="showDetailsDialog(props.row)"
                 data-test="alert-history-view-details"
               >
-                <q-icon name="visibility" />
+                <OIcon name="visibility" size="sm" />
                 <OTooltip content="View Details" />
               </OButton>
               <OButton
@@ -280,9 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pipeline-list-${props.row.name}-error-indicator`"
                 variant="ghost-destructive"
                 size="icon-circle-sm"
+                icon-left="error"
                 @click.stop="showErrorDialog(props.row)"
               >
-                <q-icon name="error" />
+                <OIcon name="error" size="sm" />
                 <OTooltip :content="`Last error: ${new Date(props.row.timestamp / 1000).toLocaleString()}`" />
               </OButton>
             </q-td>
@@ -372,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Type</div>
                   <div class="text-body2">
-                    <q-icon
+                    <OIcon
                       :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
                       class="q-mr-xs"
                       size="xs"
@@ -383,17 +385,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Silenced</div>
                   <div class="text-body2">
-                    <q-icon
+                    <OIcon
                       v-if="selectedRow.is_silenced"
-                      name="volume_off"
-                      color="warning"
+                      name="volume-off"
                       size="xs"
                       class="q-mr-xs"
                     />
-                    <q-icon
+                    <OIcon
                       v-else
-                      name="volume_up"
-                      color="positive"
+                      name="volume-up"
                       size="xs"
                       class="q-mr-xs"
                     />
@@ -454,9 +454,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
+                  <OIcon
                     name="error"
-                    color="negative"
                     size="xs"
                     class="q-mr-xs"
                   />
@@ -483,9 +482,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-separator class="q-my-sm" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
-                  <q-icon
-                    name="check_circle"
-                    color="positive"
+                  <OIcon
+                    name="check-circle"
                     size="xs"
                     class="q-mr-xs"
                   />
@@ -518,12 +516,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <q-icon name="error" size="18px" class="error-icon" />
+        <OIcon name="error" size="sm" class="error-icon" />
       </template>
       <template #header-right>
         <div class="error-timestamp tw:text-xs">
           <span class="tw:mr-1">Last error:</span>
-          <q-icon name="schedule" size="14px" class="tw:mr-1" />
+          <OIcon name="schedule" size="xs" class="tw:mr-1" />
           {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
         </div>
       </template>
@@ -549,6 +547,7 @@ import DateTime from "@/components/DateTime.vue";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";

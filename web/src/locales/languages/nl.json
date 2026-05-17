@@ -396,7 +396,8 @@
     "traces": "Sporen",
     "switchToLogs": "klik om terug te schakelen naar de logboeken",
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
-    "selectLogStream": "Stream van logboeken selecteren"
+    "selectLogStream": "Stream van logboeken selecteren",
+    "noData": "Geen gegevens beschikbaar"
   },
   "menu": {
     "home": "Home",

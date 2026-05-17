@@ -39,8 +39,8 @@
             size="xs"
           >
             <template #icon-left>
-              <GitBranch v-if="tab.value === 'or'" class="tw:size-3 tw:shrink-0" />
-              <GitMerge v-else class="tw:size-3 tw:shrink-0" />
+              <OIcon v-if="tab.value === 'or'" name="git-branch" size="xs" />
+              <OIcon v-else name="merge" size="xs" />
             </template>
             {{ tab.label }}
           </OToggleGroupItem>
@@ -86,7 +86,7 @@
                 :module="props.module"
             />
                 <OButton data-test="alert-conditions-delete-condition-btn" size="icon-xs-circle" variant="ghost" @click="removeCondition(item.id)">
-                  <q-icon name="close" />
+                  <OIcon name="close" size="sm" />
                 </OButton>
                 </div>
         </div>
@@ -101,7 +101,7 @@
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <OIcon class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
             <span class="tw:text-[0.75rem] text-bold">Condition</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
@@ -113,7 +113,7 @@
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <OIcon class="q-mr-xs text-bold" size="0.75rem" style="border-radius: 50%; border: 1px solid;" name="add" />
             <span class="tw:text-[0.75rem] text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
@@ -125,7 +125,7 @@
             variant="ghost-primary"
             @click="reorderItems()"
             >
-            <q-icon color="primary" class="q-mr-xs text-bold" size="0.75rem" name="swap_vert" />
+            <OIcon class="q-mr-xs text-bold" size="0.75rem" name="swap-vert" />
             <span class="tw:text-[0.75rem] text-bold">Reorder</span>
             <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
         </OButton>
@@ -150,7 +150,7 @@
     import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
     import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
     import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-    import { GitBranch, GitMerge } from 'lucide-vue-next';
+    import OIcon from '@/lib/core/Icon/OIcon.vue';
     import { useI18n } from 'vue-i18n';
     import { getUUID } from '@/utils/zincutils';
     import ConfirmDialog from '@/components/ConfirmDialog.vue';

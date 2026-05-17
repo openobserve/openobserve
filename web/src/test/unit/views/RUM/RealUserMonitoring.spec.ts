@@ -186,7 +186,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": {
               template: '<div class="q-spinner-hourglass">Loading...</div>',
             },
@@ -223,7 +223,7 @@ describe("RealUserMonitoring.vue", () => {
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
             },
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -249,7 +249,7 @@ describe("RealUserMonitoring.vue", () => {
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
             },
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -302,7 +302,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: {
               template:
@@ -340,7 +340,7 @@ describe("RealUserMonitoring.vue", () => {
             },
             "q-spinner-hourglass": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -371,7 +371,7 @@ describe("RealUserMonitoring.vue", () => {
             },
             "q-spinner-hourglass": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -397,7 +397,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: true,
           },
@@ -435,7 +435,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: true,
           },
@@ -458,7 +458,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: true,
           },
@@ -480,7 +480,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: true,
           },
@@ -502,7 +502,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: true,
           },
@@ -599,7 +599,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             "q-spinner-hourglass": true,
             AppTabs: true,
           },

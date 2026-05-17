@@ -24,14 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="error" class="error-message q-pa-md">
       <q-banner class="bg-negative text-white">
         <template #avatar>
-          <q-icon name="error" color="white" />
+          <OIcon name="error" size="sm" />
         </template>
         Failed to load DAG: {{ error }}
       </q-banner>
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
-      <q-icon name="info" size="48px" color="grey-5" />
+      <OIcon name="info" size="48px" />
       <div class="q-mt-md text-grey-7">No DAG data available</div>
     </div>
 
@@ -94,6 +94,7 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface SpanNode {
   span_id: string;
@@ -125,7 +126,8 @@ export default defineComponent({
     Controls,
     Handle,
     OSpinner,
-  },
+    OIcon,
+},
   props: {
     traceId: {
       type: String,

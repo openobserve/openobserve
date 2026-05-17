@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"
     >
-      <q-icon name="warning" class="q-pt-sm"></q-icon
+      <OIcon name="warning" size="sm" class="q-pt-sm" />
       >{{ store.state.selectedOrganization.note }}
     </div>
     <div v-if="loading">
@@ -106,6 +106,7 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "plans",
@@ -115,7 +116,8 @@ export default defineComponent({
     TrialPeriod,
     OSpinner,
     OProgressBar,
-  },
+    OIcon,
+},
   emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;

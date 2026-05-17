@@ -90,24 +90,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="controls flex justify-between items-center">
         <div class="flex items-center">
           <div>
-            <q-icon
-              name="replay_10"
+            <OIcon
+              name="replay-10"
               size="1.5rem"
               class="q-mr-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
-            <q-icon
+            <OIcon
               :name="
                 playerState.isPlaying
-                  ? 'pause_circle_filled'
-                  : 'play_circle_filled'
+                  ? 'pause-circle-filled'
+                  : 'play-circle-filled'
               "
               size="2rem"
               class="cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
-            <q-icon
-              name="forward_10"
+            <OIcon
+              name="forward-10"
               size="1.5rem"
               class="q-ml-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
@@ -161,6 +161,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   events: {
     type: Array,

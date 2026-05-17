@@ -102,12 +102,11 @@
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                icon-left="add"
                 @click="addField"
                 :disabled="!newFieldName && !fieldInputValue"
                 data-test="cross-link-add-field-btn"
-              >
-                <Plus class="tw:size-4" />
-              </OButton>
+              />
             </div>
           </div>
         </div>
@@ -122,7 +121,6 @@ import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { Plus } from 'lucide-vue-next';
 
 export interface CrossLink {
   name: string;
@@ -132,7 +130,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, ODialog, Plus, OInput },
+  components: { CrossLinkUserGuide, OButton, ODialog, OInput },
   props: {
     modelValue: {
       type: Boolean,

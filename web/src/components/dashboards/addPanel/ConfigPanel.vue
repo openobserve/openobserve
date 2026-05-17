@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="row no-wrap items-center" style="gap: 4px">
         <OButton variant="ghost" size="icon" @click="toggleAllSections">
           <template #icon-left
-            ><q-icon
-              :name="allSectionsExpanded ? 'unfold_less' : 'unfold_more'"
+            ><OIcon
+              :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'" size="sm"
           /></template>
         </OButton>
         <ConfigPanelSearch v-model="searchQuery" />
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="searchQuery && !anySectionVisible"
       class="config-no-results column items-center q-py-lg"
     >
-      <q-icon name="search_off" size="24px" class="q-mb-xs text-grey-5" />
+      <OIcon name="search-off" size="md" class="q-mb-xs text-grey-5" />
       <div class="text-grey-6 text-caption">
         {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
@@ -117,8 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               @change="onToggleDefaultTime"
             />
-            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop>
-              <template #icon-left><q-icon name="info_outline" /></template>
+            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop icon-left="info-outline">
               <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="250px" />
             </OButton>
           </div>
@@ -144,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
-              <q-icon
+              <OIcon
                 class="q-mr-xs q-ml-sm flex-shrink-0"
                 size="15px"
                 name="close"
@@ -457,10 +456,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="row items-center all-pointer-events">
               {{ t("dashboard.legendLabel") }}
               <div>
-                <q-icon
+                <OIcon
                   class="q-ml-xs"
-                  size="20px"
-                  name="info_outline"
+                  size="md"
+                  name="info-outline"
                   data-test="dashboard-config-promql-legend-info"
                 />
                 <OTooltip :content="t('dashboard.overrideMessage')" />
@@ -996,8 +995,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #label>
             {{ t('dashboard.pivotShowRowTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop>
-              <template #icon-left><q-icon name="info_outline" /></template>
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
               <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
@@ -1018,8 +1016,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #label>
             {{ t('dashboard.pivotStickyColTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop>
-              <template #icon-left><q-icon name="info_outline" /></template>
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
               <OTooltip :content="t('dashboard.pivotStickyColTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
@@ -1034,8 +1031,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #label>
             {{ t('dashboard.pivotShowColTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop>
-              <template #icon-left><q-icon name="info_outline" /></template>
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
               <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
@@ -1056,8 +1052,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #label>
             {{ t('dashboard.pivotStickyRowTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop>
-              <template #icon-left><q-icon name="info_outline" /></template>
+            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
               <OTooltip :content="t('dashboard.pivotStickyRowTotalsTooltip')" max-width="250px" />
             </OButton>
           </template>
@@ -1084,8 +1079,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionValueTransformations") }}
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <OTooltip :content="t('dashboard.configSectionValueTransformationsTooltip')" max-width="250px" />
           </OButton>
         </div>
@@ -1114,8 +1108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header>
         <div style="display: flex; align-items: center; flex: 1; min-width: 0">
           {{ t("dashboard.configSectionFieldOverrides") }}
-          <OButton variant="ghost" size="icon" @click.stop>
-            <template #icon-left><q-icon name="info_outline" /></template>
+          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
             <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
           </OButton>
         </div>
@@ -1545,8 +1538,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             data-test="dashboard-addpanel-config-drilldown-info"
             @click.stop
+            icon-left="info-outline"
           >
-            <template #icon-left><q-icon name="info_outline" /></template>
             <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="250px" />
           </OButton>
         </div>
@@ -1586,8 +1579,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             data-test="dashboard-addpanel-config-time-shift-info"
             @click.stop
+            icon-left="info-outline"
           >
-            <template #icon-left><q-icon name="info_outline" /></template>
             <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="250px" />
           </OButton>
         </div>
@@ -1610,7 +1603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :picker="picker"
               :isFirstEntry="false"
             />
-            <q-icon
+            <OIcon
               class="q-mr-xs q-ml-sm"
               size="15px"
               name="close"
@@ -1656,8 +1649,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             data-test="dashboard-addpanel-config-markline-info"
             @click.stop
+            icon-left="info-outline"
           >
-            <template #icon-left><q-icon name="info_outline" /></template>
             <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="250px" />
           </OButton>
         </div>
@@ -1722,6 +1715,7 @@ import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 import StepMiddle from "@/components/icons/dashboards/StepMiddle.vue";
 import PromQLChartConfig from "./PromQLChartConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
 
@@ -1779,7 +1773,8 @@ export default defineComponent({
     PromQLChartConfig,
     OButton,
     OTooltip,
-  },
+    OIcon,
+},
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
@@ -2467,7 +2462,7 @@ export default defineComponent({
       { deep: true },
     );
     // When pivot mode activates: disable conflicting features and
-    // initialize pivot config values (undefined → false defaults).
+    // initialize pivot config values (undefined ? false defaults).
     // Without this, q-toggle shows undefined as OFF but conversion
     // may treat undefined differently — causing a mismatch.
     watch(
@@ -2665,7 +2660,7 @@ export default defineComponent({
 :deep(.q-field__label) {
   pointer-events: auto !important;
 
-  .q-icon {
+  .OIcon {
     pointer-events: auto !important;
   }
 }

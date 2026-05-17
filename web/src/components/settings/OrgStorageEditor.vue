@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('storage_settings.goBack')"
           @click="emit('cancel')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="text-h6" data-test="storage-settings-editor-title">
           {{ isEditMode ? t("storage_settings.updateStorage") : t("storage_settings.newStorageConfiguration") }}
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'tw:bg-amber-950/20 tw:border-amber-400/30'
                 : 'tw:bg-amber-50 tw:border-amber-300'"
             >
-              <q-icon name="warning" size="18px" color="warning" class="tw:flex-shrink-0 tw:mt-px" />
+              <OIcon name="warning" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
               <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                 This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
               </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                 : 'tw:bg-blue-50 tw:border-blue-200'"
             >
-              <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
+              <OIcon name="info" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
               <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :alt="provider.label"
                   class="card-image"
                 />
-                <q-icon
+                <OIcon
                   v-else
                   :name="provider.icon"
                   size="28px"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="selectedProvider === provider.value"
                   class="check-icon"
                 >
-                  <q-icon name="check_circle" size="20px" color="positive" />
+                  <OIcon name="check-circle" size="md" />
                 </div>
               </div>
             </div>
@@ -299,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                     : 'tw:bg-blue-50 tw:border-blue-200'"
                 >
-                  <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
+                  <OIcon name="info" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
                   <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
@@ -451,6 +451,7 @@ import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps<{
   action: "add" | "edit";

@@ -4770,9 +4770,9 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
 describe("ODialog Migration", () => {
   // Lazy-load test-utils + vue so the rest of the spec (which runs without
   // mounting anything) stays unaffected.
-   
+
   const { mount } = require("@vue/test-utils");
-   
+
   const { defineComponent, ref, h } = require("vue");
 
   // Minimal ODialog stub: renders only the surface that tests interact with

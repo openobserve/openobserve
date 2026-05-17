@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Layers class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="layers" size="xs" class="tw:shrink-0"
             /></template>
             Spans
           </OToggleGroupItem>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><q-icon :name="outlinedAccountTree" class="tw:text-[14px] tw:shrink-0"
+              ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
             /></template>
             Traces
           </OToggleGroupItem>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Network class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="account-tree" size="xs" class="tw:shrink-0"
             /></template>
             Service Graph
           </OToggleGroupItem>
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><BookOpen class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="menu-book" size="xs" class="tw:shrink-0"
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           >
             <template #icon-left
-              ><Sparkles class="tw:size-3.5 tw:shrink-0"
+              ><OIcon name="auto-awesome" size="xs" class="tw:shrink-0"
             /></template>
             LLM Insights
           </OToggleGroupItem>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-toolbar"
             @click="resetFilters"
           >
-            <q-icon name="restart_alt" size="16px" />
+            <OIcon name="restart-alt" size="sm" />
             <OTooltip :content="t('search.resetFilters')" />
           </OButton>
           <!-- Error Only Toggle -->
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @update:model-value="onErrorOnlyToggle"
             />
-            <q-icon
+            <OIcon
               name="error"
               size="1.1rem"
               class="tw:mx-1 tw:text-red-500"
@@ -213,13 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :content="t('search.autoRunEnabled')"
               />
-              <q-icon
+              <OIcon
                 v-if="
                   searchObj.meta.liveMode &&
                   store.state.zoConfig.auto_query_enabled
                 "
                 name="autorenew"
-                size="14px"
+                size="xs"
                 class="q-mr-xs"
               />
               {{ t("search.runQuery") }}
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'search-button-dropdown-enterprise-border-radius',
                   ]"
                 >
-                  <q-icon name="arrow_drop_down" size="18px" />
+                  <OIcon name="arrow-drop-down" size="sm" />
                 </OButton>
               </template>
               <ODropdownItem
@@ -251,9 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="toggleLiveMode"
               >
                 <template #icon-left>
-                  <q-icon
+                  <OIcon
                     :name="
-                      searchObj.meta.liveMode ? 'autorenew' : 'sync_disabled'
+                      searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
                     size="16px"
                     :color="searchObj.meta.liveMode ? 'primary' : ''"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Export Traces"
           @click="downloadLogs"
         >
-          <q-icon name="download" size="16px" />
+          <OIcon name="download" size="sm" />
         </OButton>
         <share-button
           data-test="logs-search-bar-share-link-btn"
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mr-[0.375rem]"
             @click="$emit('service-graph-refresh')"
           >
-            <q-icon name="refresh" size="16px" />
+            <OIcon name="refresh" size="sm" />
             <OTooltip :content="t('common.refresh')" />
           </OButton>
           <OToggleGroup
@@ -330,9 +330,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value="tree"
               size="sm"
             >
-              <template #icon-left
-                ><GitBranch class="tw:size-3.5 tw:shrink-0"
-              /></template>
+              <template #icon-left>
+                <OIcon name="git-branch" size="sm" />
+              </template>
               Tree View
             </OToggleGroupItem>
             <OToggleGroupItem
@@ -341,8 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
             >
               <template #icon-left
-                ><Share2 class="tw:size-3.5 tw:shrink-0"
-              /></template>
+                ><OIcon name="share" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
               Graph View
             </OToggleGroupItem>
           </OToggleGroup>
@@ -382,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mr-[0.375rem]"
             @click="$emit('services-catalog-refresh')"
           >
-            <q-icon name="refresh" size="16px" />
+            <OIcon name="refresh" size="sm" />
             <OTooltip :content="t('common.refresh')" />
           </OButton>
         </div>
@@ -446,13 +445,12 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { Layers, Network, GitBranch, Share2, BookOpen, Sparkles } from "lucide-vue-next";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -477,17 +475,12 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    OIcon,
     ODropdown,
     ODropdownItem,
     OSwitch,
     OSelect,
     OTooltip,
-    Layers,
-    Network,
-    GitBranch,
-    Share2,
-    BookOpen,
-    Sparkles,
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
@@ -995,7 +988,6 @@ export default defineComponent({
       onServiceGraphVisualizationChange,
       onServiceGraphLayoutChange,
       toggleLiveMode,
-      outlinedAccountTree,
     };
   },
   computed: {
@@ -1159,7 +1151,7 @@ export default defineComponent({
       border-radius: 3px 3px 3px 3px;
       padding: 0px 5px;
 
-      .q-icon {
+      .OIcon {
         font-size: 15px;
         color: #ffffff;
       }
@@ -1190,7 +1182,7 @@ export default defineComponent({
     width: 30px;
     height: 30px;
 
-    .q-icon {
+    .OIcon {
       margin-right: 0;
     }
   }

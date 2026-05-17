@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isProtected"
             @click="!isProtected && emit('delete')"
           >
-            <q-icon name="delete" />
+            <OIcon name="delete" size="sm" />
             <OTooltip :content="isProtected ? t('correlation.serviceGroupProtected') : t('correlation.removeSemanticGroup')" />
           </OButton>
         </div>
@@ -84,6 +84,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TagInput from "./TagInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 

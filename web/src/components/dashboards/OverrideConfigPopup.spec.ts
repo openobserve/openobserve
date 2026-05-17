@@ -145,8 +145,8 @@ describe("OverrideConfigPopup", () => {
             props: ["modelValue"],
             emits: ["update:modelValue"],
           },
-          "q-icon": {
-            template: '<span class="q-icon">{{ $attrs.name }}</span>',
+          "OIcon": {
+            template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },
         },
         mocks: {

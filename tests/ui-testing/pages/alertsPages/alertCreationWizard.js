@@ -1445,7 +1445,7 @@ export class AlertCreationWizard {
         const groupBySection = this.page.locator('.alert-condition-row').filter({ hasText: 'Group by' }).first();
         await groupBySection.waitFor({ state: 'visible', timeout: 5000 });
         // Click the "+" add button to create a group-by field entry
-        const addGroupByBtn = groupBySection.locator('button:has(.q-icon:not(.q-icon--delete)), button[icon="add"], [data-test="group-by-add-btn"], button:has-text("add")').first();
+        const addGroupByBtn = groupBySection.locator('button:has(.OIcon:not(.OIcon--delete)), button[icon="add"], [data-test="group-by-add-btn"], button:has-text("add")').first();
         await addGroupByBtn.waitFor({ state: 'visible', timeout: 5000 });
         await addGroupByBtn.click();
         await this.page.waitForTimeout(800);

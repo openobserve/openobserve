@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div class="col" data-test="add-destination-title">
           <div v-if="destination" class="text-h6">
@@ -84,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center q-pa-sm el-border el-border-radius"
                   data-test="destination-type-readonly"
                 >
-                  <q-icon
-                    :name="getDestinationTypeIcon(formData.destination_type)"
+                  <OIcon
+                    :name="getDestinationTypeIcon(formData.destination-type)"
                     size="20px"
                     class="q-mr-sm"
                   />
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="t('alert_templates.edit')"
                       @click="deleteApiHeader(header)"
                     >
-                      <q-icon name="delete" />
+                      <OIcon name="delete" size="sm" />
                     </OButton>
                     <OButton
                       data-test="add-destination-add-header-btn"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="t('alert_templates.edit')"
                       @click="addApiHeader()"
                     >
-                      <q-icon name="add" />
+                      <OIcon name="add" size="sm" />
                     </OButton>
                   </div>
                 </div>
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('alert_templates.edit')"
                     @click="deleteApiHeader(header)"
                   >
-                    <q-icon name="delete" />
+                    <OIcon name="delete" size="sm" />
                   </OButton>
                   <OButton
                     data-test="add-destination-add-header-btn"
@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('alert_templates.edit')"
                     @click="addApiHeader()"
                   >
-                    <q-icon name="add" />
+                    <OIcon name="add" size="sm" />
                   </OButton>
                 </div>
               </div>
@@ -460,8 +460,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="showPreview"
+            icon-left="preview"
           >
-            <template #icon-left><q-icon name="preview" /></template>
             {{ t("alert_destinations.preview") }}
           </OButton>
           <OButton
@@ -470,8 +470,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="handleTestDestination"
+            icon-left="send"
           >
-            <template #icon-left><q-icon name="send" /></template>
             {{ t("alert_destinations.test") }}
           </OButton>
         </div>
@@ -526,6 +526,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type {
   Template,
   DestinationData,
@@ -535,7 +536,6 @@ import type {
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Webhook, Mail, Zap } from "lucide-vue-next";
 import config from "@/aws-exports";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -643,25 +643,25 @@ const tabs = computed(() => {
 
     // Only return the tab matching the current destination type
     if (currentType === "http") {
-      return [{ label: t("alerts.webhook"), value: "http", icon: Webhook }];
+      return [{ label: t("alerts.webhook"), value: "http", icon: "webhook" }];
     } else if (currentType === "email") {
-      return [{ label: t("alerts.email"), value: "email", icon: Mail }];
+      return [{ label: t("alerts.email"), value: "email", icon: "mail" }];
     } else if (currentType === "action") {
-      return [{ label: t("alerts.action"), value: "action", icon: Zap }];
+      return [{ label: t("alerts.action"), value: "action", icon: "bolt" }];
     }
   }
 
   // In create mode, show all tabs
   const tabs = [
-    { label: t("alerts.webhook"), value: "http", icon: Webhook },
-    { label: t("alerts.email"), value: "email", icon: Mail },
+    { label: t("alerts.webhook"), value: "http", icon: "webhook" },
+    { label: t("alerts.email"), value: "email", icon: "mail" },
   ];
 
   if (
     (config.isEnterprise == "true" || config.isCloud == "true") &&
     store.state.zoConfig.actions_enabled
   ) {
-    tabs.push({ label: t("alerts.action"), value: "action", icon: Zap });
+    tabs.push({ label: t("alerts.action"), value: "action", icon: "bolt" });
   }
 
   return tabs;

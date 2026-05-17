@@ -7,7 +7,7 @@
             class="tw:text-[16px] tw:flex tw:items-start"
 
           >
-          <q-icon
+          <OIcon
             v-if="!image"
             data-test="container-icon"
             :name="icon"
@@ -46,9 +46,9 @@
           </div>
 
           </div>
-          <q-icon
+          <OIcon
             data-test="expand-toggle-icon"
-            :name="expanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'"
+            :name="expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
             class="tw:rounded-full tw:p-1 tw:mt-2"
 
             :class="[

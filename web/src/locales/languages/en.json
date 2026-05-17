@@ -149,6 +149,7 @@
     "timestamp": "timestamp",
     "source": "_source",
     "noResult": "No results found.",
+    "noData": "No data available",
     "syntaxGuide": "Syntax guide",
     "recordsPerPage": "Records per page",
     "showing": "Showing",

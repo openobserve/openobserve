@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             title="Go Back"
             @click="router.back()"
           >
-            <q-icon name="arrow_back_ios_new" size="14px" />
+            <OIcon name="arrow-back-ios-new" size="xs" />
             <div
               v-if="isEditingActionScript"
               class="text-h6 q-pl-sm"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-action-script-step-1"
                 :name="1"
                 :title="t('actions.uploadCodeZip')"
-                :icon="outlinedDashboard"
+                icon="dashboard"
                 :done="step > 1"
               >
                 <div
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ]"
                   >
                     <template v-slot:prepend>
-                      <q-icon name="attachment" />
+                      <OIcon name="attachment" size="sm" />
                     </template>
                     <template v-slot:hint>
                       Note: Only .zip files are accepted and it may contain
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon-sm"
                       @click="editFileToUpload"
-                      ><q-icon name="edit" size="16px"
+                      ><OIcon name="edit" size="sm"
                     /></OButton>
                   </div>
                   <div
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex justify-start items-center q-mt-md"
                     data-test="add-action-script-frequency-info"
                   >
-                    <q-icon name="event" class="q-mr-sm" />
+                    <OIcon name="event" size="sm" class="q-mr-sm" />
                     <div style="font-size: 14px">
                       The script will be triggered immediately after it is saved
                     </div>
@@ -262,9 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="add-action-script-cron-expression-title"
                         >
                           {{ t("reports.cronExpression") + " *" }}
-                          <q-icon
+                          <OIcon
                             data-test="add-action-script-cron-info"
-                            :name="outlinedInfo"
+                            name="info"
                             size="17px"
                             class="q-ml-xs cursor-pointer"
                             :class="
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </span>
                               </template>
                             </OTooltip>
-                          </q-icon>
+                          </OIcon>
                         </div>
 
                         <OInput
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-action-script-step-3"
                 :name="3"
                 title="Select Service Account"
-                :icon="outlinedDashboard"
+                icon="dashboard"
                 :done="step > 3"
                 class="q-mt-md"
               >
@@ -360,8 +360,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-mb-xs text-bold text-grey-8"
                     >
                       {{ t("actions.serviceAccount") + " *" }}
-                      <q-icon
-                        :name="outlinedInfo"
+                      <OIcon
+                        name="info"
                         size="17px"
                         class="q-ml-xs cursor-pointer"
                         :class="
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                           </template>
                         </OTooltip>
-                      </q-icon>
+                      </OIcon>
                     </div>
                     <OSelect
                       data-test="add-action-script-service-account-select"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       :title="t('alert_templates.delete')"
                       @click="deleteApiHeader(header)"
-                      ><q-icon name="delete" size="16px"
+                      ><OIcon name="delete" size="sm"
                     /></OButton>
                     <OButton
                       data-test="add-action-script-add-header-btn"
@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
                       @click="addApiHeader()"
-                      ><q-icon name="add" size="16px"
+                      ><OIcon name="add" size="sm"
                     /></OButton>
                   </div>
                 </div>
@@ -532,7 +532,6 @@ import {
 } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import { outlinedDashboard } from "@quasar/extras/material-icons-outlined";
 import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
@@ -541,10 +540,10 @@ import actions from "@/services/action_scripts";
 import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

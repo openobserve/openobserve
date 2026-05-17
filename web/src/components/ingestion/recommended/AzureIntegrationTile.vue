@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="docs-btn"
           :data-test="`azure-${integration.id}-docs-btn`"
         >
-          <q-icon name="description" />
+          <OIcon name="description" size="sm" />
           <q-tooltip>View Documentation</q-tooltip>
         </OButton>
       </div>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleDocumentation()"
         :data-test="`azure-${integration.id}-docs-icon-btn`"
       >
-        <q-icon name="description" />
+        <OIcon name="description" size="sm" />
         <q-tooltip>View Documentation</q-tooltip>
       </OButton>
       <!-- Dashboard Button -->
@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="!integration.hasDashboard"
         class="tw:flex-1"
         :data-test="`azure-${integration.id}-dashboard-btn`"
+        icon-left="dashboard"
       >
-        <template #icon-left><q-icon name="dashboard" /></template>
         Dashboard
       </OButton>
     </q-card-actions>
@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -102,7 +103,9 @@ import segment from "@/services/segment_analytics";
 
 export default defineComponent({
   name: "AzureIntegrationTile",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+},
   props: {
     integration: {
       type: Object as PropType<AzureIntegration>,

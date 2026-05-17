@@ -83,7 +83,7 @@ const QBannerStub = {
 const QIconStub = {
   name: "QIcon",
   props: ["name", "size"],
-  template: `<i data-test="q-icon" :data-name="name" :class="$attrs.class" />`,
+  template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
 };
 
 const QCheckboxStub = {
@@ -119,7 +119,7 @@ function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
       stubs: {
         ODialog: ODialogStub,
         "q-banner": QBannerStub,
-        "q-icon": QIconStub,
+        "OIcon": QIconStub,
         "q-checkbox": QCheckboxStub,
       },
     },
@@ -192,7 +192,7 @@ describe("CustomChartConfirmDialog", () => {
           stubs: {
             ODialog: ODialogStub,
             "q-banner": QBannerStub,
-            "q-icon": QIconStub,
+            "OIcon": QIconStub,
             "q-checkbox": QCheckboxStub,
           },
         },
@@ -245,7 +245,7 @@ describe("CustomChartConfirmDialog", () => {
     it("renders the warning icon inside the banner", () => {
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const icon = wrapper.find('[data-test="q-icon"]');
+      const icon = wrapper.find('[data-test="OIcon"]');
       expect(icon.exists()).toBe(true);
       expect(icon.attributes("data-name")).toBe("warning");
     });
@@ -274,7 +274,7 @@ describe("CustomChartConfirmDialog", () => {
       store.state.theme = "dark";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const icon = wrapper.find('[data-test="q-icon"]');
+      const icon = wrapper.find('[data-test="OIcon"]');
       expect(icon.classes().join(" ")).toContain("tw:text-yellow-500/80");
     });
 
@@ -282,7 +282,7 @@ describe("CustomChartConfirmDialog", () => {
       store.state.theme = "light";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const icon = wrapper.find('[data-test="q-icon"]');
+      const icon = wrapper.find('[data-test="OIcon"]');
       expect(icon.classes().join(" ")).toContain("tw:text-orange-500");
     });
   });

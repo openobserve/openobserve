@@ -287,21 +287,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             value="schemaFields"
                             size="sm"
                           >
-                            <template #icon-left><UserCheck class="tw:size-3.5 tw:shrink-0" /></template>
+                            <template #icon-left><OIcon name="verified-user" size="sm" /></template>
                             User Defined Schema ({{ indexData.defined_schema_fields.length }})
                           </OToggleGroupItem>
                           <OToggleGroupItem value="allFields" size="sm">
-                            <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
+                            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                             {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
                           </OToggleGroupItem>
                         </OToggleGroup>
                     </div>
                    
                     <div v-if="hasUserDefinedSchema" class="q-ml-sm">
-                      <q-icon
+                      <OIcon
                         name="info"
                         class="q-mr-xs"
-                        size="16px"
+                        size="sm"
                         style="color: #f5a623; cursor: pointer"
                       >
                         <OTooltip side="right">
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           before the stream was configured to use a user-defined
                           schema.
                         </OTooltip>
-                      </q-icon>
+                      </OIcon>
                     </div>
                   </div>
 
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('search.searchField')"
                     >
                       <template #prepend>
-                        <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
+                        <OIcon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" size="sm" />
                       </template>
                     </OInput>
                     <OButton
@@ -334,9 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="q-my-sm"
                       @click.stop="openDialog"
                       title="Add Field(s)"
-                    >
-                      <Plus :size="14" />
-                    </OButton>
+                      icon-left="add"
+                    />
                   </div>
                 </div>
 
@@ -355,9 +354,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           size="icon-sm"
                           @click="closeDialog"
-                        >
-                          <X :size="14" />
-                        </OButton>
+                          icon-left="close"
+                        />
                       </div>
                     </div>
                   </q-card-section>
@@ -422,8 +420,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :props="props"
                       >
                         <span v-if="col.icon" class="tw:ml-[5px]">
-                          <q-icon  size="12px" :name="outlinedPerson"></q-icon>
-                          <q-icon  size="12px" :name="outlinedSchema"></q-icon>
+                          <OIcon name="person" size="xs" />
+                          <OIcon name="schema" size="xs" />
                         </span>
                         <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
                           {{ col.label }}
@@ -503,8 +501,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-slot:body-cell-settings="props">
                     <q-td class="text-left" v-if="props.row.isUserDefined">
-                      <q-icon size="12px"  :name="outlinedPerson"></q-icon>
-                      <q-icon size="12px" :name="outlinedSchema"></q-icon>
+                      <OIcon name="person" size="xs" />
+                      <OIcon name="schema" size="xs" />
                     </q-td>
                     <q-td v-else> </q-td>
                   </template>
@@ -542,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="val => updateIndexType(props, val)"
                       >
                       <template v-slot:append>
-                        <q-icon 
+                        <OIcon 
                           v-if="props.row.index_type && props.row.index_type.length > 0"
                           name="cancel" 
                           size="14px"
@@ -573,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
                       {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
                       <span>
-                        <q-icon name="arrow_forward" size="xs" />
+                        <OIcon name="arrow-forward" size="xs" />
                       </span>
                     </q-td>
                     <q-td v-else>
@@ -758,7 +756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: fit-content"
               >
                 <span style="font-weight: 600">
-                  <q-icon name="info" class="q-mr-xs" size="16px" />
+                  <OIcon name="info" class="q-mr-xs" size="sm" />
 
                   Additional
                   {{ store.state.zoConfig.extended_data_retention_days }} days of
@@ -921,11 +919,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @click="updateDefinedSchemaFields"
                   >
-                    <span
+                      <span
                       class="flex items-center justify-start tw:gap-1 tw:mr-1"
                     >
-                      <UserCheck :size="13" />
-                      <LayoutList :size="13" />
+                      <OIcon name="verified-user" size="sm" />
+                      <OIcon name="format-list-bulleted" size="sm" />
                     </span>
                     {{
                       activeTab === "schemaFields"
@@ -950,8 +948,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? (confirmQueryModeChangeDialog = true)
                         : (confirmDeleteDatesDialog = true)
                     "
+                    icon-left="delete"
                   >
-                    <Trash2 :size="14" class="tw:mr-1" />
                     {{ t("logStream.delete") }}
                   </OButton>
                 </div>
@@ -1045,16 +1043,10 @@ import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { UserCheck, LayoutList } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Plus, Trash2 } from "lucide-vue-next";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
-import {
-  outlinedSchema,
-  outlinedPerson,
-  outlinedDelete,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1098,8 +1090,6 @@ export default defineComponent({
     StreamFieldsInputs,
     OToggleGroup,
     OToggleGroupItem,
-    UserCheck,
-    LayoutList,
     QTablePagination,
     DateTime,
     AssociatedRegexPatterns,
@@ -1108,9 +1098,7 @@ export default defineComponent({
     LlmEvaluationSettings,
     CrossLinkManager,
     OButton,
-    X,
-    Plus,
-    Trash2,
+    OIcon,
     OSpinner,
     OInput,
     OSelect,
@@ -2566,9 +2554,6 @@ export default defineComponent({
       selectedPerPage,
       pagination,
       qTable,
-      outlinedPerson,
-      outlinedSchema,
-      outlinedDelete,
       openDialog,
       calculateDateRange,
       minDate,

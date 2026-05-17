@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
             >
-              <q-icon name="info_outline" />
+              <OIcon name="info-outline" size="sm" />
               <OTooltip :content="t('alerts.alertSettings.templateTooltip')" />
             </OButton>
           </div>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.advanced.refreshTemplates')"
               @click="$emit('refresh:templates')"
             >
-              <q-icon name="refresh" />
+              <OIcon name="refresh" size="sm" />
             </OButton>
           </div>
         </div>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
             >
-              <q-icon name="info_outline" />
+              <OIcon name="info-outline" size="sm" />
               <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
             </OButton>
           </div>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-circle-sm"
                 @click="removeVariable(variable)"
               >
-                <q-icon name="delete_outline" />
+                <OIcon name="delete-outline" size="sm" />
               </OButton>
               <OButton
                 data-test="alert-variables-add-variable-btn"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-circle-sm"
                 @click="addVariable"
               >
-                <q-icon name="add" />
+                <OIcon name="add" size="sm" />
               </OButton>
             </div>
           </template>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
               >
-                <q-icon name="info_outline" />
+                <OIcon name="info-outline" size="sm" />
                 <OTooltip :content="t('alerts.advanced.rowTemplateTooltip')" />
               </OButton>
             </div>
@@ -166,11 +166,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="emitUpdate"
               >
                 <OToggleGroupItem value="String" size="sm">
-                  <template #icon-left><TypeIcon class="tw:size-3.5 tw:shrink-0" /></template>
+                  <template #icon-left><OIcon name="title" size="sm" /></template>
                   String
                 </OToggleGroupItem>
                 <OToggleGroupItem value="Json" size="sm">
-                  <template #icon-left><Braces class="tw:size-3.5 tw:shrink-0" /></template>
+                  <template #icon-left><OIcon name="data-object" size="sm" /></template>
                   JSON
                 </OToggleGroupItem>
               </OToggleGroup>
@@ -207,7 +207,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { Type as TypeIcon, Braces } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface Variable {
   id: string;
@@ -217,7 +217,7 @@ export interface Variable {
 
 export default defineComponent({
   name: "Step6Advanced",
-  components: { OToggleGroup, OToggleGroupItem, OButton, TypeIcon, Braces, OInput, OTextarea, OSelect, OTooltip },
+  components: { OToggleGroup, OToggleGroupItem, OButton, OIcon, OInput, OTextarea, OSelect, OTooltip },
   props: {
     template: {
       type: String,

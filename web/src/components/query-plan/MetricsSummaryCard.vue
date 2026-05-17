@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="metrics-grid">
         <div class="metric-item">
           <div class="metric-icon">
-            <q-icon name="schedule" size="24px" color="primary" />
+            <OIcon name="schedule" size="md" />
           </div>
           <div class="metric-content">
             <div class="metric-label">{{ t("search.totalTime") }}</div>
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="metric-item">
           <div class="metric-icon">
-            <q-icon name="format_list_numbered" size="24px" color="primary" />
+            <OIcon name="format-list-numbered" size="md" />
           </div>
           <div class="metric-content">
             <div class="metric-label">{{ t("search.totalRows") }}</div>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="metric-item">
           <div class="metric-icon">
-            <q-icon name="memory" size="24px" color="primary" />
+            <OIcon name="memory" size="md" />
           </div>
           <div class="metric-content">
             <div class="metric-label">{{ t("search.peakMemory") }}</div>
@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { SummaryMetrics } from "@/utils/queryPlanParser";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "MetricsSummaryCard",

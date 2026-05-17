@@ -165,8 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div style="width: 130px">
                         {{ t("pipeline.trigger") }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               trigger.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div class="flex justify-start items-center">
                         <div
@@ -305,11 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="q-mb-sm q-ml-xs q-mr-sm"
                               :title="t('alert_templates.delete')"
                               @click="deleteGroupByColumn(index)"
-                            >
-                              <template #icon-left>
-                                <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                              </template>
-                            </OButton>
+                              icon-left="delete"
+                            />
                           </div>
                         </template>
                         <OButton
@@ -319,11 +316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="q-mb-sm q-ml-xs q-mr-sm"
                           :title="t('common.add')"
                           @click="addGroupByColumn()"
-                        >
-                          <template #icon-left>
-                            <Plus class="tw:size-3.5 tw:shrink-0" />
-                          </template>
-                        </OButton>
+                          icon-left="add"
+                        />
                       </div>
                     </div>
                     <div
@@ -337,8 +331,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("alerts.threshold") + " *" }}
 
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -360,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               trigger.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div
                         style="width: calc(100% - 190px)"
@@ -557,8 +551,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("alerts.crontitle") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -577,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               expression.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -613,8 +607,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         {{ t("alerts.frequency") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -651,16 +645,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               month, month, and day of week, respectively.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                         <template
                           v-if="
                             triggerData.frequency_type == 'cron' &&
                             showTimezoneWarning
                           "
                         >
-                          <q-icon
-                            :name="outlinedWarning"
-                            size="18px"
+                          <OIcon
+                            name="warning"
+                            size="sm"
                             class="cursor-pointer tw:ml-[8px]"
                             :class="
                               store.state.theme === 'dark'
@@ -677,7 +671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               Warning: The displayed timezone is approximate.
                               Verify and select the correct timezone manually.
                             </q-tooltip>
-                          </q-icon>
+                          </OIcon>
                         </template>
                       </div>
                       <div style="max-height: 50px" class="q-mb-sm">
@@ -799,8 +793,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("alerts.period") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -822,7 +816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data from 3:50 PM to 4:00 PM.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -900,8 +894,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("pipeline.delay") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -922,7 +916,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               run 10 minutes after its scheduled time.</span
                             >
                           </q-tooltip>
-                        </q-icon>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -993,17 +987,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('search.openFields')
               "
               @click="collapseFieldList"
-            >
-              <template #icon-left>
-                  <q-icon
-                  :name="
-                    collapseFields
-                      ? 'chevron_right'
-                      : 'chevron_left'
-                  "
-                />
-              </template>
-            </OButton>
+              :icon-left="collapseFields ? 'chevron-right' : 'chevron-left'"
+            />
           </template>
           <template #after>
             <div class="full-width tw:flex tw:flex-col" style="height: 100%">
@@ -1087,8 +1072,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
-size="md" />
+                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -1103,7 +1087,7 @@ size="md" />
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
+                      <OIcon name="info"
 size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
@@ -1133,10 +1117,8 @@ size="md" />
                     size="sm-action"
                     @mousedown.prevent
                     @click="$emit('delete:node')"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     {{ t("pipeline.deleteNode") }}
                   </OButton>
 
@@ -1212,11 +1194,6 @@ import {
 } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedDelete,
-  outlinedInfo,
-  outlinedWarning,
-} from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import {
   getImageURL,
@@ -1236,7 +1213,7 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Maximize2, Minimize2, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1245,7 +1222,6 @@ import useLogs from "@/composables/useLogs";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Code2, BarChart2 } from "lucide-vue-next";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1415,12 +1391,12 @@ const tabOptions = computed(() => [
   {
     label: t("alerts.sql"),
     value: "sql",
-    icon: Code2,
+    icon: "code",
   },
   {
     label: t("alerts.promql"),
     value: "promql",
-    icon: BarChart2,
+    icon: "bar-chart",
     disabled: selectedStreamType.value !== "metrics",
     tooltipLabel:
       selectedStreamType.value !== "metrics"
@@ -2564,7 +2540,7 @@ defineExpose({
     border-radius: 3px 3px 3px 3px;
     padding: 0px 5px;
 
-    .q-icon {
+    .OIcon {
       font-size: 15px;
       color: #ffffff;
     }

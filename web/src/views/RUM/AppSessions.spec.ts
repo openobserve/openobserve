@@ -216,7 +216,7 @@ describe("AppSessions.vue", () => {
             template: '<div class="q-avatar" v-bind="$attrs"><slot /></div>',
           },
           QIcon: {
-            template: '<span class="q-icon" v-bind="$attrs"></span>',
+            template: '<span class="OIcon" v-bind="$attrs"></span>',
           },
           QSpinnerHourglass: {
             template: '<div class="q-spinner-hourglass" v-bind="$attrs"></div>',

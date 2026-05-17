@@ -84,9 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
             class="q-mt-md"
-          >
-            <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+            icon-left="refresh"
+          />
         </div>
 
         <!-- Enable Sampling Toggle -->
@@ -162,7 +161,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import { RefreshCw } from "lucide-vue-next";
 
 export default defineComponent({
   name: "LlmEvaluation",

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="t('function.search')"
                 >
                   <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
+                    <OIcon class="o2-search-input-icon" name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -75,25 +75,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
                     @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    icon-left="edit"
+                  />
                   <OButton
                     variant="ghost-destructive"
                     size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
                     @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
+                    icon-left="delete"
+                  />
                   <OButton
                     variant="ghost"
                     size="icon-sm"
                     :title="'Associated Pipelines'"
                     @click="getAssociatedPipelines(props)"
                   >
-                    <q-icon :name="outlinedAccountTree" size="14px" />
+                    <OIcon name="account-tree" size="xs" />
                   </OButton>
                 </q-td>
               </template>
@@ -125,10 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     class="tw:mr-2"
                     @click="openBulkDeleteDialog"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     Delete
                   </OButton>
                   <QTablePagination
@@ -246,10 +242,7 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import {
-  outlinedDelete,
-  outlinedAccountTree,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -257,7 +250,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
 
 export default defineComponent({
   name: "functionList",
@@ -267,13 +259,12 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    OIcon,
     ODialog,
     OInput,
     OTooltip,
     OCheckbox,
-    Pencil,
-    Trash2,
-  },
+    },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -746,8 +737,6 @@ export default defineComponent({
       maxRecordToReturn,
       showAddJSTransformDialog,
       changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedAccountTree,
       forceDeleteFn,
       confirmForceDelete,
       pipelineList,

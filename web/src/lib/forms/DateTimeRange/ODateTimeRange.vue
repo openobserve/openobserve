@@ -32,6 +32,7 @@ import type { DateRange } from "reka-ui";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
@@ -307,13 +308,13 @@ const triggerClasses = computed(() => [
       class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
     >
       <slot name="label">{{ label }}</slot>
-      <q-icon
+      <OIcon
         v-if="$slots.tooltip"
-        name="info_outline"
-        size="16px"
+        name="info-outline"
+        size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="tw:cursor-help tw:text-datepicker-label"
-      ><slot name="tooltip" /></q-icon>
+      ><slot name="tooltip" /></OIcon>
     </div>
 
     <!-- Trigger + Popover -->

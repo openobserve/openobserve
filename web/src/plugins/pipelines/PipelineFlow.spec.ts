@@ -517,6 +517,6 @@ describe("PipelineFlow.vue", () => {
     
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
     expect(warningText.text()).toContain('Unsaved changes detected');
-    expect(warningText.find('.q-icon').exists()).toBe(true);
+    expect(warningText.find('.OIcon').exists()).toBe(true);
   });
 });

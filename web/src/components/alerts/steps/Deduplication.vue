@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mb-4">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t("alerts.deduplication.fingerprintFields") }}
-          <q-icon
+          <OIcon
             name="info_outline"
             size="17px"
             class="q-ml-xs cursor-pointer"
           >
             <OTooltip :content="t('alerts.deduplication.fingerprintFieldsTooltip')" side="right" />
-          </q-icon>
+          </OIcon>
         </div>
         <div
           class="tw:text-sm tw:mb-2"
@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:mb-4">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t("alerts.deduplication.timeWindow") }}
-          <q-icon
+          <OIcon
             name="info_outline"
             size="17px"
             class="q-ml-xs cursor-pointer"
           >
             <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
-          </q-icon>
+          </OIcon>
         </div>
         <div
           class="tw:text-sm tw:mb-2"
@@ -104,6 +104,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "Step5Deduplication",
@@ -297,7 +298,7 @@ export default defineComponent({
       background-color: rgba(255, 255, 255, 0.1) !important;
       color: #e0e0e0 !important;
 
-      .q-icon {
+      .OIcon {
         color: #e0e0e0 !important;
         opacity: 0.8;
 
@@ -316,7 +317,7 @@ export default defineComponent({
       background-color: rgba(0, 0, 0, 0.08) !important;
       color: #424242 !important;
 
-      .q-icon {
+      .OIcon {
         color: #424242 !important;
         opacity: 0.7;
 

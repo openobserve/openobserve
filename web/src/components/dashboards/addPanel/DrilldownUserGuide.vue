@@ -5,8 +5,8 @@
       size="icon"
       @click="onUserGuideClick"
       data-test="dashboard-drilldown-help-btn"
+      icon-left="help-outline"
     >
-      <template #icon-left><q-icon name="help_outline" /></template>
       <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
         User Guide
       </q-tooltip>

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="xs"
         @click="resetToDefaultTheme"
       >
-        <template #icon-left><q-icon name="refresh" size="14px" /></template>
+        <template #icon-left><OIcon name="refresh" size="xs" /></template>
         Reset
       </OButton>
     </template>
@@ -82,10 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :style="{ backgroundColor: customLightColor }"
                   @click="openColorPicker('light')"
                 >
-                  <q-icon
+                  <OIcon
                     name="colorize"
-                    size="16px"
-                    color="white"
+                    size="sm"
                     style="
                       position: absolute;
                       top: 50%;
@@ -157,10 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :style="{ backgroundColor: customDarkColor }"
                   @click="openColorPicker('dark')"
                 >
-                  <q-icon
+                  <OIcon
                     name="colorize"
-                    size="16px"
-                    color="white"
+                    size="sm"
                     style="
                       position: absolute;
                       top: 50%;
@@ -199,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
         >
-          <q-icon name="info_outline" size="14px" class="q-mt-xs" />
+          <OIcon name="info-outline" size="xs" class="q-mt-xs" />
           <span
             >Theme preferences are stored locally on this device and will not
             sync across different browsers or devices.</span
@@ -231,6 +229,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useQuasar } from "quasar";
