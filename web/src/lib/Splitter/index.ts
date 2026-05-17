@@ -1,4 +1,4 @@
 // Copyright 2026 OpenObserve Inc.
 
-// OSplitter component will be added in Task 2
+export { default as OSplitter } from './OSplitter.vue'
 export type { OSplitterProps, OSplitterEmits } from './OSplitter.types'
