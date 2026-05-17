@@ -3482,10 +3482,6 @@ export default defineComponent({
     font-size: 12px !important;
   }
 
-  .q-splitter__after {
-    overflow: hidden;
-  }
-
   .q-table__top {
     padding: 0px !important;
   }
@@ -3505,11 +3501,6 @@ export default defineComponent({
     height: 100% !important;
     overflow: visible !important;
     /* Changed from tw:hidden to visible for button */
-  }
-
-  .logs-horizontal-splitter .q-splitter__before {
-    z-index: auto;
-    overflow: visible;
   }
 
   // .search-result-container {
