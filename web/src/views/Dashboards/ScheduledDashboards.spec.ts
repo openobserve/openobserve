@@ -169,11 +169,6 @@ describe('ScheduledDashboards', () => {
             name: 'NoData',
             template: '<div class="no-data-mock">No data available</div>'
           },
-          'q-spinner-hourglass': {
-            name: 'q-spinner-hourglass',
-            template: '<div class="loading-spinner"></div>',
-            props: ['color', 'size']
-          },
           'q-input': {
             name: 'q-input',
             template: '<input class="q-input-mock" />',
@@ -513,7 +508,7 @@ describe('ScheduledDashboards', () => {
   describe('Loading States', () => {
     it('should show loading spinner when loading is true', () => {
       const wrapper = createWrapper({ loading: true });
-      expect(wrapper.find('.loading-spinner').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-loading"]').exists()).toBe(true);
     });
 
     it('should show no data message when not loading and no reports', () => {

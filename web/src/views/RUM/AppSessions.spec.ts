@@ -215,9 +215,6 @@ describe("AppSessions.vue", () => {
           QIcon: {
             template: '<span class="OIcon" v-bind="$attrs"></span>',
           },
-          QSpinnerHourglass: {
-            template: '<div class="q-spinner-hourglass" v-bind="$attrs"></div>',
-          },
           DateTime: {
             template:
               '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
@@ -286,7 +283,7 @@ describe("AppSessions.vue", () => {
       wrapper.vm.isLoading.push(true);
       await nextTick();
 
-      expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
+      expect(wrapper.find('[data-test="app-sessions-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain(
         "Hold on tight, we're fetching sessions.",
       );
@@ -655,7 +652,6 @@ describe("AppSessions.vue", () => {
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
             QIcon: { template: "<span></span>" },
-            QSpinnerHourglass: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
@@ -798,7 +794,6 @@ describe("AppSessions.vue", () => {
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
             QIcon: { template: "<span></span>" },
-            QSpinnerHourglass: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },

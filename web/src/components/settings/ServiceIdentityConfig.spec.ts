@@ -130,7 +130,6 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  "q-spinner-hourglass": true,
   "OIcon": { template: "<span />", props: ["name", "size", "color"] },
   "q-btn": { template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>', props: ["label", "flat", "dense", "loading", "disable"], emits: ["click"] },
   "q-expansion-item": { template: '<div class="expansion-item"><slot /><slot name="header" /></div>', props: ["label", "icon", "dense", "class", "modelValue"], emits: ["update:modelValue"] },

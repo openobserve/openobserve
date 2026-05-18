@@ -161,9 +161,6 @@ describe("AddDashboardFromGitHub Component", () => {
           ODrawer: ODrawerStub,
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          "q-spinner": {
-            template: '<div class="q-spinner"></div>',
-          },
           "OIcon": {
             template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },

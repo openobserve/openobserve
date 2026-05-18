@@ -244,7 +244,6 @@ describe("JsonPreview Component", () => {
           'q-card': true,
           'q-card-section': true,
           'q-card-actions': true,
-          'q-spinner-hourglass': true,
           'EqualIcon': true,
           'NotEqualIcon': true
         }
@@ -298,8 +297,7 @@ describe("JsonPreview Component", () => {
             'q-card': true,
             'q-card-section': true,
             'q-card-actions': true,
-            'q-spinner-hourglass': true,
-            'EqualIcon': true,
+              'EqualIcon': true,
             'NotEqualIcon': true
           }
         },
@@ -778,8 +776,7 @@ describe("JsonPreview Component", () => {
             'q-card': true,
             'q-card-section': true,
             'q-card-actions': true,
-            'q-spinner-hourglass': true,
-            'EqualIcon': true,
+              'EqualIcon': true,
             'NotEqualIcon': true
           }
         },

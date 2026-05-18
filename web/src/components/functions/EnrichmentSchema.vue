@@ -31,7 +31,7 @@
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
-          <OSpinner size="md" />
+          <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div

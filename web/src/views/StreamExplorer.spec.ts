@@ -91,7 +91,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { StreamDataTable: true },
       },
     });
 
@@ -103,7 +103,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { StreamDataTable: true },
       },
     });
 
@@ -117,7 +117,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { StreamDataTable: true },
       },
     });
 
@@ -132,7 +132,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { StreamDataTable: true },
       },
     });
 
@@ -147,7 +147,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { StreamDataTable: true },
       },
     });
 

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    
     <!-- Loading state -->
     <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
-      <OSpinner size="md" />
+      <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
     <!-- Cloud: storage not enabled -->

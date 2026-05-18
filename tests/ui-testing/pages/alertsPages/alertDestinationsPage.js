@@ -1425,7 +1425,7 @@ export class AlertDestinationsPage {
 
         // Wait for loading state to complete - use text match for the loading message
         const loadingMessage = this.page.getByText('Loading destination data...');
-        const loadingSpinner = this.page.locator('.q-spinner');
+        const loadingSpinner = this.page.locator('[data-test="add-destination-loading-indicator"]');
 
         // Check if loading state is present and wait for it to disappear
         const isLoadingVisible = await loadingMessage.isVisible().catch(() => false) ||

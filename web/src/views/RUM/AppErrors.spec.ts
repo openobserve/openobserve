@@ -247,10 +247,6 @@ describe("AppErrors.vue", () => {
               '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>',
             emits: ["click"],
           },
-          "q-spinner-hourglass": {
-            template: '<div class="q-spinner">Loading...</div>',
-            props: ["color", "size"],
-          },
         },
       },
     });
@@ -329,7 +325,7 @@ describe("AppErrors.vue", () => {
       (wrapper.vm as any).isLoading = [true];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".q-spinner").exists()).toBe(true);
+      expect(wrapper.find('[data-test="app-errors-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain(
         "Hold on tight, we're fetching application errors.",
       );
@@ -342,7 +338,7 @@ describe("AppErrors.vue", () => {
       (wrapper.vm as any).isLoading = [];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".q-spinner").exists()).toBe(false);
+      expect(wrapper.find('[data-test="app-errors-loading-indicator"]').exists()).toBe(false);
     });
 
     it("should call getStreamFields on mount", async () => {

@@ -201,7 +201,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           QBtn: false,
           QIcon: false,
           QTooltip: false,
-          QSpinner: false,
           ODialog: ODialogStub,
         },
       },

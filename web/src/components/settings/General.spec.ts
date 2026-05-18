@@ -239,10 +239,6 @@ const createWrapper = (props = {}, options = {}) => {
           template: "<span data-test-stub='OIcon'></span>",
           props: ["name"],
         },
-        QSpinnerHourglass: {
-          template: "<div data-test-stub='q-spinner-hourglass'></div>",
-          props: ["class", "size", "color"],
-        },
         QDialog: {
           template:
             "<div data-test-stub='q-dialog' v-if='modelValue'><slot></slot></div>",
@@ -864,7 +860,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: true });
 
-      const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
+      const spinner = wrapper.find('[data-test="general-settings-loading-indicator"]');
       if (spinner.exists()) {
         expect(spinner.exists()).toBe(true);
       } else {
@@ -877,7 +873,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: false });
 
-      const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
+      const spinner = wrapper.find('[data-test="general-settings-loading-indicator"]');
       expect(spinner.exists()).toBe(false);
     });
   });

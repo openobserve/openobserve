@@ -119,11 +119,6 @@ describe("ApiDashboard", () => {
       },
       global: {
         stubs: {
-                    "q-spinner-hourglass": {
-            name: "q-spinner-hourglass",
-            template: '<div class="q-spinner-hourglass"></div>',
-            props: ["color", "size", "style"],
-          },
           RenderDashboardCharts: {
             name: "RenderDashboardCharts",
             template:

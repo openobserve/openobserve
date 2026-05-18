@@ -192,10 +192,6 @@ const createWrapper = (props = {}, options = {}) => {
           template: "<span data-test-stub='OIcon'></span>",
           props: ["name", "size"],
         },
-        QSpinnerHourglass: {
-          template: "<span data-test-stub='q-spinner-hourglass'></span>",
-          props: ["color", "size"],
-        },
         FullViewContainer: {
           template: "<div data-test-stub='full-view-container'><slot></slot><slot name='right'></slot></div>",
           props: ["name", "isExpanded", "label", "labelClass"],

@@ -23,7 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-12.5rem)]"
       >
         <div>
-          <OSpinner size="md" class="tw:mx-auto tw:block" />
+          <OSpinner
+            size="md"
+            class="tw:mx-auto tw:block"
+            data-test="error-viewer-loading-indicator"
+          />
           <div class="text-center full-width">
             {{ t("rum.loadingErrorDetails") }}
           </div>

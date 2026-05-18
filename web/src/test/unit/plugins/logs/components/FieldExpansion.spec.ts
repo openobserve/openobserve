@@ -154,9 +154,6 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-inner-loading": {
-              template: "<div class='loading'>Fetching values...</div>",
-            },
             "OIcon": true,
             "q-btn": true,
           },
@@ -184,7 +181,6 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-inner-loading": { template: "<div class='loading' />" },
             "OIcon": true,
             "q-btn": true,
           },

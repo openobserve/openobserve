@@ -1190,7 +1190,6 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
           QTable: { template: '<div><slot name="no-data" /></div>' },
           QInput: { template: '<input />' },
           QIcon: { template: '<span />' },
-          QSpinnerHourglass: { template: '<span />' },
           QTr: { template: '<tr><slot /></tr>' },
           QTd: { template: '<td><slot /></td>' },
           QTh: { template: '<th><slot /></th>' },

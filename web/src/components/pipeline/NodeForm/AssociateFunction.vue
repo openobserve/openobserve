@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="loading"
         size="md"
         class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+        data-test="associate-function-loading-indicator"
       />
     </div>
     <div

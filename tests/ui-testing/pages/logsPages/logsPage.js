@@ -232,7 +232,7 @@ export class LogsPage {
         this.correlatedMetricsTab = '[role="tab"]:has-text("Metrics")';
         this.correlatedTracesTab = '[role="tab"]:has-text("Traces")';
         // Correlation loading and error states
-        this.correlationLoadingSpinner = '.q-spinner-hourglass';
+        this.correlationLoadingSpinner = '[data-test="logs-correlation-loading-indicator"]';
         this.correlationErrorMessage = '.tw\\:text-red-500';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
@@ -246,7 +246,7 @@ export class LogsPage {
         this.dimensionSelectorCollapseBtn = '[data-test="dimension-selector-collapse-btn"]';
         this.dimensionSearchInput = '[data-test="dimension-search-input"]';
         // Analysis dashboard states
-        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] .q-spinner-hourglass, [data-test="traces-analysis-dashboard-drawer"] .q-spinner';
+        this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
         this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
 
         // ===== REGRESSION TEST LOCATORS =====
@@ -295,7 +295,7 @@ export class LogsPage {
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
         // Pattern list states
-        this.patternLoadingSpinner = '.q-spinner-hourglass';
+        this.patternLoadingSpinner = '[data-test="pattern-list-loading-indicator"]';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
         this.patternEmptyState = 'text=No patterns found';
 
@@ -5144,7 +5144,7 @@ export class LogsPage {
      */
     async waitForAnalysisDashboardLoad() {
         // Wait for loading spinner to disappear
-        const spinner = this.page.locator('.q-spinner-hourglass, .q-spinner');
+        const spinner = this.page.locator('[data-test="traces-analysis-dashboard-loading-indicator"]');
         try {
             if (await spinner.isVisible({ timeout: 1000 })) {
                 await spinner.waitFor({ state: 'hidden', timeout: 30000 });

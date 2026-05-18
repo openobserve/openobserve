@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
         >
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div
               v-else-if="correlationError"
               class="tw:text-base tw:text-red-500"
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading/Empty state when no data -->
         <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
           <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" />
+            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
             <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
             <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>

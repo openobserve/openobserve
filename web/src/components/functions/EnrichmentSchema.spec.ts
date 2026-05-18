@@ -297,7 +297,7 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       await flushPromises();
 
       expect(consoleSpy).toHaveBeenCalled();
-      expect(wrapper.find('.q-spinner-hourglass').exists()).toBe(false);
+      expect(wrapper.find('[data-test="enrichment-schema-loading-indicator"]').exists()).toBe(false);
 
       consoleSpy.mockRestore();
     });

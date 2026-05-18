@@ -11,7 +11,7 @@
           v-if="loading"
           class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
         >
-          <OSpinner size="xs" />
+          <OSpinner size="xs" data-test="script-editor-loading-indicator" />
           <div class="tw:relative tw:top-[2px]">
             {{ t("confirmDialog.loading") }}
           </div>
