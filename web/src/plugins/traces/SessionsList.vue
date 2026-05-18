@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="availableStreams.length === 0"
         >
           <q-tooltip v-if="availableStreams.length === 0">
-            No LLM streams available.
+            {{ t('traces.sessionsList.noStreamsTooltip') }}
           </q-tooltip>
         </q-select>
       </div>
@@ -52,8 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center tw:gap-[0.375rem] tw:px-[0.625rem] tw:py-[0.25rem] tw:rounded tw:text-[0.75rem] tw:text-[var(--o2-text-4)] tw:bg-[var(--o2-tag-grey-1)]"
           data-test="sessions-list-count-pill"
         >
-          {{ sessions.length }} of {{ total }}
-          {{ total === 1 ? "session" : "sessions" }}
+          {{ t('traces.sessionsList.countPill', { count: sessions.length, total, unit: total === 1 ? t('traces.sessionsList.session') : t('traces.sessionsList.sessions') }) }}
         </div>
       </template>
 
@@ -99,12 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-icon name="forum" size="3rem" class="tw:mb-3 tw:opacity-40" />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        No LLM streams found
+        {{ t('traces.sessionsList.noStreamsFound') }}
       </div>
       <p class="tw:text-sm tw:max-w-[30rem]">
-        Sessions group spans by <code>gen_ai_conversation_id</code> across
-        traces streams marked as LLM streams. Either no such stream exists,
-        or no spans have been ingested yet.
+        {{ t('traces.sessionsList.noStreamsDescription1') }} <code>gen_ai_conversation_id</code> {{ t('traces.sessionsList.noStreamsDescription2') }}
       </p>
     </div>
 
@@ -119,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        Failed to load sessions
+        {{ t('traces.sessionsList.failedToLoad') }}
       </div>
       <div
         class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
@@ -127,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ error }}
       </div>
       <OButton variant="outline" size="sm" @click="loadSessions()">
-        Retry
+        {{ t('traces.sessionsList.retry') }}
       </OButton>
     </div>
 
@@ -142,14 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-3 tw:opacity-40 tw:text-[var(--o2-text-muted)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        No sessions found
+        {{ t('traces.sessionsList.noSessionsFound') }}
       </div>
       <p
         class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]"
       >
-        No LLM sessions were recorded in this time range on
-        <code>{{ activeStream }}</code>. Try widening the time range or
-        switching to a different stream.
+        {{ t('traces.sessionsList.noSessionsDescription', { stream: activeStream }) }}
       </p>
     </div>
 
@@ -196,9 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-durationNanos="{ item }">
           <span class="tw:text-[0.75rem]">
             {{ formatDuration(item.durationNanos) }}
-            <q-tooltip
-              >{{ item.durationNanos.toLocaleString() }} ns</q-tooltip
-            >
+            <q-tooltip>{{ item.durationNanos.toLocaleString() }} {{ t('traces.sessionsList.durationNs') }}</q-tooltip>
           </span>
         </template>
 
@@ -206,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-tokens="{ item }">
           <span class="tw:text-[0.75rem] tw:tabular-nums">
             {{ formatTokens(item.inputTokens) }} → {{ formatTokens(item.outputTokens) }} (Σ {{ formatTokens(item.tokens) }})
-            <q-tooltip>Input: {{ item.inputTokens.toLocaleString() }} · Output: {{ item.outputTokens.toLocaleString() }} · Total: {{ item.tokens.toLocaleString() }}</q-tooltip>
+            <q-tooltip>{{ t('traces.sessionsList.tokenTooltip', { input: item.inputTokens.toLocaleString(), output: item.outputTokens.toLocaleString(), total: item.tokens.toLocaleString() }) }}</q-tooltip>
           </span>
         </template>
 
@@ -244,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
             >
-              Loading sessions…
+              {{ t('traces.sessionsList.loading') }}
             </span>
           </div>
         </template>
@@ -260,6 +253,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { date } from "quasar";
+import { useI18n } from "vue-i18n";
 import TenstackTable from "@/components/TenstackTable.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
@@ -282,6 +276,7 @@ const emit = defineEmits<{
 
 const STREAM_LS_KEY = "sessionsList_streamFilter";
 
+const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 const { getStreams } = useStreams();
@@ -321,7 +316,7 @@ watch(totalPages, (n) => {
 const tableColumns = computed(() => [
   {
     id: "firstSeenNanos",
-    header: "Timestamp",
+    header: t('traces.sessionsList.columns.timestamp'),
     accessorKey: "firstSeenNanos",
     size: 170,
     enableSorting: false,
@@ -329,7 +324,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "sessionId",
-    header: "Session ID",
+    header: t('traces.sessionsList.columns.sessionId'),
     accessorKey: "sessionId",
     size: 200,
     enableSorting: false,
@@ -337,7 +332,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "turns",
-    header: "Turns",
+    header: t('traces.sessionsList.columns.turns'),
     accessorKey: "turns",
     size: 90,
     enableSorting: false,
@@ -345,7 +340,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "durationNanos",
-    header: "Duration",
+    header: t('traces.sessionsList.columns.duration'),
     accessorKey: "durationNanos",
     size: 120,
     enableSorting: false,
@@ -353,7 +348,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "tokens",
-    header: "Tokens",
+    header: t('traces.sessionsList.columns.tokens'),
     accessorKey: "tokens",
     size: 110,
     enableSorting: false,
@@ -361,7 +356,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "cost",
-    header: "Cost",
+    header: t('traces.sessionsList.columns.cost'),
     accessorKey: "cost",
     size: 100,
     enableSorting: false,
@@ -369,7 +364,7 @@ const tableColumns = computed(() => [
   },
   {
     id: "status",
-    header: "Status",
+    header: t('traces.sessionsList.columns.status'),
     accessorKey: "status",
     size: 100,
     enableSorting: false,

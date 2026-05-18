@@ -3255,6 +3255,74 @@
       "type": "Type",
       "multiStepAgent": "Multi-step Agent"
     },
+    "sessionsList": {
+      "noStreamsTooltip": "No LLM streams available.",
+      "session": "session",
+      "sessions": "sessions",
+      "countPill": "{count} of {total} {unit}",
+      "noStreamsFound": "No LLM streams found",
+      "noStreamsDescription1": "Sessions group spans by",
+      "noStreamsDescription2": "across traces streams marked as LLM streams. Either no such stream exists, or no spans have been ingested yet.",
+      "failedToLoad": "Failed to load sessions",
+      "retry": "Retry",
+      "noSessionsFound": "No sessions found",
+      "noSessionsDescription": "No LLM sessions were recorded in this time range on {stream}. Try widening the time range or switching to a different stream.",
+      "loading": "Loading sessions…",
+      "tokenTooltip": "Input: {input} · Output: {output} · Total: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Timestamp",
+        "sessionId": "Session ID",
+        "turns": "Turns",
+        "duration": "Duration",
+        "tokens": "Tokens",
+        "cost": "Cost",
+        "status": "Status"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Back to Sessions",
+      "pageTitle": "Session Detail",
+      "failedToLoad": "Failed to load session",
+      "retry": "Retry",
+      "sessionNotFound": "Session not found",
+      "noSpansFound": "No spans found for {id} in the current time range.",
+      "searchPlaceholder": "Search traces in this session…",
+      "turn": "turn",
+      "turns": "turns",
+      "turnsShown": "{filtered} of {total} {unit} shown",
+      "userBadge": "User",
+      "sessionPrefix": "session",
+      "copySessionId": "Copy session id",
+      "openInTraceExplorer": "Open in trace explorer",
+      "unknownUser": "Unknown user",
+      "kpi": {
+        "turns": "Turns",
+        "duration": "Duration",
+        "inputTokens": "Input Tokens",
+        "outputTokens": "Output Tokens",
+        "cost": "Cost"
+      },
+      "conversation": "Conversation",
+      "turnLabel": "Turn",
+      "openTrace": "Open trace",
+      "noUserMessage": "No user message captured for this turn.",
+      "noAssistantMessage": "No assistant response captured for this turn.",
+      "roles": {
+        "user": "User",
+        "assistant": "Assistant"
+      },
+      "stats": {
+        "status": "Status",
+        "model": "Model",
+        "tokens": "Tokens",
+        "input": "Input",
+        "output": "Output",
+        "total": "Total",
+        "cost": "Cost",
+        "spans": "Spans"
+      }
+    },
     "servicesCatalog": {
       "tabLabel": "Service Catalog",
       "title": "Service Catalog",

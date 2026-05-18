@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem]">
       <OButton variant="ghost-muted" size="icon" @click="goBack">
         <q-icon name="arrow_back" size="20px" />
-        <q-tooltip>Back to Sessions</q-tooltip>
+        <q-tooltip>{{ t('traces.sessionDetail.backToSessions') }}</q-tooltip>
       </OButton>
-      <span class="tw:text-[1rem] tw:font-semibold">Session Detail</span>
+      <span class="tw:text-[1rem] tw:font-semibold">{{ t('traces.sessionDetail.pageTitle') }}</span>
     </div>
 
     <!-- Loading -->
@@ -49,14 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        Failed to load session
+        {{ t('traces.sessionDetail.failedToLoad') }}
       </div>
       <div
         class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
       >
         {{ error }}
       </div>
-      <OButton variant="outline" size="sm" @click="load">Retry</OButton>
+      <OButton variant="outline" size="sm" @click="load">{{ t('traces.sessionDetail.retry') }}</OButton>
     </div>
 
     <!-- Not found -->
@@ -70,11 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-3 tw:text-[var(--o2-text-muted)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        Session not found
+        {{ t('traces.sessionDetail.sessionNotFound') }}
       </div>
       <div class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]">
-        No spans found for <code>{{ sessionId }}</code> in the current time
-        range.
+        {{ t('traces.sessionDetail.noSpansFound', { id: sessionId }) }}
       </div>
     </div>
 
@@ -86,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-input
           v-model="searchText"
-          placeholder="Search traces in this session…"
+          :placeholder="t('traces.sessionDetail.searchPlaceholder')"
           borderless
           dense
           clearable
@@ -118,8 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="tw:ml-auto tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
         >
-          {{ filteredTraces.length }} of {{ traces.length }}
-          {{ traces.length === 1 ? "turn" : "turns" }} shown
+          {{ t('traces.sessionDetail.turnsShown', { filtered: filteredTraces.length, total: traces.length, unit: traces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns') }) }}
         </span>
       </div>
 
@@ -139,56 +137,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               class="tw:text-[0.95rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:flex tw:items-center tw:gap-[0.5rem]"
             >
-              {{ detail.userId || "Unknown user" }}
+              {{ detail.userId || t('traces.sessionDetail.unknownUser') }}
               <span
                 class="tw:text-[0.6rem] tw:font-semibold tw:px-[0.375rem] tw:py-[0.05rem] tw:rounded tw:bg-[var(--o2-tag-grey-1)] tw:text-[var(--o2-text-4)]"
               >
-                User
+                {{ t('traces.sessionDetail.userBadge') }}
               </span>
             </span>
             <span
               class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-muted)] tw:flex tw:items-center tw:gap-[0.375rem]"
             >
-              session {{ detail.sessionId }}
+              {{ t('traces.sessionDetail.sessionPrefix') }} {{ detail.sessionId }}
               <q-icon
                 name="content_copy"
                 size="12px"
                 class="tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
                 @click="copySessionId"
               >
-                <q-tooltip>Copy session id</q-tooltip>
+                <q-tooltip>{{ t('traces.sessionDetail.copySessionId') }}</q-tooltip>
               </q-icon>
             </span>
           </div>
         </div>
         <OButton variant="outline" size="sm" @click="openInTraceExplorer">
           <q-icon name="open_in_new" size="14px" class="tw:mr-[0.25rem]" />
-          Open in trace explorer
+          {{ t('traces.sessionDetail.openInTraceExplorer') }}
         </OButton>
       </div>
 
       <!-- KPI strip (5 columns) -->
       <div class="kpi-strip tw:mb-[0.625rem]">
         <div class="kpi-cell">
-          <div class="kpi-label">Turns</div>
+          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.turns') }}</div>
           <div class="kpi-value">{{ detail.turns }}</div>
         </div>
         <div class="kpi-cell">
-          <div class="kpi-label">Duration</div>
+          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.duration') }}</div>
           <div class="kpi-value">
             {{ formatDuration(detail.durationNanos) }}
           </div>
         </div>
         <div class="kpi-cell">
-          <div class="kpi-label">Input Tokens</div>
+          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.inputTokens') }}</div>
           <div class="kpi-value">{{ formatTokens(detail.inputTokens) }}</div>
         </div>
         <div class="kpi-cell">
-          <div class="kpi-label">Output Tokens</div>
+          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.outputTokens') }}</div>
           <div class="kpi-value">{{ formatTokens(detail.outputTokens) }}</div>
         </div>
         <div class="kpi-cell">
-          <div class="kpi-label">Cost</div>
+          <div class="kpi-label">{{ t('traces.sessionDetail.kpi.cost') }}</div>
           <div class="kpi-value">${{ detail.cost.toFixed(2) }}</div>
         </div>
       </div>
@@ -198,89 +196,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
         >
-          Conversation
+          {{ t('traces.sessionDetail.conversation') }}
         </span>
         <span class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)]">
-          · {{ filteredTraces.length }} of {{ traces.length }} turns shown
+          · {{ t('traces.sessionDetail.turnsShown', { filtered: filteredTraces.length, total: traces.length, unit: traces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns') }) }}
         </span>
       </div>
 
       <!-- Turns list -->
       <div class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:pb-[1rem]">
         <div
-          v-for="(t, i) in filteredTraces"
-          :key="t.traceId"
+          v-for="(trace, i) in filteredTraces"
+          :key="trace.traceId"
           class="turn-card"
           :class="{
-            'turn-card--error': t.status === 'error',
-            'turn-card--ok': t.status === 'ok',
+            'turn-card--error': trace.status === 'error',
+            'turn-card--ok': trace.status === 'ok',
           }"
         >
           <!-- Row header (always visible, click to expand) -->
           <div
             class="turn-header"
-            :data-test="`session-turn-row-${t.traceId}`"
-            @click="toggleTurn(t.traceId)"
+            :data-test="`session-turn-row-${trace.traceId}`"
+            @click="toggleTurn(trace.traceId)"
           >
             <q-icon
-              :name="isExpanded(t.traceId) ? 'expand_more' : 'chevron_right'"
+              :name="isExpanded(trace.traceId) ? 'expand_more' : 'chevron_right'"
               size="18px"
               class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0"
             />
             <span
               class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
             >
-              Turn {{ originalTurnIndex(t.traceId) + 1 }}
+              {{ t('traces.sessionDetail.turnLabel') }} {{ originalTurnIndex(trace.traceId) + 1 }}
             </span>
             <span
               class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-muted)]"
             >
-              {{ formatTimestamp(t.startTimeMicros) }}
+              {{ formatTimestamp(trace.startTimeMicros) }}
             </span>
             <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
-              · {{ formatDuration(t.durationNanos) }}
+              · {{ formatDuration(trace.durationNanos) }}
             </span>
             <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
-              · ${{ t.cost.toFixed(4) }}
+              · ${{ trace.cost.toFixed(4) }}
             </span>
             <span
               class="tw:rounded tw:px-[0.375rem] tw:py-[0.05rem] tw:text-[0.65rem] tw:font-semibold tw:capitalize tw:inline-flex tw:items-center tw:gap-[0.25rem]"
-              :class="statusBadgeClass(t.status)"
+              :class="statusBadgeClass(trace.status)"
             >
               <q-icon
-                :name="t.status === 'error' ? 'close' : 'check'"
+                :name="trace.status === 'error' ? 'close' : 'check'"
                 size="10px"
               />
-              {{ t.status }}
+              {{ trace.status }}
             </span>
             <span
-              v-if="t.tokens"
+              v-if="trace.tokens"
               class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
             >
-              {{ formatTokens(t.inputTokens) }} → {{ formatTokens(t.outputTokens) }} (Σ {{ formatTokens(t.tokens) }})
+              {{ formatTokens(trace.inputTokens) }} → {{ formatTokens(trace.outputTokens) }} (Σ {{ formatTokens(trace.tokens) }})
             </span>
             <span class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.25rem]">
               <span
                 class="tw:text-[0.7rem] tw:font-mono tw:text-[var(--o2-text-muted)]"
               >
-                {{ shortId(t.traceId) }}
+                {{ shortId(trace.traceId) }}
               </span>
               <q-icon
                 name="open_in_new"
                 size="14px"
                 class="tw:text-[var(--o2-text-muted)] tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
-                @click.stop="openTrace(t.traceId)"
+                @click.stop="openTrace(trace.traceId)"
               >
-                <q-tooltip>Open trace</q-tooltip>
+                <q-tooltip>{{ t('traces.sessionDetail.openTrace') }}</q-tooltip>
               </q-icon>
             </span>
           </div>
 
           <!-- Expanded body -->
-          <div v-if="isExpanded(t.traceId)" class="turn-body">
+          <div v-if="isExpanded(trace.traceId)" class="turn-body">
             <!-- Loading state for lazy-loaded turn detail -->
             <div
-              v-if="turnDetailLoading[t.traceId]"
+              v-if="turnDetailLoading[trace.traceId]"
               class="tw:flex tw:items-center tw:justify-center tw:py-[1rem]"
             >
               <q-spinner color="primary" size="1.25rem" />
@@ -292,21 +290,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- USER block -->
                 <div class="msg-block msg-block--user">
                   <div class="msg-block__header">
-                    <span class="msg-block__role">User</span>
+                    <span class="msg-block__role">{{ t('traces.sessionDetail.roles.user') }}</span>
                     <q-icon
-                      v-if="turnDetail(t.traceId)?.userMessage"
+                      v-if="turnDetail(trace.traceId)?.userMessage"
                       name="content_copy"
                       size="13px"
                       class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
-                      @click="
-                        copyText(turnDetail(t.traceId)?.userMessage?.content)
-                      "
+                      @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
                     />
                   </div>
                   <div class="msg-block__body">
                     {{
-                      turnDetail(t.traceId)?.userMessage?.content ||
-                      "No user message captured for this turn."
+                      turnDetail(trace.traceId)?.userMessage?.content ||
+                      t('traces.sessionDetail.noUserMessage')
                     }}
                   </div>
                 </div>
@@ -315,30 +311,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="msg-block msg-block--assistant">
                   <div class="msg-block__header">
                     <span class="msg-block__role">
-                      Assistant
+                      {{ t('traces.sessionDetail.roles.assistant') }}
                       <span
-                        v-if="turnDetail(t.traceId)?.model"
+                        v-if="turnDetail(trace.traceId)?.model"
                         class="tw:text-[var(--o2-text-muted)] tw:ml-[0.25rem] tw:normal-case tw:font-normal"
                       >
-                        · {{ turnDetail(t.traceId)?.model }}
+                        · {{ turnDetail(trace.traceId)?.model }}
                       </span>
                     </span>
                     <q-icon
-                      v-if="turnDetail(t.traceId)?.assistantMessage"
+                      v-if="turnDetail(trace.traceId)?.assistantMessage"
                       name="content_copy"
                       size="13px"
                       class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
-                      @click="
-                        copyText(
-                          turnDetail(t.traceId)?.assistantMessage?.content,
-                        )
-                      "
+                      @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
                     />
                   </div>
                   <div class="msg-block__body">
                     {{
-                      turnDetail(t.traceId)?.assistantMessage?.content ||
-                      "No assistant response captured for this turn."
+                      turnDetail(trace.traceId)?.assistantMessage?.content ||
+                      t('traces.sessionDetail.noAssistantMessage')
                     }}
                   </div>
                 </div>
@@ -347,57 +339,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Right-side stats column -->
               <div class="turn-stats">
                 <div class="stat-section">
-                  <div class="stat-label">Status</div>
+                  <div class="stat-label">{{ t('traces.sessionDetail.stats.status') }}</div>
                   <div
                     class="stat-value tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:px-2 tw:py-0.5 tw:text-[0.75rem] tw:font-semibold"
-                    :class="statusBadgeClass(t.status)"
+                    :class="statusBadgeClass(trace.status)"
                   >
                     <span
                       class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-full tw:flex-shrink-0"
-                      :class="statusDotClass(t.status)"
+                      :class="statusDotClass(trace.status)"
                     />
-                    {{ t.status.charAt(0).toUpperCase() + t.status.slice(1) }}
+                    {{ trace.status.charAt(0).toUpperCase() + trace.status.slice(1) }}
                   </div>
                 </div>
-                <div v-if="t.model" class="stat-section">
-                  <div class="stat-label">Model</div>
+                <div v-if="trace.model" class="stat-section">
+                  <div class="stat-label">{{ t('traces.sessionDetail.stats.model') }}</div>
                   <div class="stat-value tw:font-mono tw:text-[0.75rem]!">
-                    {{ t.model }}
+                    {{ trace.model }}
                   </div>
                 </div>
                 <div class="stat-section">
-                  <div class="stat-label">Tokens</div>
+                  <div class="stat-label">{{ t('traces.sessionDetail.stats.tokens') }}</div>
                   <div class="stat-rows">
                     <div class="stat-row">
-                      <span>Input</span>
-                      <span class="tw:tabular-nums">{{
-                        t.inputTokens.toLocaleString()
-                      }}</span>
+                      <span>{{ t('traces.sessionDetail.stats.input') }}</span>
+                      <span class="tw:tabular-nums">{{ trace.inputTokens.toLocaleString() }}</span>
                     </div>
                     <div class="stat-row">
-                      <span>Output</span>
-                      <span class="tw:tabular-nums">{{
-                        t.outputTokens.toLocaleString()
-                      }}</span>
+                      <span>{{ t('traces.sessionDetail.stats.output') }}</span>
+                      <span class="tw:tabular-nums">{{ trace.outputTokens.toLocaleString() }}</span>
                     </div>
                     <div class="stat-row stat-row--total">
-                      <span>Total</span>
-                      <span class="tw:tabular-nums">{{
-                        t.tokens.toLocaleString()
-                      }}</span>
+                      <span>{{ t('traces.sessionDetail.stats.total') }}</span>
+                      <span class="tw:tabular-nums">{{ trace.tokens.toLocaleString() }}</span>
                     </div>
                   </div>
                 </div>
                 <div class="stat-section">
-                  <div class="stat-label">Cost</div>
-                  <div class="stat-value">${{ t.cost.toFixed(4) }}</div>
+                  <div class="stat-label">{{ t('traces.sessionDetail.stats.cost') }}</div>
+                  <div class="stat-value">${{ trace.cost.toFixed(4) }}</div>
                 </div>
                 <div class="stat-section">
-                  <div class="stat-label">Spans</div>
+                  <div class="stat-label">{{ t('traces.sessionDetail.stats.spans') }}</div>
                   <div class="stat-rows">
                     <div class="stat-row">
-                      <span>Total</span>
-                      <span class="tw:tabular-nums">{{ t.spanCount }}</span>
+                      <span>{{ t('traces.sessionDetail.stats.total') }}</span>
+                      <span class="tw:tabular-nums">{{ trace.spanCount }}</span>
                     </div>
                   </div>
                 </div>
@@ -416,6 +402,7 @@ import { ref, onMounted, computed, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { date, copyToClipboard, useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 import {
   useSessions,
   type SessionDetail,
@@ -430,6 +417,7 @@ import {
   splitDuration,
 } from "./llmInsightsDashboard.utils";
 
+const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
