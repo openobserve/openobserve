@@ -5243,7 +5243,6 @@ dependencies = [
  "chrono",
  "collapse",
  "config",
- "dashmap",
  "datafusion",
  "futures",
  "hashbrown 0.16.1",

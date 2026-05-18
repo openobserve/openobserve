@@ -1355,10 +1355,10 @@ pub static BYTES_CACHE_GC_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static BYTES_CACHE_GC_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static BYTES_CACHE_GC_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
-            "bytes_cache_gc_total",
+            "bytes_cache_gc_count",
             "Total number of GC runs of a bytes cache",
         )
         .namespace(NAMESPACE)
@@ -2061,7 +2061,7 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(BYTES_CACHE_GC_TIME.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(BYTES_CACHE_GC_TOTAL.clone()))
+        .register(Box::new(BYTES_CACHE_GC_COUNT.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(BYTES_CACHE_HITS_TOTAL.clone()))
@@ -2421,7 +2421,7 @@ mod tests {
         let _ = BYTES_CACHE_MEMORY_SIZE.clone();
         let _ = BYTES_CACHE_ENTRY_COUNT.clone();
         let _ = BYTES_CACHE_GC_TIME.clone();
-        let _ = BYTES_CACHE_GC_TOTAL.clone();
+        let _ = BYTES_CACHE_GC_COUNT.clone();
         let _ = BYTES_CACHE_HITS_TOTAL.clone();
         let _ = BYTES_CACHE_MISS_TOTAL.clone();
         let _ = TOKIO_RUNTIME_TASKS.clone();

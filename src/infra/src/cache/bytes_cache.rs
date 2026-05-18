@@ -20,13 +20,12 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::metrics;
-use dashmap::DashMap;
+use config::{RwHashMap, metrics};
 
 // TODO: the memory size should counter the key * 2
 pub struct BytesCache {
     tag: String,
-    readers: DashMap<String, Bytes>,
+    readers: RwHashMap<String, Bytes>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
     max_bytes: usize,
     current_memory: AtomicI64,
@@ -36,7 +35,7 @@ impl BytesCache {
     pub fn new(max_bytes: usize, tag: String) -> Self {
         Self {
             tag,
-            readers: DashMap::new(),
+            readers: RwHashMap::default(),
             cacher: parking_lot::Mutex::new(VecDeque::new()),
             max_bytes,
             current_memory: AtomicI64::new(0),
@@ -133,7 +132,7 @@ impl BytesCache {
                 .with_label_values(&[&self.tag])
                 .sub(removed_count);
         }
-        metrics::BYTES_CACHE_GC_TOTAL
+        metrics::BYTES_CACHE_GC_COUNT
             .with_label_values(&[&self.tag])
             .inc();
         let elapsed = start.elapsed().as_millis() as f64;
