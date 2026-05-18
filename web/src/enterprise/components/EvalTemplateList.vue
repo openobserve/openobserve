@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="id"
           :loading="isLoading"
           :global-filter="filterQuery"
+          :show-global-filter="false"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"

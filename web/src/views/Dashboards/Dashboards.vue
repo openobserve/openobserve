@@ -240,6 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: Table -->
       <div class="tw:flex-1 tw:min-w-0 tw:h-full">
         <div class="tw:h-full card-container">
+
           <!-- add dashboard table -->
           <OTable
             ref="oTableRef"
@@ -247,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :global-filter="filterQuery"
+            :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
@@ -266,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="value && value.length > 30"
                   :content="value"
                   max-width="300px"
+
                 />
               </div>
             </template>
