@@ -1369,7 +1369,7 @@ export default defineComponent({
   }
 
   .field-group-header {
-    background-color: rgb(229, 231, 235);
+    background-color: var(--color-primary-100);
   }
 }
 
