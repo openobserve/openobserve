@@ -67,6 +67,9 @@ use {
         config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
         settings::{get_logo, get_logo_dark, get_logo_text},
     },
+    o2_enterprise::enterprise::license::{
+        block_feature_for_report_failure, last_reported_timestamp,
+    },
     o2_openfga::config::{
         get_config as get_openfga_config, refresh_config as refresh_openfga_config,
     },
@@ -100,6 +103,17 @@ macro_rules! enterprise_value {
         #[cfg(feature = "enterprise")]
         {
             $enterprise
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            $default
+        }
+    }};
+
+    ($default:expr, $enterprise:expr, $block_feat:expr) => {{
+        #[cfg(feature = "enterprise")]
+        {
+            if $block_feat { $default } else { $enterprise }
         }
         #[cfg(not(feature = "enterprise"))]
         {
@@ -193,6 +207,8 @@ struct ConfigResponse<'a> {
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
+    #[cfg(feature = "enterprise")]
+    last_usage_report_ts: i64,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -304,10 +320,13 @@ pub async fn zo_config() -> impl IntoResponse {
     #[cfg(feature = "enterprise")]
     let openfga_cfg = get_openfga_config();
 
-    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled);
+    #[cfg(feature = "enterprise")]
+    let block_features = block_feature_for_report_failure().await;
+
+    let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled);
+    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
     let actions_enabled = enterprise_value!(false, o2cfg.actions.enabled);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
@@ -344,6 +363,8 @@ pub async fn zo_config() -> impl IntoResponse {
     let ingestion_quota_used = o2_enterprise::enterprise::license::ingestion_used() * 100.0;
     #[cfg(feature = "enterprise")]
     let ingestion_history = o2_enterprise::enterprise::license::get_ingestion_history().await;
+    #[cfg(feature = "enterprise")]
+    let last_usage_report_ts = last_reported_timestamp().await;
 
     let usage_enabled = enterprise_value!(cfg.common.usage_enabled, true);
 
@@ -432,6 +453,8 @@ pub async fn zo_config() -> impl IntoResponse {
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
+        #[cfg(feature = "enterprise")]
+        last_usage_report_ts,
     })
 }
 
@@ -1098,11 +1121,17 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
 pub async fn dex_login() -> impl IntoResponse {
     use o2_dex::meta::auth::PreLoginData;
 
+    if block_feature_for_report_failure().await {
+        return crate::common::meta::http::HttpResponse::internal_error(
+            "feature blocked due to usage reporting failure",
+        );
+    }
+
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
     let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
-    axum::Json(login_data.url)
+    crate::common::meta::http::HttpResponse::json(login_data.url)
 }
 
 #[cfg(feature = "enterprise")]
@@ -1111,6 +1140,13 @@ pub async fn refresh_token_with_dex(
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
+
+    if block_feature_for_report_failure().await {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body(Body::from("feature blocked due to usage reporting failure"))
+            .unwrap();
+    }
 
     let query_string = query
         .iter()

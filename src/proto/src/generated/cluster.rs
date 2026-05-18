@@ -1205,6 +1205,34 @@ pub struct ReleaseQueryResponse {
     #[prost(bool, tag = "1")]
     pub success: bool,
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct GetLicenseUsageRequest {}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UsageResult {
+    #[prost(string, tag = "1")]
+    pub ts: ::prost::alloc::string::String,
+    #[prost(double, tag = "2")]
+    pub value: f64,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GetLicenseUsageResponse {
+    #[prost(bool, tag = "1")]
+    pub search_allowed: bool,
+    #[prost(double, tag = "2")]
+    pub ingestion_used: f64,
+    #[prost(uint32, tag = "3")]
+    pub ingestion_limit_exceeded_count: u32,
+    #[prost(bool, tag = "4")]
+    pub last_reporting_successful: bool,
+    #[prost(int64, tag = "5")]
+    pub last_reporting_timestamp: i64,
+    #[prost(uint32, tag = "6")]
+    pub days_since_last_report: u32,
+    #[prost(string, tag = "7")]
+    pub last_usage_response: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "8")]
+    pub ingestion_history: ::prost::alloc::vec::Vec<UsageResult>,
+}
 /// Generated client implementations.
 pub mod search_client {
     #![allow(
@@ -1592,6 +1620,30 @@ pub mod search_client {
                 .insert(GrpcMethod::new("cluster.Search", "ReleaseQuery"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn get_license_usage_info(
+            &mut self,
+            request: impl tonic::IntoRequest<super::GetLicenseUsageRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetLicenseUsageResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Search/GetLicenseUsageInfo",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Search", "GetLicenseUsageInfo"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1691,6 +1743,13 @@ pub mod search_server {
             request: tonic::Request<super::ReleaseQueryRequest>,
         ) -> std::result::Result<
             tonic::Response<super::ReleaseQueryResponse>,
+            tonic::Status,
+        >;
+        async fn get_license_usage_info(
+            &self,
+            request: tonic::Request<super::GetLicenseUsageRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GetLicenseUsageResponse>,
             tonic::Status,
         >;
     }
@@ -2328,6 +2387,51 @@ pub mod search_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = ReleaseQuerySvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/GetLicenseUsageInfo" => {
+                    #[allow(non_camel_case_types)]
+                    struct GetLicenseUsageInfoSvc<T: Search>(pub Arc<T>);
+                    impl<
+                        T: Search,
+                    > tonic::server::UnaryService<super::GetLicenseUsageRequest>
+                    for GetLicenseUsageInfoSvc<T> {
+                        type Response = super::GetLicenseUsageResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GetLicenseUsageRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::get_license_usage_info(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = GetLicenseUsageInfoSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

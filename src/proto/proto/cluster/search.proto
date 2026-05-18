@@ -23,6 +23,7 @@ service Search {
     rpc TryAcquire(TryAcquireRequest) returns (TryAcquireResponse) {}
     rpc StartQuery(StartQueryRequest) returns (StartQueryResponse) {}
     rpc ReleaseQuery(ReleaseQueryRequest) returns (ReleaseQueryResponse) {}
+    rpc GetLicenseUsageInfo(GetLicenseUsageRequest) returns (GetLicenseUsageResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -189,4 +190,25 @@ message ReleaseQueryRequest {
 
 message ReleaseQueryResponse {
     bool success = 1;
+}
+
+
+message GetLicenseUsageRequest {}
+
+
+message UsageResult{
+    string  ts = 1;
+    double   value = 2;
+}
+
+message GetLicenseUsageResponse {
+    bool                    search_allowed = 1;
+    double                  ingestion_used = 2;
+    uint32                  ingestion_limit_exceeded_count = 3;
+    bool                    last_reporting_successful = 4;
+    int64                   last_reporting_timestamp = 5;
+    uint32                  days_since_last_report = 6;
+    string                  last_usage_response = 7;
+    repeated UsageResult    ingestion_history = 8;
+
 }
