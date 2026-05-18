@@ -262,7 +262,7 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
-          'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
+          'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none tw:rounded-[inherit]',
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
           'tw:py-2',
@@ -294,7 +294,7 @@ const wrapperClasses = computed(() => [
         :maxlength="maxlength"
         :autocomplete="autocomplete"
         :class="[
-          'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
+          'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none tw:rounded-[inherit]',
           'tw:text-input-text tw:placeholder:text-input-placeholder',
           'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
           heightClasses[size ?? 'md'],

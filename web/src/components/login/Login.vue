@@ -123,9 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
-          class="o2-input login-inputs"
+          class="login-inputs"
         >
-          <div class="q-gutter-md">
+          <div class="tw:flex tw:flex-col tw:gap-3">
             <OInput
               v-model="name"
               data-cy="login-user-id"
@@ -144,19 +144,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="password"
             />
 
-            <div class="q-mt-lg q-mb-xl">
-              <OButton
-                data-cy="login-sign-in"
-                variant="primary"
-                size="sm-action"
-                block
-                type="submit"
-                :loading="submitting"
-                @click="onSignIn()"
-              >
-                {{ t('login.login') }}
-              </OButton>
-            </div>
+            <OButton
+              data-cy="login-sign-in"
+              variant="primary"
+              size="sm-action"
+              block
+              type="submit"
+              :loading="submitting"
+              @click="onSignIn()"
+            >
+              {{ t('login.login') }}
+            </OButton>
           </div>
         </div>
       </div>
@@ -468,13 +466,4 @@ export default defineComponent({
 }
 </style>
 
-<style lang="scss">
-.login-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 12px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-  }
-}
-</style>
+
