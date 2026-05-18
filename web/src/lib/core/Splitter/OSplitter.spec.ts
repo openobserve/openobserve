@@ -75,6 +75,7 @@ describe('OSplitter', () => {
         maxValue: 100,
         unit: '%',
         containerRef: expect.any(Object),
+        throttleMs: 16,
         invert: false,
         onResize: expect.any(Function)
       })
@@ -139,6 +140,7 @@ describe('OSplitter', () => {
         maxValue: 100,
         unit: '%',
         containerRef: expect.any(Object),
+        throttleMs: 16,
         invert: true,
         onResize: expect.any(Function)
       })
@@ -206,6 +208,7 @@ describe('OSplitter', () => {
         maxValue: 80,
         unit: '%',
         containerRef: expect.any(Object),
+        throttleMs: 16,
         invert: false,
         onResize: expect.any(Function)
       })

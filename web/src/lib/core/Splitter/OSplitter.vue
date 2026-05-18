@@ -7,7 +7,7 @@
       'o-splitter',
       horizontal ? 'o-splitter--horizontal' : 'o-splitter--vertical',
       'tw:flex',
-      horizontal ? 'tw:flex-col' : 'tw:flex-row'
+      horizontal ? 'tw:flex-row' : 'tw:flex-col'
     ]"
   >
     <!-- Before slot -->
@@ -28,19 +28,19 @@
       :class="[
         'o-splitter__separator',
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
-        'tw:bg-[var(--o2-border)]',
         'tw:cursor-pointer',
         'tw:select-none',
         'tw:transition-colors',
         'hover:tw:bg-[var(--o2-border-input)]',
-        isResizing ? 'tw:bg-[var(--o2-primary-color)]' : '',
+        'tw:absolute',
         disable ? 'tw:cursor-not-allowed tw:opacity-50' : '',
-        horizontal ? 'tw:h-[1px] tw:w-full tw:cursor-row-resize' : 'tw:w-[1px] tw:h-full tw:cursor-col-resize',
+        horizontal ? 'tw:w-[4px] tw:h-full tw:cursor-col-resize' : 'tw:h-[4px] tw:w-full tw:cursor-row-resize',
         separatorClass
       ]"
       :style="separatorStyle"
       :tabindex="disable ? -1 : 0"
       @mousedown="!disable && onMouseDown($event)"
+      @keydown="!disable && handleKeyDown($event)"
       role="separator"
       :aria-orientation="horizontal ? 'horizontal' : 'vertical'"
       :aria-label="`${horizontal ? 'Horizontal' : 'Vertical'} splitter`"
@@ -88,7 +88,7 @@ const containerRef = ref<HTMLElement | null>(null)
 const minValue = computed(() => props.limits?.[0] || 0)
 const maxValue = computed(() => props.limits?.[1] || 100)
 
-// Setup resizer composable
+// Setup resizer composable with faster throttling for smoother movement
 const { value: currentValue, isResizing, onMouseDown } = useResizer({
   direction: props.horizontal ? 'horizontal' : 'vertical',
   initialValue: props.modelValue,
@@ -96,9 +96,9 @@ const { value: currentValue, isResizing, onMouseDown } = useResizer({
   maxValue: maxValue.value,
   unit: props.unit,
   containerRef,
-  invert: props.horizontal, // For horizontal splitters, invert the direction
+  throttleMs: 50, // 60fps for smooth movement
+  invert: false, // For horizontal splitters, invert the direction
   onResize: (newValue: number) => {
-    console.log("new value", newValue);
     emit('update:modelValue', newValue)
   }
 })
@@ -107,8 +107,8 @@ const { value: currentValue, isResizing, onMouseDown } = useResizer({
 const beforeStyle = computed(() => {
   const size = `${currentValue.value}${props.unit}`
   return props.horizontal
-    ? { height: size }
-    : { width: size }
+    ? { width: size }
+    : { height: size }
 })
 
 const afterStyle = computed(() => {
@@ -117,8 +117,8 @@ const afterStyle = computed(() => {
     : `calc(100% - ${currentValue.value}px - 1px)` // subtract separator width
 
   return props.horizontal
-    ? { height: remainingSize }
-    : { width: remainingSize }
+    ? { width: remainingSize }
+    : { height: remainingSize }
 })
 
 // Keyboard navigation support
@@ -157,7 +157,6 @@ const afterStyle = computed(() => {
 // Watch for external prop changes
 import { watch } from 'vue'
 watch(() => props.modelValue, (newValue) => {
-  console.log("new value", newValue);
   currentValue.value = newValue
 }, { immediate: true })
 </script>
