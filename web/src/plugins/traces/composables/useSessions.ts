@@ -46,7 +46,10 @@ export interface SessionTraceRow {
   cost: number;
   errorCount: number;
   status: "ok" | "error";
+  /** Primary model (first entry in the trace's models array). */
   model: string | null;
+  /** All models used across spans in this trace. */
+  models: string[];
 }
 
 /** Single message inside a turn (USER block / ASSISTANT block). */
@@ -174,7 +177,7 @@ export function useSessions() {
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {
         const errorCount = Number(h.error_count) || 0;
-        const usersArr: string[] = Array.isArray(h.users) ? h.users : [];
+        const usersArr: string[] = Array.isArray(h.user_ids) ? h.user_ids : [];
         return {
           sessionId: h.session_id,
           firstSeenNanos: Number(h.start_time) || 0,
@@ -276,8 +279,9 @@ export function useSessions() {
       const spanCount = Number(spansArr[0]) || 0;
       const errorCount = Number(spansArr[1]) || 0;
       const svcArr = Array.isArray(r.service_name) ? r.service_name : [];
-      const model =
-        r.gen_ai_response_model || r.gen_ai_request_model || null;
+      const modelsArr: string[] = Array.isArray(r.models)
+        ? r.models.map(String).filter(Boolean)
+        : [];
       const startNanos = Number(r.start_time) || 0;
       const endNanos = Number(r.end_time) || 0;
       return {
@@ -294,7 +298,8 @@ export function useSessions() {
         cost: Number(r.gen_ai_usage_cost) || 0,
         errorCount,
         status: errorCount > 0 ? "error" : "ok",
-        model: model ? String(model) : null,
+        model: modelsArr[0] ?? null,
+        models: modelsArr,
         serviceName: svcArr[0]?.service_name
           ? String(svcArr[0].service_name)
           : null,

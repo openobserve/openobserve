@@ -103,9 +103,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           borderless
           emit-value
           map-options
-          class="tw:w-[10rem] "
+          class="tw:w-[10rem]"
         />
-<span
+        <q-select
+          v-model="modelFilter"
+          :options="modelOptions"
+          dense
+          borderless
+          emit-value
+          map-options
+          class="tw:w-[14rem]"
+        />
+        <span
           class="tw:ml-auto tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
         >
           {{ t('traces.sessionDetail.turnsShown', { filtered: filteredTraces.length, total: traces.length, unit: traces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns') }) }}
@@ -491,6 +500,7 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // Toolbar filters (all client-side over the in-memory turn list).
 const searchText = ref("");
 const statusFilter = ref<"all" | "ok" | "error">("all");
+const modelFilter = ref<string>("all");
 
 const sessionId = computed(() =>
   typeof route.query.session_id === "string" ? route.query.session_id : "",
@@ -516,10 +526,21 @@ const statusOptions = [
   { label: "Error", value: "error" },
 ];
 
+const modelOptions = computed(() => {
+  const models = new Set<string>();
+  traces.value.forEach((t) => t.models.forEach((m) => models.add(m)));
+  return [
+    { label: "All models", value: "all" },
+    ...Array.from(models).map((m) => ({ label: m, value: m })),
+  ];
+});
+
 const filteredTraces = computed(() => {
   const q = searchText.value.trim().toLowerCase();
   return traces.value.filter((t) => {
     if (statusFilter.value !== "all" && t.status !== statusFilter.value)
+      return false;
+    if (modelFilter.value !== "all" && !t.models.includes(modelFilter.value))
       return false;
     if (q) {
       const hay = [t.traceId, t.model || ""].join(" ").toLowerCase();
