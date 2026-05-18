@@ -654,13 +654,13 @@ function openInTraceExplorer() {
   searchObj.meta.searchMode = "traces";
 
   // Match the traces page's URL contract:
-  //   query → base64-encoded `session_id='<id>'` (no spaces, single
-  //           quotes). `b64EncodeUnicode` produces the `.`-padded
-  //           URL-safe form the traces page expects.
+  //   query → base64-encoded SQL predicate. `b64EncodeUnicode` produces
+  //           the `.`-padded URL-safe form the traces page expects.
   //   from / to → absolute window we were navigated with — preserves
   //           the exact time scope of the session.
+  const safeId = sessionId.value.replace(/'/g, "''");
   const encodedQuery =
-    b64EncodeUnicode(`session_id='${sessionId.value}'`) ?? "";
+    b64EncodeUnicode(`gen_ai_conversation_id='${safeId}'`) ?? "";
   router.push({
     name: "traces",
     query: {
