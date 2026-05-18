@@ -614,6 +614,13 @@ pub struct SearchPartitionResponse {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub is_histogram_eligible: bool,
+    /// ORDER BY columns when the primary sort is a non-timestamp column.
+    /// Non-empty means this is a non-ts ORDER BY query; empty means timestamp sort (normal path).
+    /// Each entry is (column_name, is_descending). The heap honors all columns in order so
+    /// that ties on the primary column are broken correctly by secondary columns.
+    /// Skipped from serialization — internal leader use only, not exposed to callers.
+    #[serde(skip)]
+    pub non_ts_order_by_cols: Vec<(String, bool)>,
 }
 
 /// Request parameters for querying search history
@@ -2931,6 +2938,7 @@ mod tests {
             streaming_aggs: false,
             streaming_id: Some("stream123".to_string()),
             is_histogram_eligible: false,
+            non_ts_order_by_cols: vec![],
         };
 
         response

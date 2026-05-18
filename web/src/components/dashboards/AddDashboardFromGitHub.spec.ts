@@ -28,6 +28,22 @@ vi.mock("@/components/dashboards/AddFolder.vue", () => ({
 // Mock global fetch
 const mockFetch = vi.fn();
 
+// Helper to generate S3 ListObjectsV2 XML for folder listing (CommonPrefixes)
+const s3FolderListXml = (folders: string[]): string => {
+  const prefixes = folders
+    .map((f) => `  <CommonPrefixes><Prefix>dashboards/${f}/</Prefix></CommonPrefixes>`)
+    .join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${prefixes}\n</ListBucketResult>`;
+};
+
+// Helper to generate S3 ListObjectsV2 XML for file listing (Contents/Key)
+const s3FileListXml = (folderPath: string, files: string[]): string => {
+  const keys = files
+    .map((f) => `  <Contents><Key>dashboards/${folderPath}/${f}</Key></Contents>`)
+    .join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">\n${keys}\n</ListBucketResult>`;
+};
+
 installQuasar({ plugins: [Notify] });
 
 import dashboardsService from "@/services/dashboards";
@@ -35,12 +51,7 @@ import dashboardsService from "@/services/dashboards";
 describe("AddDashboardFromGitHub Component", () => {
   let wrapper: any;
 
-  const mockGitHubFolders = [
-    { name: "aws", type: "dir" },
-    { name: "nginx", type: "dir" },
-    { name: "kubernetes", type: "dir" },
-    { name: ".github", type: "dir" }, // Should be filtered
-  ];
+  const mockS3Folders = ["aws", "nginx", "kubernetes", ".github"];
 
   const mockFolderList = {
     data: {
@@ -326,7 +337,7 @@ describe("AddDashboardFromGitHub Component", () => {
           new Promise((resolve) =>
             setTimeout(
               () =>
-                resolve(new Response("[]", { status: 200 })),
+                resolve(new Response(s3FolderListXml([]), { status: 200 })),
               100
             )
           )
@@ -355,7 +366,7 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it("should fetch from GitHub when cache is expired", async () => {
+    it("should fetch from S3 when cache is expired", async () => {
       (store.state as any).githubDashboardGallery = {
         dashboards: [],
         lastFetched: Date.now() - 400000, // expired
@@ -364,7 +375,7 @@ describe("AddDashboardFromGitHub Component", () => {
       };
 
       mockFetch.mockResolvedValue(
-        new Response(JSON.stringify(mockGitHubFolders), { status: 200 })
+        new Response(s3FolderListXml(mockS3Folders), { status: 200 })
       );
 
       wrapper = createWrapper({ modelValue: false });
@@ -376,7 +387,7 @@ describe("AddDashboardFromGitHub Component", () => {
 
     it("should filter out dot-prefixed directories", async () => {
       mockFetch.mockResolvedValue(
-        new Response(JSON.stringify(mockGitHubFolders), { status: 200 })
+        new Response(s3FolderListXml(mockS3Folders), { status: 200 })
       );
 
       wrapper = createWrapper({ modelValue: false });
@@ -385,22 +396,26 @@ describe("AddDashboardFromGitHub Component", () => {
 
       const names = wrapper.vm.dashboards.map((d: any) => d.name);
       expect(names).not.toContain(".github");
+      expect(names).toContain("aws");
+      expect(names).toContain("nginx");
     });
 
-    it("should filter out non-directory items", async () => {
-      const items = [
-        { name: "aws", type: "dir" },
-        { name: "README.md", type: "file" },
-      ];
-      mockFetch.mockResolvedValue(
-        new Response(JSON.stringify(items), { status: 200 })
-      );
+    it("should only include folders from S3 CommonPrefixes response", async () => {
+      // S3 ListObjectsV2 with delimiter=/ returns CommonPrefixes for folders
+      // and Contents for files at the root level. parseS3Folders only reads CommonPrefixes.
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <CommonPrefixes><Prefix>dashboards/aws/</Prefix></CommonPrefixes>
+  <Contents><Key>dashboards/README.md</Key></Contents>
+</ListBucketResult>`;
+      mockFetch.mockResolvedValue(new Response(xml, { status: 200 }));
 
       wrapper = createWrapper({ modelValue: false });
       await wrapper.vm.loadDashboards();
       await flushPromises();
 
       const names = wrapper.vm.dashboards.map((d: any) => d.name);
+      expect(names).toContain("aws");
       expect(names).not.toContain("README.md");
     });
 
@@ -425,13 +440,8 @@ describe("AddDashboardFromGitHub Component", () => {
     });
 
     it("should sort dashboards alphabetically", async () => {
-      const unsortedFolders = [
-        { name: "z_last", type: "dir" },
-        { name: "a_first", type: "dir" },
-        { name: "m_middle", type: "dir" },
-      ];
       mockFetch.mockResolvedValue(
-        new Response(JSON.stringify(unsortedFolders), { status: 200 })
+        new Response(s3FolderListXml(["z_last", "a_first", "m_middle"]), { status: 200 })
       );
 
       wrapper = createWrapper({ modelValue: false });
@@ -462,11 +472,8 @@ describe("AddDashboardFromGitHub Component", () => {
       vi.mocked(dashboardsService.list_Folders).mockResolvedValue(
         mockFolderList as any
       );
-      const mockJsonFiles = [
-        { name: "dashboard.json", type: "file" },
-      ];
       mockFetch.mockResolvedValue(
-        new Response(JSON.stringify(mockJsonFiles), { status: 200 })
+        new Response(s3FileListXml("aws_ec2", ["dashboard.json"]), { status: 200 })
       );
 
       wrapper = createWrapper({ modelValue: false });

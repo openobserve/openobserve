@@ -1461,4 +1461,61 @@ describe("SearchBar", () => {
       ).toBe(false);
     });
   });
+
+  // -------------------------------------------------------------------------
+  describe("applyFilters function", () => {
+    beforeEach(async () => {
+      // Setup auto-search enabled + live mode
+      store.state.zoConfig = { auto_query_enabled: true };
+      searchObjInstance.meta.liveMode = true;
+
+      wrapper = mountSearchBar();
+      await flushPromises();
+    });
+
+    it("should emit searchdata when skipSearch=false and auto-search enabled", async () => {
+      const testTerms = ["service_name = 'test-service'"];
+
+      wrapper.vm.applyFilters(testTerms, false);
+
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+      expect(searchObjInstance.data.editorValue).toContain("service_name = 'test-service'");
+    });
+
+    it("should not emit searchdata when skipSearch=true", async () => {
+      const testTerms = ["duration > 100ms"];
+
+      wrapper.vm.applyFilters(testTerms, true);
+
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+      expect(searchObjInstance.data.editorValue).toContain("duration > 100ms");
+    });
+
+    it("should preserve existing behavior when skipSearch parameter omitted", async () => {
+      const testTerms = ["span_status = 'ERROR'"];
+
+      wrapper.vm.applyFilters(testTerms);
+
+      expect(wrapper.emitted("searchdata")).toHaveLength(1);
+      expect(searchObjInstance.data.editorValue).toContain("span_status = 'ERROR'");
+    });
+
+    it("should not emit searchdata when auto-search disabled", async () => {
+      store.state.zoConfig.auto_query_enabled = false;
+      const testTerms = ["service_name = 'test'"];
+
+      wrapper.vm.applyFilters(testTerms, false);
+
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("should not emit searchdata when live mode is OFF", async () => {
+      searchObjInstance.meta.liveMode = false;
+      const testTerms = ["http_method = 'POST'"];
+
+      wrapper.vm.applyFilters(testTerms, false);
+
+      expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+  });
 });

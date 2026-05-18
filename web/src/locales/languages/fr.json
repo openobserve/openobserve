@@ -790,7 +790,8 @@
     "no_keep_current": "Non, restez au courant",
     "feature_correlation_management": "Gestion des corrélations",
     "feature_log_patterns": "Modèles de journaux",
-    "environment_type": "Type d'environnement"
+    "environment_type": "Type d'environnement",
+    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée."
   },
   "login": {
     "userid": "ID utilisateur",

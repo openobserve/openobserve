@@ -88,6 +88,7 @@ import {
   buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
+import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
@@ -302,10 +303,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
     const stream = c.stream_name || "<stream>";
     const interval = anomalyHistogramInterval.value || "5m";
-    const fn =
-      c.detection_function === "count"
-        ? "count(*)"
-        : `${c.detection_function}(${c.detection_function_field || "<field>"})`;
+    const fn = toDetectionFunctionSql(
+      c.detection_function,
+      c.detection_function_field || "<field>",
+    );
     const filterLines = (c.filters || [])
       .filter(
         (f: any) =>
