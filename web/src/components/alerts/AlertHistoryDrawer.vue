@@ -255,22 +255,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </template>
                       <template v-else-if="col.name === 'status'">
-                        <q-chip
-                          dense
+                        <OBadge
                           size="sm"
                           :icon="getStatusChipIcon(props.row.status)"
-                          :label="formatStatus(props.row.status)"
-                          :color="getStatusChipColor(props.row.status)"
-                          :text-color="getStatusChipTextColor(props.row.status)"
+                          :variant="getStatusChipVariant(props.row.status)"
                           class="tw:cursor-default"
                           data-test="alert-history-status-chip"
                         >
+                          {{ formatStatus(props.row.status) }}
                           <OTooltip
                             v-if="props.row.error"
                             :max-width="'300px'"
                             :content="props.row.error"
                           />
-                        </q-chip>
+                        </OBadge>
                       </template>
                       <template v-else-if="col.name === 'timestamp'">
                         <span class="tw:text-[13px]">{{

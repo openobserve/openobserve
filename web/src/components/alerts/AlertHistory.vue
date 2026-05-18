@@ -156,15 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-status="{ value }">
-            <q-chip
-              :color="getStatusColor(value)"
-              text-color="white"
-              size="0.8rem"
-              dense
-              outline
+            <OBadge
+              :variant="getStatusVariant(value)"
+              size="sm"
             >
               {{ value }}
-            </q-chip>
+            </OBadge>
           </template>
 
           <template #cell-is_realtime="{ value }">

@@ -235,33 +235,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-status="{ row }">
                   <template v-if="row.status && row.status !== '--'">
-                    <q-badge
-                      :color="
+                    <OBadge
+                      :variant="
                         row.status === 'failed'
-                          ? 'negative'
+                          ? 'error'
                           : row.status === 'active'
-                            ? 'positive'
+                            ? 'success'
                             : row.status === 'training'
                               ? 'warning'
                               : row.status === 'disabled'
-                                ? 'grey'
-                                : 'positive'
+                                ? 'default'
+                                : 'success'
                       "
-                      :label="row.status"
-                      style="text-transform: capitalize; cursor: default"
+                      class="tw:capitalize tw:cursor-default"
                     >
-                      <q-tooltip
-                        v-if="
-                          row.status === 'failed' &&
-                          row.last_error
-                        "
-                        max-width="400px"
-                        anchor="top middle"
-                        self="bottom middle"
-                      >
-                        {{ row.last_error }}
-                      </q-tooltip>
-                    </q-badge>
+                      {{ row.status }}
+                      <OTooltip
+                        v-if="row.status === 'failed' && row.last_error"
+                        :max-width="'400px'"
+                        :content="row.last_error"
+                      />
+                    </OBadge>
                   </template>
                   <span v-else class="tw:block">--</span>
                 </template>
