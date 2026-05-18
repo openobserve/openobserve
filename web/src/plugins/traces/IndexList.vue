@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-visibility-toggle="row.enableVisibility"
                 :show-filter-icon="true"
                 :show-quick-mode="false"
+                :default-values-count="defaultValuesCount"
                 :value-mapper="getValueMapper(field.name)"
                 @add-to-filter="(val: string) => addSearchTerm(val)"
                 @toggle-field="toggleField"

@@ -213,8 +213,11 @@ const isFieldSelected = computed(() =>
 );
 
 const effectiveShowMultiSelect = computed(() => {
-  if (props.selectedStreamsCount !== undefined) {
-    return props.selectedStreamsCount === props.field.streams?.length;
+  if (
+    props.selectedStreamsCount !== undefined &&
+    props.field.streams !== undefined
+  ) {
+    return props.selectedStreamsCount === props.field.streams.length;
   }
   return props.showMultiSelect;
 });
