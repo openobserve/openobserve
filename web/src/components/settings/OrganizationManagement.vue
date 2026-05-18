@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="toggleExtendTrialDialog(props.row)"
               >
                 <OIcon name="event" size="xs" />
-                <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
+                <OTooltip :content="t('settings.extendTrial')" />
               </OButton>
               <OButton
                 v-if="props.row.billing_provider === '-'"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="toggleContractDialog(props.row, 'create')"
               >
                 <OIcon name="note-add" size="xs" />
-                <q-tooltip>Add Contract</q-tooltip>
+                <OTooltip content="Add Contract" />
               </OButton>
               <OButton
                 v-if="props.row.billing_provider === 'no_op'"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="toggleContractDialog(props.row, 'extend')"
               >
                 <OIcon name="event" size="xs" />
-                <q-tooltip>Extend Contract</q-tooltip>
+                <OTooltip content="Extend Contract" />
               </OButton>
               <OButton
                 v-if="props.row.billing_provider === 'no_op'"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="confirmRevokeContract(props.row)"
               >
                 <OIcon name="block" size="xs" />
-                <q-tooltip>Revoke</q-tooltip>
+                <OTooltip content="Revoke" />
               </OButton>
               <OButton
                 v-if="!props.row.org_storage_enabled"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="toggleOrgStorage(props.row)"
               >
                 <OIcon name="cloud-upload" size="xs" />
-                <q-tooltip>Enable Storage</q-tooltip>
+                <OTooltip content="Enable Storage" />
               </OButton>
               <OButton
                 v-else
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="org-management-storage-enabled-btn"
               >
                 <OIcon name="cloud-done" size="xs" />
-                <q-tooltip>Storage Enabled</q-tooltip>
+                <OTooltip content="Storage Enabled" />
               </OButton>
             </div>
           </q-td>
@@ -107,19 +107,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-table__title" data-test="org-management-list-title">
             {{ t("settings.organizationManagement") }}
           </div>
-          <q-input
+          <OInput
             data-test="org-management-search-input"
             v-model="filterQuery"
-            borderless
-            filled
-            dense
             class="q-ml-auto q-mb-xs no-border col-3"
             :placeholder="t('settings.searchOrgs')"
           >
             <template #prepend>
               <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
-          </q-input>
+          </OInput>
 
           <QTablePagination
             :scope="scope"
@@ -188,10 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-mb-xs">
           {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
         </div>
-        <q-input
+        <OInput
           v-model="contractEndDate"
-          dense
-          outlined
           type="date"
           data-test="contract-end-date-input"
         />
@@ -226,6 +221,8 @@ import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import orgStorageService from "@/services/org_storage";
 export default defineComponent({
   name: "PageAlerts",
@@ -234,6 +231,8 @@ export default defineComponent({
     QTablePagination,
     OButton,
     ODialog,
+    OTooltip,
+    OInput,
     OIcon,
 },
   setup() {

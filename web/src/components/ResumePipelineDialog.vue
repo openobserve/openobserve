@@ -28,24 +28,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
 
     <div class="resume-pipeline-dialog-body">
-      <q-radio
-        v-model="resumeFromStart"
-        class="resume-radio-align"
-        :val="false">
-        <div class="resume-radio-label">
-          <div class="resume-radio-main-text resume-pipeline-dialog-body-text">Continue from where it paused</div>
-          <div v-if="lastPausedAt" class="resume-radio-sub-text resume-pipeline-dialog-body-text-time">
-            {{ convertUnixToQuasarFormat(lastPausedAt) }}.
-          </div>
-        </div>
-      </q-radio>
-      <q-radio
-        v-model="resumeFromStart"
-        :val="true"
-        style="height: 18px;"
-      >
-        <span class="resume-pipeline-dialog-body-text">Start from now.</span>
-      </q-radio>
+      <ORadioGroup v-model="resumeFromStart">
+        <ORadio
+          class="resume-radio-align"
+          :value="false">
+          <template #label>
+            <div class="resume-radio-label">
+              <div class="resume-radio-main-text resume-pipeline-dialog-body-text">Continue from where it paused</div>
+              <div v-if="lastPausedAt" class="resume-radio-sub-text resume-pipeline-dialog-body-text-time">
+                {{ convertUnixToQuasarFormat(lastPausedAt) }}.
+              </div>
+            </div>
+          </template>
+        </ORadio>
+        <ORadio
+          :value="true"
+          style="height: 18px;"
+        >
+          <template #label>
+            <span class="resume-pipeline-dialog-body-text">Start from now.</span>
+          </template>
+        </ORadio>
+      </ORadioGroup>
     </div>
 
   </ODialog>
@@ -57,10 +61,12 @@ import { defineComponent, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { convertUnixToQuasarFormat } from "@/utils/zincutils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { ODialog },
+  components: { ODialog, ORadio, ORadioGroup },
   emits: ["update:ok", "update:cancel", "update:shouldStartfromNow", "update:modelValue"],
   props: {
     title: { type: String },
@@ -129,16 +135,6 @@ export default defineComponent({
   flex-direction: column;
   gap: 7px;
   width: 312px;
-  .q-radio{
-    margin-left: -8px;
-    ::v-deep(.q-radio__inner){
-      min-height: 16px !important;
-      height: 24px !important;
-      width: 24px !important;
-      min-width: 16px !important;
-      
-    }
-  }
 }
 
 .dialog-title{

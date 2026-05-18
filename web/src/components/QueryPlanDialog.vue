@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="runAnalyze"
                 >
                   {{ t('search.analyze') }}
-                  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
+                  <OTooltip :content="t('search.analyzeTooltip')" />
                 </OButton>
               </div>
               <q-separator />
@@ -189,6 +189,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -222,6 +223,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
+    OTooltip,
 },
   props: {
     modelValue: {

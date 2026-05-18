@@ -50,7 +50,7 @@
             <div class="dimension-section-header">
               <OIcon name="link" size="xs" />
               <span class="dimension-section-title">Matched Dimensions</span>
-              <q-tooltip>These stable dimensions were used to find related telemetry</q-tooltip>
+              <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
             <div class="service-dimensions">
               <OBadge
@@ -74,7 +74,7 @@
             <div class="dimension-section-header">
               <OIcon name="tune" size="xs" />
               <span class="dimension-section-title">Additional Filters Available</span>
-              <q-tooltip>These additional dimensions can be used for more specific filtering</q-tooltip>
+              <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
             <div class="service-dimensions">
               <OBadge
@@ -199,6 +199,7 @@ import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {

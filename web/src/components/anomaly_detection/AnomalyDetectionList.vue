@@ -53,10 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               class="q-ml-xs"
             />
-          </OBadge>
-          <q-tooltip v-if="props.row.status === 'failed'">
             {{ props.row.last_error || t("alerts.anomalyStatus.failed") }}
-          </q-tooltip>
+          <OTooltip v-if="props.row.status === 'failed'" :content="props.row.last_error || t('alerts.anomalyStatus.failed')" />
+          </OBadge>
         </q-td>
       </template>
 
@@ -250,13 +249,14 @@ import { date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, OIcon, OSpinner, OBadge },
+  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTooltip },
 
   props: {
     org_identifier: {

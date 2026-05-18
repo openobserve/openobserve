@@ -27,15 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`frustration-event-badge-${type}`"
     >
       {{ getBadgeLabel(type) }}
-      <q-tooltip
-        anchor="top middle"
-        self="bottom middle"
-        :offset="[0, 8]"
-        class="bg-grey-8"
         data-test="frustration-event-badge-tooltip"
       >
         {{ getTooltipText(type) }}
-      </q-tooltip>
+      <OTooltip
+        side="top"
+        align="center"
+        :sideOffset="8"
+        :content="getTooltipText(type)"
+        data-test="frustration-event-badge-tooltip"
+      />
     </OBadge>
   </span>
 </template>
@@ -44,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   frustrationTypes: string[];

@@ -50,11 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ props.data.description }}
-            </div>
-          </q-tooltip>
+          <OTooltip side="bottom" align="end" max-width="220px">
+            <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
+          </OTooltip>
         </OIcon>
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
@@ -74,11 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
           icon-left="warning"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            Some dynamic variables are not applied because the field is not
-            present in the query's stream. Open Query Inspector to see all the
-            details of the variables and queries executed to render this panel
-          </q-tooltip>
+          <OTooltip side="bottom" align="end" max-width="220px" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
         </OButton>
         <!-- show error here -->
         <PanelErrorButtons
@@ -103,13 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isPanelLoading"
           icon-left="refresh"
         >
-          <q-tooltip>
-            {{
-              variablesDataUpdated
-                ? t("panel.refreshToApplyVariables")
-                : t("panel.refresh")
-            }}
-          </q-tooltip>
+          <OTooltip :content="variablesDataUpdated ? t('panel.refreshToApplyVariables') : t('panel.refresh')" />
         </OButton>
         <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
         <OButton
@@ -373,6 +361,7 @@ import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
@@ -436,6 +425,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    OTooltip,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),

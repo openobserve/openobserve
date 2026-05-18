@@ -24,15 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`frustration-badge-${severity}`"
     >
       {{ count }}
-      <q-tooltip
-        anchor="top middle"
-        self="bottom middle"
-        :offset="[0, 8]"
-        class="bg-grey-8"
         data-test="frustration-badge-tooltip"
       >
         {{ tooltipText }}
-      </q-tooltip>
+      <OTooltip
+        side="top"
+        align="center"
+        :sideOffset="8"
+        :content="tooltipText"
+        data-test="frustration-badge-tooltip"
+      />
     </OBadge>
     <span v-else class="text-grey-6" data-test="frustration-badge-none">—</span>
   </div>
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   count: number;

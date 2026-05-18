@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="cursor-pointer"
                 @click="showErrorDialog(props.row.error)"
               >
-                <q-tooltip>Click to view error</q-tooltip>
+                <OTooltip content="Click to view error" />
               </OIcon>
             </q-td>
           </template> -->

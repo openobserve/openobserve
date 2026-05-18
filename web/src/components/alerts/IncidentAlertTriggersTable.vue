@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :variant="getReasonVariant(props.row.correlation_reason)"
           >
             {{ getReasonLabel(props.row.correlation_reason) }}
-            <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
+            <OTooltip :content="getReasonTooltip(props.row.correlation_reason)" side="top" />
           </OBadge>
         </q-td>
       </template>
@@ -85,6 +85,7 @@ import type { QTableProps } from "quasar";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface IncidentAlert {
   incident_id: string;
@@ -100,6 +101,7 @@ export default defineComponent({
   components: {
     QTablePagination,
     OBadge,
+    OTooltip,
   },
   props: {
     triggers: {

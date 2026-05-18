@@ -10,17 +10,16 @@
     <template #header-right>
       <CrossLinkUserGuide />
     </template>
-        <q-form @submit.prevent="onSubmit">
+        <div>
           <!-- Name -->
           <div class="tw:mb-3">
             <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
-            <q-input
+            <OInput
               v-model="form.name"
-              dense
               :placeholder="t('crossLinks.namePlaceholder')"
-              :rules="[(val: string) => !!val || t('crossLinks.nameRequired')]"
-              borderless
-              hide-bottom-space
+              :error="!!nameError"
+              :error-message="nameError"
+              @update:model-value="nameError = ''"
               data-test="cross-link-name-input"
             />
           </div>
@@ -28,13 +27,12 @@
           <!-- URL Template -->
           <div class="tw:mb-3">
             <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
-            <q-input
+            <OInput
               v-model="form.url"
-              dense
               :placeholder="t('crossLinks.urlPlaceholder')"
-              :rules="[(val: string) => !!val || t('crossLinks.urlRequired')]"
-              borderless
-              hide-bottom-space
+              :error="!!urlError"
+              :error-message="urlError"
+              @update:model-value="urlError = ''"
               data-test="cross-link-url-input"
             />
             <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
@@ -71,7 +69,7 @@
               </OBadge>
             </div>
             <div class="tw:flex tw:gap-2 tw:items-center">
-              <q-select
+              <OSelect
                 ref="fieldSelectRef"
                 v-if="availableFields.length > 0"
                 v-model="newFieldName"
@@ -84,11 +82,8 @@
                 @input-value="onFieldInputValue"
                 @update:model-value="onFieldSelected"
                 @keyup.enter="addField"
-                dense
-                borderless
                 class="tw:flex-1"
                 :placeholder="t('crossLinks.fieldSearchPlaceholder')"
-                hide-bottom-space
                 data-test="cross-link-field-input"
               >
                 <template v-slot:no-option>
@@ -98,16 +93,13 @@
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
-              <q-input
+              </OSelect>
+              <OInput
                 v-else
                 v-model="newFieldName"
-                dense
-                borderless
                 class="tw:flex-1"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @keyup.enter="addField"
-                hide-bottom-space
                 data-test="cross-link-field-input"
               />
               <OButton
@@ -120,7 +112,7 @@
               />
             </div>
           </div>
-        </q-form>
+        </div>
   </ODialog>
 </template>
 
@@ -133,6 +125,8 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export interface CrossLink {
   name: string;
@@ -142,7 +136,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, ODialog, OBadge, OIcon, },
+  components: { CrossLinkUserGuide, OBadge, OButton, ODialog, OIcon, OInput, OSelect },
   props: {
     modelValue: {
       type: Boolean,
@@ -166,6 +160,8 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
+    const nameError = ref("");
+    const urlError = ref("");
     const isEditing = computed(() => !!props.link?.name);
     const newFieldName = ref("");
     const fieldSelectRef = ref<any>(null);
@@ -244,7 +240,9 @@ export default defineComponent({
     );
 
     function onSubmit() {
-      if (!form.value.name || !form.value.url) return;
+      nameError.value = !form.value.name ? t('crossLinks.nameRequired') : '';
+      urlError.value = !form.value.url ? t('crossLinks.urlRequired') : '';
+      if (nameError.value || urlError.value) return;
       // Auto-add pending field if user typed something but didn't press +
       addField();
       emit("save", { ...form.value });
@@ -260,6 +258,8 @@ export default defineComponent({
       store,
       dialogVisible,
       isEditing,
+      nameError,
+      urlError,
       form,
       newFieldName,
       fieldInputValue,

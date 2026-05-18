@@ -52,21 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ key }}:
             </span>
-            <q-select
+            <OSelect
               v-model="pendingDimensions[key]"
               :options="getDimensionOptions(key, value)"
-              dense
-              outlined
-              emit-value
-              map-options
+              labelKey="label"
+              valueKey="value"
               @update:model-value="onPendingDimensionChange"
               class="dimension-dropdown"
-              borderless
               style="min-width: 120px"
             />
-            <q-tooltip v-if="unstableDimensionKeys.has(key)">
-              Unstable dimension - changes on pod restart. Default: All values.
-            </q-tooltip>
+            <OTooltip v-if="unstableDimensionKeys.has(key)" content="Unstable dimension - changes on pod restart. Default: All values." side="top" />
           </div>
           <!-- Apply Button -->
           <OButton
@@ -170,21 +165,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
               >
                 <!-- Search -->
-                <div
-                  class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-                >
-                  <q-input
-                    v-model="metricSearchText"
-                    dense
-                    borderless
-                    :placeholder="t('search.searchField')"
-                    clearable
+                  <div
+                    class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                   >
-                    <template #prepend>
-                      <OIcon name="search" size="xs" />
-                    </template>
-                  </q-input>
-                </div>
+                    <OInput
+                      v-model="metricSearchText"
+                      :placeholder="t('search.searchField')"
+                      clearable
+                    >
+                      <template #prepend>
+                        <OIcon name="search" size="xs" />
+                      </template>
+                    </OInput>
+                  </div>
 
                 <!-- Grouped metric list -->
                 <div
@@ -256,16 +249,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleMetricStream(stream)"
                         >
                           <q-item-section side>
-                            <q-checkbox
+                            <OCheckbox
                               :model-value="
                                 selectedMetricStreams.some(
                                   (s) => s.stream_name === stream.stream_name,
                                 )
                               "
                               @update:model-value="toggleMetricStream(stream)"
-                              color="primary"
                               size="xs"
-                              dense
                             />
                           </q-item-section>
                           <q-item-section>
@@ -498,9 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
                     {{ t('correlation.viewInTraces') }}
-                    <q-tooltip>
-                      {{ t("correlation.viewInTraces") }}
-                    </q-tooltip>
+                    <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
                   <OBadge variant="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
@@ -646,22 +635,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
             >
-              <!-- Search -->
-              <div
-                class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+            <div
+              class="dimension-sidebar-search-container tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+            >
+              <OInput
+                v-model="metricSearchText"
+                :placeholder="t('search.searchField')"
+                clearable
               >
-                <q-input
-                  v-model="metricSearchText"
-                  dense
-                  borderless
-                  :placeholder="t('search.searchField')"
-                  clearable
-                >
-                  <template #prepend>
-                    <OIcon name="search" size="xs" />
-                  </template>
-                </q-input>
-              </div>
+                <template #prepend>
+                  <OIcon name="search" size="xs" />
+                </template>
+              </OInput>
+            </div>
 
               <!-- Grouped metric list -->
               <div
@@ -738,16 +724,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleMetricStream(stream)"
                       >
                         <q-item-section side>
-                          <q-checkbox
+                          <OCheckbox
                             :model-value="
                               selectedMetricStreams.some(
                                 (s) => s.stream_name === stream.stream_name,
                               )
                             "
                             @update:model-value="toggleMetricStream(stream)"
-                            color="primary"
                             size="xs"
-                            dense
                           />
                         </q-item-section>
                         <q-item-section>
@@ -985,9 +969,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="open-in-new" size="xs" class="tw:mr-1" />
                   {{ t('correlation.viewInTraces') }}
-                  <q-tooltip>
-                    {{ t("correlation.viewInTraces") }}
-                  </q-tooltip>
+                  <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                 </OButton>
               </div>
             </div>
@@ -1045,10 +1027,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Metric Stream Selector Dialog -->
   <ODialog data-test="telemetry-correlation-dashboard-metric-selector-dialog" v-model:open="showMetricSelector" size="md" :title="t('correlation.selectMetrics')">
     <!-- Search Input -->
-    <q-input
+    <OInput
       v-model="metricSearchText"
-      dense
-      outlined
       :placeholder="t('search.searchField')"
       clearable
       class="tw:w-full tw:mb-3"
@@ -1056,7 +1036,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #prepend>
         <OIcon name="search" size="sm" />
       </template>
-    </q-input>
+    </OInput>
 
     <div class="metric-list-container">
       <template
@@ -1114,16 +1094,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="metric-list-item"
             >
               <q-item-section side>
-                <q-checkbox
+                <OCheckbox
                   :model-value="
                     selectedMetricStreams.some(
                       (s) => s.stream_name === stream.stream_name,
                     )
                   "
                   @update:model-value="toggleMetricStream(stream)"
-                  color="primary"
                   size="xs"
-                  dense
                 />
               </q-item-section>
               <q-item-section>
@@ -1187,6 +1165,10 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

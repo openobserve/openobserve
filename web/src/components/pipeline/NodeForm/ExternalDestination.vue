@@ -43,15 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <div class="row q-col-gutter-sm q-px-lg">
-          <q-toggle
+          <OSwitch
             data-test="create-stream-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-xs tw:mr-3 q-mt-md"
-            size="xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
+            class="q-mb-sm tw:h-[36px] tw:mr-3 q-mt-md"
             :label="'Create new Destination'"
             v-model="createNewDestination"
           />
@@ -67,18 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Select Existing Destination -->
           <div v-else class="col-12">
             <div class="col-12 q-py-xs destination-method-select">
-              <q-select
+              <OSelect
                 data-test="external-destination-select"
                 v-model="selectedDestination"
                 :label="'Destination *'"
                 :options="getFormattedDestinations"
                 color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop"
-                stack-label
                 outlined
-                filled
-                dense
                 tabindex="0"
               >
                 <template v-slot:option="scope">
@@ -94,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
+              </OSelect>
             </div>
 
             <!-- Action buttons for existing destination selection -->
@@ -142,6 +132,8 @@ import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

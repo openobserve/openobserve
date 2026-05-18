@@ -154,16 +154,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSelect>
       <template v-if="promqlTableMode === 'all'">
-        <q-select
+        <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'table-aggregations')"
           v-model="tableAggregations"
           :options="aggregationOptions"
           :label="t('dashboard.tableAggregations')"
           multiple
-          borderless
-          dense
           class="showLabelOnTop"
-          stack-label
           emit-value
           map-options
           data-test="dashboard-config-table-aggregations"
@@ -191,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
             <q-item v-bind="itemProps" dense style="padding: 0px 4px">
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -201,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </template>
-        </q-select>
+        </OSelect>
       </template>
 
       <!-- Column Filters -->
@@ -220,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Column Filters
         </div>
 
-        <q-select
+        <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'visible-columns')"
           v-model="visibleColumns"
           :options="visibleColumnsFilteredOptions"
@@ -231,10 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           new-value-mode="add-unique"
           @filter="filterVisibleColumns"
           @new-value="createColumnValue"
-          borderless
-          dense
           class="showLabelOnTop"
-          stack-label
           data-test="dashboard-config-visible-columns"
           :display-value="getVisibleColumnsDisplay"
         >
@@ -263,11 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
             <q-item
               v-bind="itemProps"
-              dense
               style="min-height: auto; padding: 0px 4px"
             >
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -277,9 +270,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </template>
-        </q-select>
+        </OSelect>
 
-        <q-select
+        <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'hidden-columns')"
           v-model="hiddenColumns"
           :options="hiddenColumnsFilteredOptions"
@@ -290,10 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           new-value-mode="add-unique"
           @filter="filterHiddenColumns"
           @new-value="createColumnValue"
-          borderless
-          dense
           class="showLabelOnTop"
-          stack-label
           data-test="dashboard-config-hidden-columns"
           :display-value="getHiddenColumnsDisplay"
         >
@@ -322,11 +312,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
             <q-item
               v-bind="itemProps"
-              dense
               style="min-height: auto; padding: 0px 4px"
             >
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -336,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </template>
-        </q-select>
+        </OSelect>
       </template>
 
       <!-- Sticky Columns -->
@@ -375,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSwitch>
 
-        <q-select
+        <OSelect
           v-show="isConfigOptionVisible('promqlTable', 'sticky-columns')"
           v-model="stickyColumns"
           :options="stickyColumnsFilteredOptions"
@@ -386,10 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           new-value-mode="add-unique"
           @filter="filterStickyColumns"
           @new-value="createColumnValue"
-          borderless
-          dense
           class="showLabelOnTop"
-          stack-label
           data-test="dashboard-config-sticky-columns"
           :disable="stickyFirstColumn"
           :display-value="getStickyColumnsDisplay"
@@ -419,11 +405,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
             <q-item
               v-bind="itemProps"
-              dense
               style="min-height: auto; padding: 0px 4px"
             >
               <q-item-section side class="q-pa-none">
-                <q-checkbox
+                <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
@@ -433,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-section>
             </q-item>
           </template>
-        </q-select>
+        </OSelect>
       </template>
 
       <!-- Column Order Configuration -->
@@ -485,6 +470,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
@@ -497,6 +483,7 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OIcon,
+    OCheckbox,
 },
   props: {
     chartType: {

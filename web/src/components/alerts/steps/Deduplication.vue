@@ -15,126 +15,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div
+    class="step-deduplication"
+    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+  >
     <div class="step-content card-container">
       <div class="section-header">
         <div class="section-header-accent" />
-        <span class="section-header-title">{{ t('alerts.steps.deduplication') }}</span>
+        <span class="section-header-title">{{
+          t("alerts.steps.deduplication")
+        }}</span>
       </div>
       <div class="tw:px-3 tw:py-2">
-      <!-- Fingerprint Fields -->
-      <div class="tw:mb-4">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t("alerts.deduplication.fingerprintFields") }}
-          <OIcon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-              {{ t("alerts.deduplication.fingerprintFieldsTooltip") }}
-            </q-tooltip>
-          </OIcon>
-        </div>
-        <div
-          class="tw:text-sm tw:mb-2"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
-        >
-          {{ t("alerts.deduplication.fingerprintFieldsHint") }}
-        </div>
-        <div class="tw:relative">
-          <q-select
-            v-model="localDeduplication.fingerprint_fields"
-            :options="filteredColumns"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
-            dense
-            borderless
-            multiple
-            use-chips
-            use-input
-            input-debounce="300"
-            new-value-mode="add-unique"
-            emit-value
-            map-options
-            @filter="filterColumns"
-            @update:model-value="emitUpdate"
-          >
-            <template v-slot:hint>
-              <div class="tw:text-xs">
-                💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
-                fields)
-              </div>
-            </template>
-          </q-select>
-          <q-tooltip v-if="localDeduplication.fingerprint_fields?.length > 0" max-width="400px">
-            {{ localDeduplication.fingerprint_fields.join(', ') }}
-          </q-tooltip>
-        </div>
-      </div>
-
-      <!-- Time Window -->
-      <div class="tw:mb-4">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t("alerts.deduplication.timeWindow") }}
-          <OIcon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-              {{ t("alerts.deduplication.timeWindowTooltip") }}
-            </q-tooltip>
-          </OIcon>
-        </div>
-        <div
-          class="tw:text-sm tw:mb-2"
-          :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'"
-        >
-          {{ t("alerts.deduplication.timeWindowHint") }}
-        </div>
-        <div class="tw:flex tw:items-center">
-          <div class="tw:w-[210px] tw:ml-0">
-            <q-input
-              v-model.number="localDeduplication.time_window_minutes"
-              type="number"
-              dense
-              borderless
-              min="1"
-              class="alert-v3-input"
-              :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-              style="background: none;"
-              @update:model-value="emitUpdate"
-            />
+        <!-- Fingerprint Fields -->
+        <div class="tw:mb-4">
+          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+            {{ t("alerts.deduplication.fingerprintFields") }}
+            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OTooltip
+                :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
+                side="right"
+              />
+            </OIcon>
           </div>
           <div
-            style="min-width: 90px; margin-left: 0 !important; height: 28px; font-weight: normal"
-            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
-            class="flex justify-center items-center"
+            class="tw:text-sm tw:mb-2"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-600'
+            "
           >
-            {{ t("alerts.minutes") }}
+            {{ t("alerts.deduplication.fingerprintFieldsHint") }}
+          </div>
+          <div class="tw:relative">
+            <OSelect
+              v-model="localDeduplication.fingerprint_fields"
+              :options="props.columns || []"
+              multiple
+              creatable
+              class="tw:max-w-[600px] tw:min-w-[300px]"
+              helpText="Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
+              @update:model-value="emitUpdate"
+              @create="addFingerprintField"
+            />
+            <OTooltip
+              v-if="localDeduplication.fingerprint_fields?.length > 0"
+              :content="localDeduplication.fingerprint_fields.join(', ')"
+              max-width="400px"
+            />
+          </div>
+        </div>
+
+        <!-- Time Window -->
+        <div class="tw:mb-4">
+          <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+            {{ t("alerts.deduplication.timeWindow") }}
+            <OIcon name="info" size="17px" class="q-ml-xs cursor-pointer">
+              <OTooltip
+                :content="t('alerts.deduplication.timeWindowTooltip')"
+                side="right"
+              />
+            </OIcon>
+          </div>
+          <div
+            class="tw:text-sm tw:mb-2"
+            :class="
+              store.state.theme === 'dark'
+                ? 'tw:text-gray-400'
+                : 'tw:text-gray-600'
+            "
+          >
+            {{ t("alerts.deduplication.timeWindowHint") }}
+          </div>
+          <div class="tw:flex tw:items-center">
+            <div class="tw:w-[210px] tw:ml-0">
+              <OInput
+                v-model="localDeduplication.time_window_minutes"
+                type="number"
+                min="1"
+                :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
+                @update:model-value="emitUpdate"
+              />
+            </div>
+            <div
+              style="
+                min-width: 90px;
+                margin-left: 0 !important;
+                height: 28px;
+                font-weight: normal;
+              "
+              :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+              class="flex justify-center items-center"
+            >
+              {{ t("alerts.minutes") }}
+            </div>
           </div>
         </div>
       </div>
-      </div><!-- end tw:px-3 tw:py-2 -->
+      <!-- end tw:px-3 tw:py-2 -->
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch, type PropType } from "vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "Step5Deduplication",
-  components: {
-    OIcon,
-  },
+  components: { OIcon, OInput, OSelect, OTooltip },
   props: {
     deduplication: {
       type: Object as PropType<any>,
@@ -157,10 +152,9 @@ export default defineComponent({
     const localDeduplication = ref({
       enabled: (props.deduplication?.fingerprint_fields?.length ?? 0) > 0,
       fingerprint_fields: props.deduplication?.fingerprint_fields || [],
-      time_window_minutes: props.deduplication?.time_window_minutes || undefined,
+      time_window_minutes:
+        props.deduplication?.time_window_minutes || undefined,
     });
-
-    const filteredColumns = ref(props.columns || []);
 
     // Watch for prop changes
     watch(
@@ -175,15 +169,7 @@ export default defineComponent({
           };
         }
       },
-      { deep: true }
-    );
-
-    // Watch for columns prop changes
-    watch(
-      () => props.columns,
-      (newVal) => {
-        filteredColumns.value = newVal || [];
-      }
+      { deep: true },
     );
 
     const sanitizeTimeWindow = (val: any): number | undefined => {
@@ -197,31 +183,29 @@ export default defineComponent({
       emit("update:deduplication", {
         enabled: hasFields,
         fingerprint_fields: localDeduplication.value.fingerprint_fields,
-        time_window_minutes: sanitizeTimeWindow(localDeduplication.value.time_window_minutes),
+        time_window_minutes: sanitizeTimeWindow(
+          localDeduplication.value.time_window_minutes,
+        ),
       });
     };
 
-    const filterColumns = (val: string, update: any) => {
-      update(() => {
-        if (val === '') {
-          filteredColumns.value = props.columns || [];
-        } else {
-          const needle = val.toLowerCase();
-          filteredColumns.value = (props.columns || []).filter((v: any) => {
-            const str = typeof v === 'string' ? v : (v?.label || v?.value || '');
-            return str.toLowerCase().indexOf(needle) > -1;
-          });
-        }
-      });
+    const addFingerprintField = (value: string) => {
+      if (!localDeduplication.value.fingerprint_fields) {
+        localDeduplication.value.fingerprint_fields = [];
+      }
+      if (!localDeduplication.value.fingerprint_fields.includes(value)) {
+        localDeduplication.value.fingerprint_fields.push(value);
+        emitUpdate();
+      }
     };
 
     return {
       t,
       store,
+      props,
       localDeduplication,
-      filteredColumns,
       emitUpdate,
-      filterColumns,
+      addFingerprintField,
     };
   },
 });
@@ -244,9 +228,15 @@ export default defineComponent({
       background-color: #212121;
       border: 1px solid #343434;
     }
-    .section-header { border-bottom: 1px solid #343434; }
-    .section-header-title { color: #e0e0e0; }
-    .section-header-accent { background: var(--q-primary); }
+    .section-header {
+      border-bottom: 1px solid #343434;
+    }
+    .section-header-title {
+      color: #e0e0e0;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
+    }
   }
 
   &.light-mode {
@@ -254,9 +244,15 @@ export default defineComponent({
       background-color: #ffffff;
       border: 1px solid #e6e6e6;
     }
-    .section-header { border-bottom: 1px solid #eeeeee; }
-    .section-header-title { color: #374151; }
-    .section-header-accent { background: var(--q-primary); }
+    .section-header {
+      border-bottom: 1px solid #eeeeee;
+    }
+    .section-header-title {
+      color: #374151;
+    }
+    .section-header-accent {
+      background: var(--q-primary);
+    }
   }
 }
 

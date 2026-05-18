@@ -184,9 +184,7 @@ size="xs" class="warning" />{{
           class="header-icon tw:opacity-70"
           :style="{ color: ingestionQuotaColor }"
         />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          Warning: {{ ingestionQuotaPercentage }}% of ingestion limit used
-        </q-tooltip>
+        <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
       </OButton>
 
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
@@ -255,24 +253,21 @@ size="xs" class="warning" />{{
                     <!-- Search input for filtering organizations -->
                     <template #top>
                       <div class="full-width">
-                        <q-input
+                        <OInput
                           data-test="organization-search-input"
                           :model-value="searchQuery"
                           @update:model-value="
                             (val) => $emit('update:searchQuery', val)
                           "
-                          data-cy="index-field-search-input"
-                          borderless
-                          dense
                           clearable
-                          debounce="1"
+                          :debounce="1"
                           autofocus
                           :placeholder="'Search Organization'"
                         >
                           <template #prepend>
                             <OIcon name="search" size="sm" />
                           </template>
-                        </q-input>
+                        </OInput>
                       </div>
                     </template>
 
@@ -300,13 +295,12 @@ size="xs" class="warning" />{{
                                 props.row.identifier
                               : props.row.label + " | " + props.row.identifier
                           }}
-                          <q-tooltip
+                          <OTooltip
                             v-if="props.row.label.length > 30"
-                            anchor="bottom middle"
-                            self="top start"
-                          >
-                            {{ props.row.label }}
-                          </q-tooltip>
+                            side="bottom"
+                            align="start"
+                            :content="props.row.label"
+                          />
                         </div>
                       </q-td>
                     </template>
@@ -339,17 +333,13 @@ size="xs" class="warning" />{{
         @click="openSlack"
       >
         <component :is="slackIcon" size="20px" class="header-icon tw:opacity-70" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.slack") }}
-        </q-tooltip>
+        <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
         <OIcon name="help-outline" size="md" class="header-icon tw:opacity-70" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.help") }}
-        </q-tooltip>
+        <OTooltip side="top" align="center" :content="t('menu.help')" />
 
         <q-menu
           fit
@@ -413,9 +403,7 @@ size="xs" class="warning" />{{
         @click="router.push({ name: 'settings' })"
       >
         <OIcon name="settings" size="sm" class="header-icon" />
-        <q-tooltip anchor="top middle" self="bottom middle">
-          {{ t("menu.settings") }}
-        </q-tooltip>
+        <OTooltip side="top" align="center" :content="t('menu.settings')" />
       </OButton>
 
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
@@ -429,17 +417,7 @@ size="xs" class="warning" />{{
           size="20px"
           class="header-icon tw:opacity-70"
         />
-        <q-tooltip
-          anchor="top middle"
-          self="bottom middle"
-          class="header-user-tooltip"
-        >
-          {{
-            user.given_name
-              ? user.given_name + " " + user.family_name
-              : user.email
-          }}</q-tooltip
-        >
+        <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
 
         <q-menu
           fit
@@ -588,6 +566,8 @@ import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -597,6 +577,8 @@ export default defineComponent({
     EnterpriseUpgradeDialog,
     OButton,
     OIcon,
+    OTooltip,
+    OInput,
   },
   props: {
     // Store instance

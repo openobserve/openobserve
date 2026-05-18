@@ -26,13 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon-left="share"
   >
     <span v-if="showLabel" class="tw:ml-1">{{ t("search.shareLink") }}</span>
-    <q-tooltip v-if="isWebUrlNotConfigured">
-      <OIcon name="warning" size="sm" class="q-mr-xs" />
-      {{ t("search.webUrlNotConfigured") }}
-    </q-tooltip>
-    <q-tooltip v-else-if="tooltip || !showLabel">
-      {{ tooltip || t("search.shareLink") }}
-    </q-tooltip>
+    <OTooltip v-if="isWebUrlNotConfigured">
+      <template #content><OIcon name="warning" size="sm" class="q-mr-xs" />{{ t("search.webUrlNotConfigured") }}</template>
+    </OTooltip>
+    <OTooltip v-else-if="tooltip || !showLabel" :content="tooltip || t('search.shareLink')" />
   </OButton>
 </template>
 
@@ -43,13 +40,12 @@ import { useStore } from "vuex";
 import { useQuasar, copyToClipboard } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
 
 export default defineComponent({
   name: "ShareButton",
-  components: { OButton,
-    OIcon,
-},
+  components: { OButton, OIcon, OTooltip },
   props: {
     // The long URL to be copied and shortened
     url: {

@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`column-order-move-up-${index}`"
               icon-left="arrow-upward"
             >
-              <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
+              <OTooltip :content="t('dashboard.moveUp')" />
             </OButton>
             <OButton
               variant="ghost"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`column-order-move-down-${index}`"
               icon-left="arrow-downward"
             >
-              <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
+              <OTooltip :content="t('dashboard.moveDown')" />
             </OButton>
           </div>
         </div>
@@ -109,6 +109,7 @@ import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "ColumnOrderPopUp",
@@ -117,6 +118,7 @@ export default defineComponent({
     OButton,
     ODialog,
     OIcon,
+    OTooltip,
 },
   props: {
     open: {

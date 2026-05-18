@@ -37,41 +37,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center tw:gap-2">
             <!-- Filters -->
             <div class="tw:flex tw:gap-2">
-              <q-select
+              <OSelect
                 v-model="filters.status"
-                :options="statusOptions"
-                color="input-border"
-                bg-color="input-bg"
+                :options="allStatusOptions"
                 placeholder="Status"
-                use-input
-                fill-input
-                hide-selected
-                borderless
-                dense
                 clearable
-                input-debounce="300"
-                @filter="filterStatuses"
+                searchable
                 style="width: 150px"
                 data-test="status-filter"
               />
-              <q-select
+              <OSelect
                 v-model="filters.pipelineId"
-                :options="pipelineOptions"
-                option-label="label"
-                option-value="value"
-                color="input-border"
-                bg-color="input-bg"
+                :options="allPipelineOptions"
+                labelKey="label"
+                valueKey="value"
                 placeholder="Pipeline"
-                map-options
-                use-input
-                emit-value
-                fill-input
-                hide-selected
-                borderless
-                dense
                 clearable
-                input-debounce="300"
-                @filter="filterPipelines"
+                searchable
                 style="width: 250px"
                 data-test="pipeline-filter"
               />
@@ -92,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="refresh-btn"
               icon-left="refresh"
             >
-              <q-tooltip>Refresh</q-tooltip>
+              <OTooltip content="Refresh" side="top" />
             </OButton>
           </div>
         </div>
@@ -201,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="pause-job-btn"
                     icon-left="pause"
                   >
-                    <q-tooltip>Job</q-tooltip>
+                    <OTooltip content="Job" side="top" />
                   </OButton>
                   <OButton
                     v-if="canResumeJob(props.row)"
@@ -211,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="resume-job-btn"
                     icon-left="play-arrow"
                   >
-                    <q-tooltip>Resume Job</q-tooltip>
+                    <OTooltip content="Resume Job" side="top" />
                   </OButton>
                   <OButton
                     v-if="canEditJob(props.row.status)"
@@ -221,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="edit-job-btn"
                     icon-left="edit"
                   >
-                    <q-tooltip>Edit Job</q-tooltip>
+                    <OTooltip content="Edit Job" side="top" />
                   </OButton>
                   <OButton
                     variant="ghost"
@@ -230,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="view-job-btn"
                     icon-left="visibility"
                   >
-                    <q-tooltip>View Details</q-tooltip>
+                    <OTooltip content="View Details" side="top" />
                   </OButton>
                   <OButton
                     v-if="canDeleteJob(props.row.status)"
@@ -240,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="delete-job-btn"
                     icon-left="delete"
                   >
-                    <q-tooltip>Delete Job</q-tooltip>
+                    <OTooltip content="Delete Job" side="top" />
                   </OButton>
                   <OButton
                     v-if="props.row.error"
@@ -250,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="error-indicator-btn"
                     icon-left="error"
                   >
-                    <q-tooltip>Error: {{ props.row.error }}</q-tooltip>
+                    <OTooltip :content="`Error: ${props.row.error}`" side="top" />
                   </OButton>
                 </div>
               </q-td>
@@ -357,6 +339,8 @@ import { useQuasar, date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import BackfillJobDetails from "./BackfillJobDetails.vue";

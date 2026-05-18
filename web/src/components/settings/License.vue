@@ -41,12 +41,10 @@
               <div class="text-subtitle1 q-mb-md">
                 {{ t("about.enter_license_key") }}
               </div>
-              <q-input
+              <OTextarea
                 data-test="no-license-key-input"
                 v-model="licenseKey"
-                outlined
-                type="textarea"
-                rows="8"
+                :rows="8"
                 :placeholder="t('about.paste_license_placeholder')"
                 style="height: 200px"
               />
@@ -189,12 +187,10 @@
               <div class="text-subtitle1 q-mb-sm">
                 {{ t("about.update_license_key") }}
               </div>
-              <q-input
+              <OTextarea
                 data-test="update-license-key-input"
                 v-model="licenseKey"
-                outlined
-                type="textarea"
-                rows="6"
+                :rows="6"
                 :placeholder="t('about.paste_new_license_placeholder')"
                 style="min-height: 150px"
               />
@@ -414,13 +410,11 @@
       <div class="text-body2 q-mb-md">
         {{ t('about.your_complete_license_key') }}
       </div>
-      <q-input
+      <OTextarea
         data-test="modal-license-key-display"
         v-model="licenseData.key"
-        outlined
         readonly
-        type="textarea"
-        rows="8"
+        :rows="8"
         style="font-family: monospace; font-size: 12px"
       />
     </ODialog>
@@ -446,6 +440,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -461,6 +456,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OBadge,
+    OTextarea,
 },
   setup() {
     const $q = useQuasar();

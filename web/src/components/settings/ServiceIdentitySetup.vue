@@ -248,13 +248,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="tw:mb-3">
-            <q-toggle
+            <OSwitch
               data-test="service-identity-service-optional-btn"
               v-model="serviceOptional"
               :label="t('settings.correlation.serviceOptionalLabel')"
               size="sm"
-              dense
-              class="tw:text-[13px] tw:font-semibold"
             />
             <div
               class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
@@ -383,14 +381,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{
                       getGroupByValue(fieldId)?.display ?? fieldId
                     }}</span>
-                    <q-tooltip
+                    <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs"
-                    >
-                      {{ getFieldCardinalityTooltip(fieldId) }}
-                    </q-tooltip>
+                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      side="top"
+                    />
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -402,22 +397,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Inline add select for this group -->
                   <template v-if="addingToEnv === envKey">
-                    <q-select
+                    <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
                       :options="getAddFieldOptionsForEnv(envKey)"
-                      option-label="label"
-                      option-value="value"
-                      emit-value
-                      map-options
-                      use-input
-                      input-debounce="0"
-                      dense
-                      borderless
+                      labelKey="label"
+                      valueKey="value"
+                      searchable
                       :placeholder="t('settings.correlation.selectField')"
                       style="min-width: 220px"
                       data-test="service-identity-add-distinguish-btn"
-                      @filter="onAddFieldFilter"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
                     >
                       <template #option="scope">
@@ -482,13 +471,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="add"
                   >
                     {{ t("settings.correlation.addField") }}
-                    <q-tooltip
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs tw:max-w-[240px]"
-                    >
-                      {{ t("settings.correlation.addFieldTooltip") }}
-                    </q-tooltip>
+                    <OTooltip
+                      side="top"
+                      :content="t('settings.correlation.addFieldTooltip')"
+                      max-width="240px"
+                    />
                   </OButton>
                 </div>
               </template>
@@ -501,22 +488,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
                   style="border-top: 1px solid var(--o2-border-color)"
                 >
-                  <q-select
+                  <OSelect
                     ref="addFieldSelectRef"
                     v-model="addFieldValue"
                     :options="getAddFieldOptionsForEnv(addingToEnv)"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     :placeholder="t('settings.correlation.selectField')"
                     style="min-width: 220px"
                     data-test="service-identity-add-distinguish-btn"
-                    @filter="onAddFieldFilter"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
                   >
                     <template #option="scope">
@@ -581,13 +562,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="add"
                 >
                   {{ t("settings.correlation.addGroup") }}
-                  <q-tooltip
-                    anchor="top middle"
-                    self="bottom middle"
-                    class="tw:text-xs tw:max-w-[240px]"
-                  >
-                    {{ t("settings.correlation.addGroupTooltip") }}
-                  </q-tooltip>
+                  <OTooltip
+                    side="top"
+                    :content="t('settings.correlation.addGroupTooltip')"
+                    max-width="240px"
+                  />
                 </OButton>
                 <OButton
                   variant="primary"
@@ -716,18 +695,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Inline add select -->
                 <template v-if="addingTrackedAlias">
-                  <q-select
+                  <OSelect
                     ref="addTrackedAliasSelectRef"
                     v-model="addTrackedAliasValue"
                     :options="trackedAliasAddOptions"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     placeholder="Select alias group"
                     style="min-width: 220px"
                     @update:model-value="onAddTrackedAlias($event)"
@@ -1064,12 +1038,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   {{ insightData.title }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="insightData.title.length > 25"
-                    class="tw:text-xs"
-                  >
-                    {{ insightData.title }}
-                  </q-tooltip>
+                    :content="insightData.title"
+                    side="top"
+                  />
                 </span>
               </div>
               <div
@@ -1585,6 +1558,9 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1646,7 +1622,6 @@ const addFieldValue = ref("");
 const addingTrackedAlias = ref(false);
 const addTrackedAliasValue = ref("");
 const addTrackedAliasSelectRef = ref<any>(null);
-const addFieldFilter = ref("");
 
 /** All env keys that have at least one configured field, ordered by detected env order */
 const allConfiguredEnvs = computed(() => {
@@ -3361,15 +3336,8 @@ function getAddFieldOptionsForEnv(envKey: string) {
     .flat()
     .filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
-  const needle = addFieldFilter.value.toLowerCase();
   return availableGroups.value
     .filter((g) => !used.has(g.group_id))
-    .filter(
-      (g) =>
-        !needle ||
-        g.display.toLowerCase().includes(needle) ||
-        g.group_id.toLowerCase().includes(needle),
-    )
     .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
@@ -3385,16 +3353,9 @@ function getAddFieldOptionsForEnv(envKey: string) {
     });
 }
 
-function onAddFieldFilter(val: string, update: (fn: () => void) => void) {
-  update(() => {
-    addFieldFilter.value = val;
-  });
-}
-
 /** Called when user picks a field in the inline select for a specific env */
 function onAddFieldToEnv(envKey: string, val: string) {
   if (!val) return;
-  addFieldFilter.value = "";
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,
