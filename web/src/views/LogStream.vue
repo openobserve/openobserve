@@ -124,29 +124,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #cell-actions="{ row }">
-              <OButton
-                icon-left="search"
-                :title="t('logStream.explore')"
-                data-test="log-stream-explore-btn"
-                variant="ghost"
-                size="icon-sm"
-                @click="exploreStream({ row })"
-              />
-              <OButton
-                icon-left="description"
-                :title="t('logStream.schemaHeader')"
-                data-test="log-stream-schema-btn"
-                variant="ghost"
-                size="icon-sm"
-                @click="listSchema({ row })"
-              />
-              <OButton
-                icon-left="delete"
-                :title="t('logStream.delete')"
-                variant="ghost-destructive"
-                size="icon-sm"
-                @click="confirmDeleteAction({ row })"
-              />
+               <div class="tw:flex tw:items-center actions-container">
+                <OButton
+                  icon-left="search"
+                  :title="t('logStream.explore')"
+                  data-test="log-stream-explore-btn"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="exploreStream({ row })"
+                />
+                <OButton
+                  icon-left="description"
+                  :title="t('logStream.schemaHeader')"
+                  data-test="log-stream-schema-btn"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="listSchema({ row })"
+                />
+                <OButton
+                  icon-left="delete"
+                  :title="t('logStream.delete')"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  @click="confirmDeleteAction({ row })"
+                />
+              </div>
             </template>
 
             <template #empty>
@@ -346,7 +348,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 50,
+        size: 67,
         meta: { align: "left" },
       },
       {
