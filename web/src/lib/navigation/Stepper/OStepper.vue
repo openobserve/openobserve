@@ -143,6 +143,7 @@ function triggerClasses(step: StepRegistration): string {
             <span :class="indicatorClasses(step)" aria-hidden="true">
               <OIcon name="check" size="sm" v-if="step.done && !step.error" class="tw:size-4" :stroke-width="2.5" />
               <OIcon name="error-outline" size="sm" v-else-if="step.error" class="tw:size-4" :stroke-width="2.5" />
+              <OIcon v-else-if="typeof step.icon === 'string'" :name="(step.icon as any)" class="tw:size-4" />
               <component
                 :is="step.icon as Component"
                 v-else-if="step.icon"

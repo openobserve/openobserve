@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div data-test="add-action-script-type" class="report-name-input">
+            <div data-test="add-action-script-type" class="report-name-input q-mb-md">
               <OSelect
                 data-test="add-action-script-type-select"
                 v-model="formData.type"
@@ -110,19 +110,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <q-stepper
+            <OStepper
               v-model="step"
-              vertical
-              color="primary"
+              orientation="vertical"
               animated
+              navigable
               class="q-mb-md"
-              header-nav
             >
-              <q-step
+              <OStep
                 data-test="add-action-script-step-1"
                 :name="1"
                 :title="t('actions.uploadCodeZip')"
-                icon="dashboard"
+                icon="edit"
                 :done="step > 1"
               >
                 <div
@@ -176,21 +175,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </div>
                 </div>
+                <div class="tw:flex tw:gap-2 tw:mt-8">
+                  <OButton
+                    data-test="add-action-script-step1-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
 
-                <q-stepper-navigation>
-                  <div class="q-mt-sm">
-                    <OButton
-                      data-test="add-action-script-step1-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 2"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-
-              <q-step
+              <OStep
                 v-if="formData.type === 'scheduled'"
                 data-test="add-action-script-step-2"
                 :name="2"
@@ -309,28 +305,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </div>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <OButton
+                    data-test="add-action-script-step2-back-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="step--"
+                    >Back</OButton
+                  >
+                  <OButton
+                    data-test="add-action-script-step2-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
 
-                <q-stepper-navigation>
-                  <div class="tw:flex tw:gap-2">
-                    <OButton
-                      data-test="add-action-script-step2-back-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="step = 1"
-                      >Back</OButton
-                    >
-                    <OButton
-                      data-test="add-action-script-step2-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 3"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-
-              <q-step
+              <OStep
                 data-test="add-action-script-step-3"
                 :name="3"
                 title="Select Service Account"
@@ -385,27 +378,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-
-                <q-stepper-navigation>
-                  <div class="tw:flex tw:gap-2">
-                    <OButton
-                      data-test="add-action-script-step3-back-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="step = formData.type === 'scheduled' ? 2 : 1"
-                      >Back</OButton
-                    >
-                    <OButton
-                      data-test="add-action-script-step3-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 4"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-              <q-step
+                <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <OButton
+                    data-test="add-action-script-step3-back-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="step === 3 ? (step = formData.type === 'scheduled' ? 2 : 1) : step--"
+                    >Back</OButton
+                  >
+                  <OButton
+                    data-test="add-action-script-step3-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
+              <OStep
                 data-test="add-action-script-step-4"
                 :name="4"
                 title="Environmental Variables"
@@ -455,17 +445,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     /></OButton>
                   </div>
                 </div>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-action-script-step4-back-btn"
                     variant="outline"
                     size="sm"
-                    @click="step = 3"
+                    @click="step--"
                     >Back</OButton
                   >
-                </q-stepper-navigation>
-              </q-step>
-            </q-stepper>
+                </div>
+              </OStep>
+            </OStepper>
+
           </div>
         </div>
       </div>
@@ -532,6 +523,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 
 defineProps({

@@ -5,6 +5,7 @@
  */
 
 import type { Component } from 'vue'
+import type { IconName } from '@/lib/core/Icon/OIcon.types'
 
 /** Layout direction of the stepper */
 export type StepperOrientation = 'horizontal' | 'vertical'
@@ -35,7 +36,7 @@ export interface OStepperSlots {
 export interface StepRegistration {
   name: number
   title: string
-  icon: Component | null
+  icon: IconName | Component | null
   done: boolean
   error: boolean
   description: string | undefined
