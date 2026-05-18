@@ -144,6 +144,7 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const showAddGroup = ref(false);
 
@@ -266,19 +267,17 @@ const hideAddGroup = () => {
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
-      q.notify({
+      toast({
         message: "Group deleted successfully!",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
       setupGroups();
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message: "Error while deleting group!",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
         });
       }
     });
@@ -313,22 +312,19 @@ const bulkDeleteUserGroups = async () => {
     }
 
     if (successful.length > 0 && unsuccessful.length === 0) {
-      q.notify({
+      toast({
         message: `Successfully deleted ${successful.length} group(s)`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
-        color: "warning",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Failed to delete ${unsuccessful.length} group(s)`,
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
 
@@ -337,10 +333,9 @@ const bulkDeleteUserGroups = async () => {
     confirmBulkDelete.value = false;
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
+      toast({
         message: error.response?.data?.message || error?.message || "Error while deleting groups",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
     confirmBulkDelete.value = false;

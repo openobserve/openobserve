@@ -156,6 +156,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 
@@ -252,8 +253,7 @@ const saveStream = async () => {
     false
   )
     .then(() => {
-      q.notify({
-        color: "negative",
+      toast({
         message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
         timeout: 4000,
       });
@@ -272,8 +272,7 @@ const saveStream = async () => {
       payload
     )
     .then(() => {
-      q.notify({
-        color: "positive",
+      toast({
         message: "Stream created successfully",
         timeout: 4000,
       });
@@ -293,8 +292,7 @@ const saveStream = async () => {
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
-        color: "negative",
+        toast({
         message: err.response?.data?.message || "Failed to create stream",
         timeout: 4000,
       });
@@ -330,8 +328,7 @@ const getStreamPayload = () => {
   };
 
   if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
-    q.notify({
-      color: "negative",
+    toast({
       message:
         "Invalid Data Retention Period: Retention period must be at least 1 day.",
       timeout: 4000,

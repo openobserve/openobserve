@@ -204,6 +204,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "functionList",
@@ -281,8 +282,8 @@ export default defineComponent({
     };
 
     const getJSTransforms = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading functions...",
       });
 
@@ -331,8 +332,8 @@ export default defineComponent({
 
           dismiss();
           if (err?.response?.status && err?.response?.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while pulling function.",
               timeout: 2000,
             });
@@ -442,15 +443,15 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
               timeout: 2000,
             });
             getJSTransforms();
           } else {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res.data.message,
               timeout: 2000,
             });
@@ -458,15 +459,14 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err.response.data.code == 409) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
               timeout: 10000,
               actions: [
                 {
                   label: "View",
-                  color: "white",
                   handler: () => {
                     forceRemoveFunction(err.response.data["message"]);
                   },
@@ -476,8 +476,8 @@ export default defineComponent({
             return;
           }
           if (err.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response.data["message"]) ||
                 "Function deletion failed.",
@@ -564,16 +564,16 @@ export default defineComponent({
     };
 
     const bulkDeleteFunctions = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting functions...",
         timeout: 0,
       });
 
       try {
         if (selectedFunctions.value.length === 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No functions selected for deletion",
             timeout: 2000,
           });
@@ -601,30 +601,30 @@ export default defineComponent({
 
           if (failCount > 0 && successCount > 0) {
             // Partial success
-            $q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} function(s)`,
               timeout: 3000,
             });
           } else {
             // All successful
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} function(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
           // Fallback success message
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedFunctions.value.length} function(s) deleted successfully`,
             timeout: 2000,
           });
@@ -640,8 +640,8 @@ export default defineComponent({
         // Show error message from response if available
         const errorMessage = error.response?.data?.message || error?.message || "Error deleting functions. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });

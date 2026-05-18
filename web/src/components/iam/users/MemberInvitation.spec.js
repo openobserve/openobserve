@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify, Quasar } from "quasar";
+import { Dialog, Quasar } from "quasar";
 import { nextTick } from 'vue';
 
 // Mock services
@@ -58,7 +58,7 @@ const platform = {
 
 // Install Quasar with platform
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
   config: {
     platform
   }

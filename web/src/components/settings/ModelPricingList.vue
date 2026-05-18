@@ -506,6 +506,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
@@ -759,10 +760,10 @@ function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
   const msg =
     e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
-  q.notify({
-    type: "negative",
+  toast({
+    variant: "error",
     message: `${prefix}: ${msg}`,
-    position: "bottom",
+    position: "bottom-center",
     timeout: 5000,
   });
 }
@@ -804,7 +805,7 @@ async function toggleEnabled(model: any, enabled: boolean) {
     const message = enabled
       ? t("modelPricing.modelEnabledNotif", { name: displayName })
       : t("modelPricing.modelDisabledNotif", { name: displayName });
-    q.notify({ type: "positive", message, position: "bottom", timeout: 3000 });
+    toast({ variant: "success", message, position: "bottom-center", timeout: 3000 });
   } catch (e: any) {
     notifyError(t("modelPricing.errUpdate"), e);
   }
@@ -829,10 +830,10 @@ function confirmDelete(model: any) {
     onConfirm: async () => {
       try {
         await modelPricingService.delete(orgIdentifier.value, model.id);
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("modelPricing.modelPricingDeleted"),
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
         await fetchModels();
@@ -858,10 +859,10 @@ async function refreshBuiltIn() {
   refreshing.value = true;
   try {
     await modelPricingService.refreshBuiltIn(orgIdentifier.value);
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("modelPricing.builtInRefreshed"),
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     await fetchModels();
@@ -877,10 +878,10 @@ function exportSelected() {
     selectedIds.value.includes(m.id),
   );
   if (selected.length === 0) {
-    q.notify({
-      type: "warning",
+    toast({
+      variant: "warning",
       message: t("modelPricing.noModelsSelected"),
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     return;
@@ -923,12 +924,12 @@ function confirmDeleteSelected() {
         }
       }
       if (successCount > 0) {
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("modelPricing.deletedModelsNotif", {
             count: successCount,
           }),
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
         selectedIds.value = [];

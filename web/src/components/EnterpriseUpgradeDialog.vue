@@ -231,6 +231,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -711,9 +712,8 @@ export default defineComponent({
         });
       } else {
         // Show error notification when user doesn't have access to meta org
-        $q.notify({
+        toast({
           message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
-          color: 'negative',
           timeout: 5000,
         });
       }

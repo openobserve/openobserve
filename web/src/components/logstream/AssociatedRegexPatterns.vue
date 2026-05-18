@@ -404,6 +404,7 @@ import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export interface PatternAssociation {
     field: string;
@@ -505,8 +506,7 @@ export default defineComponent({
             const response = await regexPatternsService.test(store.state.selectedOrganization.identifier, userClickedPattern.value.pattern, [testString.value], policy.value);
             outputString.value = response.data.results[0];
           } catch (error) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: error.response?.data?.message || "Failed to test string",
               timeout: 4000,
             });
@@ -647,10 +647,8 @@ export default defineComponent({
               }));
               store.dispatch("setRegexPatterns", allPatterns.value);
             } catch (error) {
-              $q.notify({
+              toast({
                 message: error?.response?.data?.message || error?.data?.message || "Error fetching regex patterns",
-                color: "negative",
-                icon: "error",
               });
             }
             finally{
@@ -699,10 +697,8 @@ export default defineComponent({
           }
           else{
             if(apply_at.value.length == 0){
-              $q.notify({
+              toast({
                 message: "Please select detect at option",
-                color: "negative",
-                icon: "error",
               });
               return;
             }

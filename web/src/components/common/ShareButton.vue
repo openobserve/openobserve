@@ -42,6 +42,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ShareButton",
@@ -149,8 +150,8 @@ export default defineComponent({
           // Short URL is ready! Copy it to clipboard
           copyToClipboard(shortURL)
             .then(() => {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: t("search.linkCopiedSuccessfully"),
                 timeout: 5000,
               });
@@ -158,8 +159,8 @@ export default defineComponent({
             })
             .catch((error) => {
               console.error("Failed to copy short URL:", error);
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: t("search.errorCopyingLink"),
                 timeout: 5000,
               });
@@ -184,8 +185,8 @@ export default defineComponent({
           store.commit("clearPendingShortURL");
 
           // Show timeout notification
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: t("search.errorShorteningLink"),
             timeout: 5000,
           });
@@ -200,8 +201,8 @@ export default defineComponent({
      */
     const handleShareClick = () => {
       if (!props.url) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "No URL to share",
           timeout: 3000,
         });
@@ -230,8 +231,8 @@ export default defineComponent({
               // Chrome/Firefox: Copy directly here
               copyToClipboard(shortUrl)
                 .then(() => {
-                  $q.notify({
-                    type: "positive",
+                  toast({
+                    variant: "success",
                     message: t("search.linkCopiedSuccessfully"),
                     timeout: 5000,
                   });
@@ -239,8 +240,8 @@ export default defineComponent({
                 })
                 .catch((error) => {
                   console.error("Failed to copy short URL:", error);
-                  $q.notify({
-                    type: "negative",
+                  toast({
+                    variant: "error",
                     message: t("search.errorCopyingLink"),
                     timeout: 5000,
                   });
@@ -263,8 +264,8 @@ export default defineComponent({
               isPolling = false;
             }
             isLoading.value = false;
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: t("search.errorShorteningLink"),
               timeout: 5000,
             });
@@ -280,8 +281,8 @@ export default defineComponent({
             isPolling = false;
           }
           isLoading.value = false;
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.errorShorteningLink"),
             timeout: 5000,
           });

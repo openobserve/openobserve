@@ -16,10 +16,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import QueryBuilder from "./QueryBuilder.vue";
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 // Mock the child components
 vi.mock("@/components/promql/components/MetricSelector.vue", () => ({

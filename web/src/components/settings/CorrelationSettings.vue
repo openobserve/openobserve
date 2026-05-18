@@ -109,6 +109,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import serviceStreamsService from "@/services/service_streams";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "CorrelationSettings",
@@ -250,7 +251,7 @@ export default defineComponent({
         q.dialog({
           title: t("common.unsavedChanges"),
           message: t("settings.correlation.fieldAliasesUnsavedConfirm"),
-          ok: { label: t("common.discardChanges"), color: "negative", flat: true },
+          ok: { label: t("common.discardChanges"), flat: true },
           cancel: { label: t("common.cancel"), flat: true },
           persistent: true,
         })
@@ -297,9 +298,9 @@ export default defineComponent({
         await serviceStreamsService.updateSemanticGroups(orgId, groups);
         semanticGroups.value = groups;
         draftSemanticGroups.value = cloneGroups(groups);
-        q.notify({ type: "positive", message: t("settings.correlation.fieldAliasesSaved") });
+        toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
       } catch (_) {
-        q.notify({ type: "negative", message: t("settings.correlation.fieldAliasesSaveError") });
+        toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
       } finally {
         savingFieldAliases.value = false;
       }
@@ -319,9 +320,9 @@ export default defineComponent({
         );
         await serviceStreamsService.updateSemanticGroups(orgId, updated);
         semanticGroups.value = updated;
-        q.notify({ type: "positive", message: t("settings.correlation.fieldAliasesSaved") });
+        toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
       } catch (_) {
-        q.notify({ type: "negative", message: t("settings.correlation.fieldAliasesSaveError") });
+        toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
       }
     };
 

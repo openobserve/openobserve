@@ -441,6 +441,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -480,8 +481,8 @@ export default defineComponent({
         checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("about.failed_to_load_license_info"),
         });
       } finally {
@@ -493,8 +494,8 @@ export default defineComponent({
       try {
         updating.value = true;
         await licenseServer.update_license(licenseKey.value.trim());
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("about.license_updated_success"),
         });
         licenseKey.value = "";
@@ -510,8 +511,8 @@ export default defineComponent({
         await loadLicenseData();
       } catch (error) {
         console.error("Error updating license:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             t("about.failed_to_update_license") +
             " : " +
@@ -552,15 +553,15 @@ export default defineComponent({
       try {
         if (!licenseData.value.key) return;
         await navigator.clipboard.writeText(licenseData.value.key);
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("about.license_key_copied"),
         });
         showLicenseKeyModal.value = false;
       } catch (error) {
         console.error("Error copying license key:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("about.failed_to_copy_license"),
         });
       }
@@ -593,13 +594,11 @@ export default defineComponent({
               persistent: true,
               ok: {
                 label: t("about.yes_update_license"),
-                color: "primary",
                 noCaps: true,
                 unelevated: true,
               },
               cancel: {
                 label: t("about.no_keep_current"),
-                color: "grey-7",
                 noCaps: true,
                 outline: true,
               },
@@ -730,8 +729,7 @@ export default defineComponent({
         thresholds.push({
           type: "yAxis",
           name: "Limit Exceeded",
-          value: ingestionLimitGB,
-          color: "#FF0000", // Red
+          value: ingestionLimitGB, // Red
           lineStyle: "solid",
           width: 2,
         });
@@ -866,7 +864,6 @@ export default defineComponent({
                           label: "",
                           alias: "y_axis_1",
                           column: "y_axis_1",
-                          color: "#FF0000",
                           isDerived: false,
                         },
                       ],

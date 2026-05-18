@@ -176,6 +176,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -250,8 +251,8 @@ watch(
 );
 
 const getTemplates = () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading templates...",
   });
 
@@ -270,8 +271,8 @@ const getTemplates = () => {
     .catch((err) => {
       dismiss();
       if (err.response.status !== 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling templates.",
           timeout: 2000,
         });
@@ -342,8 +343,8 @@ const deleteTemplate = () => {
         template_name: confirmDelete.value.data.name,
       })
       .then(() => {
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Template ${confirmDelete.value.data.name} deleted successfully`,
           timeout: 2000,
         });
@@ -352,8 +353,8 @@ const deleteTemplate = () => {
       })
       .catch((err) => {
         if (err.response.data.code === 409) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err.response.data.message,
             timeout: 2000,
           });
@@ -450,20 +451,20 @@ const bulkDeleteTemplates = () => {
       const { successful, unsuccessful } = res.data;
 
       if (successful.length > 0 && unsuccessful.length === 0) {
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Successfully deleted ${successful.length} template(s)`,
           timeout: 2000,
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
           timeout: 3000,
         });
       } else if (unsuccessful.length > 0) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to delete ${unsuccessful.length} template(s)`,
           timeout: 2000,
         });
@@ -479,8 +480,8 @@ const bulkDeleteTemplates = () => {
         err?.message ||
         "Error while deleting templates. Please try again.";
       if (err.response?.status != 403 || err?.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: errorMessage,
           timeout: 2000,
         });

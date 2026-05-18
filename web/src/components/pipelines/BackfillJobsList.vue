@@ -312,6 +312,7 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const router = useRouter();
 const $q = useQuasar();
@@ -376,8 +377,8 @@ const loadJobs = async () => {
     loadPipelineOptions();
   } catch (error: any) {
     console.error("Error loading backfill jobs:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to load backfill jobs",
       timeout: 3000,
     });
@@ -543,8 +544,8 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
       enable: false,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job paused successfully",
       timeout: 3000,
     });
@@ -552,8 +553,8 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
     loadJobs();
   } catch (error: any) {
     console.error("Error pausing backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to pause backfill job",
       timeout: 5000,
     });
@@ -569,8 +570,8 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
       enable: true,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job resumed successfully",
       timeout: 3000,
     });
@@ -578,8 +579,8 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
     loadJobs();
   } catch (error: any) {
     console.error("Error resuming backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to resume backfill job",
       timeout: 5000,
     });
@@ -594,8 +595,8 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
       job_id: jobId,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job deleted successfully",
       timeout: 3000,
     });
@@ -603,8 +604,8 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
     loadJobs();
   } catch (error: any) {
     console.error("Error deleting backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to delete backfill job",
       timeout: 5000,
     });

@@ -150,6 +150,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -402,11 +403,10 @@ const getErrorLogs = () => {
       );
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message || "Error while fetching error events",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })

@@ -108,6 +108,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -224,10 +225,9 @@ export default defineComponent({
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
+              toast({
                 message: "Stream not found",
-                color: "negative",
-                position: "top",
+                position: "top-center",
                 timeout: 2000,
               });
             }

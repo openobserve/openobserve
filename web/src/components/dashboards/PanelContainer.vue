@@ -366,6 +366,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -582,7 +583,6 @@ export default defineComponent({
       const showNotification = showPositiveNotification(
         "Redirecting to logs page",
         {
-          color: "warning",
         },
       );
       const queryDetails = props.data;
@@ -641,8 +641,8 @@ export default defineComponent({
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
       // Show a loading spinner notification.
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -932,8 +932,8 @@ export default defineComponent({
     },
     createAlertFromPanel() {
       if (!this.props.data.queries || this.props.data.queries.length === 0) {
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: this.t("panel.noQueriesToCreateAlert"),
           timeout: 2000,
         });
@@ -942,8 +942,8 @@ export default defineComponent({
 
       const query = this.props.data.queries[0];
       if (!query.fields?.stream) {
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: this.t("panel.panelQueryMustHaveStream"),
           timeout: 2000,
         });
@@ -952,8 +952,8 @@ export default defineComponent({
 
       const unsupportedTypes = ["markdown", "html", "geomap", "sankey"];
       if (unsupportedTypes.includes(this.props.data.type)) {
-        this.$q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: this.t("panel.unsupportedPanelTypeAlert", {
             type: this.props.data.type,
           }),

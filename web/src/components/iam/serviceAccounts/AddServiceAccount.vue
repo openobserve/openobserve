@@ -72,6 +72,7 @@ import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -168,8 +169,8 @@ export default defineComponent({
           return;
         }
       }
-      const dismiss = this.$q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -193,8 +194,7 @@ export default defineComponent({
           .catch((err: any) => {
             if (err.response?.status != 403) {
               if (err?.response?.data?.message) {
-                this.$q.notify({
-                  color: "negative",
+                toast({
                   message: err?.response?.data?.message,
                   timeout: 2000,
                 });
@@ -219,8 +219,7 @@ export default defineComponent({
             .catch((err: any) => {
               if(err.response?.status != 403){
                 if(err?.response?.data?.message ) {
-                  this.$q.notify({
-                    color: "negative",
+                  toast({
                     message: err?.response?.data?.message,
                     timeout: 2000,
                   });

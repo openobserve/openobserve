@@ -83,6 +83,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
   name: "JsonPreview",
@@ -124,8 +125,8 @@ export default {
 
     const copyToClipboard = () => {
       quasarCopyToClipboard(JSON.stringify(props.value, null, 2));
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("common.copyToClipboard") + "!",
         timeout: 1500,
       });

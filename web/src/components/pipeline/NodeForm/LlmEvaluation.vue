@@ -159,6 +159,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSlider from "@/lib/forms/Slider/OSlider.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "LlmEvaluation",
@@ -273,8 +274,8 @@ export default defineComponent({
 
     const refreshTemplates = async () => {
       await fetchAvailableTemplates(true); // Force refresh by ignoring cache
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.evalTemplatesRefreshed"),
         timeout: 1500,
       });
@@ -361,8 +362,8 @@ export default defineComponent({
     const saveLlmEvaluationNode = () => {
       if (!nodeName.value || nodeName.value.trim() === "") {
         nodeNameError.value = t("common.nameRequired");
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("common.nameRequired"),
           timeout: 1500,
         });
@@ -386,8 +387,8 @@ export default defineComponent({
 
       addNode(nodeData);
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.llmEvaluationNodeSaved"),
         timeout: 1500,
       });

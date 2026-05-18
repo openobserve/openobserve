@@ -892,6 +892,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue")
@@ -2034,7 +2035,7 @@ export default defineComponent({
             : props.inputData?.aggregation?.having?.column;
           if (!col || col.trim() === '') {
             columnSelectError.value = true;
-            q.notify({ type: 'negative', message: 'Column is required when using an aggregate function.', timeout: 2000 });
+            toast({ variant: "error", message: 'Column is required when using an aggregate function.', timeout: 2000 });
             return false;
           }
         }
@@ -2046,13 +2047,13 @@ export default defineComponent({
       if (localTab.value === 'sql') {
         const sqlQuery = props.sqlQuery;
         if (!sqlQuery || sqlQuery.trim() === '') {
-          q.notify({ type: 'negative', message: 'SQL query cannot be empty.', timeout: 2000 });
+          toast({ variant: "error", message: 'SQL query cannot be empty.', timeout: 2000 });
           await nextTick();
           inlineQueryEditorRef.value?.focus?.();
           return false;
         }
         if (props.sqlQueryErrorMsg && props.sqlQueryErrorMsg.trim() !== '') {
-          q.notify({ type: 'negative', message: 'Please fix the SQL error before saving.', timeout: 2000 });
+          toast({ variant: "error", message: 'Please fix the SQL error before saving.', timeout: 2000 });
           await nextTick();
           inlineQueryEditorRef.value?.focus?.();
           return false;
@@ -2064,7 +2065,7 @@ export default defineComponent({
       if (localTab.value === 'promql') {
         const promqlQuery = localPromqlQuery.value;
         if (!promqlQuery || promqlQuery.trim() === '') {
-          q.notify({ type: 'negative', message: 'PromQL query cannot be empty.', timeout: 2000 });
+          toast({ variant: "error", message: 'PromQL query cannot be empty.', timeout: 2000 });
           await nextTick();
           inlineQueryEditorRef.value?.focus?.();
           return false;

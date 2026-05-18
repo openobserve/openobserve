@@ -22,7 +22,7 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [quasar.Notify],
+  plugins: [quasar.],
 });
 
 describe("PatternList", () => {

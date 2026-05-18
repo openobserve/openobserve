@@ -251,6 +251,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
   span: object;
@@ -573,18 +574,16 @@ function copyStackTrace(stacktrace: string) {
   navigator.clipboard
     .writeText(stacktrace)
     .then(() => {
-      $q.notify({
+      toast({
         message: t("traces.stacktraceCopied"),
-        color: "positive",
-        position: "top",
+        position: "top-center",
         timeout: 2000,
       });
     })
     .catch(() => {
-      $q.notify({
+      toast({
         message: t("traces.stacktraceCopyFailed"),
-        color: "negative",
-        position: "top",
+        position: "top-center",
         timeout: 2000,
       });
     });

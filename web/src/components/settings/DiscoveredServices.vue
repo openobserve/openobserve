@@ -528,6 +528,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;
@@ -952,8 +953,8 @@ const doResetServices = async () => {
     const response = await serviceStreamsService.resetServices(orgId);
     const { deleted_count, note } = response.data;
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.resetServicesSuccess", {
         count: deleted_count,
       }),
@@ -963,8 +964,8 @@ const doResetServices = async () => {
 
     await loadServices();
   } catch (err: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.correlation.resetServicesFailed"),
       caption: err?.message || String(err),
     });

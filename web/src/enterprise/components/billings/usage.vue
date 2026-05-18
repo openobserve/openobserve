@@ -250,6 +250,7 @@ import router from "@/router";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
   
   let currentDate = new Date(); // Get the current date and time
   
@@ -301,8 +302,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         getUsage();
       })
       const getUsage = () => {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while loading usage data...",
         });
         dataLoading.value = true;
@@ -336,8 +337,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
             dismiss();
           })
           .catch((e) => {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });

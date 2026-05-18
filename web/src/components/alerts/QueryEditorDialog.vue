@@ -449,6 +449,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   modelValue: {
@@ -835,8 +836,8 @@ const triggerQuery = async (fn = false) => {
       response: err.response,
       stack: err.stack,
     });
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: err.response?.data?.message ?? t('search.errorFetchingResults'),
       timeout: 1500,
     });

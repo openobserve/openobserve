@@ -108,6 +108,7 @@ import { useI18n } from "vue-i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "InvitationList",
@@ -189,8 +190,8 @@ export default defineComponent({
     });
 
     const fetchPendingInvitations = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Loading pending invitations...",
       });
 
@@ -207,8 +208,7 @@ export default defineComponent({
         dismiss();
       } catch (error) {
         dismiss();
-        $q.notify({
-          color: "negative",
+        toast({
           message:
             error.response?.data?.message ||
             "Failed to load pending invitations",
@@ -252,8 +252,8 @@ export default defineComponent({
       if (!selectedInvitation.value) return;
       confirmAccept.value = false;
 
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Accepting invitation...",
       });
 
@@ -269,8 +269,7 @@ export default defineComponent({
         store.dispatch("setOrganizations", orgResponse.data.data);
 
         dismiss();
-        $q.notify({
-          color: "positive",
+        toast({
           message: "Invitation accepted successfully!",
         });
 
@@ -287,8 +286,7 @@ export default defineComponent({
         });
       } catch (error) {
         dismiss();
-        $q.notify({
-          color: "negative",
+        toast({
           message:
             error.response?.data?.message || "Failed to accept invitation",
           timeout: 4000,
@@ -300,8 +298,8 @@ export default defineComponent({
       if (!selectedInvitation.value) return;
       confirmReject.value = false;
 
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Rejecting invitation...",
       });
 
@@ -310,8 +308,7 @@ export default defineComponent({
           selectedInvitation.value.token,
         );
         dismiss();
-        $q.notify({
-          color: "positive",
+        toast({
           message: "Invitation rejected successfully!",
         });
 
@@ -326,8 +323,7 @@ export default defineComponent({
         }
       } catch (error) {
         dismiss();
-        $q.notify({
-          color: "negative",
+        toast({
           message:
             error.response?.data?.message || "Failed to reject invitation",
           timeout: 4000,

@@ -408,6 +408,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
   action: "add" | "edit";
@@ -474,13 +475,11 @@ const providerDefinitions = [
   {
     label: "AWS Credentials",
     value: "AwsCredentials",
-    icon: "cloud",
     image: getImageURL("images/org_storage/aws_plain_without_bg.png"),
   },
   {
     label: "Azure Credentials",
     value: "AzureCredentials",
-    icon: "cloud",
     image: getImageURL("images/org_storage/azure.png"),
   },
   // for now we do not support gcp specifically, use the  aws route to use gcp
@@ -494,7 +493,6 @@ const providerDefinitions = [
   {
     label: "AWS Role ARN",
     value: "AwsRoleArn",
-    icon: "shield",
     image: getImageURL("images/org_storage/aws_iam.png"),
   },
 ];
@@ -577,8 +575,8 @@ function validateStorageForm(): boolean {
 async function submitStorage() {
   if (!validateStorageForm()) return;
 
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -593,15 +591,15 @@ async function submitStorage() {
     if (isEditMode.value) {
       await orgStorageService.update(orgId, payload);
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Credentials updated successfully",
       });
     } else {
       await orgStorageService.create(orgId, payload);
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Storage config created successfully",
       });
     }
@@ -609,8 +607,8 @@ async function submitStorage() {
   } catch (err: any) {
     if (err.response?.status === 403) return;
     dismiss();
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err.response?.data?.error ||
         err.response?.data?.message ||
@@ -645,8 +643,8 @@ onMounted(async () => {
         formData.storage_account = parsed.storage_account || "";
       }
     } catch {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Failed to load existing storage config",
       });
     }

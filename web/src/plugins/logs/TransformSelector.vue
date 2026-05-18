@@ -147,6 +147,7 @@ import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
   functionOptions: { name: string; function: string }[];
@@ -312,10 +313,9 @@ const selectTransform = (item: any, isSelected: boolean) => {
 };
 
 const updateActionSelection = (item: any) => {
-  $q.notify({
+  toast({
     message: `${item?.name} action applied successfully`,
     timeout: 3000,
-    color: "secondary",
   });
 };
 

@@ -419,6 +419,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -656,8 +657,8 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log)).then(() =>
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Content Copied Successfully!",
           timeout: 1000,
         }),

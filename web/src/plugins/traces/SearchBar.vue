@@ -466,6 +466,7 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -659,10 +660,9 @@ export default defineComponent({
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
+              toast({
                 message: "Stream not found",
-                color: "negative",
-                position: "top",
+                position: "top-center",
                 timeout: 2000,
               });
             }

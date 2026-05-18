@@ -165,6 +165,7 @@ import OTextarea from '@/lib/forms/Input/OTextarea.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 const { t } = useI18n();
@@ -239,12 +240,12 @@ const saveTemplate = async () => {
     errors.value.content ||
     errors.value.dimensions
   ) {
-    q.notify({ type: "warning", message: t("evalTemplate.saveRequiredFields") });
+    toast({ variant: "warning", message: t("evalTemplate.saveRequiredFields") });
     return;
   }
 
   saving.value = true;
-  const dismiss = q.notify({ spinner: true, message: t("common.loading"), timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: t("common.loading"), timeout: 0 });
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -252,16 +253,16 @@ const saveTemplate = async () => {
 
     if (isEdit.value) {
       await evalTemplateService.updateTemplate(orgId, route.params.id as string, payload);
-      q.notify({ type: "positive", message: t("evalTemplate.updateSuccess") });
+      toast({ variant: "success", message: t("evalTemplate.updateSuccess") });
     } else {
       await evalTemplateService.createTemplate(orgId, payload);
-      q.notify({ type: "positive", message: t("evalTemplate.createSuccess") });
+      toast({ variant: "success", message: t("evalTemplate.createSuccess") });
     }
 
     router.push({ name: "evalTemplates" });
   } catch (err: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err?.response?.data?.message ||
         (isEdit.value ? t("evalTemplate.updateFailed") : t("evalTemplate.createFailed")),
@@ -292,8 +293,8 @@ onBeforeMount(async () => {
     dimensionsInput.value = [...(template.dimensions ?? [])];
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
         timeout: 3000,
       });

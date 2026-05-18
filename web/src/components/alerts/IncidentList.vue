@@ -187,6 +187,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "IncidentList",
@@ -319,8 +320,8 @@ export default defineComponent({
         allIncidents.value = response.data.incidents;
         store.dispatch('incidents/setCachedData', response.data.incidents);
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.errorLoading"),
         });
         console.error("Failed to load incidents:", error);
@@ -347,15 +348,15 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         await incidentsService.updateStatus(org, incident.id, newStatus);
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
         loadIncidents();
         store.dispatch('incidents/setShouldRefresh', true);
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.statusUpdateFailed"),
         });
         console.error("Failed to update incident status:", error);
@@ -521,8 +522,8 @@ export default defineComponent({
 
     const refreshIncidents = async () => {
       await loadIncidents();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Incidents refreshed",
         timeout: 1500,
       });

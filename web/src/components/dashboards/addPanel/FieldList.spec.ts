@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
 import i18n from "@/locales";
@@ -24,7 +24,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 const mockStreamData = {

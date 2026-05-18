@@ -284,6 +284,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageAbout",
@@ -373,9 +374,8 @@ export default defineComponent({
         });
       } else {
         // Show error notification when user doesn't have access to meta org
-          $q.notify({
+          toast({
             message: "You are not authorized to manage the license.",
-            color: 'negative',
             timeout: 5000,
           })
         // router.push({

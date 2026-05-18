@@ -165,6 +165,7 @@ import { onBeforeRouteLeave } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -367,8 +368,8 @@ export default defineComponent({
             return false;
           }
 
-          const loadingNotification = $q.notify({
-            spinner: true,
+          const loadingNotification = toast({
+            variant: "loading",
             message: "Please wait...",
             timeout: 0,
           });
@@ -405,15 +406,15 @@ export default defineComponent({
                 emit("update:list", _formData);
 
                 loadingNotification();
-                $q.notify({
-                  type: "positive",
+                toast({
+                  variant: "success",
                   message: res.data.message || "Function saved successfully",
                 });
               })
               .catch((err) => {
                 compilationErr.value = err?.response?.data["message"];
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message:
                     err.response?.data?.message ?? "Function creation failed",
                 });

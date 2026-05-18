@@ -17,6 +17,7 @@ import { reactive, computed } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const colors = [
   "#5960b2",
@@ -709,8 +710,8 @@ const useMetricsExplorer = () => {
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: trimmedErrorMessage,
           timeout: 5000,
         });
@@ -760,8 +761,8 @@ const useMetricsExplorer = () => {
           errorDetailValue.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
             : errorDetailValue;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: trimmedErrorMessage,
           timeout: 5000,
         });

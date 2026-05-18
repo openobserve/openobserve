@@ -66,6 +66,7 @@ import useNotifications from "@/composables/useNotifications";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue = () => {
   return {
@@ -212,8 +213,8 @@ export default defineComponent({
   },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
-      this.$q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },

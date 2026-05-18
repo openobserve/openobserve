@@ -19,6 +19,7 @@ import { computed, ComputedRef, reactive } from "vue";
 import { ref } from "vue";
 import { useQuasar } from "quasar";
 import { deepCopy } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const getStreamsPromise: any = ref(null);
 
@@ -67,8 +68,8 @@ const useStreams = () => {
         if (!isStreamFetched(streamName || "all") || force) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
-            ? q.notify({
-                spinner: true,
+            ? toast({
+                variant: "loading",
                 message: "Please wait while loading streams...",
                 timeout: 5000,
               })
@@ -188,8 +189,8 @@ const useStreams = () => {
       try {
         // Added adddtional check to fetch all streamstype separately if streamName is all
         const dismiss = notify
-          ? q.notify({
-              spinner: true,
+          ? toast({
+              variant: "loading",
               message: "Please wait while loading streams...",
               timeout: 5000,
             })

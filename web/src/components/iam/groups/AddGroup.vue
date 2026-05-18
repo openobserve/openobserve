@@ -65,6 +65,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -109,19 +110,17 @@ const saveGroup = () => {
       emits("added:group", res.data);
       emits("update:open", false);
 
-      q.notify({
+      toast({
         message: `User Group "${name.value}" Created Successfully!`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
+        toast({
         message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       }

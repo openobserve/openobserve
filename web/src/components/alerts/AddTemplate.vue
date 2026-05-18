@@ -216,6 +216,7 @@ import {
   getTemplateValidationErrorMessage,
 } from "@/utils/templates/validation";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{ template: TemplateData | null }>();
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
@@ -304,8 +305,8 @@ const isTemplateBodyValid = () => {
   const result = validateTemplateBody(formData.value.body);
 
   if (!result.valid) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: getTemplateValidationErrorMessage(),
       timeout: 1500,
     });
@@ -326,8 +327,8 @@ const saveTemplate = () => {
     nameError.value = !name.trim() ? t('common.nameRequired')
       : (!isValidResourceName(name) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : '');
     titleError.value = (formData.value.type === 'email' && !formData.value.title?.trim()) ? 'Field is required!' : '';
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
@@ -337,8 +338,8 @@ const saveTemplate = () => {
   // Here checking is template body json valid
   if (formData.value.type !== "email" && !isTemplateBodyValid()) return;
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -359,8 +360,8 @@ const saveTemplate = () => {
         dismiss();
         emit("get:templates");
         emit("cancel:hideform");
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Template Saved Successfully.`,
         });
       })
@@ -369,8 +370,8 @@ const saveTemplate = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -395,8 +396,8 @@ const saveTemplate = () => {
           dismiss();
           emit("get:templates");
           emit("cancel:hideform");
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Template Saved Successfully.`,
           });
         })
@@ -405,8 +406,8 @@ const saveTemplate = () => {
             return;
           }
           dismiss();
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err.response?.data?.error || err.response?.data?.message,
           });
         });
@@ -419,8 +420,8 @@ const saveTemplate = () => {
 };
 const copyTemplateBody = (text: any) => {
   copyToClipboard(JSON.parse(JSON.stringify(text))).then(() =>
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Content Copied Successfully!",
       timeout: 1000,
     }),

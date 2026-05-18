@@ -52,7 +52,7 @@ import SearchBar from "@/components/rum/SearchBar.vue";
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // Mock segment analytics

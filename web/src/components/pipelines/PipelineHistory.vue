@@ -505,6 +505,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
@@ -787,8 +788,8 @@ const fetchPipelineHistory = async () => {
   } catch (error: any) {
     console.error("Error fetching pipeline history:", error);
     console.error("Error response:", error.response);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         error.response?.data?.message ||
         error.message ||

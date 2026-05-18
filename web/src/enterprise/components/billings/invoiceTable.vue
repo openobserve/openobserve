@@ -60,6 +60,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const $q = useQuasar();
@@ -120,8 +121,8 @@ const columns: OTableColumnDef[] = [
 const invoiceHistory = ref([]);
 
 const getInvoiceHistory = () => {
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading invoice history...",
   });
 
@@ -151,8 +152,8 @@ const getInvoiceHistory = () => {
     })
     .catch((e) => {
       dismiss();
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: e.message,
         timeout: 5000,
       });

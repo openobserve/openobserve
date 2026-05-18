@@ -55,6 +55,7 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -132,10 +133,10 @@ export default defineComponent({
       let dismiss = function () {};
 
       try {
-        dismiss = q.notify({
+        dismiss = toast({
           message: "Please wait while we add the panel to the dashboard",
           type: "ongoing",
-          position: "bottom",
+          position: "bottom-center",
         });
         props.dashboardPanelData.data.id = getPanelId();
         // panel name will come from add to dashboard component
@@ -148,10 +149,10 @@ export default defineComponent({
           folderId,
           tabId,
         );
-        q.notify({
+        toast({
           message: "Panel added to dashboard",
-          type: "positive",
-          position: "bottom",
+          variant: "success",
+          position: "bottom-center",
           timeout: 3000,
         });
         router.push({
@@ -177,17 +178,17 @@ export default defineComponent({
     const onSubmit = useLoading(async () => {
       // if selected dashoboard is null
       if (selectedDashboard.value == null) {
-        q.notify({
+        toast({
           message: "Please select a dashboard",
-          type: "negative",
-          position: "bottom",
+          variant: "error",
+          position: "bottom-center",
           timeout: 2000,
         });
       } else if (activeTabId.value == null) {
-        q.notify({
+        toast({
           message: "Please select a tab",
-          type: "negative",
-          position: "bottom",
+          variant: "error",
+          position: "bottom-center",
           timeout: 2000,
         });
       } else {

@@ -107,6 +107,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "plans",
@@ -194,8 +195,8 @@ export default defineComponent({
           })
           .catch((e) => {
             this.proLoading = false;
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });
@@ -209,8 +210,8 @@ export default defineComponent({
             window.location.href = res.data.url;
           })
           .catch((e) => {
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });
@@ -233,8 +234,8 @@ export default defineComponent({
           }
         })
         .catch((e) => {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: e.message,
             timeout: 5000,
           });
@@ -268,8 +269,8 @@ export default defineComponent({
           this.billingProvider === "stripe"
         ) {
           // Only show subscribe prompt for Stripe orgs without subscription
-          this.$q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "Please subscribe to one of the plan.",
             timeout: 5000,
           });
@@ -289,8 +290,8 @@ export default defineComponent({
         this.loading = false;
         this.proLoading = false;
 
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: e.message,
           timeout: 5000,
         });

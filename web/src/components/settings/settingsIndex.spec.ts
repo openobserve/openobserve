@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { installQuasar } from '@/test/unit/helpers/install-quasar-plugin';
-import { Dialog, Notify, Quasar } from 'quasar';
+import { Dialog, Quasar } from 'quasar';
 import { nextTick } from 'vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import SettingsIndex from './index.vue';
 
-installQuasar({ plugins: { Dialog, Notify } });
+installQuasar({ plugins: { Dialog } });
 
 // Mock composables and config with factory functions
 vi.mock('@/composables/useIsMetaOrg', () => ({

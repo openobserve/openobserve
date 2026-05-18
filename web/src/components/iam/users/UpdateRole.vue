@@ -71,6 +71,7 @@ import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -125,8 +126,8 @@ export default defineComponent({
   },
   methods: {
     onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -149,14 +150,14 @@ export default defineComponent({
           if (res?.data?.error_members != null) {
             const message = `Error while updating organization member`;
 
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: message,
               timeout: 15000,
             });
           } else {
-            this.$q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Organization member updated successfully.",
               timeout: 3000,
             });

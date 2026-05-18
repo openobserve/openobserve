@@ -46,6 +46,7 @@ import type { IDateTime } from "@/ts/interfaces";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SearchBarInstance = InstanceType<typeof SearchBar>;
 
@@ -116,39 +117,21 @@ export default defineComponent({
       }
     });
 
-    function Notify() {
-      return q.notify({
-        type: "positive",
+    function () {
+      return toast({
+        variant: "success",
         message: "Waiting for response...",
         timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
       });
     }
 
     function ErrorException(message: string) {
       isLoading.value.pop();
       // searchObj.data.errorMsg = message;
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: message,
         timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
       });
     }
 
@@ -157,7 +140,7 @@ export default defineComponent({
         isLoading.value.push(true);
         queryData.value.errorMsg = "";
 
-        const dismiss = Notify();
+        const dismiss = ();
 
         const queryReq = buildSearch();
 
@@ -202,7 +185,7 @@ export default defineComponent({
               queryData.value.errorMsg = t(customMessage);
             }
 
-            // $q.notify({
+            // toast({
             //   message: searchObj.data.errorMsg,
             //   color: "negative",
             // });

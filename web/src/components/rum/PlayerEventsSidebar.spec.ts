@@ -26,7 +26,7 @@ document.body.appendChild(node);
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
+  plugins: [quasar.Dialog, quasar.quasar.Loading],
 });
 
 // Mock AppTabs component

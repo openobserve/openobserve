@@ -43,7 +43,7 @@ vi.mock("@vue-flow/core", () => ({
 }));
 
 vi.mock("quasar", () => ({
-  Notify: {
+  : {
     create: vi.fn(),
   },
   useQuasar: () => ({

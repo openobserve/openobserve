@@ -38,6 +38,7 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useStreamingSearch from "@/composables/useStreamingSearch";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const useLogs = () => {
   const store = useStore();
@@ -158,14 +159,13 @@ const useLogs = () => {
             "ui",
           )
           .then((res: any) => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Job Added Succesfully",
               timeout: 2000,
               actions: [
                 {
                   label: "Go To Job Scheduler",
-                  color: "white",
                   handler: () => routeToSearchSchedule(),
                 },
               ],
@@ -233,10 +233,9 @@ const useLogs = () => {
 
         // only notify if user is in logs page
         if (searchObj.meta.logsVisualizeToggle == "logs") {
-          $q.notify({
+          toast({
             message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-            color: "positive",
-            position: "top",
+            position: "top-center",
             timeout: 1000,
           });
         }

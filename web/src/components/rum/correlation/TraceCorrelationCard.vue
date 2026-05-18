@@ -202,6 +202,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   traceId: {
@@ -270,8 +271,8 @@ const calculatePercentage = (value: number, total: number) => {
 
 const copyTraceId = () => {
   copyToClipboard(props.traceId);
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: "Trace ID copied to clipboard",
     timeout: 1500,
   });
@@ -280,8 +281,8 @@ const copyTraceId = () => {
 const viewTraceDetails = () => {
   // TODO: Navigate to trace detail view
   // This will be implemented once we know the trace viewer route
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Trace detail view coming soon",
     timeout: 2000,
   });
@@ -289,8 +290,8 @@ const viewTraceDetails = () => {
 
 const refreshTraceData = () => {
   fetchCorrelation();
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Refreshing trace data...",
     timeout: 1000,
   });

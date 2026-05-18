@@ -327,6 +327,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   orgId: string;
@@ -378,14 +379,14 @@ const submitComment = async () => {
     await incidentsService.postComment(props.orgId, props.incidentId, text);
     commentText.value = "";
     await fetchEvents();
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Comment posted successfully",
       timeout: 2000,
     });
   } catch (e: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to post comment",
       timeout: 2000,
     });

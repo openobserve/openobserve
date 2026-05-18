@@ -60,6 +60,7 @@ import {
 } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "LoginPage",
@@ -364,8 +365,8 @@ export default defineComponent({
           this.store.dispatch("setCurrentUser", res.data.data);
 
           if (res.data.data.id == 0) {
-            const dismiss = this.q.notify({
-              spinner: true,
+            const dismiss = toast({
+              variant: "loading",
               message: "Please wait while creating new user...",
             });
 
@@ -390,8 +391,8 @@ export default defineComponent({
           }
         })
         .catch((error) => {
-          this.q.notify({
-            spinner: true,
+          toast({
+            variant: "loading",
             message: "Error while verifying user...",
           });
           if (error.status === 403) this.signout();

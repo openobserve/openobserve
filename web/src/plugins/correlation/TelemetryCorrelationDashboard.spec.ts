@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar, Notify } from "quasar";
+import { Quasar } from "quasar";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -291,7 +291,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       },
       global: {
         plugins: [
-          [Quasar, { plugins: { Notify } }],
+          [Quasar, { plugins: {  } }],
           i18n,
           store,
         ],

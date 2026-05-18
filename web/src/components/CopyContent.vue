@@ -43,6 +43,7 @@ import { useQuasar, copyToClipboard } from "quasar";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "CopyContent",
@@ -90,15 +91,15 @@ export default defineComponent({
       const content = replaceValues(props.content, false);
       copyToClipboard(content)
         .then(() => {
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Content Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });

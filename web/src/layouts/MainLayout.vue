@@ -198,6 +198,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -672,8 +673,8 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message:
               "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
             timeout: 5000,

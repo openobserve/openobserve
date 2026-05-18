@@ -260,6 +260,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -812,8 +813,8 @@ const handleRowClick = (row: any) => {
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData).then(() =>
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Content Copied Successfully!",
       timeout: 1000,
     })
@@ -846,15 +847,15 @@ const handleAddFieldToTable = (field: string) => {
     visibleColumns.value = new Set(visibleColumns.value);
 
     // Show success notification
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: `Column "${field}" added to table`,
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
-    $q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `Column "${field}" is already visible`,
       timeout: 1500,
     });

@@ -1349,6 +1349,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1873,12 +1874,10 @@ export default defineComponent({
         currentAbortController.value = null;
 
         // Show user notification about successful cancellation
-        $q.notify({
+        toast({
           message: "Response generation stopped",
-          color: "secondary",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
-          icon: "stop",
         });
 
         // Update UI state to reflect cancellation
@@ -4356,20 +4355,20 @@ export default defineComponent({
     const addImage = async (file: File): Promise<boolean> => {
       // Validate file size first (before reading)
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
-          position: "top",
+          position: "top-center",
         });
         return false;
       }
 
       // Basic file type check for immediate feedback (backend will detect actual type)
       if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Only PNG and JPEG images are supported",
-          position: "top",
+          position: "top-center",
         });
         return false;
       }
@@ -4559,10 +4558,10 @@ export default defineComponent({
           resolve(true);
         };
         reader.onerror = () => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Failed to read image: ${file.name}`,
-            position: "top",
+            position: "top-center",
           });
           resolve(false);
         };
@@ -4913,18 +4912,16 @@ export default defineComponent({
     const copyToClipboard = async (text: string) => {
       try {
         await navigator.clipboard.writeText(text);
-        $q.notify({
+        toast({
           message: "Code copied to clipboard",
-          color: "positive",
-          position: "top",
+          position: "top-center",
           timeout: 1000,
         });
       } catch (err) {
         console.error("Failed to copy text: ", err);
-        $q.notify({
+        toast({
           message: "Failed to copy code",
-          color: "negative",
-          position: "top",
+          position: "top-center",
         });
       }
     };
@@ -5202,7 +5199,6 @@ export default defineComponent({
         sql: "SQL",
         vrl: "VRL",
         json: "JSON",
-        html: "HTML",
         css: "CSS",
         scss: "SCSS",
         bash: "Bash",
@@ -5438,8 +5434,8 @@ export default defineComponent({
       if (success) {
         message.feedback = "thumbs_up";
         await saveToHistory();
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Thanks for your feedback!",
           timeout: 1500,
         });
@@ -5462,8 +5458,8 @@ export default defineComponent({
       if (success) {
         message.feedback = "thumbs_down";
         await saveToHistory();
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Thanks for your feedback!",
           timeout: 1500,
         });

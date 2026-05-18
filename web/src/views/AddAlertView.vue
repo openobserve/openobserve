@@ -34,6 +34,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import destinationService from "@/services/alert_destination";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -56,8 +57,8 @@ export default defineComponent({
         });
         destinations.value = res.data;
       } catch (error) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling destinations.",
           timeout: 2000,
         });
@@ -94,8 +95,8 @@ export default defineComponent({
     onBeforeMount(async () => {
       await getDestinations();
       if (!destinations.value.length) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message:
             "No destinations found. Please create a destination first.",
           timeout: 3000,

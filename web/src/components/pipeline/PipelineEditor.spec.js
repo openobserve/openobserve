@@ -20,13 +20,13 @@ import { reactive } from "vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 import pipelineService from "@/services/pipelines";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 const mockAddNode = vi.fn();
 

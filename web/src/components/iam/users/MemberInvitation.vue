@@ -70,6 +70,7 @@ import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MemberInvitationPage",
@@ -111,8 +112,8 @@ export default defineComponent({
       );
 
       if (!validationArray.includes(false)) {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait...",
           timeout: 2000,
         });
@@ -128,14 +129,14 @@ export default defineComponent({
             if (data.data.invalid_members != null) {
               const message = `Error while member invitation: ${data.data.invalid_members.toString()}`;
 
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: message,
                 timeout: 15000,
               });
             } else {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: data.message,
                 timeout: 5000,
               });
@@ -147,8 +148,8 @@ export default defineComponent({
           })
           .catch((error) => {
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: error?.response?.data?.message || error.message,
               timeout: 5000,
             });
@@ -163,8 +164,8 @@ export default defineComponent({
           page: "Users",
         });
       } else {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Please enter correct email id.`,
         });
       }

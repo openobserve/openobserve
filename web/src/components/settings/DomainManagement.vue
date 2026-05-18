@@ -359,6 +359,7 @@ import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Domain {
   name: string;
@@ -543,8 +544,8 @@ const addDomain = () => {
   
   // Check if domain already exists
   if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.domainAlreadyExists"),
       timeout: 3000,
     });
@@ -560,8 +561,8 @@ const addDomain = () => {
 
   newDomain.value = "";
 
-  // q.notify({
-  //   type: "positive",
+  // toast({
+  //   variant: "success",
   //   message: t("settings.domainAdded"),
   //   timeout: 3000,
   // });
@@ -578,8 +579,8 @@ const doRemoveDomain = () => {
   domains.splice(index, 1);
   pendingRemoveDomainIndex.value = null;
   confirmRemoveDomainOpen.value = false;
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("settings.domainRemoved"),
     timeout: 3000,
   });
@@ -590,8 +591,8 @@ const addEmail = (domain: Domain) => {
 
   // Check if email already exists
   if (domain.allowedEmails.includes(domain.newEmail.toLowerCase())) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.emailAlreadyExists"),
       timeout: 3000,
     });
@@ -601,8 +602,8 @@ const addEmail = (domain: Domain) => {
   domain.allowedEmails.push(domain.newEmail.toLowerCase());
   domain.newEmail = "";
 
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("settings.emailAdded"),
     timeout: 3000,
   });
@@ -619,8 +620,8 @@ const doRemoveEmail = () => {
   pending.domain.allowedEmails.splice(pending.emailIndex, 1);
   pendingRemoveEmail.value = null;
   confirmRemoveEmailOpen.value = false;
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("settings.emailRemoved"),
     timeout: 3000,
   });
@@ -684,14 +685,14 @@ const saveClaimParserFunction = async () => {
     // Update original value after successful save
     originalClaimParserFunction.value = claimParserFunction.value || "";
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.claimParserFunctionSaved"),
       timeout: 3000,
     });
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingClaimParserFunction"),
       timeout: 3000,
     });
@@ -805,8 +806,8 @@ const saveChanges = async () => {
     // Validate all domains have proper configuration
     for (const domain of domains) {
       if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
           timeout: 3000,
         });
@@ -827,16 +828,16 @@ const saveChanges = async () => {
     // Save to backend API
     await domainManagement.updateDomainRestrictions(store.state.zoConfig.meta_org, domainData);
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.domainSettingsSaved"),
       timeout: 3000,
     });
 
     emit("saved", domains);
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingDomainSettings"),
       timeout: 3000,
     });

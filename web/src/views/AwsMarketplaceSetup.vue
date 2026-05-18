@@ -190,6 +190,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SetupState =
   | "select_org"
@@ -296,8 +297,8 @@ export default defineComponent({
 
     const linkToExistingOrg = async () => {
       if (!selectedOrg.value) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Please select an organization",
         });
         return;

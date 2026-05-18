@@ -67,7 +67,7 @@ import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceTree from "@/plugins/traces/TraceTree.vue";
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 const mockStore = createStore({

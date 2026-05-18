@@ -147,6 +147,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   modelValue: boolean;
@@ -280,12 +281,10 @@ const onSubmit = async () => {
         "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
       cancel: {
         label: "Cancel",
-        color: "grey-8",
         flat: true,
       },
       ok: {
         label: "Yes, Delete and Backfill",
-        color: "negative",
       },
       persistent: true,
       focus: "cancel", // Focus on cancel button by default for safety
@@ -314,8 +313,8 @@ const updateBackfillJobRequest = async () => {
       },
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job updated successfully",
       timeout: 3000,
     });

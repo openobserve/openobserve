@@ -654,6 +654,7 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
@@ -726,8 +727,8 @@ const formatEventCount = (num: number): string => {
 
 const getSummary = (org_id: any) => {
   isLoadingSummary.value = true;
-  const dismiss = $q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading summary...",
   });
   orgService
@@ -837,8 +838,8 @@ const getSummary = (org_id: any) => {
     .catch((err) => {
       console.log(err);
       dismiss();
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Error while pulling summary.",
         timeout: 2000,
       });
@@ -933,14 +934,12 @@ const alertsPanelData = computed(() => {
             value: healthyAlerts,
             name: "Success Alerts",
             itemStyle: {
-              color: "#15ba73",
             },
           },
           {
             value: failedAlerts,
             name: "Failed Alerts",
             itemStyle: {
-              color: "#db373a",
             },
           },
         ],
@@ -1024,7 +1023,7 @@ const pipelinesPanelData = computed(() => {
         barWidth: "50%",
         label: {
           show: true,
-          position: "top",
+          position: "top-center",
           fontSize: 14,
           fontWeight: "bold",
           color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",

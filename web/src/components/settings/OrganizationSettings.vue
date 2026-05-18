@@ -96,6 +96,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 
@@ -201,17 +202,15 @@ const saveOrgSettings = async () => {
 
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    q.notify({
+    toast({
       message: "Organization settings updated successfully",
-      color: "positive",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   } catch (e: any) {
-    q.notify({
+    toast({
       message: e?.message || "Error saving organization settings",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   }

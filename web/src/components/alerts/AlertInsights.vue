@@ -300,6 +300,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const router = useRouter();
 const route = useRoute();
@@ -447,8 +448,8 @@ const fetchAlerts = async () => {
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to load alerts",
       timeout: 2000,
     });
@@ -604,8 +605,8 @@ const handleConfigureDedup = async (alertName: string) => {
     const alert = alertsList.value.find((a: any) => a.name === alertName);
 
     if (!alert) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
         timeout: 3000,
       });
@@ -625,8 +626,8 @@ const handleConfigureDedup = async (alertName: string) => {
       },
     });
   } catch (error) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to navigate to alert",
       timeout: 2000,
     });
@@ -639,8 +640,8 @@ const handleEditAlert = async (alertName: string) => {
     const alert = alertsList.value.find((a: any) => a.name === alertName);
 
     if (!alert) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Alert not found",
         timeout: 2000,
       });
@@ -658,8 +659,8 @@ const handleEditAlert = async (alertName: string) => {
       },
     });
   } catch (error) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to navigate to alert",
       timeout: 2000,
     });
@@ -685,8 +686,8 @@ const formatFilterValue = (value: number): string => {
 
 // Action button methods
 const openDedupConfig = () => {
-  $q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page with dedup section focused",
   });
@@ -700,8 +701,8 @@ const openDedupConfig = () => {
 };
 
 const editAlert = () => {
-  $q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: `Editing alert: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page",
   });

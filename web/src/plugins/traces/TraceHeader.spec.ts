@@ -23,7 +23,7 @@ import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 const mockStore = createStore({

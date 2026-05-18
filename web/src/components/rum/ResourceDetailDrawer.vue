@@ -176,6 +176,7 @@ import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 const props = defineProps({
@@ -280,8 +281,8 @@ const viewSessionEvents = () => {
   if (!props.resource?.session?.id) return;
 
   // TODO: Navigate to filtered session events view
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Session events view coming soon",
     timeout: 2000,
   });

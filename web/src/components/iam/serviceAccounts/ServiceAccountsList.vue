@@ -265,6 +265,7 @@ import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OTable, OBadge },
@@ -380,8 +381,8 @@ export default defineComponent({
       deleteUserEmail = row.email;
     };
     const getServiceAccountsUsers = async () =>{
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading service accounts...",
       });
 
@@ -482,8 +483,7 @@ export default defineComponent({
       showAddUserDialog.value = false;
       if (res.code == 200 ) {
         if (operationType == "created") {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Service Account created successfully.",
             });
 
@@ -508,8 +508,7 @@ export default defineComponent({
           }
         } else {
           setTimeout(() => {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Service Account updated successfully.",
             });
           }, 2000);
@@ -537,8 +536,7 @@ export default defineComponent({
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Service Account deleted successfully.",
             });
             await getServiceAccountsUsers();
@@ -546,8 +544,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if(err.response?.status != 403){
-            $q.notify({
-            color: "negative",
+            toast({
             message: err.response?.data?.message || "Error while deleting user.",
             });
           }
@@ -572,20 +569,17 @@ export default defineComponent({
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
-            color: "positive",
+          toast({
             message: `Successfully deleted ${successful.length} service account(s)`,
             timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
-            color: "warning",
+          toast({
             message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
             timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: `Failed to delete ${unsuccessful.length} service account(s)`,
             timeout: 2000,
           });
@@ -596,8 +590,7 @@ export default defineComponent({
         await getServiceAccountsUsers();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
             timeout: 2000,
           });
@@ -612,16 +605,14 @@ export default defineComponent({
           serviceToken.value = res.data.token;
           isShowToken.value = true;
 
-        $q.notify({
-          color: "positive",
+        toast({
           message: "Service token refreshed successfully.",
         });
 
         getServiceAccountsUsers();
       }).catch((err)=>{
         if(err.response?.status != 403){
-          $q.notify({
-          color: "negative",
+          toast({
           message: err.response?.data?.message || "Error while refreshing token.",
           });
         }
@@ -633,14 +624,14 @@ export default defineComponent({
     }
     const  copyToClipboard = (text:string) => {
       navigator.clipboard.writeText(text).then(() => {
-        $q.notify({
-            type: "positive",
+        toast({
+            variant: "success",
             message: `token Copied Successfully!`,
             timeout: 5000,
           });
       }).catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });

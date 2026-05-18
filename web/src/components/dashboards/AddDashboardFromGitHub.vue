@@ -184,6 +184,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface GitHubDashboard {
   name: string;
@@ -501,20 +502,20 @@ export default defineComponent({
 
         // Show summary notification
         if (successCount > 0 && failCount === 0) {
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Successfully imported ${successCount} dashboard(s)!`,
             timeout: 3000,
           });
         } else if (successCount > 0 && failCount > 0) {
-          q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: `Imported ${successCount} dashboard(s), but ${failCount} failed. Check console for details.`,
             timeout: 5000,
           });
         } else {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Failed to import dashboards: ${errors[0] || "Unknown error"}`,
             timeout: 5000,
           });
@@ -524,8 +525,8 @@ export default defineComponent({
         showFolderSelection.value = false;
         emit("added");
       } catch (err) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to add dashboards: ${err instanceof Error ? err.message : "Unknown error"}`,
           timeout: 5000,
         });

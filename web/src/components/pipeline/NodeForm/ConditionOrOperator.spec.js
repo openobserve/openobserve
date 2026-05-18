@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import useDnD from '@/plugins/pipelines/useDnD';
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
@@ -8,7 +8,7 @@ import i18n from "@/locales";
 import Condition from "./Condition.vue";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock the services and composables

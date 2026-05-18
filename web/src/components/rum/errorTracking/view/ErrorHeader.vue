@@ -72,6 +72,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -84,8 +85,8 @@ const props = defineProps({
 });
 
 const copyErrorId = (id: string) => {
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: "Copied to clipboard",
     timeout: 1500,
   });

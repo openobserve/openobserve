@@ -18,10 +18,9 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import { Notify } from "quasar";
 import BuiltInPatternsTab from "./BuiltInPatternsTab.vue";
 
-installQuasar({ plugins: { Notify } });
+installQuasar({ plugins: {  } });
 
 // --- Mock services ---
 vi.mock("@/services/regex_pattern", () => ({

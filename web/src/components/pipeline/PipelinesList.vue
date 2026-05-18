@@ -508,6 +508,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 import { filter, update } from "lodash-es";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -666,22 +667,20 @@ const togglePipelineState = (row: any, from_now: boolean) => {
       const message = row.enabled
         ? `${row.name} state resumed successfully`
         : `${row.name} state paused successfully`;
-      q.notify({
+      toast({
         message: message,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       await getPipelines();
     })
     .catch((error) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message:
             error.response?.data?.message ||
             "Error while updating pipeline state",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -883,10 +882,10 @@ const openDeleteDialog = (pipeline: any) => {
 };
 
 const savePipeline = (data: any) => {
-  const dismiss = q.notify({
+  const dismiss = toast({
     message: "saving pipeline...",
-    position: "bottom",
-    spinner: true,
+    position: "bottom-center",
+    variant: "loading",
   });
 
   pipelineService
@@ -898,21 +897,19 @@ const savePipeline = (data: any) => {
       getPipelines();
       dismiss();
       showCreatePipeline.value = false;
-      q.notify({
+      toast({
         message: "Pipeline created successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     })
     .catch((error) => {
       dismiss();
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message:
             error.response?.data?.message || "Error while saving pipeline",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -920,10 +917,10 @@ const savePipeline = (data: any) => {
 };
 
 const deletePipeline = async () => {
-  const dismiss = q.notify({
+  const dismiss = toast({
     message: "deleting pipeline...",
-    position: "bottom",
-    spinner: true,
+    position: "bottom-center",
+    variant: "loading",
   });
   const { pipeline_id } = confirmDialogMeta.value.data;
   const org_id = store.state.selectedOrganization.identifier;
@@ -933,20 +930,18 @@ const deletePipeline = async () => {
       org_id,
     })
     .then(async () => {
-      q.notify({
+      toast({
         message: "Pipeline deleted successfully",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     })
     .catch((error) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message:
             error.response?.data?.message || "Error while deleting pipeline",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -1029,10 +1024,9 @@ const exportBulkPipelines = () => {
   URL.revokeObjectURL(url);
 
   selectedPipelines.value = [];
-  q.notify({
+  toast({
     message: `${pipelinesToExport.length} pipelines exported successfully`,
-    color: "positive",
-    position: "bottom",
+    position: "bottom-center",
     timeout: 3000,
   });
 };
@@ -1081,8 +1075,8 @@ const goToBackfillJobs = () => {
 };
 
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
     timeout: 0,
   });
@@ -1094,8 +1088,8 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     );
 
     if (pipelinesToToggle.length === 0) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `No pipelines to ${action}`,
         timeout: 2000,
       });
@@ -1117,8 +1111,8 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
 
     if (response) {
       dismiss();
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Pipelines ${action}d successfully`,
         timeout: 2000,
       });
@@ -1130,8 +1124,8 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
   } catch (error) {
     dismiss();
     console.error(`Error ${action}ing pipelines:`, error);
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: `Error ${action}ing pipelines. Please try again.`,
       timeout: 2000,
     });
@@ -1147,16 +1141,16 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeletePipelines = async () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Deleting pipelines...",
     timeout: 0,
   });
 
   try {
     if (selectedPipelines.value.length === 0) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "No pipelines selected for deletion",
         timeout: 2000,
       });
@@ -1184,30 +1178,30 @@ const bulkDeletePipelines = async () => {
 
       if (failCount > 0 && successCount > 0) {
         // Partial success
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: `${successCount} pipeline(s) deleted successfully, ${failCount} failed`,
           timeout: 5000,
         });
       } else if (failCount > 0) {
         // All failed
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to delete ${failCount} pipeline(s)`,
           timeout: 3000,
         });
       } else {
         // All successful
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `${successCount} pipeline(s) deleted successfully`,
           timeout: 2000,
         });
       }
     } else {
       // Fallback success message
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
         timeout: 2000,
       });
@@ -1224,8 +1218,8 @@ const bulkDeletePipelines = async () => {
       error?.message ||
       "Error deleting pipelines. Please try again.";
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: errorMessage,
         timeout: 3000,
       });

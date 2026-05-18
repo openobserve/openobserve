@@ -29,7 +29,7 @@ document.body.appendChild(node);
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // ── vi.mock calls must be at the top level so Vitest can hoist them ──────────

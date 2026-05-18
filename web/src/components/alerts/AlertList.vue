@@ -754,6 +754,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1311,8 +1312,8 @@ export default defineComponent({
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
       }
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading alerts...",
       });
       if (query) {
@@ -1440,16 +1441,16 @@ export default defineComponent({
       } catch (error) {
         console.error(error);
         dismiss();
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling alerts.",
           timeout: 2000,
         });
       }
     };
     const getAlertById = async (id: string) => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading alert...",
       });
       try {
@@ -1649,8 +1650,8 @@ export default defineComponent({
             showAddUpdateFn({ row: alert });
           } catch (error) {
             console.error("AlertList: Failed to load alert", error);
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Failed to load alert for editing",
               timeout: 2000,
             });
@@ -1679,8 +1680,8 @@ export default defineComponent({
           destinations.value = res.data;
         })
         .catch(() =>
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while fetching destinations.",
             timeout: 3000,
           }),
@@ -1696,8 +1697,8 @@ export default defineComponent({
           templates.value = res.data;
         })
         .catch(() =>
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while fetching templates.",
             timeout: 3000,
           }),
@@ -1737,24 +1738,24 @@ export default defineComponent({
       // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
       if (toBeClonedIsAnomaly.value) {
         if (!toBeClonestreamType.value) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Please select stream type ",
             timeout: 2000,
           });
           return;
         }
         if (!toBeClonestreamName.value) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Please select stream name",
             timeout: 2000,
           });
           return;
         }
         isSubmitting.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait...",
           timeout: 2000,
         });
@@ -1770,8 +1771,8 @@ export default defineComponent({
             },
           );
           dismiss();
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Anomaly detection cloned successfully",
             timeout: 2000,
           });
@@ -1780,8 +1781,8 @@ export default defineComponent({
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               e?.response?.data?.message || "Failed to clone anomaly detection",
             timeout: 2000,
@@ -1793,32 +1794,32 @@ export default defineComponent({
       }
 
       if (!toBeClonedAlert.value) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Alert not found",
           timeout: 2000,
         });
         return;
       }
       if (!toBeClonestreamType.value) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Please select stream type ",
           timeout: 2000,
         });
         return;
       }
       if (!toBeClonestreamName.value) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Please select stream name",
           timeout: 2000,
         });
         return;
       }
       isSubmitting.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -1846,8 +1847,8 @@ export default defineComponent({
           .then(async (res) => {
             dismiss();
             if (res.data.code == 200) {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: "Alert Cloned Successfully",
                 timeout: 2000,
               });
@@ -1855,8 +1856,8 @@ export default defineComponent({
               await getAlertsFn(store, folderIdToBeCloned.value);
               activeFolderId.value = folderIdToBeCloned.value;
             } else {
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: res.data.message,
                 timeout: 2000,
               });
@@ -1869,8 +1870,8 @@ export default defineComponent({
               return;
             }
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.response.data.message,
               timeout: 2000,
             });
@@ -1881,8 +1882,8 @@ export default defineComponent({
       } catch (e: any) {
         showForm.value = true;
         isSubmitting.value = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: e.data.message,
           timeout: 2000,
         });
@@ -1927,8 +1928,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
               timeout: 2000,
             });
@@ -1937,8 +1938,8 @@ export default defineComponent({
               filterAlertsByQuery(filterQuery.value);
             }
           } else {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res.data.message,
               timeout: 2000,
             });
@@ -1948,8 +1949,8 @@ export default defineComponent({
           if (err.response?.status == 403) {
             return;
           }
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.data?.message || "Error while deleting alert.",
             timeout: 2000,
           });
@@ -2036,8 +2037,8 @@ export default defineComponent({
           filteredResults.value.forEach((alert: any) => {
             alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: isEnabled
               ? "Alert Resumed Successfully"
               : "Alert Paused Successfully",
@@ -2142,8 +2143,8 @@ export default defineComponent({
           row.alert_id,
           row.folder_name?.id,
         );
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.alertTriggeredSuccess"),
           timeout: 2000,
         });
@@ -2151,8 +2152,8 @@ export default defineComponent({
           await getAlertsFn(store, activeFolderId.value);
         }
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to trigger alert",
           timeout: 2000,
         });
@@ -2166,14 +2167,14 @@ export default defineComponent({
           row.alert_id,
         );
         row.status = "training";
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Retraining triggered",
           timeout: 2000,
         });
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message || "Failed to trigger retraining",
           timeout: 2000,
@@ -2332,8 +2333,8 @@ export default defineComponent({
 
     const debouncedSearch = debounce(async (query) => {
       if (!query) return;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while searching for dashboards...",
       });
       dismiss();
@@ -2402,15 +2403,15 @@ export default defineComponent({
       navigator.clipboard
         .writeText(text)
         .then(() => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${type} Copied Successfully!`,
             timeout: 5000,
           });
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });
@@ -2423,8 +2424,8 @@ export default defineComponent({
 
     const multipleExportAlert = async () => {
       try {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Exporting alerts...",
           timeout: 0, // Set timeout to 0 to keep it showing until dismissed
         });
@@ -2459,8 +2460,8 @@ export default defineComponent({
         URL.revokeObjectURL(url);
 
         dismiss();
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
           timeout: 2000,
         });
@@ -2468,8 +2469,8 @@ export default defineComponent({
         allSelectedAlerts.value = false;
       } catch (error) {
         console.error("Error exporting alerts:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error exporting alerts. Please try again.",
           timeout: 2000,
         });
@@ -2559,8 +2560,8 @@ export default defineComponent({
     };
 
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
         timeout: 0,
       });
@@ -2573,8 +2574,8 @@ export default defineComponent({
         );
 
         if (alertsToToggle.length === 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `No alerts to ${action}`,
             timeout: 2000,
           });
@@ -2597,8 +2598,8 @@ export default defineComponent({
 
         if (response) {
           dismiss();
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Alerts ${action}d successfully`,
             timeout: 2000,
           });
@@ -2612,8 +2613,8 @@ export default defineComponent({
       } catch (error) {
         dismiss();
         console.error(`Error ${action}ing alerts:`, error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error ${action}ing alerts. Please try again.`,
           timeout: 2000,
         });
@@ -2627,16 +2628,16 @@ export default defineComponent({
     };
 
     const bulkDeleteAlerts = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting alerts...",
         timeout: 0,
       });
 
       try {
         if (selectedAlerts.value.length === 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No alerts selected for deletion",
             timeout: 2000,
           });
@@ -2665,30 +2666,30 @@ export default defineComponent({
 
           if (failCount > 0 && successCount > 0) {
             // Partial success
-            $q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} alert(s)`,
               timeout: 3000,
             });
           } else {
             // All successful
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} alert(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
           // Fallback success message
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
             timeout: 2000,
           });
@@ -2710,8 +2711,8 @@ export default defineComponent({
           error?.message ||
           "Error deleting alerts. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });

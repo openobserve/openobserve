@@ -17,12 +17,11 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import GroupServiceAccounts from "@/components/iam/groups/GroupServiceAccounts.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Notify],
+  plugins: [],
 });
 
 vi.mock("@/composables/iam/usePermissions", () => ({

@@ -335,6 +335,7 @@ import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface SemanticGroup {
   id: string;
@@ -403,10 +404,9 @@ const loadFile = async (file: File | null) => {
 
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     clearFile();
@@ -438,10 +438,9 @@ const previewDiff = async (groups: SemanticGroup[]) => {
       (m: SemanticGroupModification) => m.proposed.id,
     );
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   }
@@ -528,10 +527,9 @@ const handleApply = () => {
   isApplying.value = false;
   emit("close");
 
-  q.notify({
+  toast({
     message: `Applied ${changeCount} changes`,
-    color: "positive",
-    position: "bottom",
+    position: "bottom-center",
     timeout: 2000,
   });
 };

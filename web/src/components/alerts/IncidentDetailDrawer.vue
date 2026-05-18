@@ -1204,6 +1204,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1242,8 +1243,8 @@ export default defineComponent({
         .writeText(text)
         .then(() => {
           copiedField.value = fieldName;
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Copied to clipboard",
             timeout: 2000,
           });
@@ -1253,8 +1254,8 @@ export default defineComponent({
           }, 2000);
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Failed to copy to clipboard",
             timeout: 2000,
           });
@@ -1981,8 +1982,8 @@ export default defineComponent({
         await checkAnalysisInFlight(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to load incident details",
         });
       } finally {
@@ -2096,8 +2097,8 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
         // Mark data as stale so incident list will refresh when navigating back
@@ -2115,8 +2116,8 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.statusUpdateFailed"),
         });
       } finally {
@@ -2169,8 +2170,8 @@ export default defineComponent({
         incidentDetails.value.title = response.data.title;
         isEditingTitle.value = false;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
           timeout: 2000,
         });
@@ -2183,8 +2184,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update title:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident title",
           timeout: 3000,
         });
@@ -2349,8 +2350,8 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         editableStatus.value = response.data.status;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Incident status updated to ${response.data.status}`,
           timeout: 2000,
         });
@@ -2363,8 +2364,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update status:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident status",
           timeout: 3000,
         });
@@ -2403,8 +2404,8 @@ export default defineComponent({
         incidentDetails.value.severity = data.severity;
         editableSeverity.value = data.severity;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Incident severity updated to ${data.severity}`,
           timeout: 2000,
         });
@@ -2415,8 +2416,8 @@ export default defineComponent({
         if ('analysis_in_flight' in data) {
           analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
-            $q.notify({
-              type: "info",
+            toast({
+              variant: "info",
               message: "AI analysis is already running for this incident",
               timeout: 3000,
             });
@@ -2425,20 +2426,20 @@ export default defineComponent({
               title: "Re-run AI Analysis?",
               message: "Severity has changed. Would you like AI to re-analyze this incident?",
               cancel: { label: "No thanks", flat: true },
-              ok: { label: "Re-run AI analysis", color: "primary" },
+              ok: { label: "Re-run AI analysis" },
               persistent: false,
             }).onOk(async () => {
               try {
                 await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
-                $q.notify({
-                  type: "positive",
+                toast({
+                  variant: "success",
                   message: "AI reanalysis started",
                   timeout: 2000,
                 });
                 await loadDetails(incidentId);
               } catch (e: any) {
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message: e?.response?.data?.message || "Failed to start reanalysis",
                   timeout: 3000,
                 });
@@ -2448,8 +2449,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update severity:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident severity",
           timeout: 3000,
         });
@@ -2828,8 +2829,8 @@ export default defineComponent({
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.rcaCompleted"),
         });
 
@@ -2838,8 +2839,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to trigger RCA:", error);
         rcaStreamContent.value = "";
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || error?.message || "Failed to perform RCA analysis",
         });
       } finally {

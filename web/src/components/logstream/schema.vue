@@ -960,6 +960,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -1276,8 +1277,7 @@ export default defineComponent({
         .then(async (res) => {
           loadingState.value = false;
           if (res.data.code == 200) {
-            q.notify({
-              color: "positive",
+            toast({
               message: "Field(s) deleted successfully.",
               timeout: 2000,
             });
@@ -1291,8 +1291,7 @@ export default defineComponent({
             );
             getSchema();
           } else {
-            q.notify({
-              color: "negative",
+            toast({
               message: res.data.message,
               timeout: 2000,
             });
@@ -1301,8 +1300,7 @@ export default defineComponent({
         .catch((err: any) => {
           loadingState.value = false;
           console.log(err);
-          q.notify({
-            color: "negative",
+          toast({
             message: err.message,
             timeout: 2000,
           });
@@ -1485,8 +1483,8 @@ export default defineComponent({
     };
 
     const getSchema = async () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading stats...",
       });
 
@@ -1523,8 +1521,7 @@ export default defineComponent({
       };
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
-        q.notify({
-          color: "negative",
+        toast({
           message:
             "Invalid Data Retention Period: Retention period must be at least 1 day.",
           timeout: 4000,
@@ -1713,8 +1710,7 @@ export default defineComponent({
             setSchema(streamResponse);
             loadingState.value = false;
             isDialogOpen.value = false;
-            q.notify({
-              color: "positive",
+            toast({
               message: "Stream settings updated successfully.",
               timeout: 2000,
             });
@@ -1730,8 +1726,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           loadingState.value = false;
-          q.notify({
-            color: "negative",
+          toast({
             message: err.response.data.message,
             timeout: 2000,
           });
@@ -2117,8 +2112,8 @@ export default defineComponent({
         const newSchemaFieldLength = currentDefinedSchemaLength + selectedFieldsSet.size;
 
         if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
             timeout: 3000,
           });

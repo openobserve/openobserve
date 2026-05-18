@@ -516,6 +516,7 @@ import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Composables
 const { t } = useI18n();
@@ -805,8 +806,8 @@ const fetchAlertHistory = async (alertId: string) => {
   } catch (error: any) {
     alertHistory.value = [];
     resultTotal.value = 0;
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         error.response?.data?.message ||
         error.message ||
@@ -848,15 +849,15 @@ const copyToClipboard = (text: string, type: string) => {
   navigator.clipboard
     .writeText(text)
     .then(() => {
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `${type} Copied Successfully!`,
         timeout: 3000,
       });
     })
     .catch(() => {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Error while copy content.",
         timeout: 3000,
       });

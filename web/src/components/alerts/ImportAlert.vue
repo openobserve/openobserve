@@ -313,6 +313,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import {
+import { toast } from "@/lib/feedback/Toast/useToast";
   detectConditionsVersion,
   convertV0ToV2,
   convertV1ToV2,
@@ -512,10 +513,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -537,10 +537,9 @@ export default defineComponent({
       }
 
       if (allAlertsCreated) {
-        q.notify({
+        toast({
           message: "Alert(s) imported successfully",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -623,10 +622,9 @@ export default defineComponent({
           return await createAlert(jsonObj, index, selectedFolderId.value);
         }
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Alert(s) please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;

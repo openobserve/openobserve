@@ -25,7 +25,8 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 import { getImageURL } from "@/utils/zincutils";
-import { Notify , useQuasar} from "quasar";
+import { useQuasar} from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 
@@ -151,10 +152,9 @@ export default function useDragAndDrop() {
       pipelineObj.hasInputNode &&
       pipelineObj.draggedNode.io_type == "input"
     ) {
-      $q.notify({
+      toast({
         message: "Only 1 source node is allowed",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 2000, 
     });
       return;
@@ -220,10 +220,9 @@ export default function useDragAndDrop() {
 
   function onConnect(connection:any) {
     if(connection.sourceHandle === "input" && connection.targetHandle === "input" || connection.sourceHandle === "output" && connection.targetHandle === "output"){
-      $q.notify({
+      toast({
         message: "Same type of edges / nodes cannot be connected",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       
     });
@@ -231,10 +230,9 @@ export default function useDragAndDrop() {
     }
     const isConnectionAlreadyAvailable = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === connection.target);
     if(isConnectionAlreadyAvailable){
-      $q.notify({
+      toast({
         message: "Only one Incoming Edge to the node is allowed",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       
     });
@@ -243,10 +241,9 @@ export default function useDragAndDrop() {
 
     const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
     if(isCycle){
-      $q.notify({
+      toast({
         message: "Adding this edge will create a cycle in the pipeline",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       
     });
@@ -410,10 +407,9 @@ export default function useDragAndDrop() {
 
       const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
       if(isCycle){
-        $q.notify({
+        toast({
           message: "Adding this edge will create a cycle in the pipeline",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         
       });

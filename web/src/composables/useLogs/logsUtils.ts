@@ -35,6 +35,7 @@ import {
   TimePeriodUnit,
 } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface SQLColumn {
   expr?: {
@@ -562,10 +563,9 @@ export const logsUtils = () => {
   };
 
   const showCancelSearchNotification = () => {
-    q.notify({
+    toast({
       message: "Running query cancelled successfully",
-      color: "positive",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 4000,
     });
   };

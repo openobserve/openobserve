@@ -220,6 +220,7 @@ import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 
 import regexPatternsService from "@/services/regex_pattern";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ImportRegexPattern",
@@ -340,10 +341,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -365,10 +365,9 @@ export default defineComponent({
       }
 
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported ${successCount} pattern(s)`,
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -407,10 +406,9 @@ export default defineComponent({
         }
         return false;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Regex Pattern please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;
@@ -460,18 +458,16 @@ export default defineComponent({
 
           // Check if it's a duplicate pattern error
           if (errorMessage.includes("already exists")) {
-            q.notify({
+            toast({
               message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 4000,
             });
           } else {
             // Show generic error notification for other errors
-            q.notify({
+            toast({
               message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 4000,
             });
           }

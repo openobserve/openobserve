@@ -229,6 +229,7 @@ import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -331,8 +332,8 @@ export default defineComponent({
         }
       }
 
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -391,8 +392,8 @@ export default defineComponent({
             emit("update:list");
 
             dismiss();
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: formData.value.updateMode === 'reload'
                 ? "Enrichment table reload started. Processing in background..."
                 : "Enrichment table job started. Processing in background...",
@@ -401,8 +402,8 @@ export default defineComponent({
           .catch((err) => {
             compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
             if(err.response?.status != 403){
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message:
                   err.response?.data?.["message"] ||
                   "Enrichment Table creation failed",
@@ -440,16 +441,16 @@ export default defineComponent({
             emit("update:list");
 
             dismiss();
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
             });
           })
           .catch((err) => {
             compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
             if(err.response?.status != 403){
-              q.notify({
-              type: "negative",
+              toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response?.data?.["error"]) ||
                 "Enrichment Table creation failed",

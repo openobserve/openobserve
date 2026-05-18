@@ -190,6 +190,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Filter {
   fieldName: string;
@@ -1028,8 +1029,8 @@ export default defineComponent({
           (field: string) => field !== name,
         );
         console.log(err);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while fetching field values",
         });
       }
@@ -1049,8 +1050,8 @@ export default defineComponent({
       if (expression) {
         searchObj.data.stream.addToFilter = expression;
       } else {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to generate filter expression",
         });
       }
@@ -1068,8 +1069,8 @@ export default defineComponent({
         .filter(Boolean);
 
       if (!expressions.length) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to generate filter expressions",
         });
         return;

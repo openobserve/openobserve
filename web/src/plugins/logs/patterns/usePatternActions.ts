@@ -20,6 +20,7 @@ import { useRouter } from "vue-router";
 import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import {
+import { toast } from "@/lib/feedback/Toast/useToast";
   extractConstantsFromPattern,
   escapeForMatchAll,
   buildPatternAlertData,
@@ -66,8 +67,8 @@ export const usePatternActions = () => {
     const constants = extractConstantsFromPattern(pattern.template);
 
     if (constants.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: "No strings longer than 10 characters found in pattern",
         timeout: 2000,
       });
@@ -109,8 +110,8 @@ export const usePatternActions = () => {
   const createAlertFromPattern = (pattern: any) => {
     const streamName = searchObj.data.stream.selectedStream[0];
     if (!streamName) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message:
           "No stream selected. Please select a stream before creating an alert.",
         timeout: 2000,
@@ -120,8 +121,8 @@ export const usePatternActions = () => {
 
     const constants = extractConstantsFromPattern(pattern.template);
     if (constants.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message:
           "Pattern has very short constant segments. The alert query will match all logs in this stream — consider adding manual filters.",
         timeout: 5000,

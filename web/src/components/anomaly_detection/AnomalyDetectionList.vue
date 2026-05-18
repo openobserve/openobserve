@@ -244,6 +244,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
@@ -329,7 +330,7 @@ export default defineComponent({
         const res = await anomalyDetectionService.list(props.org_identifier);
         configs.value = res.data?.configs ?? res.data ?? [];
       } catch {
-        $q.notify({ type: "negative", message: "Failed to load anomaly detection configs." });
+        toast({ variant: "error", message: "Failed to load anomaly detection configs." });
       } finally {
         loading.value = false;
       }
@@ -353,7 +354,7 @@ export default defineComponent({
         // Reload from server so the trigger status and timestamps are fresh.
         await loadConfigs();
       } catch {
-        $q.notify({ type: "negative", message: "Failed to update config." });
+        toast({ variant: "error", message: "Failed to update config." });
       }
     };
 
@@ -374,9 +375,9 @@ export default defineComponent({
           (c) => c.anomaly_id !== pendingDeleteRow.value.anomaly_id,
         );
         showDeleteDialog.value = false;
-        $q.notify({ type: "positive", message: "Anomaly detection config deleted." });
+        toast({ variant: "success", message: "Anomaly detection config deleted." });
       } catch {
-        $q.notify({ type: "negative", message: "Failed to delete config." });
+        toast({ variant: "error", message: "Failed to delete config." });
       } finally {
         deleting.value = false;
       }
@@ -396,10 +397,10 @@ export default defineComponent({
           pendingCancelRow.value.anomaly_id,
         );
         showCancelTrainingDialog.value = false;
-        $q.notify({ type: "positive", message: "Training cancelled. You can now retrigger it." });
+        toast({ variant: "success", message: "Training cancelled. You can now retrigger it." });
         await loadConfigs();
       } catch {
-        $q.notify({ type: "negative", message: "Failed to cancel training." });
+        toast({ variant: "error", message: "Failed to cancel training." });
       } finally {
         cancellingId.value = null;
       }
@@ -419,11 +420,11 @@ export default defineComponent({
           pendingRetrainRow.value.anomaly_id,
         );
         showRetrainDialog.value = false;
-        $q.notify({ type: "positive", message: "Training started. Status will update shortly." });
+        toast({ variant: "success", message: "Training started. Status will update shortly." });
         // Refresh list to pick up status change
         await loadConfigs();
       } catch {
-        $q.notify({ type: "negative", message: "Failed to trigger training." });
+        toast({ variant: "error", message: "Failed to trigger training." });
       } finally {
         retrainingId.value = null;
       }

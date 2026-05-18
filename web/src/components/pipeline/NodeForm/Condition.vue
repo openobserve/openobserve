@@ -169,6 +169,7 @@ import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import {
+import { toast } from "@/lib/feedback/Toast/useToast";
   detectConditionsVersion,
   convertV0ToV2,
   convertV1ToV2,
@@ -652,8 +653,8 @@ const saveCondition = async () => {
     });
 
     if (!hasValidConditions) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Please add at least one condition",
         timeout: 3000,
       });
@@ -693,8 +694,8 @@ const saveCondition = async () => {
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Error saving condition: " + (error as Error).message,
       timeout: 5000,
     });
@@ -755,8 +756,8 @@ const validateSqlQuery = () => {
       .catch((err: any) => {
         if (err.response.data.code === 500) {
           isValidSqlQuery.value = false;
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Invalid SQL Query : " + err.response.data.message,
             timeout: 3000,
           });

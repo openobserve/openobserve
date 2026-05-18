@@ -275,6 +275,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSlider from "@/lib/forms/Slider/OSlider.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
@@ -375,8 +376,8 @@ export default defineComponent({
 
     const refreshTemplates = async () => {
       await fetchAvailableTemplates(true);
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.evalTemplatesRefreshed"),
         timeout: 1500,
       });
@@ -460,8 +461,8 @@ export default defineComponent({
       const streamName = props.streamName;
 
       if (!enabled.value) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: t("pipeline.llmEvaluationRemoveWarning"),
           timeout: 4000,
         });
@@ -578,8 +579,8 @@ export default defineComponent({
         );
       }
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.llmEvaluationCreatedSuccess", { streamName }),
         timeout: 3000,
       });

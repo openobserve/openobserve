@@ -28,6 +28,7 @@ import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -317,15 +318,15 @@ const useTraces = () => {
 
     copyToClipboard(shareURL)
       .then(() => {
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Link Copied Successfully!",
           timeout: 5000,
         });
       })
       .catch(() => {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while copy link.",
           timeout: 5000,
         });

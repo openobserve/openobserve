@@ -546,6 +546,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   open: {
@@ -601,15 +602,15 @@ const {
 const copyAttributesToClipboard = () => {
   copyToClipboard(JSON.stringify(props.rawEvent, null, 2))
     .then(() => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("common.copyToClipboard") + " - " + t("common.success"),
         timeout: 1500,
       });
     })
     .catch(() => {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Error while copying content.",
         timeout: 1500,
       });

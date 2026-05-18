@@ -56,6 +56,7 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageUser",
@@ -88,8 +89,8 @@ export default defineComponent({
         .process_subscription(s, action, invited_org_id)
         .then((res) => {
           this.status = "completed";
-          const dismiss = this.$q.notify({
-            type: "positive",
+          const dismiss = toast({
+            variant: "success",
             message: res.data.message,
           });
 

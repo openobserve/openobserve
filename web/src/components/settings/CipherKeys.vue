@@ -142,6 +142,7 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -271,8 +272,8 @@ export default defineComponent({
 
     const getData = () => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading data...",
       });
 
@@ -298,8 +299,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to fetch cipher keys. Please try again.",
@@ -324,10 +325,10 @@ export default defineComponent({
 
     const deleteCipherKey = () => {
       if (confirmDelete.value?.data?.name) {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while processing delete request...",
-          type: "warning",
+          variant: "warning",
         });
         CipherKeysService.delete(
           store.state.selectedOrganization.identifier,
@@ -335,8 +336,8 @@ export default defineComponent({
         )
           .then(() => {
             dismiss();
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `Cipher Key deleted successfully`,
               timeout: 2000,
             });
@@ -346,15 +347,15 @@ export default defineComponent({
           .catch((err) => {
             dismiss();
             if (err.response.data.code === 409) {
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: err.response.data.message,
                 timeout: 2000,
               });
             } else {
               if (err?.status != 403) {
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message: err.response.data.message,
                   timeout: 2000,
                 });
@@ -404,20 +405,20 @@ export default defineComponent({
           const { successful, unsuccessful } = res.data;
 
           if (successful.length > 0 && unsuccessful.length === 0) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `Successfully deleted ${successful.length} cipher key(s)`,
               timeout: 2000,
             });
           } else if (successful.length > 0 && unsuccessful.length > 0) {
-            $q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `Deleted ${successful.length} cipher key(s), but ${unsuccessful.length} failed`,
               timeout: 3000,
             });
           } else if (unsuccessful.length > 0) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${unsuccessful.length} cipher key(s)`,
               timeout: 2000,
             });
@@ -429,8 +430,8 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response?.status != 403 || err?.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
               timeout: 2000,
             });

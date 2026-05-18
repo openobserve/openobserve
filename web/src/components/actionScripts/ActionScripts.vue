@@ -250,6 +250,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ActionScriptList {
   "#": string | number;
@@ -415,8 +416,8 @@ export default defineComponent({
     const templates = ref([0]);
 
     const getActionScripts = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading actions...",
       });
 
@@ -475,8 +476,8 @@ export default defineComponent({
         .catch((e) => {
           console.error(e);
           dismiss();
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while pulling Actions.",
             timeout: 2000,
           });
@@ -567,15 +568,15 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
               timeout: 2000,
             });
             getActionScripts();
           } else {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res.data.message,
               timeout: 2000,
             });
@@ -585,8 +586,8 @@ export default defineComponent({
           if (err.response?.status == 403) {
             return;
           }
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.data?.message || "Error while deleting alert.",
             timeout: 2000,
           });
@@ -614,8 +615,8 @@ export default defineComponent({
     const bulkDeleteActionScripts = async () => {
       try {
         if (selectedActionScripts.value.length === 0) {
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "No action scripts selected",
             timeout: 2000,
           });
@@ -637,20 +638,20 @@ export default defineComponent({
         }
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Successfully deleted ${successful.length} action script(s)`,
             timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
             timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Failed to delete ${unsuccessful.length} action script(s)`,
             timeout: 2000,
           });
@@ -661,8 +662,8 @@ export default defineComponent({
         confirmBulkDelete.value = false;
       } catch (error: any) {
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               error.response?.data?.message ||
               error?.message ||

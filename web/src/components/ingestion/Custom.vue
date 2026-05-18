@@ -89,6 +89,7 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "CustomPage",
@@ -186,15 +187,15 @@ export default defineComponent({
     const copyToClipboardFn = (content: any) => {
       copyToClipboard(content.innerText)
         .then(() => {
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Content Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });

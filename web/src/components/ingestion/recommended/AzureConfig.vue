@@ -244,6 +244,7 @@ import {
 } from "@/utils/azureIntegrations";
 import CopyContent from "@/components/CopyContent.vue";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const SCRIPT_URL =
   "https://raw.githubusercontent.com/openobserve/o2-datasource/main/azure/azure_activity_logs/configure-diagnostic-settings.sh";
@@ -302,8 +303,8 @@ export default defineComponent({
 
     const handleDeploy = () => {
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -315,8 +316,8 @@ export default defineComponent({
       const passcode = store.state?.organizationData?.organizationPasscode;
 
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -337,8 +338,8 @@ export default defineComponent({
         integration_id: "activity-logs",
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: "Opening Azure portal to deploy Activity Logs infrastructure",
         timeout: 3000,
       });

@@ -1097,6 +1097,7 @@ import { debounce } from "lodash-es";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -1829,8 +1830,8 @@ const validateInputs = (notify: boolean = true) => {
 
   if (cronJobError.value) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: cronJobError.value,
         timeout: 2000,
       });
@@ -1842,8 +1843,8 @@ const validateInputs = (notify: boolean = true) => {
     isNaN(Number(triggerData.value.period))
   ) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Period should be greater than 0",
         timeout: 1500,
       });
@@ -1859,8 +1860,8 @@ const validateInputs = (notify: boolean = true) => {
         !aggregationData.value.having.operator)
     ) {
       notify &&
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("pipeline.thresholdShouldNotBeEmpty"),
           timeout: 1500,
         });
@@ -1877,8 +1878,8 @@ const validateInputs = (notify: boolean = true) => {
       !triggerData.value.operator)
   ) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: t("pipeline.thresholdShouldNotBeEmpty"),
         timeout: 1500,
       });
@@ -2163,8 +2164,8 @@ const expandLog = (index: any) => {
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData).then(() =>
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Content Copied Successfully!",
       timeout: 1000,
     }),

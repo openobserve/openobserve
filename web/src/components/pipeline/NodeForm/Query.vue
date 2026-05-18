@@ -162,6 +162,7 @@ import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
@@ -618,8 +619,8 @@ const validateSqlQuery = async () => {
           const message = err?.response?.data?.message
             ? `Invalid SQL Query: ${err?.response?.data?.message}`
             : "Invalid SQL Query";
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `${message}`,
             timeout: 3000,
           });

@@ -933,6 +933,7 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   report: {
@@ -1119,8 +1120,8 @@ onBeforeMount(async () => {
       })
       .catch((err) => {
         if (err.response.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               err.response?.data?.message || "Error while fetching report!",
             timeout: 4000,
@@ -1505,16 +1506,16 @@ const saveReport = async () => {
     savePromise = reports.createReportV2(org, reportPayload, folderId);
   }
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
 
   savePromise
     .then(() => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Report ${
           isEditingReport.value ? "updated" : "saved"
         } successfully.`,
@@ -1524,8 +1525,8 @@ const saveReport = async () => {
     })
     .catch((error) => {
       if (error.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message ||
             `Error while ${
@@ -1782,8 +1783,8 @@ const setupEditingReport = async (report: any) => {
     formData.value.dashboards[0].folder = report.dashboards[0].folder;
   } else {
     formData.value.dashboards[0].folder = "";
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Selected folder has been deleted!",
       timeout: 4000,
     });
@@ -1798,8 +1799,8 @@ const setupEditingReport = async (report: any) => {
     formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
   } else {
     formData.value.dashboards[0].dashboard = "";
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Selected dashboard has been deleted!",
       timeout: 4000,
     });
@@ -1815,8 +1816,8 @@ const setupEditingReport = async (report: any) => {
   if (tab) {
     formData.value.dashboards[0].tabs = tab.value;
   } else {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Selected dashboard tab has been deleted!",
       timeout: 4000,
     });

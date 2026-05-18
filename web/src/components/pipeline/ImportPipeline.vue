@@ -384,6 +384,7 @@ import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import {
+import { toast } from "@/lib/feedback/Toast/useToast";
   detectConditionsVersion,
   convertV0ToV2,
   convertV1ToV2,
@@ -675,10 +676,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -700,10 +700,9 @@ export default defineComponent({
       }
 
       if (allPipelinesCreated) {
-        q.notify({
+        toast({
           message: "Pipeline(s) imported successfully",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -738,10 +737,9 @@ export default defineComponent({
           return await createPipeline(jsonObj, index);
         }
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Pipeline(s) please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;

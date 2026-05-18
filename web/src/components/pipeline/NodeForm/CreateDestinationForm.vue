@@ -482,6 +482,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<{
@@ -1092,15 +1093,15 @@ const connectionNotes = computed(() => {
 
 const createDestination = () => {
   if (!isValidDestination.value) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
     return;
   }
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -1172,8 +1173,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -1195,8 +1196,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });

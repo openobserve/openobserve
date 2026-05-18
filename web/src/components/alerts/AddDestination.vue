@@ -547,6 +547,7 @@ import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   templates: {
@@ -1026,8 +1027,8 @@ const showPreview = async () => {
     showPreviewModal.value = true;
   } catch (error) {
     console.error("Failed to generate preview:", error);
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Failed to generate preview",
       timeout: 2000,
     });
@@ -1091,15 +1092,15 @@ const saveDestination = async () => {
     const emailRegex = /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
     emailsError.value = (formData.value.type === 'email' && (!formData.value.emails || !emailRegex.test(formData.value.emails))) ? 'Add valid emails!' : '';
     actionError.value = (formData.value.type === 'action' && !formData.value.action_id) ? 'Field is required!' : '';
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
     return;
   }
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -1148,8 +1149,8 @@ const saveDestination = async () => {
         dismiss();
         emit("get:destinations");
         emit("cancel:hideform");
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Destination saved successfully.`,
         });
       })
@@ -1158,8 +1159,8 @@ const saveDestination = async () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -1178,8 +1179,8 @@ const saveDestination = async () => {
         dismiss();
         emit("get:destinations");
         emit("cancel:hideform");
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Destination saved successfully.`,
         });
       })
@@ -1188,8 +1189,8 @@ const saveDestination = async () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });

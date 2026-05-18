@@ -422,8 +422,8 @@ export default defineComponent({
 
     const getLookupTables = async (force: boolean = false) => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading enrichment tables...",
       });
 
@@ -534,8 +534,8 @@ export default defineComponent({
         console.info("Error while fetching enrichment tables", err);
         dismiss();
         if (err.response?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               err.response?.data?.message ||
               "Error while fetching functions.",
@@ -658,8 +658,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `${selectedDelete.value.name} deleted successfully.`,
             });
             resetStreamType("enrichment_tables");
@@ -668,8 +667,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message:
                 err.response?.data?.message || "Error while deleting stream.",
             });
@@ -728,18 +726,15 @@ export default defineComponent({
           });
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
-            $q.notify({
-              color: "warning",
+            toast({
               message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
             });
           } else if (failedDeletions > 0) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: `Failed to delete ${failedDeletions} enrichment table(s).`,
             });
           }
@@ -763,10 +758,9 @@ export default defineComponent({
     const getTimeRange = async (stream: any) => {
       const dateTime: { period?: string; from?: number; to?: number } = {};
 
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Redirecting to explorer...",
-        color: "secondary",
       });
 
       try {

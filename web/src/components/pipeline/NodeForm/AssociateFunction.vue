@@ -208,6 +208,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface RouteCondition {
   column: string;
@@ -363,10 +364,9 @@ const saveFunction = () => {
 
   if (createNewFunction.value) {
     if (addFunctionRef.value.formData.name == "") {
-      q.notify({
+      toast({
         message: "Function Name is required",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 2000,
       });
       return;

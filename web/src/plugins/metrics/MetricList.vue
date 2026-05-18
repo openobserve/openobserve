@@ -286,6 +286,7 @@ import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MetricsList",
@@ -419,8 +420,8 @@ export default defineComponent({
             }
           })
           .catch(() => {
-            quasar.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while fetching field values",
             });
           })
@@ -428,8 +429,8 @@ export default defineComponent({
             metricLabelValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
-        quasar.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while fetching field values",
         });
       }

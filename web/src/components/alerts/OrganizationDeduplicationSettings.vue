@@ -159,6 +159,7 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
 const $q = useQuasar();
@@ -229,8 +230,8 @@ const saveSettings = async () => {
   if (localConfig.value.alert_dedup_enabled) {
     if (!localConfig.value.alert_fingerprint_groups ||
         localConfig.value.alert_fingerprint_groups.length === 0) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Please select at least one semantic group for cross-alert deduplication",
         timeout: 3000,
       });
@@ -254,8 +255,8 @@ const saveSettings = async () => {
       configToSave,
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message:
         "Organization deduplication settings saved successfully",
       timeout: 2000,
@@ -264,8 +265,8 @@ const saveSettings = async () => {
     emit("saved");
   } catch (error: any) {
     console.error("Error saving deduplication settings:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || "Failed to save settings",
       timeout: 3000,
     });

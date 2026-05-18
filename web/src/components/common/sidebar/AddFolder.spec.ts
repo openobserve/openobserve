@@ -16,13 +16,13 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AddFolder from "@/components/common/sidebar/AddFolder.vue";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // ---------------------------------------------------------------------------

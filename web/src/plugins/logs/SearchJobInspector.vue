@@ -390,6 +390,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ProfileEvent {
   timestamp: string;
@@ -754,7 +755,7 @@ export default defineComponent({
           copiedTraceId.value = false;
         }, 2000);
       }).catch(() => {
-        $q.notify({ type: 'negative', message: 'Failed to copy trace ID to clipboard' });
+        toast({ variant: "error", message: 'Failed to copy trace ID to clipboard' });
       });
     };
 
@@ -766,7 +767,7 @@ export default defineComponent({
           copiedSql.value = false;
         }, 2000);
       }).catch(() => {
-        $q.notify({ type: 'negative', message: 'Failed to copy SQL to clipboard' });
+        toast({ variant: "error", message: 'Failed to copy SQL to clipboard' });
       });
     };
 

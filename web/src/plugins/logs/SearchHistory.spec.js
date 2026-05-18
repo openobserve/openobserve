@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify, useQuasar } from "quasar";
+import { Dialog, useQuasar } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -89,7 +89,7 @@ describe("SearchHistory Component", () => {
   beforeEach(() => {
     // Install Quasar for this test instance
     installQuasar({
-      plugins: [Dialog, Notify],
+      plugins: [Dialog],
     });
     // Setup mock store
     mockStore = {

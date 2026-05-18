@@ -237,6 +237,7 @@ import OColor from "@/lib/forms/Color/OColor.vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const $q = useQuasar();
 const store = useStore();
@@ -633,10 +634,10 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   }
 
   // Show success notification
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: `${theme.name} applied to ${mode} mode successfully!`,
-    position: "top",
+    position: "top-center",
     timeout: 2000,
   });
 };
@@ -708,10 +709,10 @@ const applyCustomTheme = (mode: "light" | "dark") => {
   }
 
   // Show success notification
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: `Custom color applied to ${mode} mode successfully!`,
-    position: "top",
+    position: "top-center",
     timeout: 2000,
   });
 };
@@ -747,13 +748,13 @@ const resetToDefaultTheme = () => {
   const isDefault = currentMode === "light" ? !orgLightColor : !orgDarkColor;
   applyThemeColors(currentColor, currentMode, isDefault);
 
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message:
       orgLightColor || orgDarkColor
         ? "Theme reset to organization settings!"
         : "Theme reset to default colors!",
-    position: "top",
+    position: "top-center",
     timeout: 2000,
   });
 };
