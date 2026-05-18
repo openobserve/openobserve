@@ -359,12 +359,16 @@ describe("TraceDetails", () => {
 
   describe("Search functionality", () => {
     it("should handle search query changes", async () => {
-      const searchInput = wrapper.find(
+      // OInput wraps the native input in a div; find the inner element
+      const searchInputWrapper = wrapper.find(
         '[data-test="trace-details-search-input"]',
       );
-      if (searchInput.exists()) {
-        await searchInput.setValue("test-search");
-        expect(wrapper.vm.searchQuery).toBe("test-search");
+      if (searchInputWrapper.exists()) {
+        const nativeInput = searchInputWrapper.find("input");
+        if (nativeInput.exists()) {
+          await nativeInput.setValue("test-search");
+          expect(wrapper.vm.searchQuery).toBe("test-search");
+        }
       }
     });
 

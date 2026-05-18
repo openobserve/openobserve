@@ -60,7 +60,6 @@ describe('enterprisePlan.vue', () => {
         },
         stubs: {
           'q-card': true,
-          'q-chip': true,
           'q-separator': true,
           'OIcon': true,
           'q-btn': {

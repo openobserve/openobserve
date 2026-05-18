@@ -34,15 +34,13 @@
                   class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
                 >
                   {{ displayedTitle || "New Chat" }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="displayedTitle && displayedTitle.length > 25"
-                    :delay="500"
-                    anchor="bottom middle"
-                    self="top middle"
-                    :offset="[0, 8]"
-                  >
-                    {{ displayedTitle }}
-                  </q-tooltip>
+                    :sideOffset="8"
+                    side="bottom"
+                    align="center"
+                    :content="displayedTitle"
+                  />
                 </span>
                 <OIcon
                   name="arrow-drop-down"
@@ -54,17 +52,15 @@
                 <!-- History menu with search -->
                 <div class="history-menu-container">
                   <div class="search-history-bar-sticky">
-                    <q-input
+                    <OInput
                       v-model="historySearchTerm"
                       placeholder="Search chat history"
-                      dense
-                      borderless
                       class="tw:mt-1"
                     >
                       <template #prepend>
                         <OIcon name="search" size="sm" />
                       </template>
-                    </q-input>
+                    </OInput>
                   </div>
                   <div class="history-list-container">
                     <q-list
@@ -105,7 +101,7 @@
                               @click.stop="deleteChat(chat.id)"
                             >
                               <OIcon name="delete" size="sm" />
-                              <q-tooltip :delay="500">Delete chat</q-tooltip>
+                              <OTooltip content="Delete chat" />
                             </OButton>
                           </div>
                         </q-item-section>
@@ -149,7 +145,7 @@
               @click.stop="openEditTitleDialog"
             >
               <OIcon name="edit" size="sm" />
-              <q-tooltip :delay="500">Edit title</q-tooltip>
+              <OTooltip content="Edit title" />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="addNewChat">
               <OIcon name="add" size="sm" />
@@ -165,11 +161,7 @@
                   ? 'close-fullscreen'
                   : 'open-in-full'
               " size="sm" />
-              <q-tooltip :delay="500"
-                >{{ store.state.isAiChatExpanded ? "Collapse" : "Expand" }} ({{
-                  isMac ? "⌘" : "Ctrl+"
-                }}B)</q-tooltip
-              >
+              <OTooltip :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`" />
             </OButton>
             <OButton
               variant="ghost"
@@ -216,10 +208,8 @@
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
-        <q-input
+        <OInput
           v-model="editingTitle"
-          dense
-          borderless
           autofocus
           @keyup.enter="saveEditedTitle"
           placeholder="Enter chat title"
@@ -442,9 +432,7 @@
                           handleNavigationAction(block.navigationAction)
                         "
                       >
-                        <q-tooltip>{{
-                          block.navigationAction.label
-                        }}</q-tooltip>
+                      <OTooltip :content="block.navigationAction.label" />
                       </OIcon>
                       <OIcon
                         v-if="
@@ -553,7 +541,7 @@
                               )
                             ">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy query</q-tooltip>
+              <OTooltip content="Copy query" />
             </OButton>
                         </div>
                         <code class="detail-value query-value">{{
@@ -645,7 +633,7 @@
                               )
                             ">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy VRL</q-tooltip>
+              <OTooltip content="Copy VRL" />
             </OButton>
                         </div>
                         <code class="detail-value query-value">{{
@@ -664,7 +652,7 @@
                               )
                             ">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy command</q-tooltip>
+              <OTooltip content="Copy command" />
             </OButton>
                         </div>
                         <code class="detail-value query-value">{{
@@ -682,7 +670,7 @@
                                 )
                               ">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy results</q-tooltip>
+              <OTooltip content="Copy results" />
             </OButton>
                           </div>
                           <div class="tool-response-hits">
@@ -804,7 +792,7 @@
                                 )
                               ">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy items</q-tooltip>
+              <OTooltip content="Copy items" />
             </OButton>
                           </div>
                           <div class="tool-response-hits">
@@ -841,7 +829,7 @@
                               )
                             ">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy response</q-tooltip>
+              <OTooltip content="Copy response" />
             </OButton>
                         </div>
                         <code class="detail-value query-value">{{
@@ -885,7 +873,7 @@
                       <div class="log-entry-content">
                         <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="copyToClipboard(block.content)">
               <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy content</q-tooltip>
+              <OTooltip content="Copy content" />
             </OButton>
                         <code
                           class="log-entry-code"
@@ -1007,7 +995,7 @@ size="sm" />
                         class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded tw:border tw:border-gray-300 tw:cursor-pointer"
                         @click="openImagePreview(img)"
                       />
-                      <q-tooltip>{{ img.filename }}</q-tooltip>
+                      <OTooltip :content="img.filename" />
                     </div>
                   </div>
                   <template
@@ -1052,13 +1040,13 @@ size="sm" />
                       'feedback-selected': message.feedback === 'thumbs_up',
                     }" data-test="o2-ai-chat-thumbs-up-btn" @click="likeCodeBlock(index)">
                     <OIcon name="thumb-up-off-alt" size="xs" />
-                    <q-tooltip>Helpful</q-tooltip>
+                    <OTooltip content="Helpful" />
                   </OButton>
                   <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_down'" :class="{
                       'feedback-selected': message.feedback === 'thumbs_down',
                     }" data-test="o2-ai-chat-thumbs-down-btn" @click="dislikeCodeBlock(index)">
                     <OIcon name="thumb-down-off-alt" size="xs" />
-                    <q-tooltip>Not helpful</q-tooltip>
+                    <OTooltip content="Not helpful" />
                   </OButton>
                 </div>
               </div>
@@ -1146,9 +1134,7 @@ size="sm" />
         <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
           <OButton variant="ghost" size="icon-sm" class="scroll-to-bottom-btn" @click="scrollToBottomSmooth">
             <OIcon name="arrow-downward" size="sm" />
-            <q-tooltip anchor="top middle" self="bottom middle">
-              Scroll to bottom
-            </q-tooltip>
+          <OTooltip side="top" align="center" content="Scroll to bottom" />
           </OButton>
         </div>
       </div>
@@ -1217,11 +1203,7 @@ size="sm" />
               <OButton variant="ghost" size="icon-xs-circle" class="image-remove-btn" @click.stop="removeImage(index)">
                 <OIcon name="close" size="xs" />
               </OButton>
-              <q-tooltip
-                >{{ img.filename }} ({{
-                  (img.size / 1024).toFixed(0)
-                }}KB)</q-tooltip
-              >
+              <OTooltip :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`" />
             </div>
           </div>
 
@@ -1254,7 +1236,7 @@ size="sm" />
                   size="sm"
                   :color="store.state.theme == 'dark' ? 'white' : 'grey-7'"
                 />
-                <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
+                <OTooltip content="Attach images (PNG, JPEG, max 2MB)" />
               </OButton>
               <div v-else class="tw:w-8"></div>
 
@@ -1284,13 +1266,7 @@ size="sm" />
                   class="auto-nav-icon"
                 />
                 <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
-                <q-tooltip>
-                  {{
-                    isAutoNavigationEnabled
-                      ? "Auto navigation enabled - O2 Assistant will auto navigate without confirmation"
-                      : "Auto navigation disabled - O2 Assistant will ask before navigating"
-                  }}
-                </q-tooltip>
+                <OTooltip :content="isAutoNavigationEnabled ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation' : 'Auto navigation disabled - O2 Assistant will ask before navigating'" />
               </OButton>
             </div>
 
@@ -1371,6 +1347,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1416,6 +1394,8 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
+    OTooltip,
+    OInput,
 },
   props: {
     isOpen: {

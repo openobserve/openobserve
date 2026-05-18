@@ -21,9 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ t("panel.mapname") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -76,7 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-name-item-${nameLabel}`"
           >
             {{ nameLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
@@ -143,9 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ t("panel.mapvalue") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -199,7 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
           >
             {{ valueLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
@@ -296,6 +296,7 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
@@ -309,7 +310,8 @@ export default defineComponent({
     DynamicFunctionPopUp,
     DashboardJoinsOption,
     OIcon,
-},
+    OTooltip,
+  },
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();

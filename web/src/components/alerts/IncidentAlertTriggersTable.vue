@@ -16,19 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="alert-triggers-table" class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
-    <q-table
+    <OTable
       data-test="triggers-qtable"
-      ref="qTableRef"
-      :rows="triggers"
+      :data="triggers"
       :columns="columns"
       row-key="created_at"
-      :pagination="pagination"
-      style="height: calc(100vh - 220px)"
-      flat
-      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:flex-1 o2-custom-table"
+      pagination="client"
+      :page-size="20"
+      :page-size-options="[20, 50, 100, 250, 500]"
+      sorting="client"
+      :default-columns="false"
+      :show-global-filter="false"
       @row-click="onRowClick"
     >
-      <template #no-data>
+      <template #empty>
         <div data-test="no-triggers-message" class="tw:text-center tw:py-8">
           <span :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm">
             No triggers loaded
@@ -36,54 +37,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #body-cell-alert_name="props">
-        <q-td :props="props" data-test="alert-name-cell">
-          <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
-            {{ props.row.alert_name }}
-          </span>
-        </q-td>
+      <template #cell-alert_name="{ row }">
+        <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
+          {{ row.alert_name }}
+        </span>
       </template>
 
-      <template #body-cell-alert_fired_at="props">
-        <q-td :props="props" data-test="fired-at-cell">
-          <span data-test="fired-at-timestamp" class="tw:text-xs">
-            {{ formatTimestamp(props.row.alert_fired_at) }}
-          </span>
-        </q-td>
+      <template #cell-alert_fired_at="{ row }">
+        <span data-test="fired-at-timestamp" class="tw:text-xs">
+          {{ formatTimestamp(row.alert_fired_at) }}
+        </span>
       </template>
 
-      <template #body-cell-correlation_reason="props">
-        <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
-          <q-badge
-            data-test="correlation-reason-badge"
-            :color="getReasonColor(props.row.correlation_reason)"
-            :label="getReasonLabel(props.row.correlation_reason)"
-            outline
-          >
-            <q-tooltip>{{ getReasonTooltip(props.row.correlation_reason) }}</q-tooltip>
-          </q-badge>
-        </q-td>
+      <template #cell-correlation_reason="{ row }">
+        <OBadge
+          data-test="correlation-reason-badge"
+          :variant="getReasonVariant(row.correlation_reason)"
+        >
+          {{ getReasonLabel(row.correlation_reason) }}
+          <OTooltip :content="getReasonTooltip(row.correlation_reason)" side="top" />
+        </OBadge>
       </template>
-
-      <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="triggers.length"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
-      </template>
-    </q-table>
+    </OTable>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, ref, computed } from "vue";
+import { defineComponent, PropType, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { date } from "quasar";
-import type { QTableProps } from "quasar";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 interface IncidentAlert {
   incident_id: string;
@@ -97,7 +84,9 @@ interface IncidentAlert {
 export default defineComponent({
   name: "IncidentAlertTriggersTable",
   components: {
-    QTablePagination,
+    OBadge,
+    OTooltip,
+    OTable,
   },
   props: {
     triggers: {
@@ -113,43 +102,29 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
 
-    const qTableRef = ref<any>(null);
-
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-
-    const pagination = ref({
-      rowsPerPage: 20,
-    });
-
-    const columns = computed<QTableProps["columns"]>(() => [
+    const columns = computed<OTableColumnDef[]>(() => [
       {
-        name: "alert_name",
-        field: "alert_name",
-        label: "Alert Name",
-        align: "left",
+        id: "alert_name",
+        header: "Alert Name",
+        accessorKey: "alert_name",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "alert_fired_at",
-        field: "alert_fired_at",
-        label: "Fired At",
-        align: "left",
+        id: "alert_fired_at",
+        header: "Fired At",
+        accessorKey: "alert_fired_at",
         sortable: true,
-        style: "width: 200px",
+        size: 200,
+        meta: { align: "left" },
       },
       {
-        name: "correlation_reason",
-        field: "correlation_reason",
-        label: "Correlation Reason",
-        align: "right",
+        id: "correlation_reason",
+        header: "Correlation Reason",
+        accessorKey: "correlation_reason",
         sortable: false,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "right" },
       },
     ]);
 
@@ -158,18 +133,63 @@ export default defineComponent({
       return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
     };
 
-    const getReasonColor = (reason: string) => {
+    const getReasonVariant = (reason: string): BadgeVariant => {
       switch (reason) {
         case "service_discovery":
-          return "blue";
+          return "primary-outline";
         case "primary_match":
-          return "purple";
+          return "primary-outline";
         case "secondary_match":
-          return "orange";
+          return "warning-outline";
         case "alert_id":
-          return "grey";
+          return "default-outline";
         default:
-          return "grey";
+          return "default-outline";
+      }
+    };
+
+    const getReasonClasses = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return "tw:border-blue-500 tw:text-blue-500";
+        case "primary_match":
+          return "tw:border-purple-500 tw:text-purple-500";
+        case "secondary_match":
+          return "tw:border-orange-500 tw:text-orange-500";
+        case "alert_id":
+          return "tw:border-gray-500 tw:text-gray-500";
+        default:
+          return "tw:border-gray-500 tw:text-gray-500";
+      }
+    };
+
+    const getReasonClasses = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return "tw:border-blue-500 tw:text-blue-500";
+        case "primary_match":
+          return "tw:border-purple-500 tw:text-purple-500";
+        case "secondary_match":
+          return "tw:border-orange-500 tw:text-orange-500";
+        case "alert_id":
+          return "tw:border-gray-500 tw:text-gray-500";
+        default:
+          return "tw:border-gray-500 tw:text-gray-500";
+      }
+    };
+
+    const getReasonClasses = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return "tw:border-blue-500 tw:text-blue-500";
+        case "primary_match":
+          return "tw:border-purple-500 tw:text-purple-500";
+        case "secondary_match":
+          return "tw:border-orange-500 tw:text-orange-500";
+        case "alert_id":
+          return "tw:border-gray-500 tw:text-gray-500";
+        default:
+          return "tw:border-gray-500 tw:text-gray-500";
       }
     };
 
@@ -203,25 +223,17 @@ export default defineComponent({
       }
     };
 
-    const changePagination = (val: { label: string; value: any }) => {
-      pagination.value.rowsPerPage = val.value;
-      qTableRef.value?.setPagination(pagination.value);
-    };
-
-    const onRowClick = (evt: Event, row: IncidentAlert) => {
+    const onRowClick = (row: IncidentAlert) => {
       emit('row-click', row.alert_name);
     };
 
     return {
-      qTableRef,
-      pagination,
-      perPageOptions,
       columns,
       formatTimestamp,
-      getReasonColor,
+      getReasonVariant,
       getReasonLabel,
       getReasonTooltip,
-      changePagination,
+      getReasonClasses,
       onRowClick,
     };
   },
@@ -229,8 +241,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
-:deep(.q-table tbody tr) {
+:deep(.o2-table tbody tr) {
   cursor: pointer;
 }
-
 </style>

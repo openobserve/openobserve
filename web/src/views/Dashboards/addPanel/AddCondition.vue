@@ -56,10 +56,7 @@
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
                       <div class="flex column" style="height: 220px">
-                        <q-select
-                          dense
-                          borderless
-                          hide-bottom-space
+                        <OSelect
                           v-model="condition.operator"
                           :options="operators"
                           :label="t('common.operator')"
@@ -81,9 +78,7 @@
                       </div>
                     </OTabPanel>
                     <OTabPanel name="list">
-                      <q-select
-                        dense
-                        borderless
+                      <OSelect
                         v-model="condition.values"
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
@@ -121,19 +116,18 @@
                         >
                           <q-item v-bind="itemProps">
                             <q-item-section side>
-                              <q-checkbox
-                                dense
+                              <OCheckbox
                                 :model-value="selected"
                                 @update:model-value="toggleOption(opt)"
                                 data-test="dashboard-add-condition-list-item"
-                              ></q-checkbox>
+                              />
                             </q-item-section>
                             <q-item-section>
                               <SanitizedHtmlRenderer :html-content="opt" />
                             </q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                     </OTabPanel>
                   </OTabPanels>
                 </div>
@@ -162,6 +156,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -185,6 +180,7 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     StreamFieldSelect,
     OSelect,
+    OCheckbox,
   },
   props: [
     "condition",

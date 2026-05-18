@@ -41,9 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ]"
             >
               {{ indexData.name }}
-              <q-tooltip v-if="indexData.name && indexData.name.length > 35" class="tw:text-xs">
-                {{ indexData.name }}
-              </q-tooltip>
+              <OTooltip v-if="indexData.name && indexData.name.length > 35" :content="indexData.name" side="top" />
             </span>
             <div 
               :class="[
@@ -81,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div v-if="indexData.schema">
-    <q-card-section class="q-ma-none q-pa-none">
-      <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
+      <div class="q-ma-none q-pa-none">
+        <div @submit.prevent="onSubmit">
         <!-- we will show loading state here -->
         <div
           v-if="loadingState"
@@ -306,30 +304,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         style="color: #f5a623; cursor: pointer"
                       >
-                        <q-tooltip style="font-size: 14px; width: 250px">
+                        <OTooltip side="right">
                           Other fields show only the schema fields that existed
                           before the stream was configured to use a user-defined
                           schema.
-                        </q-tooltip>
+                        </OTooltip>
                       </OIcon>
                     </div>
                   </div>
 
                   <div class="flex items-center tw:gap-2">
-                    <q-input
+                    <OInput
                       data-test="schema-field-search-input"
                       v-model="filterField"
                       data-cy="schema-index-field-search-input"
-                      borderless
-                      debounce="1"
                       class="q-ml-auto no-border o2-search-input"
                       :placeholder="t('search.searchField')"
-                      :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                     >
                       <template #prepend>
                         <OIcon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" size="sm" />
                       </template>
-                    </q-input>
+                    </OInput>
                     <OButton
                       v-if="isSchemaUDSEnabled"
                       data-test="schema-add-fields-title"
@@ -394,218 +389,135 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 style="margin-bottom: 10px"
               >
-                <q-table
-                  ref="qTable"
+                <OTable
                   data-test="schema-log-stream-field-mapping-table"
-                  :rows="indexData.schema"
+                  :data="filteredSchemaData"
                   :columns="columns"
-                  :row-key="(row) => 'tr_' + row.name"
-                  :filter="`${filterField}@${activeTab}`"
-                  :filter-method="filterFieldFn"
-                  :pagination="pagination"
+                  row-key="name"
                   selection="multiple"
-                  v-model:selected="selectedFields"
-                  class="q-table o2-quasar-table o2-row-md o2-schema-table"
-                  id="schemaFieldList"
+                  :selected-ids="selectedSchemaIds"
+                  @update:selected-ids="handleSchemaSelectedIdsUpdate"
+                  @selection-change="handleSchemaSelectionChange"
+                  pagination="client"
+                  :page-size="selectedPerPage"
+                  :page-size-options="perPageOptionsList"
+                  :show-global-filter="false"
+                  dense
+                  class="o2-schema-table"
                   :style="{
                     height: `${indexData.defaultFts ? 'calc(100vh - 403px)' : 'calc(100vh - 370px)'}`,
                     width: '100%'
                   }"
-                  :rows-per-page-options="[]"
-                  dense
                 >
-                  <template v-slot:header="props">
-                    <q-tr :props="props">
-                      <q-th>
-                        <q-checkbox size="xs" v-model="props.selected" color="primary" />
-                      </q-th>
-                      <q-th
-                        v-for="col in props.cols"
-                        :key="col.name"
-                        :props="props"
-                      >
-                        <span v-if="col.icon" class="tw:ml-[5px]">
-                          <OIcon name="person" size="xs" />
-                          <OIcon name="schema" size="xs" />
-                        </span>
-                        <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
-                          {{ col.label }}
-                          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-                            {{ t('logStream.sdr') }}
-                          </q-tooltip>
-                        </span>
-                        <span v-else>
-                          {{ col.label }}
-                        </span>
-                      </q-th>
-                    </q-tr>
-                  </template>
-                  <template v-slot:header-selection="scope">
-                    <q-td class="text-center">
-                      <q-checkbox
-                        v-if="
-                          !(
-                            scope.name == store.state.zoConfig.timestamp_column ||
-                            scope.name == allFieldsName
-                          )
-                        "
-                        :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
-                        v-model="scope.selected"
-                        size="sm"
-                      />
-                    </q-td>
-                  </template>
-
-                  <template v-slot:body-selection="scope">
-                    <q-checkbox
-                      v-if="
-                        !(
-                          scope.row.name ==
-                            store.state.zoConfig.timestamp_column ||
-                          scope.row.name == allFieldsName
-                        )
-                      "
-                      dense
-                      :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                      v-model="scope.selected"
-                      size="xs"
-                      class="tw:flex tw:items-center tw:justify-center tw:w-full"
-                    />
-                  </template>
-
-                  <template v-slot:body-cell-name="props">
-                    <q-td class="q-td--no-hover field-name field-name-ellipsis">
-                      <div class="tw:flex tw:items-center">
-                        <span class="field-name-text">
-                          {{ props.row.name }}
-                          <q-tooltip v-if="props.row.name.length > 30" class="tw:text-[12px]">
-                            {{ props.row.name }}
-                          </q-tooltip>
-                        </span>
-                        <span v-if="isEnvQuickModeField(props.row.name)" class="tw:flex tw:items-center tw:ml-1">
-                          <img
-                            :src="quickModeIcon"
-                            :alt="t('logStream.envQuickModeMsg')"
-                            class="tw:w-[20px] tw:h-[20px]"
-                          />
-                          <q-tooltip
-                          class="tw:text-[12px] tw:w-[200px]"
-                        >
+                  <template #cell-name="{ row }">
+                    <div class="tw:flex tw:items-center">
+                      <span class="field-name-text">
+                        {{ row.name }}
+                        <q-tooltip v-if="row.name.length > 30" class="tw:text-[12px]">
+                          {{ row.name }}
+                        </q-tooltip>
+                      </span>
+                      <span v-if="isEnvQuickModeField(row.name)" class="tw:flex tw:items-center tw:ml-1">
+                        <img
+                          :src="quickModeIcon"
+                          :alt="t('logStream.envQuickModeMsg')"
+                          class="tw:w-[20px] tw:h-[20px]"
+                        />
+                        <q-tooltip class="tw:text-[12px] tw:w-[200px]">
                           {{ t('logStream.envQuickModeMsg') }}
                         </q-tooltip>
-                        </span>
-                      </div>
-                    </q-td>
-                  </template>
-                  <template v-slot:body-cell-type="props">
-                    <q-td>
-                      <span
-                        class="field-type-badge"
-                        :class="{
-                          'badge-int64': props.row.type === 'Int64',
-                          'badge-float64': props.row.type === 'Float64',
-                          'badge-utf8': props.row.type === 'Utf8',
-                          'badge-bool': props.row.type === 'Boolean'
-                        }"
-                      >
-                        {{ props.row.type }}
                       </span>
-                    </q-td>
+                    </div>
                   </template>
-                  <template v-slot:body-cell-settings="props">
-                    <q-td class="text-left" v-if="props.row.isUserDefined">
+                  <template #cell-settings="{ row }">
+                    <template v-if="row.isUserDefined">
                       <OIcon name="person" size="xs" />
                       <OIcon name="schema" size="xs" />
-                    </q-td>
-                    <q-td v-else> </q-td>
+                    </template>
                   </template>
-                  <template v-slot:body-cell-index_type="props">
-                    <q-td data-test="schema-stream-index-select">
-                        <q-select
-                        v-if="
-                          !(
-                            props.row.name ==
-                              store.state.zoConfig.timestamp_column ||
-                            props.row.name == allFieldsName
-                          )
-                        "
-                        :model-value="computedIndexType(props).value"
-                        :options="streamIndexType"
-                        option-label="label"
-                        option-value="value"
-                        :popup-content-style="{ textTransform: 'capitalize' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="mini-select"
-                        input-class="mini-select"
-                        :option-disable="
-                          (_option) => disableOptions(props.row, _option)
-                        "
-                        multiple
-                        :max-values="2"
-                        map-options
-                        emit-value
-                        autoclose
-                        borderless
-                        dense
-                        input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
-                        style="width: 190px;"
-                        @update:model-value="val => updateIndexType(props, val)"
-                      >
+                  <template #cell-type="{ row }">
+                    <span
+                      class="field-type-badge"
+                      :class="{
+                        'badge-int64': row.type === 'Int64',
+                        'badge-float64': row.type === 'Float64',
+                        'badge-utf8': row.type === 'Utf8',
+                        'badge-bool': row.type === 'Boolean'
+                      }"
+                    >
+                      {{ row.type }}
+                    </span>
+                  </template>
+                  <template #cell-index_type="{ row }">
+                    <q-select
+                      v-if="
+                        !(
+                          row.name ==
+                            store.state.zoConfig.timestamp_column ||
+                          row.name == allFieldsName
+                        )
+                      "
+                      :model-value="computedIndexType({ row }).value"
+                      :options="streamIndexType"
+                      option-label="label"
+                      option-value="value"
+                      :popup-content-style="{ textTransform: 'capitalize' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="mini-select"
+                      input-class="mini-select"
+                      :option-disable="
+                        (_option) => disableOptions(row, _option)
+                      "
+                      multiple
+                      :max-values="2"
+                      map-options
+                      emit-value
+                      autoclose
+                      borderless
+                      dense
+                      input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
+                      style="width: 190px;"
+                      @update:model-value="val => updateIndexType({ row }, val)"
+                    >
                       <template v-slot:append>
-                        <OIcon 
-                          v-if="props.row.index_type && props.row.index_type.length > 0"
-                          name="cancel" 
+                        <OIcon
+                          v-if="row.index_type && row.index_type.length > 0"
+                          name="cancel"
                           size="14px"
                           style="cursor: pointer; display: flex; align-items: center; font-weight: bold; margin-top: 8px;"
-                          @click.stop="updateIndexType(props, [])"
+                          @click.stop="updateIndexType({ row }, [])"
                         />
                       </template>
                       <template v-slot:option="scope">
-                        <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
+                        <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(row, scope.opt)">
                           <q-item-section>
                             <q-item-label>
                               {{ scope.opt.label }}
                             </q-item-label>
                           </q-item-section>
-                          <q-tooltip class="tw:text-[12px] tw:w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
+                          <q-tooltip class="tw:text-[12px] tw:w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(row.name, scope.opt) == true">
                             This is a predefined environment setting and cannot be changed.
                           </q-tooltip>
                         </q-item>
                       </template>
-                      <q-tooltip 
-                        v-if="props.row.index_type && props.row.index_type.length > 0" 
+                      <q-tooltip
+                        v-if="row.index_type && row.index_type.length > 0"
                         class="tw:text-[12px]"
                       >
-                        {{ streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ') }}
+                        {{ streamIndexType.filter(opt => row.index_type.includes(opt.value)).map(opt => opt.label).join(', ') }}
                       </q-tooltip>
-                      </q-select>
-                    </q-td>
+                    </q-select>
                   </template>
-                  <!-- here we will render the number of regex patterns associated with the specific field -->
-                  <template v-slot:body-cell-patterns="props">
-                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
-                      {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
-                      <span>
+                  <template #cell-patterns="{ row }">
+                    <template v-if="config.isEnterprise == 'true' && !(row.name == store.state.zoConfig.timestamp_column) && (row.type == 'Utf8' || row.type == 'utf8')">
+                      <span class="tw:text-[#5960B2] tw:cursor-pointer" @click="openPatternAssociationDialog(row.name)">
+                        {{ patternAssociations[row.name]?.length ? `View ${patternAssociations[row.name]?.length} Patterns` : 'Add Pattern' }}
                         <OIcon name="arrow-forward" size="xs" />
                       </span>
-                    </q-td>
-                    <q-td v-else>
-                    </q-td>
+                    </template>
                   </template>
-
-                  <template #bottom="scope">
-                    <div class="schema-table-pagination-wrapper">
-                      <QTablePagination
-                        :scope="scope"
-                        :position="'bottom'"
-                        :resultTotal="resultTotal"
-                        :perPageOptions="perPageOptions"
-                        @update:changeRecordPerPage="changePagination"
-                      />
-                    </div>
-                  </template>
-                </q-table>
+                </OTable>
               </div>
             </div>
             
@@ -631,20 +543,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         Data Retention (days)
                       </label>
-                      <q-input
+                      <OInput
                         data-test="stream-details-data-retention-input"
                         v-model="dataRetentionDays"
                         type="number"
-                        dense
                         min="1"
-                        borderless
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @change="formDirtyFlag = true"
                         @update:model-value="markFormDirty"
                       />
                       <small 
@@ -675,21 +578,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         Max Query Range (hours)
                       </label>
-                      <q-input
+                      <OInput
                         data-test="stream-details-max-query-range-input"
                         v-model="maxQueryRange"
                         type="number"
-                        dense
-                        borderless
                         min="0"
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @wheel.prevent
-                        @change="formDirtyFlag = true"
                         @update:model-value="markFormDirty"
                       />
                       <small 
@@ -712,20 +605,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("logStream.flattenLevel") }}
                       </label>
-                      <q-input
+                      <OInput
                         data-test="stream-details-flatten-level-input"
                         v-model="flattenLevel"
                         type="number"
-                        dense
-                        borderless
                         min="0"
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @change="formDirtyFlag = true"
                         @update:model-value="markFormDirty"
                       />
                       <small 
@@ -752,13 +636,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         Use Stream Stats for Partitioning
                       </span>
-                      <q-toggle
+                      <OSwitch
                         data-test="log-stream-use_approx-toggle-btn"
                         v-model="approxPartition"
-                        size="lg"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        @click="formDirtyFlag = true"
+                        @update:model-value="formDirtyFlag = true"
                       />
                     </div>
 
@@ -769,14 +650,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <span>Store Original Data</span>
-                      <q-toggle
+                      <OSwitch
                         v-if="showStoreOriginalDataToggle"
                         data-test="log-stream-store-original-data-toggle-btn"
                         v-model="storeOriginalData"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        size="lg"
-                        @click="formDirtyFlag = true"
+                        @update:model-value="formDirtyFlag = true"
                       />
                     </div>
 
@@ -787,13 +665,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ]"
                     >
                       <span>Enable Distinct Values</span>
-                      <q-toggle
+                      <OSwitch
                         data-test="log-stream-enabled-distinct-values-toggle-btn"
                         v-model="enableDistinctFields"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        size="lg"
-                        @click="formDirtyFlag = true"
+                        @update:model-value="formDirtyFlag = true"
                       />
                     </div>
                   </div>
@@ -833,50 +708,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div class="q-mt-sm" style="margin-bottom: 10px">
-                  <q-table
-                    ref="qTable"
-                    :row-key="(row, index) => 'tr_' + row.index"
+                  <OTable
                     data-test="schema-log-stream-field-mapping-table"
-                    :rows="redBtnRows"
+                    :data="redBtnRows"
                     :columns="redBtnColumns"
-                    :pagination="pagination"
+                    row-key="index"
                     selection="multiple"
-                    v-model:selected="selectedDateFields"
-                    class="q-table o2-quasar-table o2-row-md o2-schema-table"
-                    id="schemaFieldList"
+                    v-model:selected-ids="selectedDateIds"
+                    @selection-change="handleDateSelectionChange"
+                    pagination="client"
+                    :page-size="selectedPerPage"
+                    :page-size-options="perPageOptionsList"
+                    :show-global-filter="false"
+                    dense
                     :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
                     style="height: calc(100vh - 403px);"
-                    :rows-per-page-options="[]"
-                    dense
-                  >
-                    <template v-slot:header-selection="scope">
-                        <q-checkbox
-                          :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
-                          v-model="scope.selected"
-                          size="xs"
-                        />
-                    </template>
-
-                    <!-- Body Slot for Selection -->
-                    <template v-slot:body-selection="scope">
-                        <q-checkbox
-                          :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                          v-model="scope.selected"
-                          size="xs"
-                          class="o2-table-checkbox"
-                        />
-                    </template>
-
-                    <template #bottom="scope">
-                      <QTablePagination
-                        :scope="scope"
-                        :position="'bottom'"
-                        :resultTotal="redBtnRows.length"
-                        :perPageOptions="perPageOptions"
-                        @update:changeRecordPerPage="changePagination"
-                      />
-                    </template>
-                  </q-table>
+                  />
                 </div>
               </div>
             </div>
@@ -983,9 +830,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t("logStream.removeSchemaField")
                         : t("logStream.addSchemaField")
                     }}
-                    <q-tooltip v-if="hasUDSFieldInSelection">
-                      {{ t("logStream.udsFieldAlreadyInSchema") }}
-                    </q-tooltip>
+                    <OTooltip v-if="hasUDSFieldInSelection" :content="t('logStream.udsFieldAlreadyInSchema')" side="top" />
                   </OButton>
                   <OButton
                     v-if="
@@ -1032,8 +877,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-form>
-    </q-card-section>
+        </div>
+      </div>
     </div>
     <div v-else class="q-pa-md">
       <h5>Wait while loading...</h5>
@@ -1099,7 +944,7 @@ import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -1110,6 +955,11 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const defaultValue: any = () => {
   return {
@@ -1141,7 +991,7 @@ export default defineComponent({
     StreamFieldsInputs,
     OToggleGroup,
     OToggleGroupItem,
-    QTablePagination,
+    OTable,
     DateTime,
     AssociatedRegexPatterns,
     ODrawer,
@@ -1151,6 +1001,11 @@ export default defineComponent({
     OButton,
     OIcon,
     OSpinner,
+    OInput,
+    OSelect,
+    OSwitch,
+    OTooltip,
+    OCheckbox,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1218,10 +1073,10 @@ export default defineComponent({
       { label: "500", value: 500 },
     ];
 
+    const perPageOptionsList = [20, 50, 100, 250, 500];
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
     };
 
     const selectedPerPage = ref<number>(20);
@@ -1235,6 +1090,67 @@ export default defineComponent({
     });
 
     const selectedFields = ref([]);
+
+    const filteredSchemaData = computed(() => {
+      const rows = indexData.value.schema || [];
+      if (!filterField.value && activeTab.value !== "schemaFields") return rows;
+
+      const searchTerm = filterField.value?.toLowerCase() || "";
+      const labelToValueMap: Record<string, string> = {};
+      streamIndexType.forEach(({ label, value }: any) => {
+        labelToValueMap[label.toLowerCase()] = value;
+      });
+
+      return rows.filter((row: any) => {
+        if (activeTab.value === "schemaFields") {
+          if (!indexData.value.defined_schema_fields.includes(row.name)) return false;
+        }
+        if (!searchTerm) return true;
+        if (row.name.toLowerCase().includes(searchTerm)) return true;
+        return (row.index_type || []).some((t: string) =>
+          t.toLowerCase().includes(searchTerm) || labelToValueMap[searchTerm] === t
+        );
+      });
+    });
+
+    const selectedSchemaIds = computed({
+      get: () => selectedFields.value.map((f: any) => f.name),
+      set: (ids: string[]) => {
+        const filteredIds = ids.filter(
+          (id) =>
+            id !== store.state.zoConfig.timestamp_column &&
+            id !== allFieldsName.value
+        );
+        selectedFields.value = (indexData.value.schema || []).filter(
+          (row: any) => filteredIds.includes(row.name)
+        );
+      },
+    });
+
+    const handleSchemaSelectedIdsUpdate = (ids: string[]) => {
+      selectedSchemaIds.value = ids;
+    };
+
+    const handleSchemaSelectionChange = (rows: any[]) => {
+      selectedFields.value = rows.filter(
+        (row: any) =>
+          row.name !== store.state.zoConfig.timestamp_column &&
+          row.name !== allFieldsName.value
+      );
+    };
+
+    const selectedDateIds = computed({
+      get: () => selectedDateFields.value.map((f: any) => f.index),
+      set: (ids: any[]) => {
+        selectedDateFields.value = redBtnRows.value.filter((row: any) =>
+          ids.includes(row.index)
+        );
+      },
+    });
+
+    const handleDateSelectionChange = (rows: any[]) => {
+      selectedDateFields.value = rows;
+    };
 
     const hasUserDefinedSchema = computed(() => {
       return !!indexData.value.defined_schema_fields?.length;
@@ -1966,61 +1882,56 @@ export default defineComponent({
 
     const columns = [
       {
-        name: "name",
-        label: t("logStream.propertyName"),
-        align: "center",
+        id: "name",
+        header: t("logStream.propertyName"),
+        accessorKey: "name",
         sortable: true,
-        field: "name",
+        meta: { align: "left" },
       },
       {
-        name: "settings",
-        align: "left",
+        id: "settings",
+        accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
-        field: "isUserDefined",
-        icon: "settings",
-        sort: (a, b) => {
-          // Ensure `isUserDefined` is properly handled
-          if (a && !b) return -1; // `a` comes first
-          if (!a && b) return 1; // `b` comes first
-          return 0; // No change in order
-        },
+        meta: { align: "left" },
       },
       {
-        name: "type",
-        label: t("logStream.propertyType"),
-        align: "left",
+        id: "type",
+        header: t("logStream.propertyType"),
+        accessorKey: "type",
         sortable: true,
-        field: "type",
+        meta: { align: "left" },
       },
       {
-        name: "index_type",
-        label: t("logStream.indexType"),
-        align: "left",
+        id: "index_type",
+        header: t("logStream.indexType"),
+        accessorKey: "index_type",
         sortable: false,
+        meta: { align: "left" },
       },
       // Only show patterns column for enterprise builds
       ...(config.isEnterprise == 'true' ? [{
-        name: "patterns",
-        label: t("logStream.regexPatterns"),
-        align: "left",
+        id: "patterns",
+        header: t("logStream.regexPatterns"),
+        accessorKey: "patterns",
         sortable: false,
+        meta: { align: "left" },
       }] : []),
     ];
 
     const redBtnColumns = [
       {
-        name: "start",
-        label: t("logStream.extendedStartDate"),
-        align: "center",
+        id: "start",
+        header: t("logStream.extendedStartDate"),
+        accessorKey: "start",
         sortable: true,
-        field: "start",
+        meta: { align: "left" },
       },
       {
-        name: "end",
-        label: t("logStream.extendedEndDate"),
-        align: "center",
+        id: "end",
+        header: t("logStream.extendedEndDate"),
+        accessorKey: "end",
         sortable: true,
-        field: "end",
+        meta: { align: "left" },
       },
     ];
 
@@ -2597,6 +2508,13 @@ export default defineComponent({
       closeDialog,
       resultTotal,
       perPageOptions,
+      perPageOptionsList,
+      filteredSchemaData,
+      selectedSchemaIds,
+      handleSchemaSelectedIdsUpdate,
+      handleSchemaSelectionChange,
+      selectedDateIds,
+      handleDateSelectionChange,
       changePagination,
       selectedPerPage,
       pagination,
@@ -2681,27 +2599,6 @@ export default defineComponent({
     border-radius: 0.5rem;
     position: relative;
     border: 0.0625rem solid var(--o2-border-color);
-
-    // Custom pagination wrapper styling
-    .schema-table-pagination-wrapper {
-      display: flex;
-      justify-content: flex-end;
-      width: 100%;
-
-      // Override the QTablePagination component's justify-between
-      :deep(.q-table__control) {
-        justify-content: flex-end !important;
-
-        &.row.justify-between {
-          justify-content: flex-end !important;
-        }
-      }
-
-      // Prevent pagination text from wrapping
-      :deep(.q-table__bottom-item) {
-        white-space: nowrap;
-      }
-    }
 
     thead tr {
       height: 2.5rem;

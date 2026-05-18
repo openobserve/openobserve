@@ -249,6 +249,16 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "showVisibilityToggle",
           ],
         },
+        OTable: {
+          template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
+            <div data-test="table-top"><slot name="top"></slot></div>
+            <div data-test="table-body">
+              <slot name="cell-name" v-for="row in data" :key="row.name" v-bind="{row: row}"></slot>
+            </div>
+          </div>`,
+          props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter", "rowClass"],
+          emits: ["row-click"],
+        },
       },
     },
   });
@@ -387,13 +397,17 @@ describe("IndexList Component", () => {
 
   describe("Field Search", () => {
     it("should update filter field when searching", async () => {
-      const searchInput = wrapper.find(
+      // OInput root is a wrapping div — find the inner native input
+      const searchInputWrapper = wrapper.find(
         '[data-test="log-search-index-list-field-search-input"]',
       );
-      expect(searchInput.exists()).toBe(true);
-      await searchInput.setValue("service");
-      await wrapper.vm.$nextTick();
-      expect(searchInput.exists()).toBe(true);
+      expect(searchInputWrapper.exists()).toBe(true);
+      const nativeInput = searchInputWrapper.find("input");
+      if (nativeInput.exists()) {
+        await nativeInput.setValue("service");
+        await wrapper.vm.$nextTick();
+      }
+      expect(searchInputWrapper.exists()).toBe(true);
     });
 
     it("should filter fields using filterFieldFn", () => {
@@ -783,8 +797,11 @@ describe("IndexList Component", () => {
     });
 
     it("should update selectedStream on stream change", async () => {
+      // onStreamChange now takes a string value (post q-select → OSelect migration)
+      // and looks up the stream from streamLists
       const newStream = { label: "new_stream", value: "new_stream" };
-      await wrapper.vm.onStreamChange(newStream);
+      wrapper.vm.searchObj.data.stream.streamLists = [newStream];
+      await wrapper.vm.onStreamChange("new_stream");
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(
         newStream,
       );

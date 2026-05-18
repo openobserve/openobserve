@@ -41,11 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Search input -->
-            <q-input
+            <OInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
               :placeholder="
                 searchAcrossFolders
@@ -58,28 +56,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
 
             <!-- All Folders toggle -->
             <div class="tw:ml-2">
-              <q-toggle
-                data-test="report-list-search-across-folders-toggle"
-                v-model="searchAcrossFolders"
-                label="All Folders"
-                class="tw:h-[32px] tw:mr-3 o2-toggle-button-lg all-folders-toggle"
-                size="lg"
-              />
-              <q-tooltip
-                class="q-mt-lg"
-                anchor="top middle"
-                self="bottom middle"
-              >
-                {{
-                  searchAcrossFolders
-                    ? t("dashboard.searchSelf")
-                    : t("dashboard.searchAll")
-                }}
-              </q-tooltip>
+              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                <OSwitch
+                  data-test="report-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  :label="t('dashboard.allFolders') || 'All Folders'"
+                />
+              </OTooltip>
             </div>
 
             <OButton
@@ -124,140 +111,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
             <div class="tw:h-full card-container">
-              <q-table
+              <OTable
                 data-test="report-list-table"
-                ref="reportListTableRef"
-                :rows="visibleRows"
+                :data="visibleRows"
                 :columns="columns"
                 row-key="report_id"
-                :pagination="pagination"
-                :filter="filterQuery"
-                :filter-method="filterData"
+                pagination="client"
                 selection="multiple"
-                v-model:selected="selectedReports"
+                v-model:selected-ids="selectedReportIds"
                 style="width: 100%"
                 :style="
                   hasVisibleRows
                     ? 'width: 100%; height: calc(100vh - 124px)'
                     : 'width: 100%'
                 "
-                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
               >
-                <template #no-data>
+                <template #empty>
                   <NoData />
                 </template>
 
-                <!-- Custom header with select-all checkbox -->
-                <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'o2-table-checkbox-dark'
-                            : 'o2-table-checkbox-light'
-                        "
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
-
-                <template v-slot:body-selection="scope">
-                  <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
-                </template>
-
                 <!-- Name column: badges for type/preview -->
-                <template v-slot:body-cell-name="props">
-                  <q-td :props="props">
-                    <span>{{ props.row.name }}</span>
-                    <q-badge
-                      v-if="props.row.dashboards?.[0]?.report_type === 'png'"
-                      color="teal"
-                      class="q-ml-xs"
-                      label="PNG"
-                      outline
-                    />
-                    <q-badge
-                      v-if="props.row.imagePreview"
-                      color="blue-grey"
-                      class="q-ml-xs"
-                      label="Preview"
-                      outline
-                    />
-                  </q-td>
+                <template #cell-name="{ row }">
+                  <span>{{ row.name }}</span>
+                  <OBadge
+                    v-if="row.dashboards?.[0]?.report_type === 'png'"
+                    variant="primary-outline"
+                    class="q-ml-xs"
+                  >
+                    PNG
+                  </OBadge>
+                  <OBadge
+                    v-if="row.imagePreview"
+                    variant="default-outline"
+                    class="q-ml-xs"
+                  >
+                    Preview
+                  </OBadge>
                 </template>
 
                 <!-- Folder column -->
-                <template v-slot:body-cell-folder_name="props">
-                  <q-td :props="props">
-                    {{ props.row.folder_name || "default" }}
-                  </q-td>
+                <template #cell-folder_name="{ row }">
+                  {{ row.folder_name || "default" }}
                 </template>
 
                 <!-- Actions column -->
-                <template v-slot:body-cell-actions="props">
-                  <q-td :props="props">
-                    <!-- Enable/disable toggle -->
-                    <div
-                      v-if="reportsStateLoadingMap[props.row.report_id]"
-                      data-test="report-list-toggle-report-state-loader"
-                      style="display: inline-block; width: 33.14px; height: auto"
-                      class="flex justify-center items-center"
-                    >
-                      <OSpinner size="xs" />
-                    </div>
-                    <OButton
-                      v-else
-                      :data-test="`report-list-${props.row.name}-pause-start-report`"
-                      :variant="props.row.enabled ? 'ghost-destructive' : 'ghost'"
-                      size="icon-sm"
-                      :icon-left="props.row.enabled ? 'pause' : 'play-arrow'"
-                      :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-                      @click="toggleReportState(props.row)"
-                    />
+                <template #cell-actions="{ row }">
+                  <!-- Enable/disable toggle -->
+                  <div
+                    v-if="reportsStateLoadingMap[row.report_id]"
+                    data-test="report-list-toggle-report-state-loader"
+                    style="display: inline-block; width: 33.14px; height: auto"
+                    class="flex justify-center items-center"
+                  >
+                    <OSpinner size="xs" />
+                  </div>
+                  <OButton
+                    v-else
+                    :data-test="`report-list-${row.name}-pause-start-report`"
+                    :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                    size="icon-sm"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                    @click="toggleReportState(row)"
+                  />
 
-                    <!-- Edit -->
-                    <OButton
-                      :data-test="`report-list-${props.row.name}-edit-report`"
-                      icon-left="edit"
-                      variant="ghost"
-                      size="icon-sm"
-                      :title="t('alerts.edit')"
-                      @click="editReport(props.row)"
-                    />
+                  <!-- Edit -->
+                  <OButton
+                    :data-test="`report-list-${row.name}-edit-report`"
+                    icon-left="edit"
+                    variant="ghost"
+                    size="icon-sm"
+                    :title="t('alerts.edit')"
+                    @click="editReport(row)"
+                  />
 
-                    <!-- Move to folder -->
-                    <OButton
-                      :data-test="`report-list-${props.row.name}-move-report`"
-                      icon-left="drive-file-move"
-                      variant="ghost"
-                      size="icon-sm"
-                      title="Move to Folder"
-                      @click="openMoveDialog(props.row)"
-                    />
+                  <!-- Move to folder -->
+                  <OButton
+                    :data-test="`report-list-${row.name}-move-report`"
+                    icon-left="drive-file-move"
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Move to Folder"
+                    @click="openMoveDialog(row)"
+                  />
 
-                    <!-- Delete -->
-                    <OButton
-                      :data-test="`report-list-${props.row.name}-delete-report`"
-                      icon-left="delete"
-                      variant="ghost-destructive"
-                      size="icon-sm"
-                      :title="t('alerts.delete')"
-                      @click="confirmDeleteReport(props.row)"
-                    />
-                  </q-td>
+                  <!-- Delete -->
+                  <OButton
+                    :data-test="`report-list-${row.name}-delete-report`"
+                    icon-left="delete"
+                    variant="ghost-destructive"
+                    size="icon-sm"
+                    :title="t('alerts.delete')"
+                    @click="confirmDeleteReport(row)"
+                  />
                 </template>
 
                 <!-- Table footer: pagination + bulk actions -->
@@ -289,17 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         Delete
                       </OButton>
                     </div>
-                    <!-- Right: pagination -->
-                    <QTablePagination
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                    />
                   </div>
                 </template>
-              </q-table>
+              </OTable>
             </div>
           </div>
         </template>
@@ -342,11 +280,12 @@ import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } f
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { useQuasar, date, type QTableProps } from "quasar";
+import { useQuasar, date } from "quasar";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep, debounce } from "lodash-es";
@@ -354,8 +293,13 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -395,8 +339,11 @@ const dynamicQueryModel = computed({
   },
 });
 
-const selectedReports = ref<any[]>([]);
-const reportListTableRef: Ref<any> = ref(null);
+const selectedReportIds = ref<string[]>([]);
+const selectedReports = computed({
+  get: () => (reportsTableRows.value || []).filter((row: any) => selectedReportIds.value.includes(row.report_id)),
+  set: (val) => { selectedReportIds.value = val.map((row: any) => row.report_id); },
+});
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const tabs = reactive([
@@ -404,16 +351,9 @@ const tabs = reactive([
   { label: t("reports.cached"),    value: "cached", icon: "database" },
 ]);
 
-const perPageOptions: any = [
-  { label: "20",  value: 20  },
-  { label: "50",  value: 50  },
-  { label: "100", value: 100 },
-  { label: "250", value: 250 },
-  { label: "500", value: 500 },
-];
 const resultTotal = ref<number>(0);
-const selectedPerPage = ref<number>(20);
-const pagination: any = ref({ rowsPerPage: 20 });
+const pageSize = ref(20);
+const pageSizeOptions = [20, 50, 100, 250, 500];
 
 const deleteDialog = ref({
   show:    false,
@@ -423,24 +363,25 @@ const deleteDialog = ref({
 });
 const confirmBulkDelete = ref<boolean>(false);
 
-const columns = computed<QTableProps["columns"]>(() => {
-  const base: any[] = [
-    { name: "#",               label: "#",                    field: "#",                align: "center", style: "width: 67px;" },
-    { name: "name",            label: t("alerts.name"),       field: "name",             align: "left",   sortable: true },
-    { name: "owner",           label: t("alerts.owner"),      field: "owner",            align: "center", sortable: true,  style: "width: 150px" },
-    { name: "description",     label: t("alerts.description"),field: "description",      align: "center", sortable: false, style: "width: 300px" },
-    { name: "last_triggered_at", label: t("alerts.lastTriggered"), field: "last_triggered_at", align: "left", sortable: true, style: "width: 150px" },
-    { name: "actions",         label: t("alerts.actions"),    field: "actions",          align: "center", sortable: false, classes: "actions-column" },
+const columns = computed<OTableColumnDef[]>(() => {
+  const base: OTableColumnDef[] = [
+    { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "center" } },
+    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, meta: { align: "left" } },
+    { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, size: 150, meta: { align: "center" } },
+    { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, size: 300, meta: { align: "center" } },
+    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, size: 150, meta: { align: "left" } },
+    { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column" } },
   ];
 
   if (searchAcrossFolders.value && searchQuery.value !== "") {
     base.splice(2, 0, {
-      name: "folder_name",
-      field: "folder_name",
-      label: "Folder",
-      align: "left",
+      id: "folder_name",
+      header: "Folder",
+      accessorKey: "folder_name",
+      cell: " ",
       sortable: true,
-      style: "width: 150px",
+      size: 150,
+      meta: { align: "left" },
     });
   }
 
@@ -640,12 +581,6 @@ const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
 watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
 
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  reportListTableRef.value?.setPagination(pagination.value);
-};
-
 // ── Actions ───────────────────────────────────────────────────────────────────
 const createNewReport = () => {
   track("Button Click", { button: "Add Report", page: "Reports" });
@@ -812,12 +747,3 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
 };
 </script>
 
-<style lang="scss" scoped>
-.report-list-table {
-  :deep(.q-table th),
-  :deep(.q-table td) {
-    padding: 0px 16px;
-    height: 32px;
-  }
-}
-</style>

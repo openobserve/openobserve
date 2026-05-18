@@ -70,24 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
                         :label="t('modelPricing.modelNameLabel')"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        @update:model-value="
-                          updateModelPricingName(
-                            userSelectedModelPricingName[index],
-                            index,
-                          )
-                        "
+                        @update:model-value="updateModelPricingName(userSelectedModelPricingName[index], index)"
                       />
                     </div>
                   </span>
@@ -101,24 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"
                         :label="t('modelPricing.matchPatternLabel')"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        @update:model-value="
-                          updateModelPricingPattern(
-                            userSelectedModelPricingPattern[index],
-                            index,
-                          )
-                        "
+                        @update:model-value="updateModelPricingPattern(userSelectedModelPricingPattern[index], index)"
                       />
                     </div>
                   </span>
@@ -167,6 +141,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 
 import BaseImport from "../common/BaseImport.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 import modelPricingService from "@/services/model_pricing";
 

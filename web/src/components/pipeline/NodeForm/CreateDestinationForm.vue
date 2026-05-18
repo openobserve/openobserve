@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="create-destination-form">
-    <q-form
-      ref="destinationForm"
+    <OForm
       @submit="createDestination"
       class="col-12 pipeline-add-remote-destination-form"
     >
@@ -87,39 +86,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="q-gutter-sm">
-            <q-input
+            <OFormInput
               data-test="add-destination-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
+              :validators="[
+                (val: string) => !val ? t('common.nameRequired') : !isValidResourceName(val) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : undefined,
               ]"
               tabindex="0"
-            ></q-input>
+            />
 
-            <q-input
+            <OFormInput
               data-test="add-destination-url-input"
               v-model="formData.url"
               :label="t('alert_destinations.url') + ' *'"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) => !!val.trim() || 'Field is required!',
-                (val: any) =>
-                  !val.trim().endsWith('/') ||
-                  'URL should not end with a trailing slash',
+              :validators="[
+                (val: string) => !val?.trim() ? 'Field is required!' : undefined,
+                (val: string) => val?.trim().endsWith('/') ? 'URL should not end with a trailing slash' : undefined,
               ]"
               tabindex="0"
             >
@@ -129,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   https://your-domain.com)</span
                 >
               </template>
-            </q-input>
+            </OFormInput>
 
             <!-- OpenObserve Organization and Stream fields -->
             <div
@@ -137,20 +120,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row q-col-gutter-xs q-mt-xs q-ml-xs"
             >
               <div class="col-6">
-                <q-input
+                <OFormInput
                   data-test="add-destination-openobserve-org-input"
                   v-model="openobserveOrg"
                   :label="'Organization *'"
                   :placeholder="'e.g., default'"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() ||
-                      'Organization is required for OpenObserve',
+                  :validators="[
+                    (val: string) => !val?.trim() ? 'Organization is required for OpenObserve' : undefined,
                   ]"
                   tabindex="0"
                 >
@@ -159,35 +135,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       OpenObserve organization identifier
                     </span>
                   </template>
-                </q-input>
+                </OFormInput>
               </div>
               <div class="col-6">
-                <q-input
+                <OFormInput
                   data-test="add-destination-openobserve-stream-input"
                   v-model="openobserveStream"
                   :label="'Stream Name *'"
                   :placeholder="'e.g., default'"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() ||
-                      'Stream name is required for OpenObserve',
+                  :validators="[
+                    (val: string) => !val?.trim() ? 'Stream name is required for OpenObserve' : undefined,
                   ]"
                   tabindex="0"
                 >
                   <template #hint>
                     <span class="text-caption"> OpenObserve stream name </span>
                   </template>
-                </q-input>
+                </OFormInput>
               </div>
             </div>
 
-            <!-- Endpoint Path field - shown for all destination types -->
-            <q-input
+            <OFormInput
               data-test="add-destination-url-endpoint-input"
               v-model="formData.url_endpoint"
               :label="
@@ -195,21 +163,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'Endpoint Path'
                   : 'Endpoint Path *'
               "
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              bottom-slots
-              :disable="formData.destination_type !== 'custom'"
-              :rules="[
-                ...(formData.destination_type === 'custom'
-                  ? []
-                  : [(val: any) => !!val.trim() || 'Field is required!']),
-                (val: any) =>
-                  !val.trim() ||
-                  val.trim().startsWith('/') ||
-                  'Endpoint path must start with /',
+              :disabled="formData.destination_type !== 'custom'"
+              :validators="[
+                ...(formData.destination_type !== 'custom'
+                  ? [(val: string) => !val?.trim() ? 'Field is required!' : undefined]
+                  : []),
+                (val: string) =>
+                  val?.trim() && !val.trim().startsWith('/')
+                    ? 'Endpoint path must start with /'
+                    : undefined,
               ]"
               tabindex="0"
             >
@@ -218,88 +180,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   Path will be appended to base URL (must start with /)
                 </span>
               </template>
-            </q-input>
+            </OFormInput>
             <!-- Method field - only shown for Custom destination type -->
-            <q-select
+            <OFormSelect
               v-if="formData.destination_type === 'custom'"
               data-test="add-destination-method-select"
               v-model="formData.method"
               :label="t('alert_destinations.method') + ' *'"
               :options="apiMethods"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :popup-content-style="{ textTransform: 'uppercase' }"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
               tabindex="0"
             />
 
             <!-- Output Format field - disabled for all except Custom -->
-            <q-select
+            <OFormSelect
               data-test="add-destination-output-format-select"
               v-model="formData.output_format"
               :label="t('alert_destinations.output_format') + ' *'"
               :options="outputFormats"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              emit-value
-              map-options
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              :disable="formData.destination_type !== 'custom'"
+              labelKey="label"
+              valueKey="value"
+              :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
+              :disabled="formData.destination_type !== 'custom'"
               tabindex="0"
             />
 
             <!-- ESBulk Index Name field - only shown when output format is esbulk -->
-            <q-input
+            <OFormInput
               v-if="formData.output_format === 'esbulk'"
               data-test="add-destination-esbulk-index-input"
               v-model="formData.esbulk_index"
               :label="'ESBulk Index Name *'"
               :placeholder="'Enter index name (e.g., logs, events)'"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  !!val?.trim() || 'Index name is required for ESBulk format',
+              :validators="[
+                (val: string) => !val?.trim() ? 'Index name is required for ESBulk format' : undefined,
               ]"
               tabindex="0"
             >
               <template v-slot:hint>
                 Index name where data will be written in Elasticsearch
               </template>
-            </q-input>
+            </OFormInput>
 
             <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
-            <q-input
+            <OFormInput
               v-if="formData.output_format === 'stringseparated'"
               data-test="add-destination-separator-input"
               v-model="formData.separator"
               :label="t('alert_destinations.separator') + ' *'"
               :placeholder="t('alert_destinations.separator_placeholder')"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  (val !== null && val !== undefined && val !== '') ||
-                  'Separator is required for StringSeparated format',
+              :validators="[
+                (val: string) =>
+                  (val === null || val === undefined || val === '')
+                    ? 'Separator is required for StringSeparated format'
+                    : undefined,
               ]"
               tabindex="0"
             >
               <template v-slot:hint>
                 {{ t('alert_destinations.separator_hint') }}
               </template>
-            </q-input>
+            </OFormInput>
           </div>
 
           <!-- Destination-specific Metadata Section -->
@@ -310,131 +251,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Splunk Metadata Fields -->
             <template v-if="formData.destination_type === 'splunk'">
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-source-input"
                 v-model="formData.metadata!.source"
                 :label="'Source'"
                 :placeholder="'Enter source (e.g., http:my_source)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
                 tabindex="0"
               >
                 <template v-slot:hint>
                   Splunk source field for event metadata
                 </template>
-              </q-input>
+              </OInput>
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-sourcetype-input"
                 v-model="formData.metadata!.sourcetype"
                 :label="'Source Type'"
                 :placeholder="'Enter source type (e.g., _json)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
                 tabindex="0"
               >
                 <template v-slot:hint>
                   Splunk sourcetype field for event metadata
                 </template>
-              </q-input>
+              </OInput>
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
                 tabindex="0"
               >
                 <template v-slot:hint>
                   Splunk host field for event metadata
                 </template>
-              </q-input>
+              </OInput>
             </template>
 
             <!-- Datadog Metadata Fields -->
             <template v-if="formData.destination_type === 'datadog'">
-              <q-input
+              <OFormInput
                 data-test="add-destination-metadata-ddsource-input"
                 v-model="formData.metadata!.ddsource"
                 :label="'DD Source *'"
                 :placeholder="'Enter source (e.g., nginx, java)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'DD Source is required for Datadog',
+                :validators="[
+                  (val: string) => !val?.trim() ? 'DD Source is required for Datadog' : undefined,
                 ]"
                 tabindex="0"
               >
                 <template v-slot:hint>
                   Source attribute for Datadog logs
                 </template>
-              </q-input>
+              </OFormInput>
 
-              <q-input
+              <OFormInput
                 data-test="add-destination-metadata-ddtags-input"
                 v-model="formData.metadata!.ddtags"
                 :label="'DD Tags *'"
                 :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'DD Tags are required for Datadog',
+                :validators="[
+                  (val: string) => !val?.trim() ? 'DD Tags are required for Datadog' : undefined,
                 ]"
                 tabindex="0"
               >
                 <template v-slot:hint>
                   Comma-separated tags for Datadog logs
                 </template>
-              </q-input>
+              </OFormInput>
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-service-input"
                 v-model="formData.metadata!.service"
                 :label="'Service'"
                 :placeholder="'Enter service name (e.g., api-gateway)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
                 tabindex="0"
               >
                 <template v-slot:hint> Service name for Datadog logs </template>
-              </q-input>
+              </OInput>
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
                 tabindex="0"
               >
                 <template v-slot:hint> Hostname for Datadog logs </template>
-              </q-input>
+              </OInput>
             </template>
 
           </div>
@@ -449,30 +353,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="row q-col-gutter-xs q-ml-xs"
             >
               <div class="col-5">
-                <q-input
+                <OInput
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   v-model="header.key"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  outlined
-                  filled
                   :placeholder="t('alert_destinations.api_header')"
-                  dense
                   tabindex="0"
                 />
               </div>
               <div class="col-5">
-                <q-input
+                <OInput
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   v-model="header.value"
                   :placeholder="t('alert_destinations.api_header_value')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  outlined
-                  filled
-                  dense
                   tabindex="0"
                 />
               </div>
@@ -499,15 +391,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="col-12 q-mt-md tw:inline-flex">
-            <q-toggle
+            <OSwitch
               data-test="add-destination-skip-tls-verify-toggle"
-              class="o2-toggle-button-xs q-mt-sm tw:inline-flex"
-              size="xs"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
               v-model="formData.skip_tls_verify"
               :label="t('alert_destinations.skip_tls_verify')"
             />
@@ -605,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-    </q-form>
+    </OForm>
   </div>
 </template>
 
@@ -622,6 +507,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 // Props
 const props = defineProps<{
@@ -688,7 +578,6 @@ const destinationTypes = [
   },
 ];
 
-const destinationForm = ref(null);
 const step = ref(1);
 
 const formData: Ref<DestinationData> = ref({

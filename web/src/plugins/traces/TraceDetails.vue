@@ -245,6 +245,7 @@ size="xs"
                 <template #icon-left
                   ><OIcon name="align-left" size="xs" class="tw:shrink-0"
                 /></template>
+                Waterfall
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
                 <template #icon-left>

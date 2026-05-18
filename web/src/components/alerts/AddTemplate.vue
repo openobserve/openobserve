@@ -52,24 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container tw:h-full tw:flex tw:flex-col">
           <div class="q-pa-md tw:overflow-auto">
             <div class="col-12 q-pb-sm q-pt-sm o2-input">
-            <q-input
+            <OInput
               data-test="add-template-name-input"
               v-model="formData.name"
               :label="t('alerts.name') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              v-bind:readonly="isUpdatingTemplate"
-              v-bind:disable="isUpdatingTemplate"
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
-              ]"
+              :readonly="isUpdatingTemplate"
+              :disabled="isUpdatingTemplate"
               tabindex="0"
+              :error="!!nameError"
+              :error-message="nameError"
+              @update:model-value="nameError = ''"
             />
           </div>
           <div class="col-12 q-pb-md">
@@ -82,16 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
-            <q-input
+            <OInput
               data-test="add-template-email-title-input"
               v-model="formData.title"
               :label="t('alerts.title') + ' *'"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              :rules="[(val: any) => !!val.trim() || 'Field is required!']"
               tabindex="0"
+              :error="!!titleError"
+              :error-message="titleError"
+              @update:model-value="titleError = ''"
             />
           </div>
           <div class="col-12 q-pb-md">
@@ -215,6 +205,7 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard, useQuasar } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
@@ -244,6 +235,8 @@ const store = useStore();
 const q = useQuasar();
 const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
+const nameError = ref('');
+const titleError = ref('');
 const { track } = useReo();
 const sampleTemplates = [
   {
@@ -329,6 +322,10 @@ const isTemplateFilled = () =>
 
 const saveTemplate = () => {
   if (!isTemplateFilled()) {
+    const name = formData.value.name;
+    nameError.value = !name.trim() ? t('common.nameRequired')
+      : (!isValidResourceName(name) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : '');
+    titleError.value = (formData.value.type === 'email' && !formData.value.title?.trim()) ? 'Field is required!' : '';
     q.notify({
       type: "negative",
       message: "Please fill required fields",

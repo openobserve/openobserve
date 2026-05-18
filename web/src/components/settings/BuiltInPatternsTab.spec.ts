@@ -176,7 +176,6 @@ function mountComponent() {
       stubs: {
         ODialog: ODialogStub,
         "q-spinner-hourglass": true,
-        "q-chip": { template: "<span><slot /></span>", props: ["size", "color", "textColor", "dense"] },
         "q-list": { template: "<div><slot /></div>", props: ["bordered", "separator"] },
         "q-item": { template: "<div class='q-item'><slot /></div>", props: ["class"] },
         "q-item-section": { template: "<div class='q-item-section'><slot /></div>", props: ["side"] },

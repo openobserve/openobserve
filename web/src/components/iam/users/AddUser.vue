@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4 tw:w-full">
-        <q-form ref="updateUserForm" @submit.prevent="onSubmit">
+        <OForm ref="updateUserForm" @submit.prevent="onSubmit">
           <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
@@ -40,15 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("user.customRole") }} :
             <strong>{{ formData.custom_role.join(", ") }}</strong>
           </p>
-          <q-input
+          <OInput
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            hide-bottom-space
-            dense
-            borderless
             :rules="[
               (val: any, rules: any) =>
                 rules.email(val) || 'Please enter a valid email address',
@@ -58,15 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <div v-if="!beingUpdated && !existingUser" class="tw:mt-2">
-            <q-input
+            <OInput
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
               :label="t('user.password') + ' *'"
               class="showLabelOnTop"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -82,33 +74,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="isPwd = !isPwd"
                 />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
-          <q-input
+          <OInput
             v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            dense
-            hide-bottom-space
-            borderless
             data-test="user-first-name-field"
           />
 
-          <q-input
+          <OInput
             v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            dense
-            hide-bottom-space
-            borderless
             data-test="user-last-name-field"
           />
-          <q-select
+          <OSelect
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
@@ -120,14 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             emit-value
             map-options
-            stack-label
-            dense
-            hide-bottom-space
-            borderless
             :rules="[(val: any) => !!val || 'Field is required']"
             data-test="user-role-field"
           />
-          <q-select
+          <OSelect
             v-if="
               (existingUser || beingUpdated) &&
               userRole !== 'member' &&
@@ -141,30 +121,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             multiple
             emit-value
             map-options
-            stack-label
-            dense
-            borderless
-            hide-bottom-space
             use-input
             @filter="filterFn"
             data-test="user-custom-role-field"
             :disable="filterdOption.length === 0"
           />
           <div v-if="beingUpdated" class="tw:mt-2">
-            <q-toggle
+            <OSwitch
               v-model="formData.change_password"
               :label="t('user.changePassword')"
-              stack-label
-              outlined
-              filled
-              hide-bottom-space
-              class="o2-toggle-button-lg -tw:ml-4"
               size="lg"
-              :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
               data-test="user-change-password-field"
             />
 
-            <q-input
+            <OInput
               v-if="
                 formData.change_password &&
                 (userRole == 'member' ||
@@ -174,10 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="formData.old_password"
               :label="t('user.oldPassword') + ' *'"
               class="showLabelOnTop tw:mt-2"
-              stack-label
-              dense
-              borderless
-              hide-bottom-space
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -193,18 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="isOldPwd = !isOldPwd"
                 />
               </template>
-            </q-input>
+            </OInput>
 
-            <q-input
+            <OInput
               v-if="formData.change_password"
               :type="isNewPwd ? 'password' : 'text'"
               v-model="formData.new_password"
               :label="t('user.newPassword') + ' *'"
               class="showLabelOnTop tw:mt-2"
-              stack-label
-              dense
-              hide-bottom-space
-              borderless
               :rules="[
                 (val: any) => !!val || 'Field is required',
                 (val: any) =>
@@ -220,9 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="isNewPwd = !isNewPwd"
                 />
               </template>
-            </q-input>
+            </OInput>
           </div>
-          <q-input
+          <OInput
             v-if="
               !beingUpdated &&
               userRole != 'member' &&
@@ -231,10 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="formData.other_organization"
             :label="t('user.otherOrganization')"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            dense
-            borderless
-            hide-bottom-space
             :rules="[
               (val: any) =>
                 /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
@@ -261,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('user.save') }}
             </OButton>
           </div>
-        </q-form>
+        </OForm>
     </div>
   </ODrawer>
   <ODialog data-test="add-user-logout-confirm-dialog"
@@ -301,6 +259,10 @@ import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -320,6 +282,10 @@ export default defineComponent({
   name: "ComponentAddUpdateUser",
   components: { OButton, ODialog, ODrawer,
     OIcon,
+    OSwitch,
+    OInput,
+    OSelect,
+    OForm,
 },
   props: {
     open: {

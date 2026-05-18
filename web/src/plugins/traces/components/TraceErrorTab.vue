@@ -139,136 +139,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>
-    <q-table
+    <OTable
       data-test="trace-details-sidebar-exceptions-table"
-      :rows="hasExceptionEvents"
+      :data="exceptionData"
       :columns="exceptionEventColumns"
-      row-key="name"
-      :rows-per-page-options="[0]"
-      class="q-table o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
-      dense
+      row-key="_index"
+      pagination="none"
+      :show-global-filter="false"
+      class="o2-quasar-table trace-detail-tab-table o2-row-sm o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
     >
-      <template v-slot:body="props">
-        <q-tr
-          :data-test="`trace-event-detail-${props.row[timestampColumn]}`"
-          :key="props.key"
-          @click="expandEvent(props.rowIndex)"
-          style="cursor: pointer"
-          class="pointer"
+      <template #cell-@timestamp="{ row }">
+        <div
+          :data-test="`trace-event-detail-${row[timestampColumn]}`"
+          class="flex row items-center no-wrap cursor-pointer"
+          @click="expandEvent(row._index)"
         >
-          <q-td
-            v-for="column in exceptionEventColumns"
-            :key="props.rowIndex + '-' + column.name"
-            class="field_list text-left"
-            style="cursor: pointer"
+          <OButton
+            variant="ghost"
+            size="icon-xs-sq"
+            class="q-mr-xs"
+            :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${row._index}`"
+            @click.capture.stop="expandEvent(row._index)"
           >
-            <div class="flex row items-center no-wrap">
-              <OButton
-                v-if="column.name == '@timestamp'"
-                variant="ghost"
-                size="icon-xs-sq"
-                class="q-mr-xs"
-                :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${props.rowIndex}`"
-                @click.capture.stop="expandEvent(props.rowIndex)"
-              >
-                  <OIcon
-                    :name="
-                      expandedEvents[props.rowIndex.toString()] ? 'expand-more' : 'chevron-right'
-                    "
-                    size="14px"
-                  /> 
-              </OButton>
-              <span
-                v-if="column.name !== '@timestamp'"
-                v-html="highlightTextMatch(column.prop(props.row), searchQuery)"
-              />
-              <span v-else> {{ column.prop(props.row) }}</span>
-            </div>
-          </q-td>
-        </q-tr>
-        <q-tr
-          v-if="expandedEvents[props.rowIndex.toString()]"
-          :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${props.rowIndex}`"
+            <OIcon
+              :name="
+                expandedEvents[String(row._index)] ? 'expand-more' : 'chevron-right'
+              "
+              size="14px"
+            />
+          </OButton>
+          <span>{{ formatTimestamp(row) }}</span>
+        </div>
+        <div
+          v-if="expandedEvents[String(row._index)]"
+          :data-test="`trace-details-sidebar-exceptions-table-expanded-row-${row._index}`"
+          class="exception-details-container tw:mt-2"
         >
-          <q-td colspan="2" class="exception-details-container tw:px-[0.5rem]!">
-            <div class="exception-content">
-              <!-- Exception Type -->
-              <div class="exception-field">
-                <span
-                  class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                  >{{ t("traces.typeLabel") }}</span
-                >
-                <span class="exception-type">{{
-                  props.row["exception.type"]
-                }}</span>
-              </div>
-
-              <!-- Exception Message -->
-              <div class="exception-field">
-                <span
-                  class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                  >{{ t("traces.messageLabel") }}</span
-                >
-                <div class="exception-message">
-                  {{ formatExceptionMessage(props.row["exception.message"]) }}
-                </div>
-              </div>
-
-              <!-- Escaped -->
-              <div class="exception-field">
-                <span
-                  class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                  >{{ t("traces.escapedLabel") }}</span
-                >
-                <span class="exception-value">{{
-                  props.row["exception.escaped"]
-                }}</span>
-              </div>
-
-              <!-- Stacktrace -->
-              <div class="exception-field">
-                <div class="stacktrace-header">
-                  <span
-                    class="exception-label tw:text-[var(--o2-text-secondary)]!"
-                    >{{ t("traces.stacktraceLabel") }}</span
-                  >
-                  <OButton
-                    v-if="props.row['exception.stacktrace'] && props.row['exception.stacktrace'].trim()"      
-                    variant="secondary"
-                    size="icon-sm"
-                    class="copy-btn"
-                    @click="copyStackTrace(props.row['exception.stacktrace'])"
-                  >
-                    <OIcon name="content-copy" size="sm" />
-                    <OTooltip :content="t('traces.copyStacktrace')" />
-                  </OButton>
-                </div>
-                <div
-                  v-if="
-                    props.row['exception.stacktrace'] &&
-                    props.row['exception.stacktrace'].trim()
-                  "
-                  class="stacktrace-container"
-                >
-                  <pre
-                    class="stacktrace-content"
-                    v-html="
-                      DOMPurify.sanitize(
-                        formatStackTrace(props.row['exception.stacktrace']),
-                      )
-                    "
-                  ></pre>
-                </div>
-                <div v-else class="stacktrace-empty">
-                  <OIcon name="info" size="sm" class="q-mr-xs" />
-                  <span>{{ t("traces.noStacktraceAvailable") }}</span>
-                </div>
+          <div class="exception-content">
+            <div class="exception-field">
+              <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.typeLabel") }}</span>
+              <span class="exception-type">{{ row["exception.type"] }}</span>
+            </div>
+            <div class="exception-field">
+              <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.messageLabel") }}</span>
+              <div class="exception-message">
+                {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
-          </q-td>
-        </q-tr>
+            <div class="exception-field">
+              <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.escapedLabel") }}</span>
+              <span class="exception-value">{{ row["exception.escaped"] }}</span>
+            </div>
+            <div class="exception-field">
+              <div class="stacktrace-header">
+                <span class="exception-label tw:text-[var(--o2-text-secondary)]!">{{ t("traces.stacktraceLabel") }}</span>
+                <OButton
+                  v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
+                  variant="secondary"
+                  size="icon-sm"
+                  class="copy-btn"
+                  @click="copyStackTrace(row['exception.stacktrace'])"
+                >
+                  <OIcon name="content-copy" size="sm" />
+                  <OTooltip :content="t('traces.copyStacktrace')" />
+                </OButton>
+              </div>
+              <div
+                v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
+                class="stacktrace-container"
+              >
+                <pre
+                  class="stacktrace-content"
+                  v-html="
+                    DOMPurify.sanitize(
+                      formatStackTrace(row['exception.stacktrace']),
+                    )
+                  "
+                ></pre>
+              </div>
+              <div v-else class="stacktrace-empty">
+                <OIcon name="info" size="sm" class="q-mr-xs" />
+                <span>{{ t("traces.noStacktraceAvailable") }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
-    </q-table>
+
+      <template #cell-type="{ row }">
+        <span
+          class="cursor-pointer"
+          @click="expandEvent(row._index)"
+          v-html="highlightTextMatch(row['exception.type'], searchQuery)"
+        />
+      </template>
+    </OTable>
   </template>
 </template>
 
@@ -284,6 +249,8 @@ import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps<{
   span: object;
@@ -314,28 +281,35 @@ const timestampColumn = computed(() => store.state.zoConfig.timestamp_column);
 
 const expandedEvents: any = ref({});
 
-const exceptionEventColumns = computed(() => [
+const exceptionData = computed(() =>
+  hasExceptionEvents.value.map((event: any, index: number) => ({
+    ...event,
+    _index: index,
+  })),
+);
+
+const formatTimestamp = (row: any) =>
+  date.formatDate(
+    Math.floor(row[timestampColumn.value] / 1000000),
+    "MMM DD, YYYY HH:mm:ss.SSS Z",
+  );
+
+const exceptionEventColumns: OTableColumnDef[] = [
   {
-    name: "@timestamp",
-    field: "@timestamp",
-    prop: (row: any) =>
-      date.formatDate(
-        Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-        "MMM DD, YYYY HH:mm:ss.SSS Z",
-      ),
-    label: t("traces.timestamp"),
-    align: "left" as const,
+    id: "@timestamp",
+    header: t("traces.timestamp"),
+    accessorKey: "@timestamp",
+    meta: { align: "left" },
     sortable: true,
   },
   {
-    name: "type",
-    field: "exception.type",
-    prop: (row: any) => row["exception.type"],
-    label: t("traces.typeLabel"),
-    align: "left" as const,
+    id: "type",
+    header: t("traces.typeLabel"),
+    accessorKey: "exception.type",
+    meta: { align: "left" },
     sortable: true,
   },
-]);
+];
 
 watch(
   hasExceptionEvents,

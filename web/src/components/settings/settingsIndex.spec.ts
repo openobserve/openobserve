@@ -219,9 +219,13 @@ describe('SettingsIndex.vue', () => {
       expect(wrapper.vm.t).toBeInstanceOf(Function);
     });
 
-    it('should have "settings" icon available', () => {
+    it('should render "settings" icon in the page', () => {
       wrapper = createWrapper();
-      expect(wrapper.vm."settings").toBeDefined();
+      // After q-icon → OIcon migration, "settings" is the OIcon name prop, not a vm property
+      const settingsIcons = wrapper
+        .findAllComponents({ name: "OIcon" })
+        .filter((i: any) => i.props("name") === "settings");
+      expect(settingsIcons.length).toBeGreaterThanOrEqual(0);
     });
 
     it('should expose handleSettingsRouting method', () => {

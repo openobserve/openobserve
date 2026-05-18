@@ -4,7 +4,7 @@
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -77,7 +77,7 @@ const columns: OTableColumnDef[] = [
           :title="t('common.edit')"
           @click="emit('edit', row)"
         >
-          <q-icon name="edit" />
+          <OIcon name="edit" size="sm" />
         </OButton>
         <OButton
           :data-test="`iam-roles-delete-${row.role_name}-role-icon`"
@@ -86,7 +86,7 @@ const columns: OTableColumnDef[] = [
           :title="t('common.delete')"
           @click="emit('delete', row)"
         >
-          <q-icon :name="outlinedDelete" />
+          <OIcon name="delete" size="sm" />
         </OButton>
       </div>
     </template>
@@ -106,7 +106,7 @@ const columns: OTableColumnDef[] = [
         @click="emit('bulk-delete')"
       >
         <template #icon-left>
-          <q-icon name="delete" size="1rem" />
+          <OIcon name="delete" size="sm" />
         </template>
         {{ t("common.delete") }}
       </OButton>

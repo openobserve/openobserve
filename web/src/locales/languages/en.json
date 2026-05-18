@@ -1644,6 +1644,7 @@
     "singleColor": "Single Color",
     "colorMode": "Background Color",
     "searchAcross": "Search Across Folders",
+    "allFolders": "All Folders",
     "searchSelf": "Switch to Search across the current Folder",
     "searchAll": "Switch to Search Across all Folders",
     "folder": "Folder",

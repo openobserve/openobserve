@@ -60,9 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-panel-data-view-query-inspector-btn"
             icon-left="info-outline"
           >
-            <q-tooltip anchor="center left" self="center right"
-              >Query Inspector</q-tooltip
-            >
+            <OTooltip side="left" align="center" content="Query Inspector" />
           </OButton>
           <DateTimePickerDashboard
             v-if="selectedDate"
@@ -178,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw:px-4 tw:pt-4">
+      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"
@@ -240,6 +238,7 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -260,6 +259,7 @@ export default defineComponent({
     OInput,
     ODropdown,
     ODropdownItem,
+    OTooltip,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,

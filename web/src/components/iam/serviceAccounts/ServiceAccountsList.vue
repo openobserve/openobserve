@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span class="text-weight-medium">AI SRE Agent</span>
-                <q-badge color="blue-2" text-color="blue-8" label="system" class="q-ml-sm q-px-xs" style="font-size: 10px;" />
+                <OBadge variant="primary-soft" size="sm" class="q-ml-sm">system</OBadge>
               </template>
               <template v-else>{{ row.email }}</template>
             </template>
@@ -91,9 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-actions="{ row }">
               <template v-if="row.is_system">
-                <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
+                <OBadge variant="default">
+                    {{ t('serviceAccounts.systemManaged', 'System Managed') }}
                   <OTooltip v-if="row.description" :content="row.description" />
-                </q-badge>
+                </OBadge>
               </template>
               <template v-else>
                 <OButton
@@ -238,6 +239,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -265,7 +267,7 @@ import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OTable },
+  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OInput, OTooltip, OTable, OBadge },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

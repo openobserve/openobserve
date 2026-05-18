@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-ml-xs"
               @click="copyTraceId"
             >
-              <q-tooltip>Copy Trace ID</q-tooltip>
+              <OTooltip content="Copy Trace ID" />
             </OButton>
           </div>
         </div>
@@ -163,10 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="git-branch" size="sm" class="tw:mr-1" />
             View Trace Details
-            <q-tooltip v-if="!hasBackendTrace">
-              Backend trace data not yet available. Trace data may take up to 30
-              seconds to be ingested.
-            </q-tooltip>
+            <OTooltip v-if="!hasBackendTrace" content="Backend trace data not yet available. Trace data may take up to 30 seconds to be ingested." />
           </OButton>
           <OButton
             icon-left="refresh"
@@ -204,6 +201,7 @@ import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps({
   traceId: {

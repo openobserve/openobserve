@@ -143,28 +143,21 @@ describe('ScheduledDashboards', () => {
             props: ['open', 'width', 'title', 'subTitle', 'showClose', 'persistent', 'size'],
             emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
           },
-          'q-table': {
-            name: 'q-table',
-            template: `<div class="q-table-mock">
-              <div class="q-table__top"><slot name="top" /></div>
-              <div class="q-table-body"><slot name="no-data" /></div>
-              <div class="q-table__bottom"><slot name="bottom" /></div>
+          'OTable': {
+            name: 'OTable',
+            template: `<div class="o-table-mock">
+              <div class="o-table-body"><slot name="cell-name" /><slot name="cell-tab" /><slot name="cell-time_range" /><slot name="cell-frequency" /><slot name="cell-last_triggered_at" /><slot name="cell-created_at" /><slot name="empty" /></div>
             </div>`,
             props: {
-              rows: { type: Array, default: () => [] },
+              data: { type: Array, default: () => [] },
               columns: { type: Array, default: () => [] },
               'row-key': { type: String, default: 'id' },
-              pagination: { type: Object, default: () => ({}) },
-              filter: { type: String, default: '' },
-              'filter-method': { type: Function, default: () => {} }
+              pagination: { type: String },
+              'page-size': { type: Number },
+              'page-size-options': { type: Array },
+              'show-global-filter': { type: Boolean },
+              loading: { type: Boolean },
             },
-            emits: ['row-click']
-          },
-          'QTablePagination': {
-            name: 'QTablePagination',
-            template: '<div class="q-table-pagination-mock"></div>',
-            props: ['scope', 'position', 'resultTotal', 'perPageOptions'],
-            emits: ['update:changeRecordPerPage']
           },
           'AppTabs': {
             name: 'AppTabs',
@@ -441,25 +434,22 @@ describe('ScheduledDashboards', () => {
     it('should handle filter functionality', () => {
       const wrapper = createWrapper();
 
-      const table = wrapper.findComponent({ name: 'q-table' });
+      const table = wrapper.findComponent({ name: 'OTable' });
       expect(table.exists()).toBe(true);
-      expect(table.props()).toHaveProperty('filter');
-      expect(table.props()).toHaveProperty('filterMethod');
+      // Filtering is done externally via displayReports computed, so OTable receives pre-filtered data
+      expect(table.props()).toHaveProperty('showGlobalFilter', false);
+      expect(table.props()).toHaveProperty('pagination', 'client');
     });
   });
 
   describe('Pagination', () => {
-    it('should render pagination components', () => {
-      const wrapper = createWrapper();
-      const paginationComponents = wrapper.findAllComponents({ name: 'QTablePagination' });
-      expect(paginationComponents).toHaveLength(2); // Top and bottom pagination
-    });
-
     it('should pass pagination props to table', () => {
       const wrapper = createWrapper();
-      const table = wrapper.findComponent({ name: 'q-table' });
+      const table = wrapper.findComponent({ name: 'OTable' });
       expect(table.exists()).toBe(true);
-      expect(table.props()).toHaveProperty('pagination');
+      expect(table.props()).toHaveProperty('pagination', 'client');
+      expect(table.props()).toHaveProperty('pageSize', 20);
+      expect(table.props()).toHaveProperty('pageSizeOptions', [5, 10, 20, 50, 100]);
     });
   });
 
@@ -503,18 +493,18 @@ describe('ScheduledDashboards', () => {
       });
     });
 
-    it('should handle row clicks on table', () => {
+    it('should configure table with row-key', () => {
       const wrapper = createWrapper();
-      const table = wrapper.findComponent({ name: 'q-table' });
+      const table = wrapper.findComponent({ name: 'OTable' });
       expect(table.exists()).toBe(true);
-      expect(table.props()).toHaveProperty('rowKey');
+      expect(table.props()).toHaveProperty('rowKey', 'id');
     });
   });
 
   describe('Table Configuration', () => {
-    it('should pass columns to q-table component', () => {
+    it('should pass columns to OTable component', () => {
       const wrapper = createWrapper();
-      const table = wrapper.findComponent({ name: 'q-table' });
+      const table = wrapper.findComponent({ name: 'OTable' });
       expect(table.exists()).toBe(true);
       expect(table.props()).toHaveProperty('columns');
     });
@@ -570,9 +560,9 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.find('.app-tabs-mock').exists()).toBe(true);
     });
 
-    it('should render QTablePagination components', () => {
+    it('should render OTable component', () => {
       const wrapper = createWrapper();
-      expect(wrapper.findAll('.q-table-pagination-mock')).toHaveLength(2);
+      expect(wrapper.find('.o-table-mock').exists()).toBe(true);
     });
 
     it('should render search input', () => {

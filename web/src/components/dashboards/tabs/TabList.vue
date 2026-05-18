@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-tab-add-btn"
       icon-left="add"
     >
-      <q-tooltip>Add Tab</q-tooltip>
+      <OTooltip content="Add Tab" />
     </OButton>
     <AddTab
       v-model:open="showAddTabDialog"
@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -93,6 +94,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    OTooltip,
   },
   props: {
     dashboardData: {

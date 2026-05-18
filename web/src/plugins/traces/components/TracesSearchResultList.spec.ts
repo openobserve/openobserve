@@ -216,8 +216,9 @@ describe("TracesSearchResultList", () => {
   describe("loading state", () => {
     it("shows a spinner while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
+      // Migrated from QSpinnerHourglass to OSpinner
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.findComponent({ name: "OSpinner" }).exists(),
       ).toBe(true);
     });
 

@@ -767,8 +767,8 @@ test.describe("Cross-Linking testcases", () => {
         const urlText = await listItem.locator('.text-caption').first().textContent();
         expect(urlText).toContain('display.example.com');
 
-        // Verify field chips are rendered (CrossLinkManager shows q-chip for each field)
-        const fieldChips = listItem.locator('.q-chip');
+        // Verify field chips are rendered (CrossLinkManager shows OBadge for each field after q-chip → OBadge migration)
+        const fieldChips = listItem.locator('[data-test^="cross-link-field-chip-"]');
         const chipCount = await fieldChips.count();
         expect(chipCount).toBe(2);
 

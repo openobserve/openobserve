@@ -113,7 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-pagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs'
+              searchObj.meta.logsVisualizeToggle === 'logs' &&
+              !searchObj.loading
             "
             :disable="searchObj.loading == true"
             v-model="pageNumberInput"
@@ -151,7 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-if="
               searchObj.meta.resultGrid.showPagination &&
-              searchObj.meta.logsVisualizeToggle === 'logs'
+              searchObj.meta.logsVisualizeToggle === 'logs' &&
+              !searchObj.loading
             "
             data-test="logs-search-result-records-per-page"
             v-model="searchObj.meta.resultGrid.rowsPerPage"

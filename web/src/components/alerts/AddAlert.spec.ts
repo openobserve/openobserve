@@ -2473,6 +2473,8 @@ describe("AddAlert Component", () => {
 
     beforeEach(async () => {
       vi.clearAllMocks();
+      // Reset router query so prior fromPanel tests don't pollute initializeFormData
+      router.currentRoute.value.query = {} as any;
       w = mount(AddAlert, {
         global: {
           provide: { store },
@@ -2480,6 +2482,7 @@ describe("AddAlert Component", () => {
         }
       });
       await nextTick();
+      await flushPromises();
     });
 
     afterEach(() => {

@@ -103,7 +103,7 @@
               >
                 <OColor
                   v-model="mapping.color"
-                  class="tw:flex-1"
+                  class="tw:flex-1 tw:h-9 tw:mt-3"
                 />
                 <OIcon
                   name="cancel"

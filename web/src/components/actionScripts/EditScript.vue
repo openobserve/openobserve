@@ -128,38 +128,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-action-script-file-input"
                   class="flex items-center"
                 >
-                  <q-file
+                  <OFile
                     v-if="
                       !isEditingActionScript || formData.fileNameToShow == ''
                     "
                     ref="fileInput"
-                    color="primary"
-                    filled
                     v-model="formData.codeZip"
                     :label="t('actions.zipFile') + ' *'"
-                    bg-color="input-bg"
-                    class="tw:w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
-                    stack-label
-                    outlined
-                    dense
                     accept=".zip"
-                    :rules="[
-                      (val: any) => {
-                        if (!isEditingActionScript) {
-                          return !!val || 'ZIP File is required!';
-                        }
-                        return true;
-                      },
-                    ]"
+                    data-test="add-action-script-file-input"
+                    :error-message="!isEditingActionScript && !formData.codeZip ? 'ZIP File is required!' : undefined"
+                    :error="!isEditingActionScript && !formData.codeZip && step > 1"
                   >
-                    <template v-slot:prepend>
-                      <OIcon name="attachment" size="sm" />
-                    </template>
-                    <template v-slot:hint>
+                    <template #hint>
                       Note: Only .zip files are accepted and it may contain
                       various resources such as .py, .txt and main.py file etc.
                     </template>
-                  </q-file>
+                  </OFile>
 
                   <div
                     v-else-if="
@@ -540,6 +525,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 
 defineProps({
   report: {

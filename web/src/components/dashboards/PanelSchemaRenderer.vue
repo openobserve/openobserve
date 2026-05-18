@@ -210,9 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('show-legends')"
           icon-left="format-list-bulleted"
         >
-          <q-tooltip anchor="top middle" self="bottom right">
-            Show Legends
-          </q-tooltip>
+          <OTooltip content="Show Legends" side="top" align="end" />
         </OButton>
         <OButton
           v-if="
@@ -237,11 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left
             ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
           /></template>
-          <q-tooltip anchor="top middle" self="bottom right">
-            {{
-              isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
-            }}
-          </q-tooltip>
+          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
         </OButton>
       </div>
       <div
@@ -407,6 +401,7 @@ const AlertContextMenu = defineAsyncComponent(() => {
 });
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -424,6 +419,7 @@ export default defineComponent({
     LoadingProgress,
     OButton,
     OIcon,
+    OTooltip,
 },
   props: {
     selectedTimeObj: {

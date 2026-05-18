@@ -11,18 +11,16 @@
           :rows="3"
         />
 
-        <q-select
+        <OSelect
             hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
-            stack-label
             emit-value
             map-options
             @update:model-value="updateSelectedPanels"
             :display-value="displayValue"
             style="min-width: 150px"
-            dense
             label="Select Panels"
             input-debounce="0"
             behavior="menu"
@@ -30,8 +28,6 @@
             class="textbox col no-case showLabelOnTop"
             popup-no-route-dismiss
             popup-content-style="z-index: 10001"
-            borderless
-            hide-bottom-space
           >
             <template v-slot:option="{ opt, selected, toggleOption }">
               <q-item
@@ -44,11 +40,9 @@
 
               <q-item v-else v-ripple clickable @click="toggleOption(opt)">
                 <q-item-section side>
-                  <q-checkbox
+                  <OCheckbox
                     :model-value="selected"
                     @update:model-value="() => toggleOption(opt)"
-                    dense
-                    class="q-ma-none"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -56,7 +50,7 @@
                 </q-item-section>
               </q-item>
             </template>
-          </q-select>
+          </OSelect>
         <div class="text-caption q-mt-md">
           Timestamp: {{ annotationDateString }}
         </div>
@@ -108,8 +102,10 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 const props = defineProps({
   dashboardId: { type: String, required: true },

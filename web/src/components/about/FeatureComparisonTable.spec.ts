@@ -217,7 +217,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const icon = wrapper.find(".icon-wrapper .OIcon");
+    const iconWrapper = wrapper.find(".icon-wrapper");
+    expect(iconWrapper.exists()).toBe(true);
+    const icon = iconWrapper.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
   });
 

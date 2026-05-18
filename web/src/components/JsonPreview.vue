@@ -9,7 +9,7 @@
       @click="copyToClipboard"
     >
       <OIcon name="content-copy" size="sm" />
-      <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
+      <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
     <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
@@ -81,6 +81,7 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default {
@@ -90,6 +91,7 @@ export default {
     ChunkedContent,
     OButton,
     ODropdown,
+    OTooltip,
   },
   props: {
     value: {

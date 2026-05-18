@@ -427,7 +427,8 @@ test.describe("Anomaly Detection Alerts", () => {
       // Note: Status may be "waiting" or "ready" depending on training state
       // We just verify it's no longer "disabled"
       const row = pm.anomalyDetectionPage.getAnomalyRow(anomalyName);
-      await expect(row.locator('.q-badge')).not.toContainText('disabled', { ignoreCase: true, timeout: 5000 });
+      // q-badge → OBadge migration: use data-test selector instead of .q-badge class
+      await expect(row.locator('[data-test="anomaly-detection-status-badge"]')).not.toContainText('disabled', { ignoreCase: true, timeout: 5000 });
 
       testLogger.info('Pause/resume works correctly');
     });

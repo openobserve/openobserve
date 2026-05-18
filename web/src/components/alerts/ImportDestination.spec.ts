@@ -259,7 +259,9 @@ describe('ImportDestination Component - Comprehensive Function Tests', () => {
     });
   });
 
-  describe('4. Filter Functions', () => {
+  // TODO: filter functions (filterTemplates, filterActions) were removed when q-select → OSelect.
+  // Skipped until OSelect-based tests are written.
+  describe.skip('4. Filter Functions', () => {
     it('should filter templates correctly with empty value', () => {
       const mockUpdate = vi.fn();
       wrapper.vm.filterTemplates('', mockUpdate);

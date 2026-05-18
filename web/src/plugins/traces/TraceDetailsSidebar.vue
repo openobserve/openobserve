@@ -40,16 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
-        <q-badge
+        <OBadge
           v-if="isLLMSpan"
-          :label="
-            span.gen_ai_operation_name?.charAt(0) +
-            span.gen_ai_operation_name?.slice(1).toLowerCase()
-          "
-          :color="getObservationTypeColor(span.gen_ai_operation_name)"
+          :variant="getObservationTypeVariant(span.gen_ai_operation_name)"
           class="q-mr-xs observation-type-badge"
           data-test="trace-details-sidebar-observation-badge"
-        />
+        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OBadge>
 
         <span class="ellipsis">{{ span.operation_name }}</span>
       </div>
@@ -74,19 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex items-center" style="flex-wrap: nowrap">
           <!-- Service Badge -->
-          <q-chip
-            dense
-            square
+          <OBadge
+            size="sm"
             class="toolbar-chip service-chip"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
-            <img
-              :src="serviceIconUrl"
-              class="q-mr-xs tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
-              aria-hidden="true"
-              alt=""
-            />
+            <template #icon>
+              <img
+                :src="serviceIconUrl"
+                class="tw:w-[0.875rem] tw:h-[0.875rem] tw:shrink-0"
+                aria-hidden="true"
+                alt=""
+              />
+            </template>
             <span class="chip-label">Service</span>
             <span
               class="chip-value"
@@ -94,85 +91,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ span.service_name }}
             </span>
-          </q-chip>
+          </OBadge>
 
           <!-- Duration Badge -->
-          <q-chip
-            dense
-            square
+          <OBadge
+            size="sm"
             class="toolbar-chip duration-chip"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
-            <OIcon name="schedule"
-size="xs"
-class="q-mr-xs" />
+            <template #icon><OIcon name="schedule" size="xs" /></template>
             <span class="chip-label">Duration</span>
             <span class="chip-value">{{ getDuration }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- TTFT Badge -->
-          <q-chip
+          <OBadge
             v-if="getTTFT"
-            dense
-            square
+            size="sm"
             class="toolbar-chip ttft-chip"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
-            <OIcon name="speed"
-size="xs"
-class="q-mr-xs" />
+            <template #icon><OIcon name="speed" size="xs" /></template>
             <span class="chip-label">TTFT</span>
             <span class="chip-value">{{ getTTFT }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- Start Time Badge -->
-          <q-chip
-            dense
-            square
+          <OBadge
+            size="sm"
             class="toolbar-chip time-chip"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
-            <OIcon name="access-time"
-size="xs"
-class="q-mr-xs" />
+            <template #icon><OIcon name="access-time" size="xs" /></template>
             <span class="chip-label">Start</span>
             <span class="chip-value">{{ getStartTime }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- Resend Count Badge -->
-          <q-chip
+          <OBadge
             v-if="spanHttpResendCount"
-            dense
-            square
+            size="sm"
             class="toolbar-chip resend-chip"
             :title="`Request resent ${spanHttpResendCount} time(s)`"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
-            <OIcon name="replay"
-size="xs"
-class="q-mr-xs" />
+            <template #icon><OIcon name="replay" size="xs" /></template>
             <span class="chip-label">Resends</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
-          </q-chip>
+          </OBadge>
         </div>
 
         <div class="flex items-center">
           <!-- Span ID Badge -->
-          <q-chip
-            dense
-            square
+          <OBadge
+            size="sm"
             clickable
             class="toolbar-chip span-id-chip"
             :title="`Span ID: ${span.span_id}`"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
-            <OIcon name="tag"
-size="xs"
-class="q-mr-xs" />
+            <template #icon><OIcon name="tag" size="xs" /></template>
             <span class="chip-value">{{ span.span_id }}</span>
             <OIcon
               name="content-copy"
@@ -180,7 +162,7 @@ class="q-mr-xs" />
               class="q-ml-xs copy-icon"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
-          </q-chip>
+          </OBadge>
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
@@ -210,68 +192,60 @@ class="q-mr-xs" />
       >
         <div class="flex items-center" style="flex-wrap: nowrap">
           <!-- Model Chip -->
-          <q-chip
-            dense
-            square
-            class="llm-chip model-chip"
+          <OBadge
+            size="sm"
             icon="psychology"
+            class="llm-chip model-chip"
             :title="span.gen_ai_response_model"
           >
             <span class="chip-value text-bold">{{ span.gen_ai_response_model }}</span>
-          </q-chip>
+          </OBadge>
 
           <!-- Token Usage Group -->
           <div class="tokens-group">
             <!-- Input Tokens -->
-            <q-chip
-              dense
-              square
+            <OBadge
+              size="sm"
               class="llm-chip token-chip input-token-chip"
               title="Input Tokens"
             >
-              <OIcon name="arrow-upward"
-size="10px"
-class="q-mr-xs" />
+              <template #icon><OIcon name="arrow-upward" size="10px" /></template>
               <span class="chip-label">In</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
-            </q-chip>
+            </OBadge>
 
             <!-- Output Tokens -->
-            <q-chip
-              dense
-              square
+            <OBadge
+              size="sm"
               class="llm-chip token-chip output-token-chip"
               title="Output Tokens"
             >
-              <OIcon name="arrow-downward"
-size="10px"
-class="q-mr-xs" />
+              <template #icon><OIcon name="arrow-downward" size="10px" /></template>
               <span class="chip-label">Out</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
-            </q-chip>
+            </OBadge>
           </div>
 
           <!-- Cost Chip -->
-          <q-chip
-            dense
-            square
-            class="llm-chip cost-chip"
+          <OBadge
+            size="sm"
             icon="attach_money"
+            class="llm-chip cost-chip"
             title="Total Cost"
           >
             <span class="chip-value text-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
-          </q-chip>
+          </OBadge>
         </div>
 
         <div class="flex items-center">
           <!-- Provider Badge -->
-          <q-badge
+          <OBadge
             v-if="span.gen_ai_provider_name"
-            :label="span.gen_ai_provider_name"
+            variant="primary"
             class="provider-badge"
-          />
+          >{{ span.gen_ai_provider_name }}</OBadge>
         </div>
       </div>
     </div>
@@ -309,12 +283,12 @@ class="q-mr-xs" />
 
         >
           {{ t('common.error') }}
-          <q-badge
+          <OBadge
             v-if="hasExceptionEvents.length"
+            variant="error"
             class="tw:font-normal! q-ml-xs tw:text-[var(--o2-error-tag-text)]! tw:bg-[var(--o2-error-tag-bg)]!"
-            :label="hasExceptionEvents.length"
             data-test="trace-details-sidebar-tabs-error-count"
-          />
+          >{{ hasExceptionEvents.length }}</OBadge>
         </OTab>
         <OTab
           v-if="hasDbSpan"
@@ -949,6 +923,8 @@ import TraceErrorTab from "./components/TraceErrorTab.vue";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1007,6 +983,7 @@ export default defineComponent({
     TraceErrorTab,
     OSpinner,
     OSwitch,
+    OBadge,
   },
   emits: [
     "close",
@@ -2049,6 +2026,25 @@ export default defineComponent({
       copyContent,
       formatModelParams,
       getObservationTypeColor,
+      getObservationTypeVariant: (type: string | null | undefined): BadgeVariant => {
+        const color = getObservationTypeColor(type);
+        const map: Record<string, BadgeVariant> = {
+          green: "success",
+          blue: "primary",
+          purple: "primary",
+          orange: "warning",
+          indigo: "primary",
+          cyan: "primary",
+          teal: "primary",
+          pink: "primary",
+          "deep-purple": "primary",
+          "light-blue": "primary",
+          red: "error",
+          grey: "default",
+          amber: "warning",
+        };
+        return map[color] || "default";
+      },
       hasContent,
       parsedSystemInstructions,
       ioContainerRef,
@@ -2185,23 +2181,6 @@ export default defineComponent({
 
   .table-head-chip {
     padding: 0px;
-
-    .q-chip__content {
-      margin-right: 0.5rem;
-      font-size: 0.75rem;
-      color: $dark;
-    }
-
-    .q-chip__icon--remove {
-      height: 1rem;
-      width: 1rem;
-      opacity: 1;
-      margin: 0;
-
-      &:hover {
-        opacity: 0.7;
-      }
-    }
 
     .q-table th.sortable {
       cursor: pointer;

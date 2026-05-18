@@ -54,7 +54,7 @@
               :aria-label="t('panel.removeJoin')"
               icon-left="close"
             >
-              <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
+              <OTooltip :content="t('panel.removeJoin')" />
             </OButton>
           </OButtonGroup>
         </div>
@@ -66,7 +66,7 @@
           :aria-label="t('panel.addJoin')"
           icon-left="add"
         >
-          <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
+          <OTooltip :content="t('panel.addJoin')" />
         </OButton>
       </div>
     </div>
@@ -77,6 +77,7 @@
 import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
@@ -143,6 +144,7 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     AddJoinPopUp,
+    OTooltip,
     LeftJoinTypeSvg,
     InnerJoinTypeSvg,
     RightJoinTypeSvg,

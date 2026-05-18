@@ -68,45 +68,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Compact Status, Severity, Alerts badges at extreme right -->
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
         <!-- Status Badge -->
-        <q-badge
-          :color="getStatusColor(incidentDetails.status)"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          style="height: 33px;"
-          outline
+        <OBadge
+          :variant="getStatusVariant(incidentDetails.status)"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <OIcon name="info" size="xs" />
             <span>{{ getStatusLabel(incidentDetails.status) }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
-        </q-badge>
+        </OBadge>
 
         <!-- Severity Badge -->
-        <q-badge
-          :style="{ color: getSeverityColorHex(incidentDetails.severity), height: '33px' }"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          outline
+        <OBadge
+          :variant="getSeverityVariant(incidentDetails.severity)"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <OIcon name="warning" size="xs" />
             <span>{{ incidentDetails.severity }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
-        </q-badge>
+        </OBadge>
 
         <!-- Alert Count Badge -->
-        <q-badge
-          color="primary"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          style="height: 33px;"
-          outline
+        <OBadge
+          variant="primary-soft"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <OIcon name="notifications-active" size="xs" />
             <span>{{ triggers.length }} Alerts</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
-        </q-badge>
+        </OBadge>
       </div>
 
       <!-- Save/Cancel buttons when editing -->
@@ -916,9 +911,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <q-badge :color="alerts[selectedAlertIndex]?.stream_type === 'logs' ? 'blue' : alerts[selectedAlertIndex]?.stream_type === 'metrics' ? 'purple' : 'teal'" outline class="tw:w-fit">
+                          <OBadge variant="primary" class="tw:w-fit">
                             <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
-                          </q-badge>
+                          </OBadge>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
@@ -1207,6 +1202,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1225,6 +1222,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OIcon,
+    OBadge,
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
@@ -2194,16 +2192,16 @@ export default defineComponent({
       }
     };
 
-    const getStatusColor = (status: string) => {
+    const getStatusVariant = (status: string): BadgeVariant => {
       switch (status) {
         case "open":
-          return "negative";
+          return "error-soft";
         case "acknowledged":
-          return "orange";
+          return "warning-soft";
         case "resolved":
-          return "positive";
+          return "success-soft";
         default:
-          return "grey";
+          return "default-soft";
       }
     };
 
@@ -2232,6 +2230,21 @@ export default defineComponent({
           return "#6b7280"; // gray-500
         default:
           return "#6b7280"; // gray-500
+      }
+    };
+
+    const getSeverityVariant = (severity: string): BadgeVariant => {
+      switch (severity) {
+        case "P1":
+          return "error-soft";
+        case "P2":
+          return "warning-soft";
+        case "P3":
+          return "warning-soft";
+        case "P4":
+          return "default-soft";
+        default:
+          return "default-soft";
       }
     };
 
@@ -2911,9 +2924,10 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
-      getStatusColor,
+      getStatusVariant,
       getStatusLabel,
       getSeverityColorHex,
+      getSeverityVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,
