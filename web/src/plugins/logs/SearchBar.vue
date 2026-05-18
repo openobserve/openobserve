@@ -959,7 +959,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -1202,6 +1202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.zoConfig.auto_query_enabled
                 "
                 class="tw:h-[1.875rem]! tw:w-[1px]"
+                vertical
               />
               <ODropdown
                 v-if="

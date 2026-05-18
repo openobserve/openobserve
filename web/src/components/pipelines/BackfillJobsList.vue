@@ -339,8 +339,8 @@ const confirmDialog = ref({
 });
 
 const filters = ref({
-  status: null as string | null,
-  pipelineId: null as any,
+  status: undefined as string | undefined,
+  pipelineId: undefined as any,
 });
 
 const selectedPerPage = ref(10);
@@ -447,8 +447,8 @@ const filteredJobs = computed(() => {
 
 const clearFilters = () => {
   filters.value = {
-    status: null,
-    pipelineId: null,
+    status: undefined,
+    pipelineId: undefined,
   };
 };
 

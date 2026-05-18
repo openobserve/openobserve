@@ -109,6 +109,7 @@ import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsCo
 import OButton from "@/lib/core/Button/OButton.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from 'quasar';
 
 export default defineComponent({
   name: "CorrelationSettings",

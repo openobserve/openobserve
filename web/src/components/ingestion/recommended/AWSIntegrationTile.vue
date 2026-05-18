@@ -166,6 +166,7 @@ import dashboardsService from "@/services/dashboards";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
