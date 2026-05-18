@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <div
       class="create-cipher-form"
     >
@@ -195,6 +195,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();

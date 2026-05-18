@@ -51,7 +51,7 @@
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></OTab>
                 </OTabs>
-                <q-separator></q-separator>
+                <OSeparator />
                 <div class="tw:h-full">
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
@@ -157,6 +157,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";

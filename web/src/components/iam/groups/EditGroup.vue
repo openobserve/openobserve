@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span style="font-size: 18px" class="q-px-md ">
       {{ groupDetails.group_name }}
       </span>
-  <q-separator />
+  <OSeparator />
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";

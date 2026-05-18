@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:p-[0.625rem]">
         <ErrorHeader :error="errorDetails" />
       </div>
-      <q-separator class="full-width" />
+      <OSeparator class="tw:w-full" />
       <div class="tw:p-[0.625rem]">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
@@ -66,6 +66,7 @@ import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 

@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="toggleHelpSection"
                     />
                   </div>
-                  <q-separator class="q-mt-sm q-mb-md" />
+                  <OSeparator class="tw:mt-2 tw:mb-4" />
                   <div class="q-mt-sm q-px-sm">
                     <div>
                       Configure access with JSON objects specifying "object"
@@ -305,6 +305,7 @@ import config from "@/aws-exports";
 import commonService from "@/services/common";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),

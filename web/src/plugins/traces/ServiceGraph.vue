@@ -106,7 +106,7 @@
             </div>
           </div>
         </div>
-        <q-separator
+        <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
           class="tw:self-stretch tw:mx-1"
@@ -295,6 +295,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "ServiceGraph",

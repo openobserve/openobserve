@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="tw:my-4" />
 
         <!-- Action Buttons -->
         <div class="row q-gutter-sm">
@@ -203,6 +203,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const props = defineProps({
   traceId: {

@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <q-separator></q-separator>
+        <OSeparator />
       </div>
 
       <RenderDashboardCharts
@@ -362,6 +362,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";

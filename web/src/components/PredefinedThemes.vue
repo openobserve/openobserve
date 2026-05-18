@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ theme.light.themeColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isThemeApplied(theme, 'light')"
                   variant="success"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ customLightColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isCustomThemeApplied('light')"
                   variant="success"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ theme.dark.themeColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isThemeApplied(theme, 'dark')"
                   variant="success"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ customDarkColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isCustomThemeApplied('dark')"
                   variant="success"
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Note at the bottom -->
       <q-card-section class="q-pt-none q-pb-sm">
-        <q-separator class="q-mb-sm" />
+        <OSeparator class="tw:mb-2" />
         <div
           class="text-caption text-grey-7 tw:flex tw:items-start q-gutter-xs"
         >
@@ -234,6 +234,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { hexToRgba, applyThemeColors } from "@/utils/theme";
 import { toast } from "@/lib/feedback/Toast/useToast";

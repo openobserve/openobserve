@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.datetimeRelative") }}
         </OButton>
-        <q-separator vertical inset />
+        <OSeparator vertical class="tw:my-2" />
         <OButton
           class="tab-button"
           :variant="
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("common.datetimeAbsolute") }}
         </OButton>
       </div>
-      <q-separator />
+      <OSeparator />
       <OTabPanels v-model="data.selectedDate.tab" animated>
         <OTabPanel name="relative">
           <div class="date-time-table relative column">
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:end-date="data.selectedDate.absolute.date.to = $event"
             />
             <div class="notePara">{{ t("common.datetimeMessage") }}</div>
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
 
             <table class="q-px-md startEndTime">
               <tr>
@@ -134,10 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </tr>
               <tr>
                 <td>
-                  <OTime class="tw:w-full" v-model="data.selectedDate.absolute.startTime" />
+                  <OTime
+                    class="tw:w-full"
+                    v-model="data.selectedDate.absolute.startTime"
+                  />
                 </td>
                 <td>
-                  <OTime class="tw:w-full" v-model="data.selectedDate.absolute.endTime" />
+                  <OTime
+                    class="tw:w-full"
+                    v-model="data.selectedDate.absolute.endTime"
+                  />
                 </td>
               </tr>
             </table>
@@ -158,6 +164,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";

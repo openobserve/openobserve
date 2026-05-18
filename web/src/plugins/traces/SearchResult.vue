@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:ml-2"
         />
 
-        <q-space />
+        <div class="tw:flex-1" />
         <!-- Pagination -->
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect

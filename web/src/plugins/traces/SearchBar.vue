@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.runQuery") }}
             </OButton>
             <!-- Dropdown: shown when live mode feature is enabled -->
-            <q-separator
+            <OSeparator
               v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
               class="tw:h-[1.875rem]! tw:w-[1px]"
             />
@@ -450,6 +450,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 

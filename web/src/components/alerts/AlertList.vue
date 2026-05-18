@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </q-item-section>
                             <q-item-section>Move</q-item-section>
                           </q-item>
-                          <q-separator />
+                          <OSeparator />
                           <q-item
                             class="flex items-center justify-center"
                             clickable
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               t("alerts.delete")
                             }}</q-item-section>
                           </q-item>
-                          <q-separator />
+                          <OSeparator />
                           <q-item
                             class="flex items-center justify-center"
                             clickable
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </q-item-section>
                             <q-item-section>Export</q-item-section>
                           </q-item>
-                          <q-separator />
+                          <OSeparator />
                           <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
                           <template v-if="row.type === 'anomaly'">
                             <q-item
@@ -753,6 +753,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 // import alertList from "./alerts";

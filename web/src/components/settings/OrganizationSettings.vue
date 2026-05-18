@@ -57,7 +57,7 @@
 
     <!-- Cross-Linking Configuration -->
     <template v-if="store.state.zoConfig?.enable_cross_linking">
-      <q-separator class="q-mt-lg q-mb-md" />
+      <OSeparator class="tw:mt-6 tw:mb-4" />
       <CrossLinkManager
         v-model="crossLinks"
         :title="t('crossLinks.orgConfigTitle')"
@@ -94,6 +94,7 @@ import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

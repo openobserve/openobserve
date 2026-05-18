@@ -56,7 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="goToPipelineHistory"
               >
                 <template #icon-left
-                  ><OIcon name="history" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                  ><OIcon
+                    name="history"
+                    size="sm"
+                    class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 {{ t(`pipeline.history`) }}
               </OButton>
               <OButton
@@ -68,7 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="goToBackfillJobs"
               >
                 <template #icon-left
-                  ><OIcon name="refresh" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                  ><OIcon
+                    name="refresh"
+                    size="sm"
+                    class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 {{ t("pipeline.backfill") }}
               </OButton>
               <OButton
@@ -79,7 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="routeToImportPipeline"
               >
                 <template #icon-left
-                  ><OIcon name="upload" size="sm" class="tw:size-3.5 tw:shrink-0" /></template>
+                  ><OIcon
+                    name="upload"
+                    size="sm"
+                    class="tw:size-3.5 tw:shrink-0"
+                /></template>
                 {{ t(`pipeline.import`) }}
               </OButton>
             </template>
@@ -157,22 +169,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:selected-ids="selectedPipelineIds"
             :expansion="activeTab === 'realtime' ? 'none' : 'single'"
             v-model:expanded-ids="expandedId"
-            style="width: 100%; height: calc(100vh - var(--navbar-height) - 77px)"
+            style="
+              width: 100%;
+              height: calc(100vh - var(--navbar-height) - 77px);
+            "
             @row-click="handleRowClick"
           >
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
                 <OButton
                   :data-test="`pipeline-list-${row.name}-pause-start-alert`"
-                  :variant="
-                    row.enabled ? 'ghost-destructive' : 'ghost'
-                  "
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                   size="icon-xs-sq"
-                  :title="
-                    row.enabled
-                      ? t('alerts.pause')
-                      : t('alerts.start')
-                  "
+                  :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   @click.stop="togglePipeline(row)"
                 />
@@ -194,7 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="visibility" size="sm" />
                   </template>
                   <OTooltip>
-                    <template #content><PipelineView :pipeline="row" /></template>
+                    <template #content
+                      ><PipelineView :pipeline="row"
+                    /></template>
                   </OTooltip>
                 </OButton>
                 <OButton
@@ -219,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           t("pipeline.export")
                         }}</q-item-section>
                       </q-item>
-                      <q-separator
+                      <OSeparator
                         v-if="
                           row.source.source_type === 'scheduled' &&
                           config.isEnterprise == 'true'
@@ -240,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item-section>
                         <q-item-section>Create Backfill</q-item-section>
                       </q-item>
-                      <q-separator />
+                      <OSeparator />
                       <q-item
                         class="flex items-center"
                         clickable
@@ -254,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           t("pipeline.delete")
                         }}</q-item-section>
                       </q-item>
-                      <q-separator v-if="row.last_error" />
+                      <OSeparator v-if="row.last_error" />
                       <q-item
                         v-if="row.last_error"
                         class="flex items-center"
@@ -263,18 +274,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="showErrorDialog(row)"
                       >
                         <q-item-section dense avatar>
-                          <OIcon
-                            size="sm"
-                            name="error"
-                          />
+                          <OIcon size="sm" name="error" />
                         </q-item-section>
                         <q-item-section>
                           <div>View Error</div>
                           <div class="text-caption text-grey">
                             {{
                               new Date(
-                                row.last_error
-                                  .last_error_timestamp / 1000,
+                                row.last_error.last_error_timestamp / 1000,
                               ).toLocaleString()
                             }}
                           </div>
@@ -302,9 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="scheduled-pipeline-expanded-sql"
                     class="scrollable-content expanded-sql"
                   >
-                    <pre style="text-wrap: wrap"
-                      >{{ row?.sql_query }} </pre
-                    >
+                    <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                   </div>
                 </div>
               </div>
@@ -372,7 +377,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <router-view v-else />
 
-  <ODrawer data-test="pipelines-list-create-pipeline-drawer" v-model:open="showCreatePipeline" size="lg">
+  <ODrawer
+    data-test="pipelines-list-create-pipeline-drawer"
+    v-model:open="showCreatePipeline"
+    size="lg"
+  >
     <stream-selection @save="savePipeline" />
   </ODrawer>
 
@@ -402,12 +411,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 
   <!-- Pipeline Error Dialog -->
-  <ODialog data-test="pipelines-list-error-dialog"
+  <ODialog
+    data-test="pipelines-list-error-dialog"
     v-model:open="errorDialog.show"
     @update:open="(v) => !v && closeErrorDialog()"
     size="md"
     :title="errorDialog.data?.name"
-    :sub-title="errorDialog.data ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}` : undefined"
+    :sub-title="
+      errorDialog.data
+        ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`
+        : undefined
+    "
     :primary-button-label="t('pipeline_list.close')"
     @click:primary="closeErrorDialog"
   >
@@ -419,8 +433,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="tw:mb-4">
         <div class="section-label tw:mb-2">
-            {{ t("pipeline_list.error_summary") }}
-          </div>
+          {{ t("pipeline_list.error_summary") }}
+        </div>
         <div class="error-summary-box">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
@@ -428,39 +442,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Node Errors -->
       <div
-          v-if="
-            errorDialog.data.last_error.node_errors &&
-            Object.keys(errorDialog.data.last_error.node_errors).length > 0
-          "
-        >
+        v-if="
+          errorDialog.data.last_error.node_errors &&
+          Object.keys(errorDialog.data.last_error.node_errors).length > 0
+        "
+      >
         <div class="section-label tw:mb-3">
-            {{ t("pipeline_list.node_errors") }}
-          </div>
+          {{ t("pipeline_list.node_errors") }}
+        </div>
         <div class="node-errors-container">
           <div
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
-                .node_errors"
+              .node_errors"
             :key="nodeId"
             class="node-error-item"
           >
             <div class="node-error-header">
-              <span class="node-name">{{
-                  nodeError.node_name || nodeId
-                }}</span>
+              <span class="node-name">{{ nodeError.node_name || nodeId }}</span>
               <span class="node-type">{{ nodeError.node_type }}</span>
             </div>
             <div
-                v-if="
-                  nodeError.error_messages &&
-                  nodeError.error_messages.length > 0
-                "
-                class="node-error-messages"
-              >
+              v-if="
+                nodeError.error_messages && nodeError.error_messages.length > 0
+              "
+              class="node-error-messages"
+            >
               <div
-                  v-for="(msg, idx) in nodeError.error_messages"
-                  :key="idx"
-                  class="error-message"
-                >
+                v-for="(msg, idx) in nodeError.error_messages"
+                :key="idx"
+                class="error-message"
+              >
                 {{ msg }}
               </div>
             </div>
@@ -468,7 +479,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-
   </ODialog>
 </template>
 <script setup lang="ts">
@@ -505,6 +515,7 @@ import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDia
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 import { filter, update } from "lodash-es";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -530,7 +541,6 @@ onUnmounted(() => {
 });
 
 const showCreatePipeline = ref(false);
-
 
 const pipelines = ref([]);
 
@@ -587,7 +597,9 @@ const tabs = reactive([
 
 const selectedPipelineIds = ref<string[]>([]);
 const selectedPipelines = computed(() =>
-  filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id))
+  filteredPipelines.value.filter((p: any) =>
+    selectedPipelineIds.value.includes(p.pipeline_id),
+  ),
 );
 const expandedId = ref<string[]>([]);
 
@@ -784,9 +796,23 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   if (tab === "realtime") {
-    return [hashColumn, nameColumn, streamNameColumn, streamTypeColumn, actionsColumn];
+    return [
+      hashColumn,
+      nameColumn,
+      streamNameColumn,
+      streamTypeColumn,
+      actionsColumn,
+    ];
   }
-  return [hashColumn, nameColumn, scheduledStreamTypeColumn, frequencyColumn, periodColumn, cronColumn, actionsColumn];
+  return [
+    hashColumn,
+    nameColumn,
+    scheduledStreamTypeColumn,
+    frequencyColumn,
+    periodColumn,
+    cronColumn,
+    actionsColumn,
+  ];
 };
 
 onMounted(async () => {
@@ -1041,8 +1067,6 @@ const handleCancelResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
   return;
 };
-
-
 
 const showErrorDialog = (pipeline: any) => {
   errorDialog.value.show = true;

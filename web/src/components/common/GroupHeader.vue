@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ title }}
     </span>
     <span class="tw:flex-1">
-      <q-separator />
+      <OSeparator />
     </span>
   </div>
 </template>
@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
 import { computed, defineComponent } from "vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "GroupHeader",

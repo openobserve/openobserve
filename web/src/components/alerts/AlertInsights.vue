@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
       </OButton>
 
-      <q-space />
+      <div class="tw:flex-1" />
 
       <OButton
         variant="ghost"

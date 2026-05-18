@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets Parameter Helper -->
       <q-slide-transition>
         <div v-if="showParamHelper && deploymentMode === 'stackset'">
-          <q-separator class="tw:mb-4" />
+          <OSeparator class="tw:mb-4" />
           <div class="param-helper">
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
               <div class="tw:font-semibold step-label">
@@ -353,6 +353,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

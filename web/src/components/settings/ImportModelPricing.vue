@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('modelPricing.errorValidations') }}
         </div>
         <div v-else class="text-center text-h6 tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Model Pricing Errors Section -->
           <div
@@ -141,6 +141,7 @@ import { useRouter } from "vue-router";
 
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 import modelPricingService from "@/services/model_pricing";
 import { toast } from "@/lib/feedback/Toast/useToast";

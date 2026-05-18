@@ -559,7 +559,7 @@ defineExpose({
     justify-content: flex-start;
   }
 
-  .q-separator {
+  [role="separator"] {
     display: none !important;
   }
 }

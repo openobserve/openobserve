@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
                   <div class="text-center text-h6 tw:py-2">Output Messages</div>
-                  <q-separator class="q-mx-md q-mt-md" />
+                  <OSeparator class="tw:mx-4 tw:mt-4" />
                   <div class="error-report-container">
                     <div class="text-center q-pa-md text-grey-6">
                       No messages to display
@@ -227,6 +227,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "BaseImport",

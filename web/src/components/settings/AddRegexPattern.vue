@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <q-separator class="tw:my-2" />
+            <OSeparator class="tw:my-2" />
             <div>
               <div class="tw:flex tw:items-center tw:justify-between">
                 <span class="regex-pattern-test-string-label">
@@ -333,6 +333,7 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "AddRegexPattern",

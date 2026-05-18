@@ -23,7 +23,7 @@
           </div>
         </div>
       </q-card-section>
-      <q-separator />
+      <OSeparator />
     </div>
 
     <OTable
@@ -46,6 +46,7 @@ import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTable from '@/lib/core/Table/OTable.vue';
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "QueryList",

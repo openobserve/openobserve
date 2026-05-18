@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Error Validations
       </div>
       <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-      <q-separator class="q-mx-md q-mt-md" />
+      <OSeparator class="tw:mx-4 tw:mt-4" />
       <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
         <!-- Alert Errors Section -->
         <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
@@ -312,6 +312,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import {
   detectConditionsVersion,
   convertV0ToV2,

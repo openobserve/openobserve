@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
     <div class="q-px-md">{{ tag.key }}</div>
-    <q-separator data-test="separator" vertical />
+    <OSeparator data-test="separator" vertical />
     <div class="q-px-md tw:bg-[var(--o2-table-header-bg)] tw:break-all">
       {{ tag.value }}
     </div>
@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 defineProps({
   tag: {
     type: Object,

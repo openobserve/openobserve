@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <q-separator class="q-my-sm" />
+          <OSeparator class="tw:my-2" />
 
           <!-- Time Information -->
           <div class="detail-section">
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <q-separator class="q-my-sm" />
+          <OSeparator class="tw:my-2" />
 
           <!-- Pipeline Configuration -->
           <div class="detail-section">
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedRow.is_partial !== undefined)
             "
           >
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
             <div class="detail-section">
               <div class="row q-col-gutter-md">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="col-4">
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Source Node (if available) -->
           <template v-if="selectedRow.source_node">
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
             <div class="detail-section">
               <div class="text-caption text-grey-7 q-mb-xs">Source Node</div>
               <div class="text-body2 text-mono">
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Error Details (if available) -->
           <template v-if="selectedRow.error">
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
             <div class="detail-section">
               <div class="text-caption text-grey-7 q-mb-xs">
                 <OIcon name="error" size="xs" class="q-mr-xs" />
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Success Response (if available) -->
           <template v-if="selectedRow.success_response">
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
             <div class="detail-section">
               <div class="text-caption text-grey-7 q-mb-xs">
                 <OIcon name="check-circle" size="xs" class="q-mr-xs" />
@@ -502,6 +502,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";

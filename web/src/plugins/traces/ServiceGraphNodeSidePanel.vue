@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="tw:my-[1rem]!" />
+        <OSeparator class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
@@ -621,6 +621,7 @@ import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(

@@ -8,7 +8,7 @@
         </div>
       </q-card-section>
 
-      <q-separator />
+      <OSeparator />
 
       <q-card-section>
         <!-- Query Builder Section -->
@@ -32,7 +32,7 @@
         </div>
       </q-card-section>
 
-      <q-separator />
+      <OSeparator />
 
       <!-- Generated Query Display -->
       <q-card-section>
@@ -95,6 +95,7 @@ import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 

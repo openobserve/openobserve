@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
     <!-- Source Maps List -->
     <div class="source-maps-list q-pa-md">
@@ -215,6 +215,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

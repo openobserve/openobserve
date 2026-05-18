@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OTabs>
     </div>
-    <q-separator style="width: 100%" />
+    <OSeparator class="tw:w-full" />
     <div class="span_details_tab-panels  tw:p-2">
       <OTabPanels v-model="activeTab"
 grow
@@ -924,6 +924,7 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

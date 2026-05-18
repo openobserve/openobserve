@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- target container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- value container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
@@ -381,9 +381,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -417,6 +417,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",

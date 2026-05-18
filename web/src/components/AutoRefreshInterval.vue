@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <q-separator />
+        <OSeparator />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
           <div
             v-for="(item, j) in items"
@@ -96,33 +96,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="row items-center no-wrap">
             <OIcon
               left
-              name="update" size="sm"
+              name="update"
+              size="sm"
               :class="[
                 isAnimating ? 'rotating-icon' : '',
                 isAnimating ? 'text-primary' : '',
               ]"
             />
             <div class="text-center">{{ selectedLabel }}</div>
-            <OIcon
-              name="arrow-drop-down"
-              size="sm"
-              class="tw:ml-0.5"
-            />
+            <OIcon name="arrow-drop-down" size="sm" class="tw:ml-0.5" />
           </div>
         </OButton>
       </template>
       <div class="tw:w-[300px] tw:p-2">
         <div class="row">
-          <div
-            class="col col-12 q-pa-sm"
-            style="text-align: center"
-          >
+          <div class="col col-12 q-pa-sm" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
               size="sm"
               :block="true"
-              @click="() => { onItemClick({ label: t('common.off'), value: 0 }); btnRefreshInterval = false; }"
+              @click="
+                () => {
+                  onItemClick({ label: t('common.off'), value: 0 });
+                  btnRefreshInterval = false;
+                }
+              "
             >
               {{ t("common.off") }}
             </OButton>
@@ -140,7 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
               :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
               size="sm"
-              @click="() => { onItemClick(item); btnRefreshInterval = false; }"
+              @click="
+                () => {
+                  onItemClick(item);
+                  btnRefreshInterval = false;
+                }
+              "
               :disabled="item.disabled"
             >
               <OTooltip
@@ -177,12 +181,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OButton, ODropdown, ODropdownSeparator, OTooltip,
-    OIcon,
-},
+  components: { OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
   props: {
     modelValue: {
       type: Number,
