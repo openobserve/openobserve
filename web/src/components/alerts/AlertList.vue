@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:shrink-0 tw:px-[0.625rem]"
       v-if="!showAddAlertDialog && !showImportAlertDialog"
     >
-      <div class="card-container">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px]"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div class="tw:flex tw:items-center tw:gap-4">
             <div
@@ -65,41 +65,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Search for Alerts -->
             <OInput
               v-model="dynamicQueryModel"
-              :placeholder="
-                searchAcrossFolders
-                  ? t('dashboard.searchAcross')
-                  : t('alerts.search')
-              "
+              :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
               data-test="alert-list-search-input"
               :clearable="searchAcrossFolders"
               @clear="clearSearchHistory"
-              :class="[
-                'o2-search-input',
-                isCompactToolbar ? 'alert-search-input' : '',
-              ]"
+              class="tw:ml-2 tw:w-[200px]"
             >
-              <template #prepend>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-              <template v-if="isCompactToolbar" #append>
-                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="bottom">
-                  <OSwitch
-                    data-test="alert-list-search-across-folders-toggle"
-                    v-model="searchAcrossFolders"
-                  />
-                </OTooltip>
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
-            <!-- All Folders toggle (normal resolution) -->
-            <div v-if="!isCompactToolbar" class="tw:ml-2">
-              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
-                <OSwitch
-                  data-test="alert-list-search-across-folders-toggle"
-                  v-model="searchAcrossFolders"
-                  :label="t('dashboard.allFolders')"
-                />
-              </OTooltip>
-            </div>
+            <!-- All Folders toggle -->
+            <OSwitch
+              data-test="alert-list-search-across-folders-toggle"
+              v-model="searchAcrossFolders"
+              size="lg"
+              class="tw:ml-2 tw:flex tw:items-center tw:py-[0.45rem] tw:px-[0.375rem] tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)]"
+            >
+              <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
+              <template #tooltip>
+                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
+              </template>
+            </OSwitch>
           </div>
           <!-- Import button -->
           <OButton
@@ -171,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :page-size="pageSize"
                 :page-size-options="pageSizeOptions"
                 width="100%"
-                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
                 :show-global-filter="false"
                 :default-columns="false"
                 @row-click="triggerExpand"
@@ -744,6 +730,9 @@ import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import { symOutlinedSoundSampler } from "@quasar/extras/material-symbols-outlined";
@@ -770,6 +759,9 @@ export default defineComponent({
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
+    OInput,
+    OSwitch,
+    OTooltip,
     SelectFolderDropDown,
     AlertHistoryDrawer,
     O2AIContextAddBtn,

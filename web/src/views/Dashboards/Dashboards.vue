@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
     <!-- searchBar at top -->
-    <div class="tw:shrink-0 tw:px-[0.625rem]">
-      <div class="card-container">
+    <div class="tw:shrink-0 tw:px-[0.625rem] tw:pt-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
