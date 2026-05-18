@@ -61,20 +61,9 @@ async function initQueryBuilderTest(page, pm) {
     await applyQueryButton(pm);
 }
 
-/**
- * Lite init: navigate and select stream only. No initial query.
- * For tests that call setupQueryAndSwitchToBuild (which runs their own query).
- */
-async function initQueryBuilderTestLite(page, pm) {
-    await page.waitForLoadState('domcontentloaded');
-    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-    await pm.logsPage.selectStream("e2e_automate");
-}
-
 module.exports = {
     ingestForQueryBuilderTest,
     applyQueryButton,
     setupQueryAndSwitchToBuild,
     initQueryBuilderTest,
-    initQueryBuilderTestLite,
 };
