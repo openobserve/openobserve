@@ -2378,17 +2378,20 @@ export class PipelinesPage {
     async clearPipelineFieldSearch() {
         const searchInput = this.pipelineFieldSearchInput;
         await searchInput.fill('');
-        // Wait for the field list to fully repopulate after clearing the search.
-        // Quasar's filtered q-table may batch-render rows, so we check that
-        // rows have settled before counting.
+        // Wait for the field list count to stabilize after clearing.
+        // Quasar's virtual-scroll q-table batches rows incrementally, so
+        // poll until two consecutive reads return the same count — avoids
+        // hardcoded thresholds that break on partial data or schema changes.
         await this.page.waitForFunction(() => {
-            const labels = document.querySelectorAll('.field_label');
-            // A reasonable minimum — if we were searching and had matches,
-            // after clearing we should see at least 30 fields (more than
-            // the initial batch of ~25 virtual rows).
-            return labels.length >= 30;
+            const table = document.querySelector('[data-test="log-search-index-list-fields-table"]');
+            if (!table) return false;
+            const labels = table.querySelectorAll('.field_label');
+            const count = labels.length;
+            const prev = Number(table.dataset.prevFieldCount ?? -1);
+            table.dataset.prevFieldCount = String(count);
+            return prev >= 0 && count === prev && count > 0;
         }, { timeout: 8000 }).catch(() => {
-            testLogger.info('Field list repopulation wait timed out — continuing with partial count');
+            testLogger.info('Field list stabilization wait timed out — continuing with current count');
         });
         testLogger.info('Field list search cleared');
     }
