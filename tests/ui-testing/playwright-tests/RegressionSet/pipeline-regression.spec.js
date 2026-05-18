@@ -8,7 +8,7 @@ const logsdata = require('../../../test-data/logs_data.json');
 test.describe.configure({ mode: "serial" });
 
 test.use({
-  launchOptions: {
+  contextOptions: {
     slowMo: 500
   }
 });

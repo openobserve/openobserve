@@ -11,7 +11,7 @@ test.describe.configure({ mode: 'parallel' });
 const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
   storageState: authFile,
-  launchOptions: {
+  contextOptions: {
     slowMo: 1000
   }
 });

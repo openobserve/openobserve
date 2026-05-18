@@ -7,7 +7,7 @@ const logsdata = require("../../../test-data/logs_data.json");
 test.describe.configure({ mode: "parallel" });
 
 test.use({
-  launchOptions: {
+  contextOptions: {
     slowMo: 1000
   }
 });

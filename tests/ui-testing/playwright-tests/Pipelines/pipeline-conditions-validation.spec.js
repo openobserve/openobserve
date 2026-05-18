@@ -9,7 +9,7 @@ const path = require('path');
 test.describe.configure({ mode: "parallel" });
 
 test.use({
-  launchOptions: {
+  contextOptions: {
     slowMo: 1000
   }
 });

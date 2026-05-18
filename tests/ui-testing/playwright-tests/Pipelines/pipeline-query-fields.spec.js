@@ -6,11 +6,7 @@ const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "serial" });
 
-test.use({
-  launchOptions: {
-    slowMo: 500
-  }
-});
+test.use({ slowMo: 500 });
 
 test.describe("Pipeline Query Node - Field List", { tag: ['@all', '@pipelines', '@scheduledPipeline'] }, () => {
   let pageManager;
