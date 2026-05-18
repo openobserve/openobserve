@@ -3108,7 +3108,8 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.limit.footer_cache_max_size == 0 {
         cfg.limit.footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 * SIZE_IN_MB * 0.05) as usize).clamp(100, 1024);
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
     }
     Ok(())
 }
