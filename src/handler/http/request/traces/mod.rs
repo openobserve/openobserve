@@ -69,7 +69,6 @@ pub(crate) struct TraceDetail {
     pub(crate) gen_ai_usage_cost: f64,
     pub(crate) error_count: i64,
     pub(crate) user_id: Option<String>,
-    pub(crate) model: Option<String>,
     pub(crate) first_user_message: Option<String>,
 }
 
@@ -361,6 +360,7 @@ pub async fn get_latest_traces(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
@@ -506,6 +506,15 @@ pub async fn get_latest_traces(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
                 gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
+                models: item
+                    .get("gen_ai_response_models")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             },
         );
     }
@@ -1139,6 +1148,7 @@ async fn process_latest_traces_stream(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
@@ -1440,6 +1450,15 @@ async fn process_latest_traces_stream(
                         item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                     ),
                     gen_ai_input_messages: item.get("gen_ai_input_messages").cloned(),
+                    models: item
+                        .get("gen_ai_response_models")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 },
             );
         }
@@ -1760,6 +1779,7 @@ struct TraceResponseItem {
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
     gen_ai_input_messages: Option<serde_json::Value>,
+    models: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize)]

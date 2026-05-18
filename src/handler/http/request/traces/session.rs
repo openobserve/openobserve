@@ -332,7 +332,6 @@ pub async fn get_latest_sessions(
         sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
         sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
         sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-        max(gen_ai_response_model) as gen_ai_response_model, \
         FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
@@ -410,9 +409,6 @@ pub async fn get_latest_sessions(
                 error_count: json::get_int_value(item.get("error_count").unwrap_or_default()),
                 user_id: item
                     .get("user_id")
-                    .and_then(|v| v.as_str().map(String::from)),
-                model: item
-                    .get("gen_ai_response_model")
                     .and_then(|v| v.as_str().map(String::from)),
                 first_user_message,
             },
@@ -534,7 +530,6 @@ struct SessionDetails {
     gen_ai_usage_cost: f64,
     error_count: i64,
     users: Vec<String>,
-    models: Vec<String>,
     first_user_message: Option<String>,
 }
 
@@ -548,7 +543,6 @@ impl SessionDetails {
         let mut cost_total: f64 = 0.0;
         let mut error_count: i64 = 0;
         let mut user_ids: Vec<String> = Vec::with_capacity(details.len());
-        let mut models: Vec<String> = Vec::with_capacity(details.len());
         let mut first_user_message: Option<String> = None;
         let mut earliest_user_msg_time: i64 = 0;
         for detail in details {
@@ -565,11 +559,6 @@ impl SessionDetails {
             error_count += detail.error_count;
             if let Some(ref uid) = detail.user_id {
                 user_ids.push(uid.clone());
-            }
-            if let Some(ref model) = detail.model
-                && !models.contains(model)
-            {
-                models.push(model.clone());
             }
             if let Some(ref msg) = detail.first_user_message
                 && (first_user_message.is_none()
@@ -597,7 +586,6 @@ impl SessionDetails {
             gen_ai_usage_cost: cost_total,
             error_count,
             users: user_ids,
-            models,
             first_user_message,
         }
     }
@@ -927,7 +915,6 @@ mod tests {
         assert_eq!(session.gen_ai_usage_cost, 0.0);
         assert_eq!(session.error_count, 0);
         assert!(session.users.is_empty());
-        assert!(session.models.is_empty());
         assert!(session.first_user_message.is_none());
     }
 
@@ -1007,26 +994,6 @@ mod tests {
         assert_eq!(session.trace_count, 5);
         assert_eq!(session.start_time, 0);
         assert_eq!(session.end_time, 0);
-    }
-
-    #[test]
-    fn test_from_trace_details_models_collected_and_deduplicated() {
-        let details = vec![
-            TraceDetail {
-                model: Some("gpt-4".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                model: Some("gpt-4".to_string()),
-                ..Default::default()
-            },
-            TraceDetail {
-                model: Some("claude-3".to_string()),
-                ..Default::default()
-            },
-        ];
-        let session = SessionDetails::from_trace_details("sess-1".to_string(), 3, &details);
-        assert_eq!(session.models, vec!["gpt-4", "claude-3"]);
     }
 
     #[test]
