@@ -231,7 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="signout"
   >
     <div class="tw:flex tw:items-center tw:gap-3">
-      <q-avatar icon="info" color="primary" text-color="white" />
+      <div class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-10 tw:h-10 tw:rounded-full tw:shrink-0">
+        <OIcon name="info" size="sm" />
+      </div>
       <span>As you've chosen to change your password, you'll be automatically
         logged out.</span
       >

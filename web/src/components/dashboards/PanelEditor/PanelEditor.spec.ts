@@ -281,7 +281,6 @@ const mountGlobal = {
     QIcon: true,
     QBtn: true,
     QTooltip: true,
-    QAvatar: true,
     ODialog: ODialogStub,
     // Explicit stub so shallowMount tracks `open` as a declared prop.
     ShowLegendsPopup: {

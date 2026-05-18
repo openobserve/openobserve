@@ -212,9 +212,6 @@ describe("AppSessions.vue", () => {
               '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
             props: ["modelValue", "unit", "vertical"],
           },
-          QAvatar: {
-            template: '<div class="q-avatar" v-bind="$attrs"><slot /></div>',
-          },
           QIcon: {
             template: '<span class="OIcon" v-bind="$attrs"></span>',
           },
@@ -657,7 +654,6 @@ describe("AppSessions.vue", () => {
               template:
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
-            QAvatar: { template: "<div><slot /></div>" },
             QIcon: { template: "<span></span>" },
             QSpinnerHourglass: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },
@@ -801,7 +797,6 @@ describe("AppSessions.vue", () => {
               template:
                 '<div><slot name="before" /><slot name="after" /></div>',
             },
-            QAvatar: { template: "<div><slot /></div>" },
             QIcon: { template: "<span></span>" },
             QSpinnerHourglass: { template: "<div></div>" },
             DateTime: { template: "<div></div>" },

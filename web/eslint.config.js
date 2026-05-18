@@ -149,6 +149,10 @@ export default [
           element: 'q-chip',
           message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.'
         },
+        {
+          element: 'q-avatar',
+          message: 'Use a plain <div class="tw:rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.'
+        },
         // {
         //   element: 'q-spinner',
         //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'

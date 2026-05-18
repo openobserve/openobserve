@@ -19,9 +19,9 @@
           class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full"
         >
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-avatar size="24px">
-              <img :src="o2AiTitleLogo" />
-            </q-avatar>
+            <div class="tw:inline-flex tw:w-6 tw:h-6 tw:rounded-full tw:overflow-hidden">
+              <img :src="o2AiTitleLogo" class="tw:w-full tw:h-full tw:object-cover" />
+            </div>
 
             <OButton
               variant="ghost"
@@ -331,9 +331,9 @@
             ]"
           >
             <div class="message-content">
-              <q-avatar
+              <div
                 v-if="message.role === 'user'"
-                size="24px"
+                class="tw:inline-flex tw:items-center tw:justify-center tw:w-6 tw:h-6 tw:rounded-full"
                 :class="
                   store.state.theme == 'dark'
                     ? 'dark-user-avatar'
@@ -345,7 +345,7 @@
                   name="person"
                   :color="store.state.theme == 'dark' ? 'white' : '#4a5568'"
                 />
-              </q-avatar>
+              </div>
               <div
                 class="message-blocks"
                 style="background-color: transparent"
