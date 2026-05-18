@@ -355,8 +355,8 @@ pub async fn get_latest_sessions(
             max(user_id) as user_id,
             min(start_time) as trace_start_time, \
             max(end_time) as trace_end_time, \
-            CAST(0 AS BIGINT) as gen_ai_usage_details_input, \
-            CAST(0 AS BIGINT) as gen_ai_usage_details_output, \
+            sum(llm_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(llm_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
             CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \

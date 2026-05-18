@@ -382,8 +382,8 @@ pub async fn get_latest_traces(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            CAST(0 AS BIGINT) as gen_ai_usage_details_input, \
-            CAST(0 AS BIGINT) as gen_ai_usage_details_output, \
+            sum(llm_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(llm_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
             CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
             FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
@@ -1197,8 +1197,8 @@ async fn process_latest_traces_stream(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
             (max(end_time) - min(start_time)) as zo_sql_duration, \
-            CAST(0 AS BIGINT) as gen_ai_usage_details_input, \
-            CAST(0 AS BIGINT) as gen_ai_usage_details_output, \
+            sum(llm_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(llm_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
             CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
             FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
