@@ -28,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="iam-roles-search-input">
             <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:h-[36px]"
               :placeholder="t('iam.searchRole')"
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
           </div>
