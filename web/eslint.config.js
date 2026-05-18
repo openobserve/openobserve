@@ -157,10 +157,10 @@ export default [
           element: 'q-img',
           message: 'Use a native <img> element instead of <q-img>. q-img features (lazy load, aspect-ratio, spinner) are not used anywhere in this codebase.'
         },
-        // {
-        //   element: 'q-spinner',
-        //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
-        // },
+        {
+          element: 'q-spinner',
+          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
+        },
         {
           element: 'q-spinner-hourglass',
           message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-hourglass>.'
