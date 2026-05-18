@@ -89,6 +89,7 @@ export default [
       // Enforced rules
       "vue/no-restricted-html-elements": [
         "error",
+<<<<<<< HEAD
         {
           element: "q-btn",
           message:
