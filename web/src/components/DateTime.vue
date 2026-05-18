@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         anchor="bottom left"
         self="top left"
         no-route-dismiss
+        :persistent="isTimezoneSelectOpen"
         @before-show="onBeforeShow"
         @before-hide="onBeforeHide"
         @hide="onHide"
@@ -103,14 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ item }}
                     <OTooltip
-                      side="right"
-                      align="center"
-                      max-width="300px"
                       v-if="
                         relativeDatesInHour[period.value][item_index] >
                           queryRangeRestrictionInHour &&
                         queryRangeRestrictionInHour > 0
                       "
+                      side="right"
+                      align="center"
+                      max-width="300px"
                       :content="queryRangeRestrictionMsg"
                     />
                   </OButton>
@@ -167,14 +168,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="queryRangeRestrictionInHour > 0"
                 :content="queryRangeRestrictionMsg"
               />
-              <ODateRangeCalendar
-                :start-date="selectedDate.from"
-                :end-date="selectedDate.to"
-                :min-date="calendarMinDate"
-                :max-date="calendarMaxDate"
-                @update:start-date="selectedDate.from = $event"
-                @update:end-date="selectedDate.to = $event"
-              />
+              <div class="tw:flex tw:justify-center tw:px-3 tw:py-2">
+                <ODateRangeCalendar
+                  :start-date="selectedDate.from"
+                  :end-date="selectedDate.to"
+                  :min-date="calendarMinDate"
+                  :max-date="calendarMaxDate"
+                  @update:start-date="selectedDate.from = $event"
+                  @update:end-date="selectedDate.to = $event"
+                />
+              </div>
               <div class="notePara">* You can choose multiple date</div>
               <q-separator v-if="!disableRelative" class="q-my-sm" />
 
@@ -187,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <tr>
                     <td>
                       <OTime
+                        class="tw:w-full"
                         v-model="selectedTime.startTime"
                         with-seconds
                         @blur="
@@ -199,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </td>
                     <td>
                       <OTime
+                        class="tw:w-full"
                         v-model="selectedTime.endTime"
                         :with-seconds="true"
                         @blur="
@@ -219,25 +224,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
           v-model="timezone"
-          :options="filteredTimezone"
-          @blur="
-            timezone =
-              timezone == ''
-                ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                : timezone
-          "
-          use-input
-          @filter="timezoneFilterFn"
-          :input-debounce="0"
-          emit-value
-          fill-input
-          hide-selected
+          :options="timezoneSelectOptions"
+          searchable
           :label="t('logStream.timezone')"
           @update:model-value="onTimezoneChange"
-          :display-value="`Timezone: ${timezone}`"
-          class="timezone-select o2-custom-select-dashboard"
-        >
-        </OSelect>
+          @open="isTimezoneSelectOpen = true"
+          @close="isTimezoneSelectOpen = false"
+          class="timezone-select"
+        />
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <OButton
@@ -418,7 +412,12 @@ export default defineComponent({
       onTimezoneChange();
     }
 
-    const filteredTimezone: any = ref([]);
+    const filteredTimezone: any = ref(timezoneOptions);
+    const isTimezoneSelectOpen = ref(false);
+
+    const timezoneSelectOptions = computed(() =>
+      timezoneOptions.map((tz: string) => ({ label: tz, value: tz })),
+    );
 
     let relativePeriods = [
       { label: t("common.seconds"), value: "s" },
@@ -1083,6 +1082,8 @@ export default defineComponent({
       onHide,
       calendarMinDate,
       calendarMaxDate,
+      timezoneSelectOptions,
+      isTimezoneSelectOpen,
     };
   },
   computed: {
@@ -1167,6 +1168,7 @@ export default defineComponent({
 
 .date-time-table.relative {
   display: flex;
+  flex-direction: column;
 
   .relative-row {
     display: flex;
@@ -1218,6 +1220,11 @@ export default defineComponent({
   // border: $secondary;
   background: rgba(0, 0, 0, 0.07);
   font-weight: 700;
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
 }
 
 .rp-selector-selected {
@@ -1281,7 +1288,11 @@ export default defineComponent({
   }
 }
 .startEndTime {
+  width: calc(100% - 0.8rem);
   margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  td {
+    width: 50%;
+  }
   .q-field__control-container {
     min-height: 32px;
     height: 32px;
