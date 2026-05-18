@@ -891,7 +891,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
                   />
-                  <q-tree
+                  <OTree
                     class="col-12 col-sm-6 q-mx-sm q-mb-sm"
                     :nodes="store.state.regionInfo"
                     node-key="label"
@@ -2096,6 +2096,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OTree from "@/lib/data/Tree/OTree.vue";
 
 const defaultValue: any = () => {
   return {
@@ -2181,6 +2182,7 @@ export default defineComponent({
     OInput,
     OSelect,
     OSwitch,
+    OTree,
   },
   emits: [
     "searchdata",
