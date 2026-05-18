@@ -211,7 +211,6 @@ export default defineComponent({
     OTooltip,
     OInput,
     OIcon,
-    OInput,
     OTable,
   },
   setup() {
