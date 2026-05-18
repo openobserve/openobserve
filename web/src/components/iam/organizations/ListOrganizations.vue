@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onUpdated, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, copyToClipboard } from "quasar";
@@ -231,33 +231,6 @@ export default defineComponent({
           name: router.currentRoute.value.query?.to_be_updated_org_name || "",
           identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
         };
-      }
-    });
-
-    onUpdated(() => {
-      if (
-        router.currentRoute.value.query.action == "add"
-      ) {
-        showAddOrganizationDialog.value = true;
-      }
-      else if (
-        router.currentRoute.value.query.action == "update"
-      ) {
-        showAddOrganizationDialog.value = true;
-        toBeUpdatedOrganization.value = {
-          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
-          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
-        };
-      }
-
-      if (router.currentRoute.value.query.action == "invite") {
-        organizations.value.map((org) => {
-          if (org.identifier == router.currentRoute.value.query.id) {
-            organization.value = org;
-            showJoinOrganizationDialog.value = true;
-          }
-        });
       }
     });
 
