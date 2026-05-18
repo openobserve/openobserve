@@ -238,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="columns"
                 row-key="id"
                 :global-filter="filterQuery"
+                :show-global-filter="false"
                 :page-size="20"
                 :page-size-options="[20, 50, 100, 250, 500]"
                 selection="multiple"
