@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Error Validations
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
               <div
@@ -215,6 +215,7 @@ import { useRouter } from "vue-router";
 import AppTabs from "../common/AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import BaseImport from "../common/BaseImport.vue";
 import axios from "axios";
 

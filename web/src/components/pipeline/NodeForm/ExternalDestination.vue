@@ -25,6 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:rounded-md">
       <div class="o2-input">
+        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
+          <div class="flex items-center tw:w-full">
+            <div class="tw:w-full" data-test="add-destination-title">
+              <div
+                class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
+              >
+                External Destination
+                <div>
+                  <OButton variant="ghost" size="icon" v-close-popup>
+                    <OIcon name="cancel" size="xs" />
+                  </OButton>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <OSeparator />
         <div class="row q-col-gutter-sm q-px-lg">
           <OSwitch
             data-test="create-stream-toggle"
@@ -100,6 +117,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

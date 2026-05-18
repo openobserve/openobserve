@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
 
     <div
       style="height: calc(100vh - 120px); overflow: auto"
@@ -369,6 +369,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

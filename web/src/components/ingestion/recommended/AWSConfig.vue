@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </div>
 
-    <q-separator class="tw:mb-6" />
+    <OSeparator class="tw:mb-6" />
 
     <OTabPanels v-model="activeTab" animated>
       <OTabPanel name="quick-setup">
@@ -66,6 +66,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";

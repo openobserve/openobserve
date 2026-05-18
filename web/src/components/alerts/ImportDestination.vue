@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Destination Errors Section -->
           <div
@@ -319,6 +319,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "ImportDestination",

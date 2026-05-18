@@ -105,7 +105,7 @@
           </div>
         </div>
 
-        <q-separator />
+        <OSeparator />
 
         <!-- Correlation Queries -->
         <div class="correlation-queries">
@@ -200,6 +200,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Props {
   show: boolean;

@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-separator class="q-mb-sm q-px-sm" />
+      <OSeparator class="tw:mb-2 tw:px-2" />
 
       <div class="flex q-mt-md q-px-sm">
         <div class="nodes-drag-container q-pr-md">
@@ -202,6 +202,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

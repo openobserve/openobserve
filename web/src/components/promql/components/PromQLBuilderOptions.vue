@@ -1,6 +1,6 @@
 <template>
   <div>
-    <q-separator />
+    <OSeparator />
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div class="tw:py-[0.25rem]">

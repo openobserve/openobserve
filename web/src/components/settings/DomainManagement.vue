@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Divider -->
-    <q-separator class="q-mb-xl" />
+    <OSeparator class="tw:mb-8" />
 
     <div class="text-h6 text-bold q-mb-xs">
       {{ t("settings.domainRestrictionsSubsection") }}
@@ -359,6 +359,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Domain {
   name: string;

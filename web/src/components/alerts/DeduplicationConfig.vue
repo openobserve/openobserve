@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="isExpanded" class="tw:w-full row alert-setup-container">
-        <q-separator class="tw:my-2"/>
+        <OSeparator class="tw:my-2"/>
         <div class="q-mt-sm tw:w-full tw:pl-3">
             <!-- Fingerprint Fields -->
             <div class="tw:mb-4">
@@ -118,6 +118,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 

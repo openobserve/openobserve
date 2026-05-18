@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-slide-transition>
         <div v-show="showDetails">
-          <q-separator />
+          <OSeparator />
           <q-card-section class="tw:pt-4">
             <div class="tw:text-sm details-section">
               <h6
@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab name="pretty" label="Pretty" />
       </OTabs>
 
-      <q-separator class="q-mb-sm" />
+      <OSeparator class="tw:mb-2" />
 
       <!-- Tab panels -->
       <OTabPanels v-model="activeTab" animated>
@@ -72,6 +72,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useI18n } from "vue-i18n";
 import { ref } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";

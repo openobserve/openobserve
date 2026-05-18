@@ -65,7 +65,7 @@
         />
       </OTabs>
 
-      <q-separator v-if="!customQuery && !fields.isDerived" />
+      <OSeparator v-if="!customQuery && !fields.isDerived" />
 
       <OTabPanels
         v-if="!customQuery && !fields.isDerived"
@@ -183,6 +183,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default {
   name: "DynamicFunctionPopUp",
   components: {

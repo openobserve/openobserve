@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("function.function_definition") }}
               </div>
             </q-card-section>
-            <q-separator />
+            <OSeparator />
             <q-card-section class="function-definition-content q-pa-none">
               <div class="function-code-container">
                 <pre class="function-code">{{
@@ -208,6 +208,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface RouteCondition {
   column: string;

@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </OButton>
     </div>
-    <q-separator style="margin-top: -1px; flex-shrink: 0" />
+    <OSeparator class="tw:-mt-px tw:shrink-0" />
     <div class="sidebar-content scroll" v-if="isOpen">
       <slot></slot>
     </div>
@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   components: { OButton,

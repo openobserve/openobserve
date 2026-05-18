@@ -436,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               pricingDialogRow.match_pattern
             }}</code>
           </div>
-          <q-separator class="tw:mb-4" />
+          <OSeparator class="tw:mb-4" />
 
           <div>
             <div class="pricing-section-label tw:mt-2">
@@ -504,6 +504,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

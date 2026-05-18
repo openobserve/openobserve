@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <q-separator class="q-mt-sm" />
+      <OSeparator class="tw:mt-2" />
       <div class="events-list">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
@@ -127,6 +127,7 @@ import AppTabs from "../common/AppTabs.vue";
 import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 
