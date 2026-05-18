@@ -122,7 +122,7 @@ const pagination = useTablePagination(table, {
   pageSize: props.pageSize,
   pageSizeOptions: props.pageSizeOptions,
   currentPage: props.currentPage,
-  totalCount: props.totalCount,
+  get totalCount() { return props.totalCount; },
   get data() { return props.data; },
 }, emit);
 
@@ -334,26 +334,6 @@ defineExpose({
       :content="'Loading...'"
       dense
       data-test="o2-table-loading-banner"
-    />
-
-    <!-- ── Top pagination ───────────────────────────────────── -->
-    <OTablePagination
-      v-if="pagination.isEnabled.value && pagination.isServerMode.value"
-      position="top"
-      :current-page="pagination.currentPage.value"
-      :total-pages="pagination.totalPages.value"
-      :total-count="pagination.totalCount.value"
-      :page-size="pagination.pageSize.value"
-      :page-size-options="pagination.pageSizeOptions.value"
-      :showing-from="pagination.showingFrom.value"
-      :showing-to="pagination.showingTo.value"
-      :is-first-page="pagination.isFirstPage.value"
-      :is-last-page="pagination.isLastPage.value"
-      @update:page-size="pagination.setPageSize"
-      @first-page="pagination.firstPage"
-      @prev-page="pagination.prevPage"
-      @next-page="pagination.nextPage"
-      @last-page="pagination.lastPage"
     />
 
     <!-- ── Scrollable table area ────────────────────────────── -->
