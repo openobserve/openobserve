@@ -155,18 +155,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ formatDate(value) }}
           </template>
 
-          <template #body-cell-status="props">
-            <q-td :props="props">
-              <q-chip
-                :color="getStatusColor(props.row.status)"
-                text-color="white"
-                size="0.8rem"
-                dense
-                outline
-              >
-                {{ props.row.status }}
-              </q-chip>
-            </q-td>
+          <template #cell-status="{ value }">
+            <q-chip
+              :color="getStatusColor(value)"
+              text-color="white"
+              size="0.8rem"
+              dense
+              outline
+            >
+              {{ value }}
+            </q-chip>
           </template>
 
           <template #cell-is_realtime="{ value }">

@@ -408,45 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="min-width: 220px"
                       data-test="service-identity-add-distinguish-btn"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
-                    >
-                      <template #option="scope">
-                        <q-item v-bind="scope.itemProps">
-                          <q-item-section>
-                            <q-item-label
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              {{ scope.opt.label }}
-                              <OBadge
-                                v-if="scope.opt.cardinalityLabel"
-                                :variant="`${scope.opt.cardinalityColor}-outline`"
-                                class="tw:text-[10px]"
-                              >
-                                {{ scope.opt.cardinalityLabel }}
-                              </OBadge>
-                              <OBadge
-                                v-if="scope.opt.recommended"
-                                variant="success-outline"
-                                class="tw:text-[10px]"
-                              >
-                                recommended
-                              </OBadge>
-                            </q-item-label>
-                            <q-item-label
-                              caption
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              <span v-if="scope.opt.uniqueValues"
-                                >{{ scope.opt.uniqueValues }} unique
-                                values</span
-                              >
-                              <span v-if="scope.opt.streamTypes">{{
-                                scope.opt.streamTypes.join(", ")
-                              }}</span>
-                            </q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
+                    />
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -499,44 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="min-width: 220px"
                     data-test="service-identity-add-distinguish-btn"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
-                  >
-                    <template #option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            {{ scope.opt.label }}
-                            <OBadge
-                              v-if="scope.opt.cardinalityLabel"
-                              :variant="`${scope.opt.cardinalityColor}-outline`"
-                              class="tw:text-[10px]"
-                            >
-                              {{ scope.opt.cardinalityLabel }}
-                            </OBadge>
-                            <OBadge
-                              v-if="scope.opt.recommended"
-                              variant="success-outline"
-                              class="tw:text-[10px]"
-                            >
-                              recommended
-                            </OBadge>
-                          </q-item-label>
-                          <q-item-label
-                            caption
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            <span v-if="scope.opt.uniqueValues"
-                              >{{ scope.opt.uniqueValues }} unique values</span
-                            >
-                            <span v-if="scope.opt.streamTypes">{{
-                              scope.opt.streamTypes.join(", ")
-                            }}</span>
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
+                  />
                   <OButton
                     variant="ghost"
                     size="icon-xs-sq"

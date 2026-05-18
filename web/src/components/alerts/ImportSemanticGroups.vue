@@ -245,7 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OBadge
         v-for="field in selectedGroup?.fields"
         :key="field"
-        variant="primary"
+        dense
+        color="primary"
+        text-color="white"
         class="q-ma-xs"
       >
         {{ field }}
@@ -274,7 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            variant="default"
+            dense
+            color="grey-4"
             size="sm"
             class="q-ma-xs"
           >
@@ -289,7 +292,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            :variant="isNewField(field) ? 'success' : 'default'"
+            dense
+            :color="isNewField(field) ? 'positive' : 'grey-4'"
+            :text-color="isNewField(field) ? 'white' : 'black'"
             size="sm"
             class="q-ma-xs"
           >

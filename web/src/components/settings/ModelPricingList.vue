@@ -354,8 +354,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #bottom>
-          <div class="bottom-btn tw:h-[48px]">
+        <template #bottom="scope">
+          <div class="bottom-btn tw:h-[48px] tw:gap-x-2">
             <div
               class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px]"
             >
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="selectedCount > 0 && selectedIdsOnlyContainsOwn"
               data-test="model-pricing-delete-selected-btn"
-              variant="ghost-destructive"
+              variant="outline-destructive"
               size="sm"
               @click="confirmDeleteSelected"
               icon-left="delete"

@@ -39,7 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
 
-          <div class="tw:h-[calc(100vh-110px)] tw:overflow-y-auto">
+          <div class="tw:flex tw:flex-col tw:h-[calc(100vh-110px)]">
+            <div class="tw:flex-1 tw:overflow-y-auto">
             <q-list>
               <q-expansion-item
                 v-if="
@@ -408,16 +409,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-card>
               </q-expansion-item>
 
-              <span class="tw:float-right tw:mr-2 tw:mb-2 tw:mt-2">
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  @click="applyFilter()"
-                >
-                  {{ t("nodes.applyFilter") }}
-                </OButton>
-              </span>
             </q-list>
+            </div>
+            <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0">
+              <OButton
+                variant="primary"
+                size="sm-action"
+                @click="applyFilter()"
+              >
+                {{ t("nodes.applyFilter") }}
+              </OButton>
+            </div>
           </div>
         </div>
       </template>
@@ -554,7 +556,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({

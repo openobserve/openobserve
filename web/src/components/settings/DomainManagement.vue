@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md domain_management">
+  <div class="domain_management tw:flex tw:flex-col tw:h-full">
+  <div class="q-px-md q-py-md tw:flex-1 tw:overflow-y-auto tw:pb-4">
     <!-- Claim Parser Function Selection -->
     <div class="q-mb-xl">
       <div class="text-h6 text-bold q-mb-xs">
@@ -293,8 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("settings.noDomainMessage") }}
     </div>
 
+  </div>
     <!-- Action Buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-2 q-pl-lg q-pr-xl q-py-lg full-width tw:absolute tw:bottom-0">
+    <div class="tw:flex tw:justify-end tw:gap-2 tw:px-6 tw:py-4 tw:border-t tw:border-(--o2-border-color) tw:shrink-0 tw:bg-(--o2-bg-default)">
       <OButton
         variant="outline"
         size="sm-action"
@@ -308,6 +310,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ t('settings.saveChanges') }}</OButton>
     </div>
   </div>
+
+  <!-- Confirm remove domain dialog -->
+  <ODialog
+    v-model:open="confirmRemoveDomainOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveDomainOpen = false"
+    @click:primary="doRemoveDomain"
+  >
+    <p v-if="pendingRemoveDomainIndex !== null">{{ t('settings.confirmRemoveDomain', { domain: domains[pendingRemoveDomainIndex]?.name }) }}</p>
+  </ODialog>
+
+  <!-- Confirm remove email dialog -->
+  <ODialog
+    v-model:open="confirmRemoveEmailOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveEmailOpen = false"
+    @click:primary="doRemoveEmail"
+  >
+    <p v-if="pendingRemoveEmail !== null">{{ t('settings.confirmRemoveEmail', { email: pendingRemoveEmail.email }) }}</p>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
@@ -320,6 +348,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
@@ -340,6 +369,12 @@ interface Domain {
 
 const { t } = useI18n();
 const q = useQuasar();
+
+// Dialog state for domain/email removal confirmations
+const confirmRemoveDomainOpen = ref(false);
+const pendingRemoveDomainIndex = ref<number | null>(null);
+const confirmRemoveEmailOpen = ref(false);
+const pendingRemoveEmail = ref<{ domain: any; emailIndex: number; email: string } | null>(null);
 const store = useStore();
 const router = useRouter();
 
@@ -533,18 +568,20 @@ const addDomain = () => {
 };
 
 const removeDomain = (index: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveDomain", { domain: domains[index].name }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domains.splice(index, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.domainRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveDomainIndex.value = index;
+  confirmRemoveDomainOpen.value = true;
+};
+
+const doRemoveDomain = () => {
+  const index = pendingRemoveDomainIndex.value;
+  if (index === null) return;
+  domains.splice(index, 1);
+  pendingRemoveDomainIndex.value = null;
+  confirmRemoveDomainOpen.value = false;
+  q.notify({
+    type: "positive",
+    message: t("settings.domainRemoved"),
+    timeout: 3000,
   });
 };
 
@@ -572,18 +609,20 @@ const addEmail = (domain: Domain) => {
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveEmail.value = { domain, emailIndex, email: domain.allowedEmails[emailIndex] };
+  confirmRemoveEmailOpen.value = true;
+};
+
+const doRemoveEmail = () => {
+  const pending = pendingRemoveEmail.value;
+  if (!pending) return;
+  pending.domain.allowedEmails.splice(pending.emailIndex, 1);
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
+  q.notify({
+    type: "positive",
+    message: t("settings.emailRemoved"),
+    timeout: 3000,
   });
 };
 

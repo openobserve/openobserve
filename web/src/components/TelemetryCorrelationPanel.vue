@@ -198,8 +198,6 @@ import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrel
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {

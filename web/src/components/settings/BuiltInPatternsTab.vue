@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-12 col-md-4">
           <OSelect
             v-model="selectedTags"
-            :options="availableTags"
-            :label="t('regex_patterns.filter_by_tag')"
+            :options="tagOptions"
+            :placeholder="t('regex_patterns.filter_by_tag')"
             multiple
             clearable
             data-test="built-in-pattern-tag-filter"
@@ -262,10 +262,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner,
-    OIcon,
-    OBadge,
-},
+  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -288,6 +285,10 @@ export default defineComponent({
       });
       return Array.from(tags).sort();
     });
+
+    const tagOptions = computed(() =>
+      availableTags.value.map((tag) => ({ label: tag, value: tag }))
+    );
 
     const filteredPatterns = computed(() => {
       let filtered = patterns.value;
@@ -452,6 +453,7 @@ export default defineComponent({
       searchQuery,
       selectedTags,
       availableTags,
+      tagOptions,
       filteredPatterns,
       selectedCount,
       showPreview,
