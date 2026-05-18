@@ -25,23 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:rounded-md">
       <div class="o2-input">
-        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
-          <div class="flex items-center tw:w-full">
-            <div class="tw:w-full" data-test="add-destination-title">
-              <div
-                class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
-              >
-                External Destination
-                <div>
-                  <OButton variant="ghost" size="icon" v-close-popup>
-                    <OIcon name="cancel" size="xs" />
-                  </OButton>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <q-separator />
         <div class="row q-col-gutter-sm q-px-lg">
           <OSwitch
             data-test="create-stream-toggle"
@@ -66,25 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="selectedDestination"
                 :label="'Destination *'"
                 :options="getFormattedDestinations"
-                color="input-border"
                 class="showLabelOnTop"
-                outlined
                 tabindex="0"
-              >
-                <template v-slot:option="scope">
-                  <q-item
-                    style="max-width: calc(40vw - 42px)"
-                    v-bind="scope.itemProps"
-                  >
-                    <q-item-section class="flex flex-col">
-                      <q-item-label>
-                        <span class="text-bold"> {{ scope.opt.label }}</span> -
-                        <span class="truncate-url"> {{ scope.opt.url }}</span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </OSelect>
+              />
             </div>
 
             <!-- Action buttons for existing destination selection -->
@@ -156,13 +123,8 @@ const { t } = useI18n();
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const createNewDestination = ref(false);
-const selectedDestination: any = ref(
-  pipelineObj.currentSelectedNodeData?.data?.destination_name
-    ? {
-        label: pipelineObj.currentSelectedNodeData.data.destination_name,
-        value: pipelineObj.currentSelectedNodeData.data.destination_name,
-      }
-    : { label: "", value: "" },
+const selectedDestination = ref<string>(
+  pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "",
 );
 const destinations = ref([]);
 
@@ -234,15 +196,12 @@ const getDestinations = () => {
 
 const saveDestination = () => {
   const destinationData = {
-    destination_name: selectedDestination.value.value,
+    destination_name: selectedDestination.value,
     node_type: "remote_stream",
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (
-    selectedDestination.value.hasOwnProperty("value") &&
-    selectedDestination.value.value === ""
-  ) {
+  if (!selectedDestination.value) {
     q.notify({
       message: "Please select External destination from the list",
       color: "negative",
@@ -257,10 +216,7 @@ const saveDestination = () => {
 
 const handleDestinationCreated = (destinationName: string) => {
   // Switch back to selection mode and select the newly created destination
-  selectedDestination.value = {
-    label: destinationName,
-    value: destinationName,
-  };
+  selectedDestination.value = destinationName;
   createNewDestination.value = false;
   getDestinations();
 };

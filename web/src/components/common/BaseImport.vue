@@ -236,9 +236,10 @@ export default defineComponent({
     ),
     AppTabs,
     OButton,
+    OInput,
     OIcon,
     OFile,
-},
+  },
   props: {
     // Title for the import page
     title: {
