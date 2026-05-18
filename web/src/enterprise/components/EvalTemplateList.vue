@@ -221,7 +221,7 @@ const columns = ref([
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "response_type",

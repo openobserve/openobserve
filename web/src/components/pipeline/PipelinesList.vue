@@ -625,7 +625,7 @@ const updateActiveTab = () => {
     .filter((pipeline: any) => pipeline.source.source_type === activeTab.value)
     .map((pipeline: any, index) => ({
       ...pipeline,
-      "#": index + 1,
+      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
     }));
 
   columns.value = getColumnsForActiveTab(activeTab.value);
@@ -832,7 +832,7 @@ const getPipelines = async () => {
       pipeline.edges = updatedEdges;
       return {
         ...pipeline,
-        "#": index + 1,
+        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       };
     });
   } catch (error) {
