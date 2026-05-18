@@ -129,6 +129,7 @@ function makeTrace(overrides: Record<string, any> = {}) {
     errorCount: 0,
     status: "ok" as const,
     model: "gpt-4",
+    models: [] as string[],
     ...overrides,
   };
 }
