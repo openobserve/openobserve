@@ -36,20 +36,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #after>
-        <AppTable :columns="columns" :rows="rows">
-          <template v-slot:error_details="slotProps">
-            <ErrorDetail :column="slotProps"></ErrorDetail>
+        <OTable
+          :data="tableRows"
+          :columns="tableColumns"
+          row-key="id"
+          pagination="none"
+          virtual-scroll
+          dense
+          data-test="rum-errors-list-table"
+        >
+          <template #cell-error="{ row }">
+            <ErrorDetail :column="row" />
           </template>
-        </AppTable>
+        </OTable>
       </template>
     </q-splitter>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import AppTable from "./AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "@/plugins/traces/IndexList.vue";
@@ -67,54 +75,47 @@ interface Session {
 const { t } = useI18n();
 
 const splitterModel = ref(250);
-const columns = ref([
+const tableColumns = [
   {
-    name: "error",
-    field: (row: any) => row["error"],
-    prop: (row: any) => row["error"],
-    label: t("rum.error"),
-    align: "left",
+    id: "error",
+    header: t("rum.error"),
+    accessorKey: "error",
     sortable: true,
-    slot: true,
-    slotName: "error_details",
+    meta: { align: "left" },
   },
   {
-    name: "type",
-    field: (row: any) => row["type"],
-    prop: (row: any) => row["type"],
-    label: t("rum.sessionType"),
-    align: "left",
+    id: "type",
+    header: t("rum.sessionType"),
+    accessorKey: "type",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "time_spent",
-    field: (row: any) => formatDuration(row["time_spent"] / 1000000),
-    label: t("rum.timeSpent"),
-    align: "left",
+    id: "time_spent",
+    header: t("rum.timeSpent"),
+    accessorFn: (row: any) => formatDuration(row["time_spent"] / 1000000),
     sortable: true,
-    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return parseInt(rowA.time_spent) - parseInt(rowB.time_spent);
-    },
+    meta: { align: "left" },
   },
   {
-    name: "error_count",
-    field: (row: any) => row["error_count"],
-    prop: (row: any) => row["error_count"],
-    label: t("rum.errorCount"),
-    align: "left",
+    id: "error_count",
+    header: t("rum.errorCount"),
+    accessorKey: "error_count",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "initial_view_name",
-    field: (row: any) => row["initial_view_name"],
-    prop: (row: any) => row["initial_view_name"],
-    label: t("rum.initialViewName"),
-    align: "left",
+    id: "initial_view_name",
+    header: t("rum.initialViewName"),
+    accessorKey: "initial_view_name",
     sortable: true,
+    meta: { align: "left" },
   },
-]);
+];
 
 const rows = ref<Session[]>([]);
+
+const tableRows = computed(() => rows.value);
 </script>
 
 <style lang="scss">

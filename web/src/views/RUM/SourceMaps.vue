@@ -129,97 +129,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Source Maps Table -->
-      <template v-else-if="groupedSourceMaps.length > 0">
-        <q-table
-          ref="qTableRef"
-          :rows="groupedSourceMaps"
+      <template v-else>
+        <OTable
+          :data="groupedSourceMaps"
           :columns="columns"
-          :row-key="(row) => `${row.service}-${row.version}-${row.env}`"
-          flat
-          bordered
-          :pagination="pagination"
+          row-key="id"
+          pagination="client"
+          :page-size="selectedPerPage"
+          :page-size-options="perPageOptionsList"
+          :show-global-filter="false"
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           style="width: 100%; height: calc(100vh - 200px)"
         >
-          <template v-slot:body="props">
-            <q-tr :props="props">
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                <template v-if="col.name === 'expand'">
-                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
-                    >
-                      <OIcon
-                        :name="expandedRow !== getRowKey(props.row) ? 'expand-more' : 'expand-less'"
-                        size="14px"
-                      />
-                    </OButton>
-                  </div>
-                </template>
-                <template v-else-if="col.name === 'actions'">
-                  <OButton
-                    :data-test="`source-maps-${props.row.service}-delete`"
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    title="Delete"
-                    @click="confirmDeleteSourceMap(props.row)"
-                  >
-                    <OIcon name="delete" size="sm" />
-                  </OButton>
-                </template>
-                <template v-else>
-                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
-                    {{ col.value }}
-                  </div>
-                </template>
-              </q-td>
-            </q-tr>
-            <q-tr v-show="expandedRow === getRowKey(props.row)" :props="props">
-              <q-td colspan="100%">
-                <div class="expanded-details q-pa-md">
-                  <div class="text-subtitle2 text-weight-bold q-mb-sm">
-                    Source Map Files ({{ props.row.files.length }})
-                  </div>
-                  <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
-                    <q-item v-for="(file, index) in props.row.files" :key="index">
-                      <q-item-section>
-                        <q-item-label caption>Source File</q-item-label>
-                        <q-item-label class="text-code">{{ file.source_file_name }}</q-item-label>
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label caption>Source Map File</q-item-label>
-                        <q-item-label class="text-code">{{ file.source_map_file_name }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </div>
-              </q-td>
-            </q-tr>
+          <template #cell-expand="{ row }">
+            <div class="cursor-pointer" @click="toggleExpand(row)">
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+              >
+                <OIcon
+                  :name="expandedRow !== row.id ? 'expand-more' : 'expand-less'"
+                  size="14px"
+                />
+              </OButton>
+            </div>
+            <div
+              v-if="expandedRow === row.id"
+              class="expanded-details tw:mt-3 tw:p-3"
+            >
+              <div class="text-subtitle2 text-weight-bold tw:mb-3">
+                Source Map Files ({{ row.files.length }})
+              </div>
+              <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
+                <q-item v-for="(file, index) in row.files" :key="index">
+                  <q-item-section>
+                    <q-item-label caption>Source File</q-item-label>
+                    <q-item-label class="text-code">{{ file.source_file_name }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label caption>Source Map File</q-item-label>
+                    <q-item-label class="text-code">{{ file.source_map_file_name }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </div>
           </template>
 
-          <template #bottom="scope">
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+          <template #cell-service="{ row }">
+            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.service }}</div>
           </template>
-        </q-table>
-      </template>
 
-      <!-- Empty State -->
-      <template v-else>
-        <div class="q-pa-xl text-center text-grey-7">
-          <OIcon name="code" size="xl" class="q-mb-md" />
-          <div class="text-h6 q-mb-sm">No Source Maps Found</div>
-          <div class="text-body2">
-            Upload source maps to enable stack trace translation
-          </div>
-        </div>
+          <template #cell-version="{ row }">
+            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.version }}</div>
+          </template>
+
+          <template #cell-environment="{ row }">
+            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.env }}</div>
+          </template>
+
+          <template #cell-file_count="{ row }">
+            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.fileCount }}</div>
+          </template>
+
+          <template #cell-uploaded_at="{ row }">
+            <div class="cursor-pointer" @click="toggleExpand(row)">{{ formatTimestamp(row.uploaded_at) }}</div>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`source-maps-${row.service}-delete`"
+              variant="ghost-destructive"
+              size="icon-sm"
+              title="Delete"
+              @click="confirmDeleteSourceMap(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+          </template>
+
+          <template #empty>
+            <div class="q-pa-xl text-center text-grey-7">
+              <OIcon name="code" size="xl" class="q-mb-md" />
+              <div class="text-h6 q-mb-sm">No Source Maps Found</div>
+              <div class="text-body2">
+                Upload source maps to enable stack trace translation
+              </div>
+            </div>
+          </template>
+        </OTable>
       </template>
     </div>
 
@@ -246,17 +243,16 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const store = useStore();
 const router = useRouter();
 const $q = useQuasar();
-
-const qTableRef = ref<any>(null);
 
 // Delete dialog state
 const deleteDialog = ref({
@@ -377,88 +373,67 @@ const groupedSourceMaps = ref<any[]>([]);
 const expandedRow = ref<string | null>(null);
 
 // Table columns
-const columns = [
+const columns: OTableColumnDef[] = [
   {
-    name: "expand",
-    label: "#",
-    field: "",
-    align: "left" as const,
+    id: "expand",
+    header: "#",
+    accessorKey: "id",
+    meta: { align: "left" },
     sortable: false,
+    size: 60,
   },
   {
-    name: "service",
-    label: "Service",
-    field: "service",
-    align: "left" as const,
+    id: "service",
+    header: "Service",
+    accessorKey: "service",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "version",
-    label: "Version",
-    field: "version",
-    align: "left" as const,
+    id: "version",
+    header: "Version",
+    accessorKey: "version",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "environment",
-    label: "Environment",
-    field: "env",
-    align: "left" as const,
+    id: "environment",
+    header: "Environment",
+    accessorKey: "env",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "file_count",
-    label: "Files",
-    field: "fileCount",
-    align: "left" as const,
+    id: "file_count",
+    header: "Files",
+    accessorKey: "fileCount",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "uploaded_at",
-    label: "Uploaded At",
-    field: "uploaded_at",
-    align: "left" as const,
+    id: "uploaded_at",
+    header: "Uploaded At",
+    accessorKey: "uploaded_at",
     sortable: true,
-    format: (val: number) => {
-      if (!val) return "-";
-      // Convert microseconds to milliseconds
-      return new Date(val / 1000).toLocaleString();
+    meta: {
+      align: "left",
+      format: (_v: any, row: any) => formatTimestamp(row.uploaded_at),
     },
   },
   {
-    name: "actions",
-    field: "actions",
-    label: "Actions",
-    align: "center" as const,
-    sortable: false,
-    style: "width: 100px",
+    id: "actions",
+    header: "Actions",
+    accessorKey: "actions",
+    meta: { align: "center" },
+    isAction: true,
+    size: 100,
   },
 ];
 
 // Pagination
-const pagination = ref({
-  sortBy: "created_at",
-  descending: true,
-  page: 1,
-  rowsPerPage: 20,
-});
-
 const selectedPerPage = ref<number>(20);
 
-const perPageOptions = [
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "250", value: 250 },
-];
-
-const resultTotal = computed(() => groupedSourceMaps.value.length);
-
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
+const perPageOptionsList = [20, 50, 100, 250];
 
 // Fetch source maps
 const fetchSourceMaps = async () => {
@@ -498,6 +473,7 @@ const groupSourceMaps = () => {
 
     if (!groups.has(key)) {
       groups.set(key, {
+        id: key,
         service: sourceMap.service,
         version: sourceMap.version,
         env: sourceMap.env,
@@ -530,18 +506,12 @@ const applyFilters = () => {
   fetchSourceMaps();
 };
 
-// Get unique row key
-const getRowKey = (row: any) => {
-  return `${row.service}-${row.version}-${row.env}`;
-};
-
 // Toggle expand/collapse
 const toggleExpand = (row: any) => {
-  const rowKey = getRowKey(row);
-  if (expandedRow.value === rowKey) {
+  if (expandedRow.value === row.id) {
     expandedRow.value = null;
   } else {
-    expandedRow.value = rowKey;
+    expandedRow.value = row.id;
   }
 };
 
@@ -584,7 +554,7 @@ const deleteSourceMap = async () => {
 
     // Remove from local list
     groupedSourceMaps.value = groupedSourceMaps.value.filter(
-      (item) => getRowKey(item) !== getRowKey(sourceMap)
+      (item) => item.id !== sourceMap.id
     );
   } catch (error: any) {
     console.error("Error deleting source maps:", error);

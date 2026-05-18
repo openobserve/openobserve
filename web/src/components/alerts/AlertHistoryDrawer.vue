@@ -215,121 +215,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'code-block-light'
               "
             >
-              <q-table
-                ref="qTableRef"
-                :rows="alertHistory"
+              <OTable
+                :data="alertHistory"
                 :columns="historyTableColumns"
                 row-key="timestamp"
-                v-model:pagination="pagination"
-                @request="onRequest"
-                style="flex: 1; overflow: hidden"
-                class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky history-table"
+                pagination="server"
+                sorting="none"
+                v-model:current-page="currentPage"
+                v-model:page-size="selectedPerPage"
+                :total-count="resultTotal"
+                :loading="isLoadingHistory"
+                :row-class="getRowClass"
+                :show-global-filter="false"
+                class="history-table tw:flex-1 tw:overflow-hidden"
                 data-test="alert-details-history-table"
+                @pagination-change="onPaginationChange"
               >
-                <template v-slot:body="props">
-                  <q-tr :props="props" :class="getRowClass(props.row.status)">
-                    <q-td
-                      v-for="col in historyTableColumns"
-                      :key="col.name"
-                      :props="props"
-                    >
-                      <template v-if="col.name === '#'">
-                        <span
-                          class="tw:text-[13px] tw:tabular-nums"
-                          :class="
-                            store.state.theme === 'dark'
-                              ? 'tw:text-gray-500'
-                              : 'tw:text-gray-400'
-                          "
-                        >
-                          {{
-                            (currentPage - 1) * selectedPerPage +
-                            props.rowIndex +
-                            1
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'status'">
-                        <q-chip
-                          dense
-                          size="sm"
-                          :icon="getStatusChipIcon(props.row.status)"
-                          :label="formatStatus(props.row.status)"
-                          :color="getStatusChipColor(props.row.status)"
-                          :text-color="getStatusChipTextColor(props.row.status)"
-                          class="tw:cursor-default"
-                          data-test="alert-history-status-chip"
-                        >
-                          <OTooltip
-                            v-if="props.row.error"
-                            :max-width="'300px'"
-                            :content="props.row.error"
-                          />
-                        </q-chip>
-                      </template>
-                      <template v-else-if="col.name === 'timestamp'">
-                        <span class="tw:text-[13px]">{{
-                          formatTimestamp(props.row.timestamp)
-                        }}</span>
-                        <OTooltip :content="formatTimestampFull(props.row.timestamp)" />
-                      </template>
-                      <template v-else-if="col.name === 'evaluation_time'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{
-                            props.row.evaluation_took_in_secs
-                              ? props.row.evaluation_took_in_secs.toFixed(3) +
-                                "s"
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'query_time'">
-                        <span class="tw:text-[13px] tw:tabular-nums">
-                          {{
-                            props.row.query_took
-                              ? props.row.query_took + "ms"
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                      <template v-else-if="col.name === 'anomaly_count'">
-                        <span
-                          class="tw:text-[13px] tw:tabular-nums"
-                          :class="
-                            props.row.anomaly_count > 0
-                              ? 'tw:text-red-500 tw:font-medium'
-                              : ''
-                          "
-                        >
-                          {{
-                            props.row.anomaly_count != null
-                              ? props.row.anomaly_count
-                              : "—"
-                          }}
-                        </span>
-                      </template>
-                    </q-td>
-                  </q-tr>
+                <template #cell-#="{ row }">
+                  <span
+                    class="tw:text-[13px] tw:tabular-nums"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-gray-500'
+                        : 'tw:text-gray-400'
+                    "
+                  >
+                    {{ (currentPage - 1) * selectedPerPage + row.index + 1 }}
+                  </span>
                 </template>
-
-                <template #bottom="scope">
+                <template #cell-status="{ row }">
+                  <q-chip
+                    dense
+                    size="sm"
+                    :icon="getStatusChipIcon(row.status)"
+                    :label="formatStatus(row.status)"
+                    :color="getStatusChipColor(row.status)"
+                    :text-color="getStatusChipTextColor(row.status)"
+                    class="tw:cursor-default"
+                    data-test="alert-history-status-chip"
+                  >
+                    <OTooltip
+                      v-if="row.error"
+                      :max-width="'300px'"
+                      :content="row.error"
+                    />
+                  </q-chip>
+                </template>
+                <template #cell-timestamp="{ row }">
+                  <span class="tw:text-[13px]">{{
+                    formatTimestamp(row.timestamp)
+                  }}</span>
+                  <OTooltip :content="formatTimestampFull(row.timestamp)" />
+                </template>
+                <template #cell-evaluation_time="{ row }">
+                  <span class="tw:text-[13px] tw:tabular-nums">
+                    {{
+                      row.evaluation_took_in_secs
+                        ? row.evaluation_took_in_secs.toFixed(3) + "s"
+                        : "—"
+                    }}
+                  </span>
+                </template>
+                <template #cell-query_time="{ row }">
+                  <span class="tw:text-[13px] tw:tabular-nums">
+                    {{ row.query_took ? row.query_took + "ms" : "—" }}
+                  </span>
+                </template>
+                <template #cell-anomaly_count="{ row }">
+                  <span
+                    class="tw:text-[13px] tw:tabular-nums"
+                    :class="
+                      row.anomaly_count > 0
+                        ? 'tw:text-red-500 tw:font-medium'
+                        : ''
+                    "
+                  >
+                    {{ row.anomaly_count != null ? row.anomaly_count : "—" }}
+                  </span>
+                </template>
+                <template #cell-error></template>
+                <template #bottom="{ totalRows }">
                   <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
                     <div
                       class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]"
                     >
-                      {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
+                      {{ totalRows }} {{ t("alerts.alertDetails.results") }}
                     </div>
-                    <QTablePagination
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                      @update:changePagination="onPageChange"
-                    />
                   </div>
                 </template>
-              </q-table>
+              </OTable>
             </div>
           </div>
         </OTabPanel>
@@ -513,7 +487,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DateTime from "@/components/DateTime.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
@@ -560,7 +534,6 @@ const activeTab = ref("history");
 // Refs
 const alertHistory: Ref<any[]> = ref([]);
 const isLoadingHistory = ref(false);
-const qTableRef: Ref<any> = ref(null);
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -579,140 +552,108 @@ const dateTimeValues = ref({
   relativeTimePeriod: "15m",
 });
 
-// Pagination (server-side pagination)
+// Pagination (server-side)
 const selectedPerPage = ref<number>(50);
 const currentPage = ref<number>(1);
-const pagination: any = ref({
-  page: 1,
-  rowsPerPage: 50,
-  rowsNumber: 0,
-});
 
-const perPageOptions = [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
-
-const onRequest = async (requestProps: any) => {
-  const { page, rowsPerPage } = requestProps.pagination;
-  currentPage.value = page;
-  selectedPerPage.value = rowsPerPage;
+const onPaginationChange = async (params: { page: number; size: number }) => {
+  currentPage.value = params.page;
+  selectedPerPage.value = params.size;
   isLoadingHistory.value = true;
   await fetchAlertHistory(props.alertId);
-  pagination.value.page = page;
-  pagination.value.rowsPerPage = rowsPerPage;
   isLoadingHistory.value = false;
-};
-
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1;
-  qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value,
-  });
-};
-
-const onPageChange = (page: number) => {
-  pagination.value.page = page;
-  qTableRef.value?.requestServerInteraction({
-    pagination: pagination.value,
-  });
 };
 
 // Columns
 const alertHistoryColumns = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left" as const,
+    id: "#",
+    header: "#",
+    accessorFn: () => null,
     sortable: false,
-    style: "width: 48px;",
+    size: 48,
+    meta: { align: "left" as const },
   },
   {
-    name: "timestamp",
-    label: t("alerts.historyTable.timestamp"),
-    field: "timestamp",
-    align: "left" as const,
-    sortable: true,
-    style: "width: 140px;",
+    id: "timestamp",
+    header: t("alerts.historyTable.timestamp"),
+    accessorKey: "timestamp",
+    sortable: false,
+    size: 140,
+    meta: { align: "left" as const },
   },
   {
-    name: "status",
-    label: t("alerts.historyTable.status"),
-    field: "status",
-    align: "left" as const,
-    sortable: true,
-    style: "width: 110px;",
+    id: "status",
+    header: t("alerts.historyTable.status"),
+    accessorKey: "status",
+    sortable: false,
+    size: 110,
+    meta: { align: "left" as const },
   },
   {
-    name: "evaluation_time",
-    label: t("alerts.historyTable.evaluationTime"),
-    field: "evaluation_took_in_secs",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 130px;",
+    id: "evaluation_time",
+    header: t("alerts.historyTable.evaluationTime"),
+    accessorKey: "evaluation_took_in_secs",
+    sortable: false,
+    size: 130,
+    meta: { align: "right" as const },
   },
   {
-    name: "query_time",
-    label: t("alerts.historyTable.queryTime"),
-    field: "query_took",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 120px;",
+    id: "query_time",
+    header: t("alerts.historyTable.queryTime"),
+    accessorKey: "query_took",
+    sortable: false,
+    size: 120,
+    meta: { align: "right" as const },
   },
   {
-    name: "error",
-    label: t("alerts.historyTable.error"),
-    field: "error",
-    align: "left" as const,
+    id: "error",
+    header: t("alerts.historyTable.error"),
+    accessorKey: "error",
     sortable: false,
   },
 ];
 
 const anomalyHistoryColumns = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left" as const,
+    id: "#",
+    header: "#",
+    accessorFn: () => null,
     sortable: false,
-    style: "width: 48px;",
+    size: 48,
+    meta: { align: "left" as const },
   },
   {
-    name: "timestamp",
-    label: t("alerts.historyTable.timestamp"),
-    field: "timestamp",
-    align: "left" as const,
-    sortable: true,
-    style: "width: 140px;",
+    id: "timestamp",
+    header: t("alerts.historyTable.timestamp"),
+    accessorKey: "timestamp",
+    sortable: false,
+    size: 140,
+    meta: { align: "left" as const },
   },
   {
-    name: "status",
-    label: "Result",
-    field: "status",
-    align: "left" as const,
-    sortable: true,
-    style: "width: 120px;",
+    id: "status",
+    header: "Result",
+    accessorKey: "status",
+    sortable: false,
+    size: 120,
+    meta: { align: "left" as const },
   },
   {
-    name: "evaluation_time",
-    label: t("alerts.historyTable.evaluationTime"),
-    field: "evaluation_took_in_secs",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 130px;",
+    id: "evaluation_time",
+    header: t("alerts.historyTable.evaluationTime"),
+    accessorKey: "evaluation_took_in_secs",
+    sortable: false,
+    size: 130,
+    meta: { align: "right" as const },
   },
   {
-    name: "anomaly_count",
-    label: "Anomalies",
-    field: "anomaly_count",
-    align: "right" as const,
-    sortable: true,
-    style: "width: 120px;",
+    id: "anomaly_count",
+    header: "Anomalies",
+    accessorKey: "anomaly_count",
+    sortable: false,
+    size: 120,
+    meta: { align: "right" as const },
   },
 ];
 
@@ -722,7 +663,8 @@ const historyTableColumns = computed(() =>
 
 // Helper Functions
 
-const getRowClass = (status: string) => {
+const getRowClass = (row: any) => {
+  const status = row?.status;
   if (store.state.theme === "dark") {
     switch (status?.toLowerCase()) {
       case "firing":
@@ -857,11 +799,9 @@ const fetchAlertHistory = async (alertId: string) => {
     );
     alertHistory.value = response.data?.hits || [];
     resultTotal.value = response.data?.total || 0;
-    pagination.value.rowsNumber = response.data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
     resultTotal.value = 0;
-    pagination.value.rowsNumber = 0;
     $q.notify({
       type: "negative",
       message:
@@ -892,7 +832,6 @@ const updateDateTime = (value: any) => {
     };
   }
 
-  pagination.value.page = 1;
   currentPage.value = 1;
   if (props.alertId) {
     isLoadingHistory.value = true;
@@ -926,17 +865,10 @@ watch(
   () => props.alertId,
   async (newVal) => {
     if (newVal) {
-      pagination.value.page = 1;
       currentPage.value = 1;
-      if (!qTableRef.value) {
-        isLoadingHistory.value = true;
-        await fetchAlertHistory(newVal);
-        isLoadingHistory.value = false;
-      } else {
-        qTableRef.value?.requestServerInteraction({
-          pagination: pagination.value,
-        });
-      }
+      isLoadingHistory.value = true;
+      await fetchAlertHistory(newVal);
+      isLoadingHistory.value = false;
       // Fetch full config for the Condition tab when this is an anomaly detection alert.
       if (isAnomaly.value) {
         try {

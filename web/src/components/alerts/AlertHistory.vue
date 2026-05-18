@@ -116,196 +116,144 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:w-full tw:h-full tw:px-[0.625rem]">
       <div class="alert-history-table card-container tw:h-[calc(100vh-130px)]">
-        <q-table
+        <OTable
           data-test="alert-history-table"
-          ref="qTable"
-          :rows="rows"
+          :data="rows"
           :columns="columns"
           row-key="id"
-          v-model:pagination="pagination"
-          :rows-per-page-options="rowsPerPageOptions"
-          @request="onRequest"
+          pagination="server"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :page-size-options="pageSizeOptions"
+          :total-count="totalCount"
+          sorting="server"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
           :loading="loading"
-          binary-state-sort
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 130px)"
+          :show-global-filter="false"
+          :default-columns="false"
+          width="100%"
+          max-height="calc(100vh - 130px)"
+          @pagination-change="onPaginationChange"
+          @sort-change="onSortChange"
         >
-          <template #no-data>
+          <template #empty>
             <div class="tw:h-[100vh] full-width">
               <no-data />
             </div>
           </template>
 
-          <template #body-cell-timestamp="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.timestamp) }}
-            </q-td>
+          <template #cell-timestamp="{ value }">
+            {{ formatDate(value) }}
           </template>
 
-          <template #body-cell-start_time="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.start_time) }}
-            </q-td>
+          <template #cell-start_time="{ value }">
+            {{ formatDate(value) }}
           </template>
 
-          <template #body-cell-end_time="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.end_time) }}
-            </q-td>
+          <template #cell-end_time="{ value }">
+            {{ formatDate(value) }}
           </template>
 
-          <template #body-cell-status="props">
-            <q-td :props="props">
-              <q-chip
-                :color="getStatusColor(props.row.status)"
-                text-color="white"
-                size="0.8rem"
-                dense
-                outline
-              >
-                {{ props.row.status }}
-              </q-chip>
-            </q-td>
+          <template #cell-status="{ value }">
+            <q-chip
+              :color="getStatusColor(value)"
+              text-color="white"
+              size="0.8rem"
+              dense
+              outline
+            >
+              {{ value }}
+            </q-chip>
           </template>
 
-          <template #body-cell-is_realtime="props">
-            <q-td :props="props">
-              <OIcon
-                :name="props.row.is_realtime ? 'check-circle' : 'schedule'"
-                :color="props.row.is_realtime ? 'positive' : 'grey'"
-                size="xs"
-              >
-                <OTooltip :content="props.row.is_realtime ? 'Real-time' : 'Scheduled'" />
-              </OIcon>
-            </q-td>
+          <template #cell-is_realtime="{ value }">
+            <OIcon
+              :name="value ? 'check-circle' : 'schedule'"
+              :color="value ? 'positive' : 'grey'"
+              size="xs"
+            >
+              <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
+            </OIcon>
           </template>
 
-          <template #body-cell-is_silenced="props">
-            <q-td :props="props">
-              <OIcon
-                :name="props.row.is_silenced ? 'volume-off' : 'volume-up'"
-                :color="props.row.is_silenced ? 'grey' : 'positive'"
-                size="20px"
-              >
-                <OTooltip :content="props.row.is_silenced ? 'Silenced' : 'Not Silenced'" />
-              </OIcon>
-            </q-td>
+          <template #cell-is_silenced="{ value }">
+            <OIcon
+              :name="value ? 'volume-off' : 'volume-up'"
+              :color="value ? 'grey' : 'positive'"
+              size="20px"
+            >
+              <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
+            </OIcon>
           </template>
 
-          <template #body-cell-duration="props">
-            <q-td :props="props">
-              {{ formatDuration(props.row.end_time - props.row.start_time) }}
-            </q-td>
+          <template #cell-duration="{ row }">
+            {{ formatDuration(row.end_time - row.start_time) }}
           </template>
 
-          <!-- <template #body-cell-error="props">
-            <q-td :props="props">
-              <OIcon
-                v-if="props.row.error"
-                name="error"
-                size="sm"
-                class="cursor-pointer"
-                @click="showErrorDialog(props.row.error)"
-              >
-                <q-tooltip>Click to view error</q-tooltip>
-              </OIcon>
-            </q-td>
-          </template> -->
-
-          <template #body-cell-dedup="props">
-            <q-td :props="props">
-              <!-- Not deduplicated or dedup not enabled -->
-              <span v-if="!props.row.dedup_enabled" class="text-grey-5">
-                -
+          <template #cell-dedup="{ row }">
+            <span v-if="!row.dedup_enabled" class="text-grey-5">-</span>
+            <div v-else-if="row.dedup_suppressed" class="text-negative">
+              <OIcon name="block" size="sm" />
+              <OTooltip>
+                <template #content>
+                  Suppressed by deduplication
+                  <div v-if="row.dedup_count">
+                    {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? 's' : '' }}
+                  </div>
+                </template>
+              </OTooltip>
+            </div>
+            <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
+              <OIcon name="group-work" size="md" />
+              <span class="text-caption q-ml-xs">×{{ row.group_size || 1 }}</span>
+              <OTooltip>
+                <template #content>
+                  Grouped notification
+                  <div>{{ row.group_size }} alerts batched together</div>
+                </template>
+              </OTooltip>
+            </div>
+            <div v-else class="text-positive flex items-center justify-center">
+              <OIcon name="check-circle" size="md" />
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="text-caption q-ml-xs">
+                ×{{ row.dedup_count }}
               </span>
-
-              <!-- Suppressed by deduplication -->
-              <div v-else-if="props.row.dedup_suppressed" class="text-negative">
-                <OIcon name="block" size="sm" />
-                <OTooltip>
-                  <template #content>
-                    Suppressed by deduplication
-                    <div v-if="props.row.dedup_count">
-                      {{ props.row.dedup_count }} occurrence{{ props.row.dedup_count > 1 ? 's' : '' }}
-                    </div>
-                  </template>
-                </OTooltip>
-              </div>
-
-              <!-- Grouped notification -->
-              <div v-else-if="props.row.grouped" class="text-primary flex items-center justify-center">
-                <OIcon name="group-work" size="md" />
-                <span class="text-caption q-ml-xs">×{{ props.row.group_size || 1 }}</span>
-                <OTooltip>
-                  <template #content>
-                    Grouped notification
-                    <div>
-                      {{ props.row.group_size }} alerts batched together
-                    </div>
-                  </template>
-                </OTooltip>
-              </div>
-
-              <!-- Sent (passed dedup) -->
-              <div v-else class="text-positive flex items-center justify-center">
-                <OIcon name="check-circle" size="md" />
-                <span v-if="props.row.dedup_count && props.row.dedup_count > 1" class="text-caption q-ml-xs">
-                  ×{{ props.row.dedup_count }}
-                </span>
-                <OTooltip>
-                  <template #content>
-                    Notification sent
-                    <div v-if="props.row.dedup_count && props.row.dedup_count > 1">
-                      {{ props.row.dedup_count }} occurrences deduplicated
-                    </div>
-                  </template>
-                </OTooltip>
-              </div>
-            </q-td>
+              <OTooltip>
+                <template #content>
+                  Notification sent
+                  <div v-if="row.dedup_count && row.dedup_count > 1">
+                    {{ row.dedup_count }} occurrences deduplicated
+                  </div>
+                </template>
+              </OTooltip>
+            </div>
           </template>
 
-          <template #body-cell-actions="props">
-            <q-td :props="props">
-              <OButton
-                variant="ghost"
-                size="icon-circle-sm"
-                icon-left="visibility"
-                @click="showDetailsDialog(props.row)"
-                data-test="alert-history-view-details"
-              >
-                <OIcon name="visibility" size="sm" />
-                <OTooltip content="View Details" />
-              </OButton>
-              <OButton
-                v-if="props.row.error"
-                :data-test="`pipeline-list-${props.row.name}-error-indicator`"
-                variant="ghost-destructive"
-                size="icon-circle-sm"
-                icon-left="error"
-                @click.stop="showErrorDialog(props.row)"
-              >
-                <OIcon name="error" size="sm" />
-                <OTooltip :content="`Last error: ${new Date(props.row.timestamp / 1000).toLocaleString()}`" />
-              </OButton>
-            </q-td>
+          <template #cell-actions="{ row }">
+            <OButton
+              variant="ghost"
+              size="icon-circle-sm"
+              icon-left="visibility"
+              @click="showDetailsDialog(row)"
+              data-test="alert-history-view-details"
+            >
+              <OIcon name="visibility" size="sm" />
+              <OTooltip content="View Details" />
+            </OButton>
+            <OButton
+              v-if="row.error"
+              :data-test="`pipeline-list-${row.name}-error-indicator`"
+              variant="ghost-destructive"
+              size="icon-circle-sm"
+              icon-left="error"
+              @click.stop="showErrorDialog(row)"
+            >
+              <OIcon name="error" size="sm" />
+              <OTooltip :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`" />
+            </OButton>
           </template>
-
-          <template #bottom="scope">
-            <div class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md">
-                  {{ pagination.rowsNumber }} {{ t('pipeline.header') }}
-                </div>
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="pagination.rowsNumber"
-                :perPageOptions="rowsPerPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-              </div>
-          </template>
-          
-        </q-table>
+        </OTable>
       </div>
     </div>
 
@@ -544,7 +492,8 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useQuasar, date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -565,20 +514,13 @@ const searchQuery = ref("");
 const selectedAlert = ref<any>(null);
 const allAlerts = ref<any[]>([]);
 const filteredAlertOptions = ref<any[]>([]);
-const pagination = ref({
-  page: 1,
-  rowsPerPage: 20,
-  rowsNumber: 0,
-  sortBy: "timestamp",
-  descending: true,
-});
+const currentPage = ref(1);
+const pageSize = ref(20);
+const totalCount = ref(0);
+const sortBy = ref("timestamp");
+const sortOrder = ref<"asc" | "desc">("desc");
 
-const rowsPerPageOptions = [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
+const pageSizeOptions = [10, 20, 50, 100];
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -606,101 +548,115 @@ const selectedRow = ref<any>(null);
 const errorMessage = ref("");
 
 // Table columns
-const columns = ref([
-  { name: "#", label: "#", field: "#", align: "left", style: "width: 37px;" },
+const columns = ref<OTableColumnDef[]>([
+  { id: "#", header: "#", accessorKey: "#", size: 37, minSize: 37, maxSize: 37, sortable: false, meta: { align: "left" } },
   {
-    name: "alert_name",
-    label: "Alert Name",
-    field: "alert_name",
-    align: "left",
+    id: "alert_name",
+    header: t("alerts.alertName") || "Alert Name",
+    accessorKey: "alert_name",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "is_realtime",
-    label: "Type",
-    field: "is_realtime",
-    align: "center",
+    id: "is_realtime",
+    header: t("alerts.type") || "Type",
+    accessorKey: "is_realtime",
     sortable: true,
-    style: "width: 37px;",
+    size: 37,
+    minSize: 37,
+    maxSize: 37,
+    cell: " ",
+    meta: { align: "center" },
   },
   {
-    name: "is_silenced",
-    label: "Is Silenced",
-    field: "is_silenced",
-    align: "center",
+    id: "is_silenced",
+    header: t("alerts.isSilenced") || "Is Silenced",
+    accessorKey: "is_silenced",
     sortable: true,
-    style: "width: 37px;",
+    size: 37,
+    minSize: 37,
+    maxSize: 37,
+    cell: " ",
+    meta: { align: "center" },
   },
   {
-    name: "timestamp",
-    label: "Timestamp",
-    field: "timestamp",
-    align: "left",
+    id: "timestamp",
+    header: t("alerts.timestamp") || "Timestamp",
+    accessorKey: "timestamp",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    maxSize: 160,
+    cell: " ",
+    meta: { align: "left" },
   },
   {
-    name: "start_time",
-    label: "Start Time",
-    field: "start_time",
-    align: "left",
+    id: "start_time",
+    header: t("alerts.startTime") || "Start Time",
+    accessorKey: "start_time",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    maxSize: 160,
+    cell: " ",
+    meta: { align: "left" },
   },
   {
-    name: "end_time",
-    label: "End Time",
-    field: "end_time",
-    align: "left",
+    id: "end_time",
+    header: t("alerts.endTime") || "End Time",
+    accessorKey: "end_time",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    maxSize: 160,
+    cell: " ",
+    meta: { align: "left" },
   },
   {
-    name: "duration",
-    label: "Duration",
-    field: (row: any) => row.end_time - row.start_time,
-    align: "right",
-    sortable: true,
-    style: "width: 50px;",
-  },
-  {
-    name: "status",
-    label: "Status",
-    field: "status",
-    align: "left",
-    sortable: true,
-    style: "width: 150px;",
-  },
-  {
-    name: "retries",
-    label: "Retries",
-    field: "retries",
-    align: "center",
-    sortable: true,
-    style: "width: 50px;",
-  },
-  {
-    name: "dedup",
-    label: "Dedup",
-    field: "dedup",
-    align: "center",
+    id: "duration",
+    header: t("alerts.duration") || "Duration",
+    accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
-    style: "width: 80px;",
+    size: 80,
+    maxSize: 80,
+    cell: " ",
+    meta: { align: "right" },
   },
-  // {
-  //   name: "error",
-  //   label: "Error",
-  //   field: "error",
-  //   align: "center",
-  //   sortable: false,
-  // },
   {
-    name: "actions",
-    label: "Actions",
-    field: "actions",
-    align: "center",
+    id: "status",
+    header: t("alerts.status") || "Status",
+    accessorKey: "status",
+    sortable: true,
+    size: 150,
+    maxSize: 150,
+    cell: " ",
+    meta: { align: "left" },
+  },
+  {
+    id: "retries",
+    header: t("alerts.retries") || "Retries",
+    accessorKey: "retries",
+    sortable: true,
+    size: 64,
+    maxSize: 64,
+    meta: { align: "center" },
+  },
+  {
+    id: "dedup",
+    header: t("alerts.dedup") || "Dedup",
     sortable: false,
-    style: "width: 50px;",
+    size: 80,
+    maxSize: 80,
+    cell: " ",
+    meta: { align: "center" },
+  },
+  {
+    id: "actions",
+    header: t("common.actions") || "Actions",
+    isAction: true,
+    pinned: "right",
+    size: 80,
+    minSize: 64,
+    maxSize: 100,
+    sortable: false,
+    meta: { align: "center" },
   },
 ]);
 
@@ -769,7 +725,7 @@ const clearSearch = () => {
 };
 
 const manualSearch = () => {
-  pagination.value.page = 1;
+  currentPage.value = 1;
   fetchAlertHistory();
 };
 
@@ -778,45 +734,36 @@ const fetchAlertHistory = async () => {
   try {
     const org = store.state.selectedOrganization.identifier;
 
-    // Use the stored datetime values (already in microseconds)
     const startTime = dateTimeValues.value.startTime;
     const endTime = dateTimeValues.value.endTime;
 
     const query: any = {
       start_time: startTime.toString(),
       end_time: endTime.toString(),
-      from: (
-        (pagination.value.page - 1) *
-        pagination.value.rowsPerPage
-      ).toString(),
-      size: pagination.value.rowsPerPage.toString(),
+      from: ((currentPage.value - 1) * pageSize.value).toString(),
+      size: pageSize.value.toString(),
     };
 
-    // Add alert_name filter if search query is provided
     if (searchQuery.value && searchQuery.value.trim()) {
       query.alert_id = searchQuery.value.trim();
     }
 
-    // Add sorting parameters
-    if (pagination.value.sortBy) {
-      query.sort_by = pagination.value.sortBy;
-      query.sort_order = pagination.value.descending ? "desc" : "asc";
+    if (sortBy.value) {
+      query.sort_by = sortBy.value;
+      query.sort_order = sortOrder.value;
     }
 
     const response = await alertsService.getHistory(org, query);
     if (response.data) {
-      // Handle the response data
       const historyData = response.data;
 
-      // Map the hits array or handle empty response
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": (index + 1) + (pagination.value.page - 1) * pagination.value.rowsPerPage,
+        "#": (index + 1) + (currentPage.value - 1) * pageSize.value,
       }));
 
-      // Update pagination total
-      pagination.value.rowsNumber = historyData.total || 0;
+      totalCount.value = historyData.total || 0;
 
       if (rows.value.length === 0) {
         console.warn("No alert history found for the selected time range");
@@ -838,7 +785,6 @@ const fetchAlertHistory = async () => {
 };
 
 const updateDateTime = (value: any) => {
-  // Store the datetime values for API calls
   dateTimeValues.value = {
     startTime: value.startTime,
     endTime: value.endTime,
@@ -846,7 +792,6 @@ const updateDateTime = (value: any) => {
     relativeTimePeriod: value.relativeTimePeriod || "",
   };
 
-  // Update the component state
   if (value.relativeTimePeriod) {
     dateTimeType.value = "relative";
     relativeTime.value = value.relativeTimePeriod;
@@ -858,18 +803,19 @@ const updateDateTime = (value: any) => {
     };
   }
 
-  // Reset pagination and fetch new data
-  pagination.value.page = 1;
+  currentPage.value = 1;
   fetchAlertHistory();
 };
 
-const onRequest = (props: any) => {
-  // The pagination component passes the updated pagination object
-  pagination.value = {
-    ...pagination.value,
-    ...props.pagination,
-  };
+const onPaginationChange = (params: { page: number; size: number }) => {
+  currentPage.value = params.page;
+  pageSize.value = params.size;
+  fetchAlertHistory();
+};
 
+const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
+  sortBy.value = params.column;
+  sortOrder.value = params.order;
   fetchAlertHistory();
 };
 
@@ -958,16 +904,11 @@ watch(
     fetchAlertHistory();
   },
 );
-const changePagination = (val: { label: string; value: any }) => {
-  pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1; // Reset to first page when changing page size
-  fetchAlertHistory();
-};
 </script>
 
 <style scoped lang="scss">
 .alert-history-table {
-  :deep(.q-table) {
+  :deep(table) {
     width: 100%;
 
     td {
