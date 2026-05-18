@@ -44,7 +44,7 @@
       </div>
     </div>
 
-    <q-separator class="tw:mb-6" />
+    <OSeparator class="tw:mb-6" />
 
     <!-- Advanced/Manual Install Section -->
     <q-expansion-item
@@ -109,7 +109,7 @@
               <OTooltip :content="t('ingestion.internalLabel')" side="top" />
             </OTab>
           </OTabs>
-          <q-separator />
+          <OSeparator />
           <OTabPanels
             v-model="tab"
             animated
@@ -212,6 +212,7 @@ import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const store = useStore();
 

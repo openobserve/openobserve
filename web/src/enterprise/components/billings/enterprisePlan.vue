@@ -18,15 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card class="col o2-card-wrapper">
     <div class="row items-center justify-between q-px-md q-py-sm">
       <div>
-        <div class="o2-card-title q-pt-sm">{{ t("billing.enterpriseLabel") }}</div>
-        <div class="o2-card-subtitle q-mt-sm">{{ t("billing.enterpriseSubtitle") }}</div>
+        <div class="o2-card-title q-pt-sm">
+          {{ t("billing.enterpriseLabel") }}
+        </div>
+        <div class="o2-card-subtitle q-mt-sm">
+          {{ t("billing.enterpriseSubtitle") }}
+        </div>
       </div>
       <OBadge
         variant="primary-soft"
         class="q-mt-sm text-caption q-px-sm q-py-md"
         style="border-radius: 0px"
       >
-        {{ t('billing.discountTag') }}
+        {{ t("billing.discountTag") }}
       </OBadge>
     </div>
 
@@ -34,7 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="q-px-md q-pt-sm tw:h-[550px]">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
+      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">
+        {{ t("billing.included") }}
+      </div>
 
       <div
         v-if="pricingError && !features?.length"
@@ -45,9 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
-      <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
+      <div
+        v-for="(feature, index) in features"
+        :key="index"
+        class="row items-center justify-between q-mb-sm"
+      >
         <div class="row items-center">
-          <OIcon v-if="feature.is_parent" name="check-circle" size="sm" class="q-mr-sm" />
+          <OIcon
+            v-if="feature.is_parent"
+            name="check-circle"
+            size="sm"
+            class="q-mr-sm"
+          />
           <OIcon v-else name="" color="green" size="16px" class="q-mr-sm" />
           <div class="o2-page-subtitle3">{{ feature.name }}</div>
         </div>
@@ -57,18 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator />
 
-    <div class="o2-page-subtitle2 q-px-md q-pt-sm ">
+    <div class="o2-page-subtitle2 q-px-md q-pt-sm">
       {{ t("billing.enterpriseNote") }}
     </div>
 
-    <div class="row justify-between q-pa-md tw:mt-[18px] ">
-      <OButton
-        variant="primary"
-        size="sm-action"
-        block
-        @click="contactSales"
-      >
-        {{ t('billing.contactLabel') }}
+    <div class="row justify-between q-pa-md tw:mt-[18px]">
+      <OButton variant="primary" size="sm-action" block @click="contactSales">
+        {{ t("billing.contactLabel") }}
       </OButton>
     </div>
   </q-card>
@@ -78,30 +88,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
-  components: { OButton,
-    OBadge,
-    OIcon,
-},
+  components: { OButton, OBadge, OIcon },
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
 
     const contactSales = () => {
       window.open(siteURL.contactSales, "_blank");
-    }
+    };
 
     return {
       t,
       contactSales,
-    }
-  }
+    };
+  },
 });
 </script>
 

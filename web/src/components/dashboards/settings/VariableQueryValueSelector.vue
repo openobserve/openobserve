@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox :model-value="isAllSelected" @update:model-value="toggleSelectAll" @click.stop />
           <span>{{ variableItem.multiSelect ? 'Select All' : 'All' }}</span>
         </div>
-        <q-separator />
+        <OSeparator />
         <div
           v-if="currentSearchTerm"
           class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ currentSearchTerm }}
           <span class="text-grey-6 tw:text-xs tw:italic">(Custom)</span>
         </div>
-        <q-separator v-if="currentSearchTerm" />
+        <OSeparator v-if="currentSearchTerm" />
       </template>
       <template #empty>
         <div
@@ -84,6 +84,7 @@ import {
 } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "VariableQueryValueSelector",

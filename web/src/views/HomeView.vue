@@ -14,9 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-
-    <div class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto" style="max-height: calc(100vh - var(--navbar-height) - 18px)">
+  <div
+    class="tw:rounded-md tw:px-[0.625rem] q-pt-xs home-page"
+    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''"
+  >
+    <div
+      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto"
+      style="max-height: calc(100vh - var(--navbar-height) - 18px)"
+    >
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
       <div
         v-if="tabOrder.length > 1"
@@ -28,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="tab in tabOrder"
           :key="tab.id"
           variant="ghost"
-        class="home-tab-btn"
+          class="home-tab-btn"
           :class="{
-          'home-tab-active': activeHomeTab === tab.id,
-          'home-tab-dragging': draggingTab === tab.id,
-        }"
+            'home-tab-active': activeHomeTab === tab.id,
+            'home-tab-dragging': draggingTab === tab.id,
+          }"
           draggable="true"
           @click="activeHomeTab = tab.id"
           @dragstart="onTabDragStart($event, tab.id)"
@@ -40,10 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @dragenter.prevent="onTabDragEnter(tab.id)"
         >
           <OIcon
-          name="drag-indicator"
-          class="home-tab-drag-handle"
-          size="0.875em"
-        />
+            name="drag-indicator"
+            class="home-tab-drag-handle"
+            size="0.875em"
+          />
           {{ tab.label }}
         </OButton>
       </div>
@@ -52,15 +57,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
         <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
         <O2AIChat
-        ref="homeChat"
-        :is-open="true"
-        :header-height="0"
-        :centered-start="true"
-      />
+          ref="homeChat"
+          :is-open="true"
+          :header-height="0"
+          :centered-start="true"
+        />
       </div>
 
       <!-- Overview tab -->
-      <div v-if="activeHomeTab === 'overview'" class="card-container home-tab-panel">
+      <div
+        v-if="activeHomeTab === 'overview'"
+        class="card-container home-tab-panel"
+      >
         <OverviewTab />
       </div>
 
@@ -121,10 +129,12 @@ export default defineComponent({
         if (saved) {
           const ids: string[] = JSON.parse(saved);
           const ordered = ids
-            .map(id => DEFAULT_TABS.value.find(t => t.id === id))
+            .map((id) => DEFAULT_TABS.value.find((t) => t.id === id))
             .filter(Boolean) as { id: string; label: string }[];
           // append any new tabs not yet in saved order
-          DEFAULT_TABS.value.forEach(t => { if (!ordered.find(o => o.id === t.id)) ordered.push(t); });
+          DEFAULT_TABS.value.forEach((t) => {
+            if (!ordered.find((o) => o.id === t.id)) ordered.push(t);
+          });
           return ordered;
         }
       } catch {}
@@ -134,7 +144,11 @@ export default defineComponent({
     const tabOrder = ref(loadTabOrder());
 
     const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
-    const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.value.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
+    const activeHomeTab = ref(
+      savedActiveTab && DEFAULT_TABS.value.find((t) => t.id === savedActiveTab)
+        ? savedActiveTab
+        : tabOrder.value[0].id,
+    );
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
@@ -190,7 +204,7 @@ export default defineComponent({
 
     function onSwitchTab(e: Event) {
       const tab = (e as CustomEvent).detail;
-      if (DEFAULT_TABS.value.find(t => t.id === tab)) {
+      if (DEFAULT_TABS.value.find((t) => t.id === tab)) {
         activeHomeTab.value = tab;
       }
     }
@@ -224,7 +238,7 @@ export default defineComponent({
     HomeChatHistory,
     OButton,
     OIcon,
-},
+  },
 });
 </script>
 

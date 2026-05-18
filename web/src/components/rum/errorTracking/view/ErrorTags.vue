@@ -75,7 +75,7 @@ import windows from "@/assets/images/rum/windows.png";
 import mac from "@/assets/images/rum/mac.png";
 import linux from "@/assets/images/rum/linux.png";
 import { useI18n } from "vue-i18n";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 const { t } = useI18n();
 

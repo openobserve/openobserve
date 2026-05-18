@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
     <div :class="['tab-panels-container tw:h-screen tw:overflow-y-auto', tab.startsWith('correlated-') ? 'full-height-panels' : '']">
     <OTabPanels
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
-    <q-separator v-if="tab === 'json' || tab === 'table'" />
+    <OSeparator v-if="tab === 'json' || tab === 'table'" />
     <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
@@ -420,6 +420,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 const defaultValue: any = () => {
   return {
     data: {},

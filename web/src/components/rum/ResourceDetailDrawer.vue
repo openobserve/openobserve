@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator vertical />
             <div class="row items-center">
               <OIcon
-                :name="getStatusIcon(resource.resource-status-code)"
+                :name="getStatusIcon(resource.resource - status - code)"
                 :color="getStatusColor(resource.resource_status_code)"
                 size="sm"
                 class="q-mr-xs"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tags-title text-bold q-ml-xs q-mb-sm">
             Session Context
           </div>
-        <div class="row q-gutter-sm">
+          <div class="row q-gutter-sm">
             <OButton
               icon-left="play-circle"
               variant="outline"
@@ -174,7 +174,7 @@ import { date } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';

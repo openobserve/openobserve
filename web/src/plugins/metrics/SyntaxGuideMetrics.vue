@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
   >
     <OIcon name="help" size="sm" class="tw:size-4 tw:mr-1" />
-    {{ t('search.syntaxGuideLabel') }}
+    {{ t("search.syntaxGuideLabel") }}
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <q-card flat v-if="!sqlmode">
         <q-card-section class="syntax-guide-title">
@@ -71,8 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For full text search of value 'error' use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('error')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
@@ -124,15 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "SyntaxGuideMetrics",
-  components: { OButton,
-    OIcon,
-},
+  components: { OButton, OIcon },
   props: {
     sqlmode: {
       type: Boolean,

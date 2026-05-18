@@ -75,16 +75,10 @@
 
             <div class="text-subtitle2 q-mb-sm">Current Status:</div>
             <div>
-              <OBadge
-                v-if="isServiceStreamsEnabled"
-                variant="success"
-              >
+              <OBadge v-if="isServiceStreamsEnabled" variant="success">
                 Service Streams: Enabled
               </OBadge>
-              <OBadge
-                v-else
-                variant="error"
-              >
+              <OBadge v-else variant="error">
                 Service Streams: Disabled
               </OBadge>
             </div>
@@ -119,7 +113,8 @@
     </div>
 
     <!-- Query Preview Dialog -->
-    <ODialog data-test="correlation-demo-query-dialog"
+    <ODialog
+      data-test="correlation-demo-query-dialog"
       v-model:open="showQueryDialog"
       size="md"
       title="Generated Query"
@@ -144,7 +139,7 @@ import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 // Demo state
 const showCorrelation = ref(false);

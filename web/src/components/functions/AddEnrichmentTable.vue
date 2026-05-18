@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-separator />
+      <OSeparator />
       <div>
           <div class="row">
             <OInput
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ job.url }}
                     </div>
                   </div>
-                  <q-separator v-if="Number(index) < formData.urlJobs.length - 1" class="q-my-xs" />
+                  <OSeparator v-if="Number(index) < formData.urlJobs.length - 1" class="tw:my-1" />
                 </div>
               </q-card>
             </div>
@@ -229,6 +229,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 const defaultValue: any = () => {
   return {
     name: "",

@@ -67,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="applyChanges"
                 :disable="!hasSelectedChanges"
                 :loading="isApplying"
-              >Apply Changes</OButton>
+                >Apply Changes</OButton
+              >
             </div>
           </div>
         </div>
@@ -79,12 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="row items-center q-col-gutter-sm">
               <div class="col-auto">
                 <OBadge variant="success" class="summary-chip">
-                  <strong>{{ diffData.additions.length }}</strong>&nbsp;New
+                  <strong>{{ diffData.additions.length }}</strong
+                  >&nbsp;New
                 </OBadge>
               </div>
               <div class="col-auto">
                 <OBadge variant="warning" class="summary-chip">
-                  <strong>{{ diffData.modifications.length }}</strong>&nbsp;Modified
+                  <strong>{{ diffData.modifications.length }}</strong
+                  >&nbsp;Modified
                 </OBadge>
               </div>
               <div class="col-auto">
@@ -98,17 +101,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost-primary"
                     size="xs"
                     @click="selectAllAdditions"
-                  >Select All New</OButton>
+                    >Select All New</OButton
+                  >
                   <OButton
                     variant="ghost-warning"
                     size="xs"
                     @click="selectAllModifications"
-                  >Select All Modified</OButton>
-                  <OButton
-                    variant="ghost-muted"
-                    size="xs"
-                    @click="deselectAll"
-                  >Clear All</OButton>
+                    >Select All Modified</OButton
+                  >
+                  <OButton variant="ghost-muted" size="xs" @click="deselectAll"
+                    >Clear All</OButton
+                  >
                 </OButtonGroup>
               </div>
             </div>
@@ -120,7 +123,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="diffData.additions.length > 0" class="q-mb-sm">
               <div class="section-header text-positive q-pa-xs">
                 <OIcon name="add-circle" size="sm" />
-                New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
+                New ({{ selectedAdditions.length }}/{{
+                  diffData.additions.length
+                }})
               </div>
               <q-list dense bordered separator class="compact-list">
                 <q-item
@@ -137,10 +142,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
+                    <q-item-label class="text-weight-medium">{{
+                      group.display
+                    }}</q-item-label>
                     <q-item-label caption lines="1">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OBadge v-if="group.normalize" variant="primary" class="q-ml-xs">norm</OBadge>
+                      <OBadge
+                        v-if="group.normalize"
+                        variant="primary"
+                        class="q-ml-xs"
+                        >norm</OBadge
+                      >
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -160,7 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="diffData.modifications.length > 0" class="q-mb-sm">
               <div class="section-header text-warning q-pa-xs">
                 <OIcon name="edit" size="sm" />
-                Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
+                Modified ({{ selectedModifications.length }}/{{
+                  diffData.modifications.length
+                }})
               </div>
               <q-list dense bordered separator class="compact-list">
                 <q-item
@@ -172,14 +186,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <q-item-section side top>
                     <OCheckbox
-                      :model-value="selectedModifications.includes(mod.proposed.id)"
+                      :model-value="
+                        selectedModifications.includes(mod.proposed.id)
+                      "
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ mod.proposed.display }}</q-item-label>
+                    <q-item-label class="text-weight-medium">{{
+                      mod.proposed.display
+                    }}</q-item-label>
                     <q-item-label caption lines="1">
-                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
+                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
+                      {{ mod.proposed.fields.length }} fields
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -210,7 +229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <q-item-section>
                       <q-item-label>{{ group.display }}</q-item-label>
-                      <q-item-label caption>{{ group.id }} • {{ group.fields.length }} fields</q-item-label>
+                      <q-item-label caption
+                        >{{ group.id }} •
+                        {{ group.fields.length }} fields</q-item-label
+                      >
                     </q-item-section>
                   </q-item>
                 </q-list>
@@ -220,9 +242,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- No Diff State -->
-        <div v-else-if="!isImporting && !diffData" class="card-container q-pa-lg text-center">
+        <div
+          v-else-if="!isImporting && !diffData"
+          class="card-container q-pa-lg text-center"
+        >
           <OIcon name="cloud-upload" size="64px" class="q-mb-md" />
-          <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file to get started</div>
+          <div class="text-h6 text-grey-7 q-mb-sm">
+            Upload a JSON file to get started
+          </div>
           <div class="text-body2 text-grey-6">
             The system will analyze the file and show you what will change
           </div>
@@ -232,7 +259,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </base-import>
 
   <!-- Group Details Dialog -->
-  <ODialog data-test="import-semantic-groups-group-dialog"
+  <ODialog
+    data-test="import-semantic-groups-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
     :title="selectedGroup?.display"
@@ -241,7 +269,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-subtitle2 q-mb-sm">Fields ({{ selectedGroup?.fields.length }})</div>
+      <div class="text-subtitle2 q-mb-sm">
+        Fields ({{ selectedGroup?.fields.length }})
+      </div>
       <OBadge
         v-for="field in selectedGroup?.fields"
         :key="field"
@@ -252,14 +282,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ field }}
       </OBadge>
       <div class="q-mt-md">
-        <OBadge v-if="selectedGroup?.normalize" variant="primary">Normalized</OBadge>
+        <OBadge v-if="selectedGroup?.normalize" variant="primary"
+          >Normalized</OBadge
+        >
         <OBadge v-else variant="default">Not Normalized</OBadge>
       </div>
     </div>
   </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog data-test="import-semantic-groups-modification-dialog"
+  <ODialog
+    data-test="import-semantic-groups-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
     :title="selectedModification?.proposed.display"
@@ -270,7 +303,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-col-gutter-md">
       <div class="col-6">
         <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-        <div class="text-caption q-mb-xs">{{ selectedModification?.current.fields.length }} fields</div>
+        <div class="text-caption q-mb-xs">
+          {{ selectedModification?.current.fields.length }} fields
+        </div>
         <div class="field-chips-container">
           <OBadge
             v-for="field in selectedModification?.current.fields"
@@ -285,7 +320,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="col-6">
         <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-        <div class="text-caption q-mb-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
+        <div class="text-caption q-mb-xs">
+          {{ selectedModification?.proposed.fields.length }} fields
+        </div>
         <div class="field-chips-container">
           <OBadge
             v-for="field in selectedModification?.proposed.fields"
@@ -296,7 +333,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ma-xs"
           >
             {{ field }}
-            <OIcon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
+            <OIcon
+              v-if="isNewField(field)"
+              name="add"
+              size="xs"
+              class="q-ml-xs"
+            />
           </OBadge>
         </div>
       </div>
@@ -353,7 +395,9 @@ const selectedGroup = ref<SemanticGroup | null>(null);
 const selectedModification = ref<SemanticGroupModification | null>(null);
 
 const hasSelectedChanges = computed(() => {
-  return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
+  return (
+    selectedAdditions.value.length > 0 || selectedModifications.value.length > 0
+  );
 });
 
 const loadFile = async (file: File | null) => {
@@ -401,8 +445,12 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     diffData.value = response.data;
 
     // Auto-select all additions and modifications
-    selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
-    selectedModifications.value = response.data.modifications.map((m: SemanticGroupModification) => m.proposed.id);
+    selectedAdditions.value = response.data.additions.map(
+      (g: SemanticGroup) => g.id,
+    );
+    selectedModifications.value = response.data.modifications.map(
+      (m: SemanticGroupModification) => m.proposed.id,
+    );
   } catch (error: any) {
     toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
@@ -414,12 +462,14 @@ const previewDiff = async (groups: SemanticGroup[]) => {
 
 const selectAllAdditions = () => {
   if (!diffData.value) return;
-  selectedAdditions.value = diffData.value.additions.map(g => g.id);
+  selectedAdditions.value = diffData.value.additions.map((g) => g.id);
 };
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(m => m.proposed.id);
+  selectedModifications.value = diffData.value.modifications.map(
+    (m) => m.proposed.id,
+  );
 };
 
 const deselectAll = () => {
@@ -469,15 +519,15 @@ const applyChanges = async () => {
     const finalGroups: SemanticGroup[] = [];
 
     // Add selected additions
-    const selectedAdditionGroups = diffData.value.additions.filter(g =>
-      selectedAdditions.value.includes(g.id)
+    const selectedAdditionGroups = diffData.value.additions.filter((g) =>
+      selectedAdditions.value.includes(g.id),
     );
     finalGroups.push(...selectedAdditionGroups);
 
     // Add selected modifications
     const selectedModificationGroups = diffData.value.modifications
-      .filter(m => selectedModifications.value.includes(m.proposed.id))
-      .map(m => m.proposed);
+      .filter((m) => selectedModifications.value.includes(m.proposed.id))
+      .map((m) => m.proposed);
     finalGroups.push(...selectedModificationGroups);
 
     // Add unchanged groups
@@ -485,8 +535,8 @@ const applyChanges = async () => {
 
     // Add unselected current groups (keep them as-is)
     const unselectedModifications = diffData.value.modifications
-      .filter(m => !selectedModifications.value.includes(m.proposed.id))
-      .map(m => m.current);
+      .filter((m) => !selectedModifications.value.includes(m.proposed.id))
+      .map((m) => m.current);
     finalGroups.push(...unselectedModifications);
 
     // Save to backend

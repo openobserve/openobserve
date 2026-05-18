@@ -134,10 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </tr>
               <tr>
                 <td>
-                  <OTime class="tw:w-full" v-model="data.selectedDate.absolute.startTime" />
+                  <OTime
+                    class="tw:w-full"
+                    v-model="data.selectedDate.absolute.startTime"
+                  />
                 </td>
                 <td>
-                  <OTime class="tw:w-full" v-model="data.selectedDate.absolute.endTime" />
+                  <OTime
+                    class="tw:w-full"
+                    v-model="data.selectedDate.absolute.endTime"
+                  />
                 </td>
               </tr>
             </table>
@@ -158,7 +164,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";

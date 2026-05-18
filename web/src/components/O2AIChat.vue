@@ -156,18 +156,19 @@
               data-test="ai-chat-expand-btn"
               @click="toggleExpand"
             >
-              <OIcon :name="
-                store.state.isAiChatExpanded
-                  ? 'close-fullscreen'
-                  : 'open-in-full'
-              " size="sm" />
-              <OTooltip :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`" />
+              <OIcon
+                :name="
+                  store.state.isAiChatExpanded
+                    ? 'close-fullscreen'
+                    : 'open-in-full'
+                "
+                size="sm"
+              />
+              <OTooltip
+                :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`"
+              />
             </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              @click="$emit('close')"
-            >
+            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
               <OIcon name="close" size="sm" />
             </OButton>
           </div>
@@ -176,7 +177,12 @@
       <OSeparator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
+      <ODrawer
+        data-test="o2-ai-chat-history-drawer"
+        v-model:open="showHistory"
+        size="sm"
+        title="Chat History"
+      >
         <q-list separator>
           <q-item
             v-for="chat in chatHistory"
@@ -190,16 +196,15 @@
               <q-item-label caption>
                 {{ new Date(chat.timestamp).toLocaleString() }}
               </q-item-label>
-              <q-item-label caption>
-                Model: {{ chat.model }}
-              </q-item-label>
+              <q-item-label caption> Model: {{ chat.model }} </q-item-label>
             </q-item-section>
           </q-item>
         </q-list>
       </ODrawer>
 
       <!-- Edit Title Dialog -->
-      <ODialog data-test="o2-ai-chat-edit-title-dialog"
+      <ODialog
+        data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
         size="sm"
         title="Edit Chat Title"
@@ -235,13 +240,21 @@
       />
 
       <!-- Image Preview Dialog -->
-      <ODialog data-test="o2-ai-chat-image-preview-dialog" v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg" :title="previewImage?.filename">
+      <ODialog
+        data-test="o2-ai-chat-image-preview-dialog"
+        v-model:open="showImagePreview"
+        @update:open="(v) => !v && closeImagePreview()"
+        size="lg"
+        :title="previewImage?.filename"
+      >
         <div class="tw:flex tw:justify-center">
           <img
             v-if="previewImage"
-            :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+            :src="
+              'data:' + previewImage.mimeType + ';base64,' + previewImage.data
+            "
             :alt="previewImage.filename"
-            style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+            style="max-width: 100%; max-height: 80vh; object-fit: contain"
           />
         </div>
       </ODialog>
@@ -432,7 +445,7 @@
                           handleNavigationAction(block.navigationAction)
                         "
                       >
-                      <OTooltip :content="block.navigationAction.label" />
+                        <OTooltip :content="block.navigationAction.label" />
                       </OIcon>
                       <OIcon
                         v-if="
@@ -535,14 +548,19 @@
                       >
                         <div class="detail-header">
                           <span class="detail-label">Query</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.query,
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy query" />
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy query" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           getToolCallDisplayData(block.context)?.query
@@ -627,14 +645,19 @@
                       >
                         <div class="detail-header">
                           <span class="detail-label">VRL</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.vrl,
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy VRL" />
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy VRL" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           getToolCallDisplayData(block.context)?.vrl
@@ -646,14 +669,19 @@
                       >
                         <div class="detail-header">
                           <span class="detail-label">Command</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.command,
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy command" />
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy command" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           getToolCallDisplayData(block.context)?.command
@@ -664,14 +692,19 @@
                         <div class="detail-item">
                           <div class="detail-header">
                             <span class="detail-label">Results</span>
-                            <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
+                              class="copy-btn"
+                              @click.stop="
                                 copyToClipboard(
                                   JSON.stringify(block.response.hits, null, 2),
                                 )
-                              ">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy results" />
-            </OButton>
+                              "
+                            >
+                              <OIcon name="content-copy" size="sm" />
+                              <OTooltip content="Copy results" />
+                            </OButton>
                           </div>
                           <div class="tool-response-hits">
                             <div
@@ -786,14 +819,19 @@
                         >
                           <div class="detail-header">
                             <span class="detail-label">Items</span>
-                            <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
+                              class="copy-btn"
+                              @click.stop="
                                 copyToClipboard(
                                   JSON.stringify(block.response.items, null, 2),
                                 )
-                              ">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy items" />
-            </OButton>
+                              "
+                            >
+                              <OIcon name="content-copy" size="sm" />
+                              <OTooltip content="Copy items" />
+                            </OButton>
                           </div>
                           <div class="tool-response-hits">
                             <div
@@ -821,16 +859,21 @@
                       <div v-else-if="block.response" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">Response</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 typeof block.response === 'string'
                                   ? block.response
                                   : JSON.stringify(block.response, null, 2),
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy response" />
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy response" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           typeof block.response === "string"
@@ -871,10 +914,15 @@
                       @click.stop
                     >
                       <div class="log-entry-content">
-                        <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="copyToClipboard(block.content)">
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip content="Copy content" />
-            </OButton>
+                        <OButton
+                          variant="ghost"
+                          size="icon-xs-circle"
+                          class="copy-btn"
+                          @click.stop="copyToClipboard(block.content)"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                          <OTooltip content="Copy content" />
+                        </OButton>
                         <code
                           class="log-entry-code"
                           v-html="formatLogEntryContent(block.content)"
@@ -891,8 +939,7 @@
                     "
                   >
                     <div class="stream-error-header">
-                      <OIcon name="warning"
-size="sm" />
+                      <OIcon name="warning" size="sm" />
                       <span class="stream-error-message">{{
                         block.message
                       }}</span>
@@ -920,10 +967,17 @@ size="sm" />
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
                     "
                   >
-                    <OButton variant="primary" size="xs" class="navigation-block-btn" @click="handleNavigationAction(block.navigationAction)">
-                    <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
-                    {{ block.navigationAction.label }}
-                  </OButton>
+                    <OButton
+                      variant="primary"
+                      size="xs"
+                      class="navigation-block-btn"
+                      @click="handleNavigationAction(block.navigationAction)"
+                    >
+                      <template #icon-left
+                        ><OIcon :name="'open-in-new'" size="sm"
+                      /></template>
+                      {{ block.navigationAction.label }}
+                    </OButton>
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
@@ -941,10 +995,15 @@ size="sm" />
                           >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
-                          <OButton variant="ghost" size="xs" class="copy-button" @click="copyToClipboard(textBlock.content)">
-                        <OIcon size="sm" name="content-copy" />
-                        <span class="tw:ml-1">Copy</span>
-                      </OButton>
+                          <OButton
+                            variant="ghost"
+                            size="xs"
+                            class="copy-button"
+                            @click="copyToClipboard(textBlock.content)"
+                          >
+                            <OIcon size="sm" name="content-copy" />
+                            <span class="tw:ml-1">Copy</span>
+                          </OButton>
                         </div>
                         <span class="generated-code-block">
                           <code
@@ -955,10 +1014,15 @@ size="sm" />
                         <div
                           class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
                         >
-                          <OButton variant="ghost" size="xs" class="retry-button" @click="retryGeneration(message)">
-                        <OIcon size="sm" name="refresh" />
-                        <span class="tw:ml-1">Retry</span>
-                      </OButton>
+                          <OButton
+                            variant="ghost"
+                            size="xs"
+                            class="retry-button"
+                            @click="retryGeneration(message)"
+                          >
+                            <OIcon size="sm" name="refresh" />
+                            <span class="tw:ml-1">Retry</span>
+                          </OButton>
                         </div>
                       </div>
                       <div
@@ -1007,10 +1071,15 @@ size="sm" />
                         <span v-if="block.language" class="code-type-label">
                           {{ getLanguageDisplay(block.language) }}
                         </span>
-                        <OButton variant="ghost" size="xs" class="copy-button" @click="copyToClipboard(block.content)">
-                        <OIcon size="sm" name="content-copy" />
-                        <span class="tw:ml-1">Copy</span>
-                      </OButton>
+                        <OButton
+                          variant="ghost"
+                          size="xs"
+                          class="copy-button"
+                          @click="copyToClipboard(block.content)"
+                        >
+                          <OIcon size="sm" name="content-copy" />
+                          <span class="tw:ml-1">Copy</span>
+                        </OButton>
                       </div>
                       <span class="generated-code-block">
                         <code
@@ -1036,15 +1105,29 @@ size="sm" />
                   class="feedback-buttons"
                   :class="{ 'feedback-active': message.feedback }"
                 >
-                  <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_up'" :class="{
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    :disabled="message.feedback === 'thumbs_up'"
+                    :class="{
                       'feedback-selected': message.feedback === 'thumbs_up',
-                    }" data-test="o2-ai-chat-thumbs-up-btn" @click="likeCodeBlock(index)">
+                    }"
+                    data-test="o2-ai-chat-thumbs-up-btn"
+                    @click="likeCodeBlock(index)"
+                  >
                     <OIcon name="thumb-up-off-alt" size="xs" />
                     <OTooltip content="Helpful" />
                   </OButton>
-                  <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_down'" :class="{
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    :disabled="message.feedback === 'thumbs_down'"
+                    :class="{
                       'feedback-selected': message.feedback === 'thumbs_down',
-                    }" data-test="o2-ai-chat-thumbs-down-btn" @click="dislikeCodeBlock(index)">
+                    }"
+                    data-test="o2-ai-chat-thumbs-down-btn"
+                    @click="dislikeCodeBlock(index)"
+                  >
                     <OIcon name="thumb-down-off-alt" size="xs" />
                     <OTooltip content="Not helpful" />
                   </OButton>
@@ -1132,9 +1215,14 @@ size="sm" />
 
         <!-- Scroll to bottom button -->
         <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
-          <OButton variant="ghost" size="icon-sm" class="scroll-to-bottom-btn" @click="scrollToBottomSmooth">
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            class="scroll-to-bottom-btn"
+            @click="scrollToBottomSmooth"
+          >
             <OIcon name="arrow-downward" size="sm" />
-          <OTooltip side="top" align="center" content="Scroll to bottom" />
+            <OTooltip side="top" align="center" content="Scroll to bottom" />
           </OButton>
         </div>
       </div>
@@ -1200,10 +1288,17 @@ size="sm" />
                 :alt="img.filename"
                 class="preview-image"
               />
-              <OButton variant="ghost" size="icon-xs-circle" class="image-remove-btn" @click.stop="removeImage(index)">
+              <OButton
+                variant="ghost"
+                size="icon-xs-circle"
+                class="image-remove-btn"
+                @click.stop="removeImage(index)"
+              >
                 <OIcon name="close" size="xs" />
               </OButton>
-              <OTooltip :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`" />
+              <OTooltip
+                :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`"
+              />
             </div>
           </div>
 
@@ -1266,7 +1361,13 @@ size="sm" />
                   class="auto-nav-icon"
                 />
                 <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
-                <OTooltip :content="isAutoNavigationEnabled ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation' : 'Auto navigation disabled - O2 Assistant will ask before navigating'" />
+                <OTooltip
+                  :content="
+                    isAutoNavigationEnabled
+                      ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation'
+                      : 'Auto navigation disabled - O2 Assistant will ask before navigating'
+                  "
+                />
               </OButton>
             </div>
 
@@ -1397,7 +1498,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OInput,
-},
+  },
   props: {
     isOpen: {
       type: Boolean,
