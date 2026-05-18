@@ -19,7 +19,7 @@
     :open="open"
     @update:open="(v) => { if (!v) cancelEdit(); }"
     title="Color by series"
-    :width="40"
+    size="lg"
     neutral-button-label="+ Add a new color"
     neutral-button-variant="outline"
     primary-button-label="Save"
@@ -46,7 +46,7 @@
               :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
             />
           </div>
-          <div class="draggable-content tw:flex tw:gap-x-6">
+          <div class="draggable-content tw:flex tw:items-center tw:gap-x-3">
             <div
               class="input-container tw:flex-1"
               @focusin="focusedSeriesIndex = index"
@@ -79,7 +79,7 @@
             </div>
 
             <!-- Color Picker -->
-            <div class="color-section tw:shrink-0 tw:w-40">
+            <div class="color-section tw:shrink-0">
               <div
                 v-if="series.color !== null"
                 class="tw:items-center tw:flex tw:gap-1"
@@ -87,13 +87,8 @@
                 <OColor
                   v-model="series.color"
                   class="tw:flex-1"
-                />
-                <OIcon
-                  name="cancel"
-                  class="cursor-pointer tw:align-middle"
-                  size="xs"
-                  title="Remove color"
-                  @click="removeColorByIndex(index)"
+                  clearable
+                  @clear="removeColorByIndex(index)"
                 />
               </div>
               <div v-else class="tw:w-full">
@@ -119,24 +114,6 @@
             </div>
           </div>
         </draggable>
-      </div>
-      <!-- Footer Buttons -->
-    <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="addcolorBySeries"
-        data-test="dashboard-addpanel-config-color-by-series-add-btn"
-        >+ Add a new color</OButton
-      >
-      <OButton
-        variant="primary"
-        size="sm-action"
-        @click="applycolorBySeries"
-        :disabled="!isFormValid"
-        data-test="dashboard-addpanel-config-color-by-series-apply-btn"
-        >Save</OButton
-      >
     </div>
   </ODialog>
 </template>
@@ -376,5 +353,6 @@ export default defineComponent({
 .color-section {
   display: flex;
   align-items: center;
+  margin-top: 9px;
 }
 </style>

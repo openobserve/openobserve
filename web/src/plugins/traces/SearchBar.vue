@@ -103,13 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
+            class="toolbar-toggle-container element-box-shadow"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="sm"
+              size="lg"
             />
             <img
               :src="metricsIcon"
@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <!-- Error Only Toggle -->
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
+            class="toolbar-toggle-container element-box-shadow"
           >
             <OSwitch
               data-test="traces-search-bar-error-only-toggle-btn"
               v-model="searchObj.meta.showErrorOnly"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="sm"
+              size="lg"
               @update:model-value="onErrorOnlyToggle"
             />
             <OIcon
@@ -1225,5 +1225,24 @@ export default defineComponent({
 .o2-color-cancel {
   background-color: #f67a7a;
   color: var(--o2-primary-btn-text);
+}
+
+.toolbar-toggle-container {
+  padding: 0.25rem 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--color-button-outline-border);
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+:global(.dark-theme) .toolbar-toggle-container {
+  border: 0.0625rem solid var(--color-button-outline-border);
 }
 </style>
