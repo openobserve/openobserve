@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="general-settings-max-series-per-query"
               style="width: 180px"
             >
-              <template v-slot:append>
+              <template v-slot:icon-right>
                 <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
                 </OIcon>
