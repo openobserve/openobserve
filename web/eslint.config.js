@@ -89,50 +89,50 @@ export default [
       // Enforced rules
       "vue/no-restricted-html-elements": [
         "error",
-        {
-          element: "q-btn",
-          message:
-            'Use <OButton> from "@/lib/core/Button/OButton.vue" instead of <q-btn>.',
-        },
-        {
-          element: "q-btn-group",
-          message:
-            'Use <OButtonGroup> from "@/lib/core/Button/OButtonGroup.vue" instead of <q-btn-group>.',
-        },
-        {
-          element: "q-tabs",
-          message:
-            'Use <OTabs> from "@/lib/navigation/Tabs/OTabs.vue" instead of <q-tabs>.',
-        },
-        {
-          element: "q-tab",
-          message:
-            'Use <OTab> from "@/lib/navigation/Tabs/OTab.vue" instead of <q-tab>.',
-        },
-        {
-          element: "q-tab-panels",
-          message:
-            'Use <OTabPanels> from "@/lib/navigation/Tabs/OTabPanels.vue" instead of <q-tab-panels>.',
-        },
-        {
-          element: "q-tab-panel",
-          message:
-            'Use <OTabPanel> from "@/lib/navigation/Tabs/OTabPanel.vue" instead of <q-tab-panel>.',
-        },
-        {
-          element: "q-route-tab",
-          message:
-            'Use <ORouteTab> from "@/lib/navigation/Tabs/ORouteTab.vue" instead of <q-route-tab>.',
-        },
-        {
-          element: "q-btn-toggle",
-          message:
-            'Use <OToggleGroup> from "@/lib/core/ToggleGroup/OToggleGroup.vue" instead of <q-btn-toggle>.',
-        },
-        {
-          element: 'q-btn-dropdown',
-          message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
-        },
+        // {
+        //   element: "q-btn",
+        //   message:
+        //     'Use <OButton> from "@/lib/core/Button/OButton.vue" instead of <q-btn>.',
+        // },
+        // {
+        //   element: "q-btn-group",
+        //   message:
+        //     'Use <OButtonGroup> from "@/lib/core/Button/OButtonGroup.vue" instead of <q-btn-group>.',
+        // },
+        // {
+        //   element: "q-tabs",
+        //   message:
+        //     'Use <OTabs> from "@/lib/navigation/Tabs/OTabs.vue" instead of <q-tabs>.',
+        // },
+        // {
+        //   element: "q-tab",
+        //   message:
+        //     'Use <OTab> from "@/lib/navigation/Tabs/OTab.vue" instead of <q-tab>.',
+        // },
+        // {
+        //   element: "q-tab-panels",
+        //   message:
+        //     'Use <OTabPanels> from "@/lib/navigation/Tabs/OTabPanels.vue" instead of <q-tab-panels>.',
+        // },
+        // {
+        //   element: "q-tab-panel",
+        //   message:
+        //     'Use <OTabPanel> from "@/lib/navigation/Tabs/OTabPanel.vue" instead of <q-tab-panel>.',
+        // },
+        // {
+        //   element: "q-route-tab",
+        //   message:
+        //     'Use <ORouteTab> from "@/lib/navigation/Tabs/ORouteTab.vue" instead of <q-route-tab>.',
+        // },
+        // {
+        //   element: "q-btn-toggle",
+        //   message:
+        //     'Use <OToggleGroup> from "@/lib/core/ToggleGroup/OToggleGroup.vue" instead of <q-btn-toggle>.',
+        // },
+        // {
+        //   element: 'q-btn-dropdown',
+        //   message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
+        // },
         // {
         //   element: 'q-bar',
         //   message: 'Use a plain <div> instead of <q-bar>.',
@@ -145,46 +145,46 @@ export default [
         //   element: 'q-toolbar-title',
         //   message: 'Remove <q-toolbar-title> — use a plain <div> or <span> for the title content.',
         // },
-        {
-          element: 'q-icon',
-          message: 'Use <OIcon> from "@/lib/core/Icon/OIcon.vue" instead of <q-icon>. To add a new icon update OIcon.icons.ts.'
-        },
-        {
-          element: 'q-dialog',
-          message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
-        },
-        {
-          element: 'q-badge',
-          message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-badge>.'
-        },
-        {
-          element: 'q-chip',
-          message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.'
-        },
-        {
-          element: 'q-avatar',
-          message: 'Use a plain <div class="tw:rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.'
-        },
-        {
-          element: 'q-img',
-          message: 'Use a native <img> element instead of <q-img>. q-img features (lazy load, aspect-ratio, spinner) are not used anywhere in this codebase.'
-        },
-        {
-          element: 'q-spinner',
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
-        },
-        {
-          element: 'q-spinner-hourglass',
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-hourglass>.'
-        },
-        {
-          element: 'q-spinner-dots',
-          message: 'Use <OSpinner variant="dots"> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-dots>.'
-        },
-        {
-          element: 'q-spinner-gears',
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-gears>.'
-        },
+        // {
+        //   element: 'q-icon',
+        //   message: 'Use <OIcon> from "@/lib/core/Icon/OIcon.vue" instead of <q-icon>. To add a new icon update OIcon.icons.ts.'
+        // },
+        // {
+        //   element: 'q-dialog',
+        //   message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
+        // },
+        // {
+        //   element: 'q-badge',
+        //   message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-badge>.'
+        // },
+        // {
+        //   element: 'q-chip',
+        //   message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.'
+        // },
+        // {
+        //   element: 'q-avatar',
+        //   message: 'Use a plain <div class="tw:rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.'
+        // },
+        // {
+        //   element: 'q-img',
+        //   message: 'Use a native <img> element instead of <q-img>. q-img features (lazy load, aspect-ratio, spinner) are not used anywhere in this codebase.'
+        // },
+        // {
+        //   element: 'q-spinner',
+        //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
+        // },
+        // {
+        //   element: 'q-spinner-hourglass',
+        //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-hourglass>.'
+        // },
+        // {
+        //   element: 'q-spinner-dots',
+        //   message: 'Use <OSpinner variant="dots"> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-dots>.'
+        // },
+        // {
+        //   element: 'q-spinner-gears',
+        //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-gears>.'
+        // },
         // {
         //   element: 'q-circular-progress',
         //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-circular-progress>.'

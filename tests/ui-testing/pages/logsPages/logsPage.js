@@ -133,7 +133,7 @@ export class LogsPage {
         this.logsSearchBarSaveTransformBtn = '[data-test="logs-search-bar-save-transform-btn"]';
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         this.qNotifyWarning = '#q-notify div';
-        this.qPageContainer = '[data-o2-page-container]';
+        this.qPageContainer = '[data-test="logs-page-container"]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
@@ -290,8 +290,8 @@ export class LogsPage {
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
         this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] .wildcard-chip`;
         this.wildcardChip = '.wildcard-chip';
-        // Pattern details dialog
-        this.closePatternDialog = '[data-test="close-pattern-dialog"]';
+        // Pattern details dialog (ODrawer — PatternDetailsDialog.vue)
+        this.closePatternDialog = '[data-test="pattern-details-dialog"] [data-test="o-drawer-close-btn"]';
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
         // Pattern list states
@@ -3457,8 +3457,11 @@ export class LogsPage {
         // Wait for the page to stabilize and check for "No events found" condition
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
+        // Wait for the container to be present before reading its text
+        await logsPage.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+
         // If no data is available, trigger a refresh and wait
-        const pageText = await logsPage.textContent();
+        const pageText = await logsPage.textContent({ timeout: 10000 }).catch(() => '');
         if (pageText.includes('No events found')) {
             testLogger.debug('No events found, attempting to refresh...');
             await this.clickRefreshButton();
@@ -6864,7 +6867,7 @@ export class LogsPage {
         await this.page.locator(this.builderQueryType).click();
         // Confirmation dialog only appears when switching Custom → Builder
         // AND there's an existing query that would be wiped
-        const confirmBtn = this.page.locator('[data-test="confirm-button"]');
+        const confirmBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
         if (await confirmBtn.isVisible({ timeout: 500 }).catch(() => false)) {
             await confirmBtn.click();
             testLogger.info('Confirmed Builder mode switch (dialog dismissed)');
