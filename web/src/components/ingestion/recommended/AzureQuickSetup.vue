@@ -187,6 +187,7 @@ import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "AzureQuickSetup",
