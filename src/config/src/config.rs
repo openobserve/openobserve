@@ -1435,12 +1435,6 @@ pub struct Common {
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
     #[env_config(
-        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
-        default = false,
-        help = "Enable to use large partition for index. This will apply for all streams"
-    )]
-    pub align_partitions_for_index: bool,
-    #[env_config(
         name = "ZO_CONFIG_WATCHER_INTERVAL",
         default = 30,
         help = "Config file watcher interval in seconds. Set to 0 to disable"
@@ -1806,6 +1800,12 @@ pub struct Limit {
         help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -3104,6 +3104,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
+    }
+
+    if cfg.limit.footer_cache_max_size == 0 {
+        cfg.limit.footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }

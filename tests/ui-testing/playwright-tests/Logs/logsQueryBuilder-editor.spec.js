@@ -15,7 +15,6 @@ const {
     ingestForQueryBuilderTest,
     setupQueryAndSwitchToBuild,
     initQueryBuilderTest,
-    initQueryBuilderTestLite,
 } = require('../utils/queryBuilder-helpers.js');
 
 // ============================================================================
@@ -434,7 +433,7 @@ test.describe("Logs Query Builder — Bare Field Select defaults (Case 3a)", () 
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('Bare field select test setup completed');
     });
@@ -518,7 +517,7 @@ test.describe("Logs Query Builder — FieldList button visibility", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
 
         testLogger.info('FieldList button test setup completed');
     });
