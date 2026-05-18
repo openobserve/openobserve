@@ -15,7 +15,6 @@ const PageManager = require('../../pages/page-manager.js');
 const {
     ingestForQueryBuilderTest,
     setupQueryAndSwitchToBuild,
-    initQueryBuilderTestLite,
     initQueryBuilderTest,
 } = require('../utils/queryBuilder-helpers.js');
 
@@ -35,7 +34,7 @@ test.describe("Logs Query Builder - Filter Operators (Advanced)", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await initQueryBuilderTestLite(page, pm);
+        await initQueryBuilderTest(page, pm);
         testLogger.info('Filter Operators (Advanced) test setup completed');
     });
 
