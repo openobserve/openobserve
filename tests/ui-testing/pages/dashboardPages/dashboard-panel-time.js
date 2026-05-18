@@ -301,9 +301,12 @@ export default class DashboardPanelTime {
     await this.page.keyboard.press('Escape').catch(() => {});
     await this.page.waitForTimeout(300);
 
-    // Wait for any existing dropdowns to close
+    // Wait for any existing dropdowns to close (.date-time-dialog wrapper still
+    // exists post-migration on the ODropdown content wrapper; .q-menu is the
+    // legacy popup, [role="menu"] covers the new ODropdown)
     await this.page.locator('.date-time-dialog').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
     await this.page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await this.page.locator('[role="menu"][data-state="open"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Wait for network to settle before clicking
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

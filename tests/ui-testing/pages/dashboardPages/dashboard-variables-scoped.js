@@ -456,8 +456,8 @@ export default class DashboardVariablesScoped {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        // Use .q-item with exact text match
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        // Use OSelect option (Reka Listbox role=option) post-migration with .q-item fallback
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -484,8 +484,8 @@ export default class DashboardVariablesScoped {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        // Use .q-item with exact text match
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        // Use OSelect option (Reka Listbox role=option) post-migration with .q-item fallback
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -502,13 +502,13 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
-        // Wait for dropdown items to load
-        await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
+        // Wait for dropdown items to load (OSelect role=option or legacy .q-item)
+        await this.page.waitForSelector('[role="option"], .q-item', { state: "visible", timeout: 5000 });
 
         // Click each panel checkbox by panel name
         for (const panelName of assignedPanels) {
-          // Use .q-item with exact text match for panel name
-          const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
+          // Use OSelect option (Reka Listbox) post-migration with .q-item fallback
+          const panelItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
           await this.page.waitForTimeout(500); // Wait after each selection
@@ -1159,8 +1159,9 @@ export default class DashboardVariablesScoped {
       throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
     }
 
-    // Wait for dropdown menu to open and stabilize
-    const dropdownMenu = this.page.locator('.q-menu').first();
+    // Wait for dropdown menu to open and stabilize — variable selector uses
+    // OSelect (Reka Listbox) post-migration, q-select (.q-menu) pre-migration.
+    const dropdownMenu = this.page.locator('[role="listbox"]:visible, .q-menu').first();
     await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for options to be present in the dropdown
@@ -1269,7 +1270,7 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -1289,7 +1290,7 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -1445,7 +1446,7 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -1465,7 +1466,7 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -1583,7 +1584,7 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of assignedTabs) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }
@@ -1603,7 +1604,7 @@ export default class DashboardVariablesScoped {
 
       for (const tabId of tabsToSelect) {
         const tabLabel = tabId === 'default' ? 'Default' : tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
+        const tabItem = this.page.locator('[role="option"], .q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
       }

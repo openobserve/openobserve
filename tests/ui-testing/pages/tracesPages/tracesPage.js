@@ -208,9 +208,9 @@ export class TracesPage {
   async selectTraceStream(streamName = 'default') {
     const streamSelectLocator = this.page.locator(this.streamSelect);
 
-    // Click the q-select to open the dropdown menu
+    // Click the dropdown — OSelect (Reka Listbox) post-migration, q-select pre.
     await streamSelectLocator.click();
-    await this.page.locator('.q-menu').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await this.page.locator('[role="listbox"], .q-menu').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     // Type into the internal input to trigger the @filter filterStreamFn
     await streamSelectLocator.fill('');

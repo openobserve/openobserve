@@ -82,6 +82,7 @@ import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";

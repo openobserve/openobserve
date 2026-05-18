@@ -710,8 +710,9 @@ export class LogsPage {
                     await this.page.waitForTimeout(1500);
                 }
 
-                // Look for the dropdown menu with scroll capability
-                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
+                // Stream picker is OSelect (Reka Listbox) post-migration; legacy
+                // q-select uses .q-menu.scroll / .q-virtual-scroll__content.
+                const dropdownMenu = this.page.locator('[role="listbox"]:visible, .q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
 
                 // Try to click the stream toggle div directly first
                 const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
@@ -1540,9 +1541,12 @@ export class LogsPage {
         const resultsDropdown = this.page.locator('[data-test="logs-search-result-records-per-page"]');
         await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await resultsDropdown.click({ force: true });
-        // Dropdown uses a QMenu popup — wait for it to appear, then click "10"
+        // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page.waitForTimeout(500);
-        const option10 = this.page.locator('.q-menu .q-item').filter({ hasText: /^10$/ }).first();
+        const option10 = this.page
+            .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+            .filter({ hasText: /^10$/ })
+            .first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
         await option10.click({ force: true });
         // Wait for the per-page change to take effect — cloud wildcard queries
