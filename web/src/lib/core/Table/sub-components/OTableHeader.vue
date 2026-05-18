@@ -147,19 +147,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           <span v-else>{{ col.label ?? col.id }}</span>
           <OIcon
             v-if="getSortIcon?.(col.id) === 'asc'"
-            name="arrow_upward"
+            name="arrow-upward"
             size="0.85rem"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else-if="getSortIcon?.(col.id) === 'desc'"
-            name="arrow_downward"
+            name="arrow-downward"
             size="0.85rem"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else
-            name="unfold_more"
+            name="unfold-more"
             size="0.85rem"
             class="tw:opacity-40"
           />
@@ -196,19 +196,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         {{ cell.label }}
         <OIcon
           v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
-          name="arrow_upward"
+          name="arrow-upward"
           size="0.85rem"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
-          name="arrow_downward"
+          name="arrow-downward"
           size="0.85rem"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn"
-          name="unfold_more"
+          name="unfold-more"
           size="0.85rem"
           class="tw:opacity-40 tw:ml-1"
         />
@@ -321,21 +321,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
-                name="arrow_upward"
+                name="arrow-upward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
-                name="arrow_downward"
+                name="arrow-downward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
-                name="unfold_more"
+                name="unfold-more"
                 size="0.85rem"
                 class="tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
@@ -444,21 +444,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
-                name="arrow_upward"
+                name="arrow-upward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
-                name="arrow_downward"
+                name="arrow-downward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
-                name="unfold_more"
+                name="unfold-more"
                 size="0.85rem"
                 class="tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
