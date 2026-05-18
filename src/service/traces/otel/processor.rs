@@ -320,11 +320,17 @@ impl OtelIngestionProcessor {
         }
 
         if let Some(ref input_val) = extracted.input {
-            span_attributes.insert(GenAiAttributes::INPUT_MESSAGES.to_string(), input_val.clone());
+            span_attributes.insert(
+                GenAiAttributes::INPUT_MESSAGES.to_string(),
+                input_val.clone(),
+            );
         }
 
         if let Some(ref output_val) = extracted.output {
-            span_attributes.insert(GenAiAttributes::OUTPUT_MESSAGES.to_string(), output_val.clone());
+            span_attributes.insert(
+                GenAiAttributes::OUTPUT_MESSAGES.to_string(),
+                output_val.clone(),
+            );
         }
 
         // Model parameters as individual gen_ai.request.* scalars.
@@ -405,11 +411,17 @@ impl OtelIngestionProcessor {
         }
 
         if let Some(ref targs) = extracted.tool_call_arguments {
-            span_attributes.insert(GenAiAttributes::TOOL_CALL_ARGUMENTS.to_string(), targs.clone());
+            span_attributes.insert(
+                GenAiAttributes::TOOL_CALL_ARGUMENTS.to_string(),
+                targs.clone(),
+            );
         }
 
         if let Some(ref tresult) = extracted.tool_call_result {
-            span_attributes.insert(GenAiAttributes::TOOL_CALL_RESULT.to_string(), tresult.clone());
+            span_attributes.insert(
+                GenAiAttributes::TOOL_CALL_RESULT.to_string(),
+                tresult.clone(),
+            );
         }
 
         // Evaluation scores and metadata.

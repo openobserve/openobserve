@@ -19,7 +19,10 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     get_config,
     meta::{
-        search::{PaginatedResponse, SearchPartitionRequest, StreamResponses, TimeOffset, default_use_cache},
+        search::{
+            PaginatedResponse, SearchPartitionRequest, StreamResponses, TimeOffset,
+            default_use_cache,
+        },
         stream::StreamType,
     },
     metrics,
@@ -55,6 +58,20 @@ use crate::{
 pub mod dag;
 pub mod session;
 pub mod user;
+
+#[derive(Default, Clone, Debug)]
+pub(crate) struct TraceDetail {
+    pub(crate) start_time: i64,
+    pub(crate) end_time: i64,
+    pub(crate) gen_ai_usage_input_tokens: i64,
+    pub(crate) gen_ai_usage_output_tokens: i64,
+    pub(crate) gen_ai_usage_total_tokens: i64,
+    pub(crate) gen_ai_usage_cost: f64,
+    pub(crate) error_count: i64,
+    pub(crate) user_id: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) first_user_message: Option<String>,
+}
 
 /// TracesIngest
 #[utoipa::path(
@@ -344,7 +361,7 @@ pub async fn get_latest_traces(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
@@ -800,7 +817,10 @@ pub async fn get_latest_traces(
         total: traces_data.len(),
         from,
         size,
-        hits: traces_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        hits: traces_data
+            .into_iter()
+            .map(|v| json::to_value(v).unwrap())
+            .collect(),
         trace_id,
         function_error: range_error,
     })
@@ -1119,7 +1139,7 @@ async fn process_latest_traces_stream(
             sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
             sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {

@@ -14,11 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::{search::PaginatedResponse, stream::StreamType}, metrics, utils::json};
+use config::{
+    TIMESTAMP_COL_NAME, get_config,
+    meta::{search::PaginatedResponse, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
+use super::TraceDetail;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -318,13 +324,16 @@ pub async fn get_latest_sessions(
     let trace_ids_sql = sanitized_ids.join("','");
     let query_sql = format!(
         "SELECT trace_id, \
+        max(user_id) as user_id,
         min(start_time) as trace_start_time, \
         max(end_time) as trace_end_time, \
         sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
         sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
         sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
         sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-        sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count \
+        sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
+        max(gen_ai_response_model) as gen_ai_response_model, \
+        FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
         FROM \"{stream_name}\" \
         WHERE trace_id IN ('{trace_ids_sql}') \
         GROUP BY trace_id"
@@ -380,6 +389,7 @@ pub async fn get_latest_sessions(
             Some(s) => s.to_string(),
             None => continue,
         };
+        let first_user_message = extract_first_user_message(item.get("gen_ai_input_messages"), 30);
         trace_details.insert(
             tid,
             TraceDetail {
@@ -398,6 +408,13 @@ pub async fn get_latest_sessions(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
                 error_count: json::get_int_value(item.get("error_count").unwrap_or_default()),
+                user_id: item
+                    .get("user_id")
+                    .and_then(|v| v.as_str().map(String::from)),
+                model: item
+                    .get("gen_ai_response_model")
+                    .and_then(|v| v.as_str().map(String::from)),
+                first_user_message,
             },
         );
     }
@@ -432,24 +449,80 @@ pub async fn get_latest_sessions(
         total: sessions_data.len(),
         from,
         size,
-        hits: sessions_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        hits: sessions_data
+            .into_iter()
+            .map(|v| json::to_value(v).unwrap())
+            .collect(),
         trace_id,
         function_error: range_error,
     })
 }
 
-struct TraceDetail {
-    start_time: i64,
-    end_time: i64,
-    gen_ai_usage_input_tokens: i64,
-    gen_ai_usage_output_tokens: i64,
-    gen_ai_usage_total_tokens: i64,
-    gen_ai_usage_cost: f64,
-    error_count: i64,
+/// Extract the first user message from a `gen_ai_input_messages` JSON value.
+///
+/// The input is expected to be a JSON array of message objects with `role` and
+/// `content` fields (e.g. `[{"role":"user","content":"hello"}]`). Returns the
+/// content of the first message with role "user", trimmed to `max_len` chars.
+fn extract_first_user_message(
+    messages_val: Option<&json::Value>,
+    max_len: usize,
+) -> Option<String> {
+    let val = messages_val?;
+
+    // The value may be:
+    // 1. A JSON array directly: [{"role":"user","content":"..."}]
+    // 2. A JSON string of an array: "[{\"role\":\"user\",...}]"
+    // 3. A JSON string of an object with a nested "messages" array:
+    //    "{\"model\":\"...\",\"messages\":[{\"role\":\"user\",...}]}"
+    let parsed: json::Value;
+    let msgs_val: &json::Value = if val.is_array() {
+        val
+    } else if let Some(s) = val.as_str() {
+        parsed = json::from_str(s).ok()?;
+        &parsed
+    } else {
+        return None;
+    };
+
+    // Resolve the actual messages array — either the top-level value, or a nested
+    // "messages" key (OpenAI-style) or "contents" key (Gemini/LiteLLM-style).
+    let arr = if let Some(a) = msgs_val.as_array() {
+        a
+    } else if let Some(a) = msgs_val.get("messages").and_then(|v| v.as_array()) {
+        a
+    } else if let Some(a) = msgs_val.get("contents").and_then(|v| v.as_array()) {
+        a
+    } else {
+        return None;
+    };
+
+    for msg in arr {
+        let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("");
+        if !role.eq_ignore_ascii_case("user") {
+            continue;
+        }
+
+        // OpenAI-style: content is a plain string
+        if let Some(content) = msg.get("content").and_then(|v| v.as_str()) {
+            let trimmed: String = content.chars().take(max_len).collect();
+            return Some(trimmed);
+        }
+
+        // Gemini/LiteLLM-style: parts: [{text: "..."}]
+        if let Some(text) = msg
+            .get("parts")
+            .and_then(|v| v.as_array())
+            .and_then(|parts| parts.iter().find_map(|p| p.get("text").and_then(|t| t.as_str())))
+        {
+            let trimmed: String = text.chars().take(max_len).collect();
+            return Some(trimmed);
+        }
+    }
+    None
 }
 
 #[derive(Debug, Serialize)]
-struct SessionResponseItem {
+struct SessionDetails {
     session_id: String,
     start_time: i64,
     end_time: i64,
@@ -460,6 +533,74 @@ struct SessionResponseItem {
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
     error_count: i64,
+    users: Vec<String>,
+    models: Vec<String>,
+    first_user_message: Option<String>,
+}
+
+impl SessionDetails {
+    fn from_trace_details(session_id: String, trace_count: usize, details: &[TraceDetail]) -> Self {
+        let mut start_time: i64 = 0;
+        let mut end_time: i64 = 0;
+        let mut usage_input: i64 = 0;
+        let mut usage_output: i64 = 0;
+        let mut usage_total: i64 = 0;
+        let mut cost_total: f64 = 0.0;
+        let mut error_count: i64 = 0;
+        let mut user_ids: Vec<String> = Vec::with_capacity(details.len());
+        let mut models: Vec<String> = Vec::with_capacity(details.len());
+        let mut first_user_message: Option<String> = None;
+        let mut earliest_user_msg_time: i64 = 0;
+        for detail in details {
+            if start_time == 0 || detail.start_time < start_time {
+                start_time = detail.start_time;
+            }
+            if detail.end_time > end_time {
+                end_time = detail.end_time;
+            }
+            usage_input += detail.gen_ai_usage_input_tokens;
+            usage_output += detail.gen_ai_usage_output_tokens;
+            usage_total += detail.gen_ai_usage_total_tokens;
+            cost_total += detail.gen_ai_usage_cost;
+            error_count += detail.error_count;
+            if let Some(ref uid) = detail.user_id {
+                user_ids.push(uid.clone());
+            }
+            if let Some(ref model) = detail.model
+                && !models.contains(model)
+            {
+                models.push(model.clone());
+            }
+            if let Some(ref msg) = detail.first_user_message
+                && (first_user_message.is_none()
+                    || (detail.start_time != 0 && detail.start_time < earliest_user_msg_time)
+                    || earliest_user_msg_time == 0)
+            {
+                first_user_message = Some(msg.clone());
+                earliest_user_msg_time = detail.start_time;
+            }
+        }
+        let duration = if end_time > start_time {
+            end_time - start_time
+        } else {
+            0
+        };
+        SessionDetails {
+            session_id,
+            start_time,
+            end_time,
+            duration,
+            trace_count: trace_count as u16,
+            gen_ai_usage_input_tokens: usage_input,
+            gen_ai_usage_output_tokens: usage_output,
+            gen_ai_usage_total_tokens: usage_total,
+            gen_ai_usage_cost: cost_total,
+            error_count,
+            users: user_ids,
+            models,
+            first_user_message,
+        }
+    }
 }
 
 fn parse_session_trace_ids(
@@ -492,52 +633,22 @@ fn aggregate_sessions(
     session_ids: &[String],
     session_trace_ids: &HashMap<String, Vec<String>>,
     trace_details: &HashMap<String, TraceDetail>,
-) -> Vec<SessionResponseItem> {
-    let mut sessions_data: Vec<SessionResponseItem> = Vec::with_capacity(session_ids.len());
+) -> Vec<SessionDetails> {
+    let mut sessions_data: Vec<SessionDetails> = Vec::with_capacity(session_ids.len());
     for session_id in session_ids {
         let trace_ids = match session_trace_ids.get(session_id) {
             Some(ids) => ids,
             None => continue,
         };
-        let mut session_start_time: i64 = 0;
-        let mut session_end_time: i64 = 0;
-        let mut usage_input: i64 = 0;
-        let mut usage_output: i64 = 0;
-        let mut usage_total: i64 = 0;
-        let mut cost_total: f64 = 0.0;
-        let mut error_count: i64 = 0;
-        for tid in trace_ids {
-            if let Some(detail) = trace_details.get(tid) {
-                if session_start_time == 0 || detail.start_time < session_start_time {
-                    session_start_time = detail.start_time;
-                }
-                if detail.end_time > session_end_time {
-                    session_end_time = detail.end_time;
-                }
-                usage_input += detail.gen_ai_usage_input_tokens;
-                usage_output += detail.gen_ai_usage_output_tokens;
-                usage_total += detail.gen_ai_usage_total_tokens;
-                cost_total += detail.gen_ai_usage_cost;
-                error_count += detail.error_count;
-            }
-        }
-        let duration = if session_end_time > session_start_time {
-            session_end_time - session_start_time
-        } else {
-            0
-        };
-        sessions_data.push(SessionResponseItem {
-            session_id: session_id.clone(),
-            start_time: session_start_time,
-            end_time: session_end_time,
-            duration,
-            trace_count: trace_ids.len() as u16,
-            gen_ai_usage_input_tokens: usage_input,
-            gen_ai_usage_output_tokens: usage_output,
-            gen_ai_usage_total_tokens: usage_total,
-            gen_ai_usage_cost: cost_total,
-            error_count,
-        });
+        let details: Vec<TraceDetail> = trace_ids
+            .iter()
+            .filter_map(|tid| trace_details.get(tid).cloned())
+            .collect();
+        sessions_data.push(SessionDetails::from_trace_details(
+            session_id.clone(),
+            trace_ids.len(),
+            &details,
+        ));
     }
     sessions_data.sort_by(|a, b| b.start_time.cmp(&a.start_time));
     sessions_data
@@ -615,6 +726,8 @@ mod tests {
                 gen_ai_usage_total_tokens: 150,
                 gen_ai_usage_cost: 0.01,
                 error_count: 0,
+                user_id: None,
+                ..Default::default()
             },
         );
         trace_details.insert(
@@ -627,6 +740,8 @@ mod tests {
                 gen_ai_usage_total_tokens: 300,
                 gen_ai_usage_cost: 0.02,
                 error_count: 0,
+                user_id: None,
+                ..Default::default()
             },
         );
 
@@ -662,6 +777,8 @@ mod tests {
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
                 error_count: 0,
+                user_id: None,
+                ..Default::default()
             },
         );
         trace_details.insert(
@@ -674,6 +791,8 @@ mod tests {
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
                 error_count: 0,
+                user_id: None,
+                ..Default::default()
             },
         );
 
@@ -711,6 +830,8 @@ mod tests {
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
                 error_count: 0,
+                user_id: None,
+                ..Default::default()
             },
         );
 
@@ -738,6 +859,8 @@ mod tests {
                     gen_ai_usage_total_tokens: 0,
                     gen_ai_usage_cost: 0.0,
                     error_count: 0,
+                    user_id: None,
+                    ..Default::default()
                 },
             );
         }
@@ -766,6 +889,8 @@ mod tests {
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
                 error_count: 3,
+                user_id: None,
+                ..Default::default()
             },
         );
         trace_details.insert(
@@ -778,11 +903,211 @@ mod tests {
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
                 error_count: 2,
+                user_id: None,
+                ..Default::default()
             },
         );
 
         let result = aggregate_sessions(&session_ids, &session_trace_ids, &trace_details);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].error_count, 5);
+    }
+
+    #[test]
+    fn test_from_trace_details_empty() {
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 0, &[]);
+        assert_eq!(session.session_id, "sess-1");
+        assert_eq!(session.start_time, 0);
+        assert_eq!(session.end_time, 0);
+        assert_eq!(session.duration, 0);
+        assert_eq!(session.trace_count, 0);
+        assert_eq!(session.gen_ai_usage_input_tokens, 0);
+        assert_eq!(session.gen_ai_usage_output_tokens, 0);
+        assert_eq!(session.gen_ai_usage_total_tokens, 0);
+        assert_eq!(session.gen_ai_usage_cost, 0.0);
+        assert_eq!(session.error_count, 0);
+        assert!(session.users.is_empty());
+        assert!(session.models.is_empty());
+        assert!(session.first_user_message.is_none());
+    }
+
+    #[test]
+    fn test_from_trace_details_single_trace() {
+        let details = vec![TraceDetail {
+            start_time: 1000,
+            end_time: 2000,
+            gen_ai_usage_input_tokens: 10,
+            gen_ai_usage_output_tokens: 20,
+            gen_ai_usage_total_tokens: 30,
+            gen_ai_usage_cost: 0.05,
+            error_count: 1,
+            ..Default::default()
+        }];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 1, &details);
+        assert_eq!(session.session_id, "sess-1");
+        assert_eq!(session.start_time, 1000);
+        assert_eq!(session.end_time, 2000);
+        assert_eq!(session.duration, 1000);
+        assert_eq!(session.trace_count, 1);
+        assert_eq!(session.gen_ai_usage_input_tokens, 10);
+        assert_eq!(session.gen_ai_usage_output_tokens, 20);
+        assert_eq!(session.gen_ai_usage_total_tokens, 30);
+        assert!((session.gen_ai_usage_cost - 0.05).abs() < 1e-10);
+        assert_eq!(session.error_count, 1);
+    }
+
+    #[test]
+    fn test_from_trace_details_with_user_ids() {
+        let details = vec![
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                user_id: Some("user-a".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 1500,
+                end_time: 3000,
+                user_id: Some("user-b".to_string()),
+                ..Default::default()
+            },
+        ];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
+        assert_eq!(session.trace_count, 2);
+        assert_eq!(session.start_time, 1000);
+        assert_eq!(session.end_time, 3000);
+        assert_eq!(session.users, vec!["user-a", "user-b"]);
+    }
+
+    #[test]
+    fn test_from_trace_details_skips_none_user_ids() {
+        let details = vec![
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                user_id: Some("user-a".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 1500,
+                end_time: 3000,
+                user_id: None,
+                ..Default::default()
+            },
+        ];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
+        assert_eq!(session.users, vec!["user-a"]);
+    }
+
+    #[test]
+    fn test_from_trace_details_trace_count_independent_of_details_len() {
+        let details = vec![];
+        // trace_count can be larger than details.len() (e.g. traces not found in DB)
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 5, &details);
+        assert_eq!(session.trace_count, 5);
+        assert_eq!(session.start_time, 0);
+        assert_eq!(session.end_time, 0);
+    }
+
+    #[test]
+    fn test_from_trace_details_models_collected_and_deduplicated() {
+        let details = vec![
+            TraceDetail {
+                model: Some("gpt-4".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                model: Some("gpt-4".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                model: Some("claude-3".to_string()),
+                ..Default::default()
+            },
+        ];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 3, &details);
+        assert_eq!(session.models, vec!["gpt-4", "claude-3"]);
+    }
+
+    #[test]
+    fn test_from_trace_details_first_user_message_from_earliest_trace() {
+        let details = vec![
+            TraceDetail {
+                start_time: 2000,
+                end_time: 3000,
+                first_user_message: Some("what is the weather".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 1000, // earliest
+                end_time: 2000,
+                first_user_message: Some("hello".to_string()),
+                ..Default::default()
+            },
+        ];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
+        assert_eq!(session.first_user_message, Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_from_trace_details_first_user_message_skips_zero_start_time() {
+        let details = vec![
+            TraceDetail {
+                start_time: 0, // no start_time, skipped
+                end_time: 2000,
+                first_user_message: Some("zero time msg".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                first_user_message: Some("real msg".to_string()),
+                ..Default::default()
+            },
+        ];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
+        assert_eq!(session.first_user_message, Some("real msg".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_basic() {
+        let messages = json::json!([
+            {"role": "system", "content": "You are helpful"},
+            {"role": "user", "content": "Hello, how are you doing today?"},
+            {"role": "assistant", "content": "I'm fine, thanks!"}
+        ]);
+        let result = extract_first_user_message(Some(&messages), 30);
+        assert_eq!(result, Some("Hello, how are you doing today".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_trim_to_length() {
+        let messages = json::json!([
+            {"role": "user", "content": "short"}
+        ]);
+        let result = extract_first_user_message(Some(&messages), 30);
+        assert_eq!(result, Some("short".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_empty() {
+        assert_eq!(extract_first_user_message(None, 30), None);
+        assert_eq!(extract_first_user_message(Some(&json::json!([])), 30), None);
+        assert_eq!(
+            extract_first_user_message(
+                Some(&json::json!([{"role": "assistant", "content": "hi"}])),
+                30
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_extract_first_user_message_case_insensitive_role() {
+        let messages = json::json!([
+            {"role": "User", "content": "Hello"}
+        ]);
+        let result = extract_first_user_message(Some(&messages), 30);
+        assert_eq!(result, Some("Hello".to_string()));
     }
 }

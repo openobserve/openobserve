@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{TIMESTAMP_COL_NAME, get_config, meta::{search::PaginatedResponse, stream::StreamType}, metrics, utils::json};
+use config::{
+    TIMESTAMP_COL_NAME, get_config,
+    meta::{search::PaginatedResponse, stream::StreamType},
+    metrics,
+    utils::json,
+};
 use hashbrown::HashMap;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -372,6 +377,7 @@ pub async fn get_latest_users(
                 gen_ai_usage_cost: json::get_float_value(
                     item.get("gen_ai_usage_cost_details").unwrap_or_default(),
                 ),
+                ..Default::default()
             },
         );
     }
@@ -406,18 +412,16 @@ pub async fn get_latest_users(
         total: users_data.len(),
         from,
         size,
-        hits: users_data.into_iter().map(|v| json::to_value(v).unwrap()).collect(),
+        hits: users_data
+            .into_iter()
+            .map(|v| json::to_value(v).unwrap())
+            .collect(),
         trace_id,
         function_error: range_error,
     })
 }
 
-struct TraceDetail {
-    start_time: i64,
-    end_time: i64,
-    gen_ai_usage_total_tokens: i64,
-    gen_ai_usage_cost: f64,
-}
+use super::TraceDetail;
 
 #[derive(Debug, Serialize)]
 struct UserResponseItem {
@@ -427,6 +431,33 @@ struct UserResponseItem {
     total_events: u32,
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
+}
+
+impl UserResponseItem {
+    fn from_trace_details(user_id: String, total_events: usize, details: &[TraceDetail]) -> Self {
+        let mut first_event: i64 = 0;
+        let mut last_event: i64 = 0;
+        let mut usage_total: i64 = 0;
+        let mut cost_total: f64 = 0.0;
+        for detail in details {
+            if first_event == 0 || detail.start_time < first_event {
+                first_event = detail.start_time;
+            }
+            if detail.end_time > last_event {
+                last_event = detail.end_time;
+            }
+            usage_total += detail.gen_ai_usage_total_tokens;
+            cost_total += detail.gen_ai_usage_cost;
+        }
+        UserResponseItem {
+            user_id,
+            first_event,
+            last_event,
+            total_events: total_events as u32,
+            gen_ai_usage_total_tokens: usage_total,
+            gen_ai_usage_cost: cost_total,
+        }
+    }
 }
 
 fn parse_user_trace_ids(
@@ -466,30 +497,15 @@ fn aggregate_users(
             Some(ids) => ids,
             None => continue,
         };
-        let mut first_event: i64 = 0;
-        let mut last_event: i64 = 0;
-        let mut usage_total: i64 = 0;
-        let mut cost_total: f64 = 0.0;
-        for tid in trace_ids {
-            if let Some(detail) = trace_details.get(tid) {
-                if first_event == 0 || detail.start_time < first_event {
-                    first_event = detail.start_time;
-                }
-                if detail.end_time > last_event {
-                    last_event = detail.end_time;
-                }
-                usage_total += detail.gen_ai_usage_total_tokens;
-                cost_total += detail.gen_ai_usage_cost;
-            }
-        }
-        users_data.push(UserResponseItem {
-            user_id: llm_user_id.clone(),
-            first_event,
-            last_event,
-            total_events: trace_ids.len() as u32,
-            gen_ai_usage_total_tokens: usage_total,
-            gen_ai_usage_cost: cost_total,
-        });
+        let details: Vec<TraceDetail> = trace_ids
+            .iter()
+            .filter_map(|tid| trace_details.get(tid).cloned())
+            .collect();
+        users_data.push(UserResponseItem::from_trace_details(
+            llm_user_id.clone(),
+            trace_ids.len(),
+            &details,
+        ));
     }
     users_data.sort_by(|a, b| b.last_event.cmp(&a.last_event));
     users_data
@@ -564,6 +580,7 @@ mod tests {
                 end_time: 2000,
                 gen_ai_usage_total_tokens: 150,
                 gen_ai_usage_cost: 0.01,
+                ..Default::default()
             },
         );
         trace_details.insert(
@@ -573,6 +590,7 @@ mod tests {
                 end_time: 3000,
                 gen_ai_usage_total_tokens: 300,
                 gen_ai_usage_cost: 0.02,
+                ..Default::default()
             },
         );
 
@@ -601,6 +619,7 @@ mod tests {
                 end_time: 200,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
+                ..Default::default()
             },
         );
         trace_details.insert(
@@ -610,6 +629,7 @@ mod tests {
                 end_time: 9000,
                 gen_ai_usage_total_tokens: 0,
                 gen_ai_usage_cost: 0.0,
+                ..Default::default()
             },
         );
 
@@ -647,6 +667,7 @@ mod tests {
                     end_time: start + 50,
                     gen_ai_usage_total_tokens: 0,
                     gen_ai_usage_cost: 0.0,
+                    ..Default::default()
                 },
             );
         }
@@ -654,5 +675,69 @@ mod tests {
         let result = aggregate_users(&user_ids, &user_trace_ids, &trace_details);
         assert_eq!(result[0].first_event, 100);
         assert_eq!(result[0].last_event, 350);
+    }
+
+    #[test]
+    fn test_from_trace_details_empty() {
+        let user = UserResponseItem::from_trace_details("user-1".to_string(), 0, &[]);
+        assert_eq!(user.user_id, "user-1");
+        assert_eq!(user.first_event, 0);
+        assert_eq!(user.last_event, 0);
+        assert_eq!(user.total_events, 0);
+        assert_eq!(user.gen_ai_usage_total_tokens, 0);
+        assert_eq!(user.gen_ai_usage_cost, 0.0);
+    }
+
+    #[test]
+    fn test_from_trace_details_single_trace() {
+        let details = vec![TraceDetail {
+            start_time: 1000,
+            end_time: 2000,
+            gen_ai_usage_total_tokens: 100,
+            gen_ai_usage_cost: 0.05,
+            ..Default::default()
+        }];
+        let user = UserResponseItem::from_trace_details("user-1".to_string(), 1, &details);
+        assert_eq!(user.user_id, "user-1");
+        assert_eq!(user.first_event, 1000);
+        assert_eq!(user.last_event, 2000);
+        assert_eq!(user.total_events, 1);
+        assert_eq!(user.gen_ai_usage_total_tokens, 100);
+        assert!((user.gen_ai_usage_cost - 0.05).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_from_trace_details_multiple_traces() {
+        let details = vec![
+            TraceDetail {
+                start_time: 500,
+                end_time: 1500,
+                gen_ai_usage_total_tokens: 100,
+                gen_ai_usage_cost: 0.01,
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 1000,
+                end_time: 3000,
+                gen_ai_usage_total_tokens: 200,
+                gen_ai_usage_cost: 0.02,
+                ..Default::default()
+            },
+        ];
+        let user = UserResponseItem::from_trace_details("user-1".to_string(), 2, &details);
+        assert_eq!(user.first_event, 500);
+        assert_eq!(user.last_event, 3000);
+        assert_eq!(user.total_events, 2);
+        assert_eq!(user.gen_ai_usage_total_tokens, 300);
+        assert!((user.gen_ai_usage_cost - 0.03).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_from_trace_details_total_events_independent_of_details_len() {
+        let details = vec![];
+        let user = UserResponseItem::from_trace_details("user-1".to_string(), 5, &details);
+        assert_eq!(user.total_events, 5);
+        assert_eq!(user.first_event, 0);
+        assert_eq!(user.last_event, 0);
     }
 }
