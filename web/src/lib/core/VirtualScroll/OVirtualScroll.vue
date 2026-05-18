@@ -67,7 +67,7 @@ watch(virtualItems, (items) => {
 // Whether we own the scroll container (no external scrollTarget).
 const ownsScroll = computed(() => !props.scrollTarget);
 
-// CSS for the outer container.
+// CSS for the outer container
 const containerStyle = computed(() => {
   if (!ownsScroll.value) {
     // External element scrolls — our container is just a positioning parent.
