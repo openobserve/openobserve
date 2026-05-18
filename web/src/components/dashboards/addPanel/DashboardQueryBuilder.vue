@@ -96,18 +96,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="drag-indicator" size="13px" />
                   </template>
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip-12"
-                  :data-test="`dashboard-x-item-${itemX?.alias}`"
-                >
-                  {{ xLabel[index] }}
-                  <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
-                  <q-menu
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip-12"
+                      :data-test="`dashboard-x-item-${itemX?.alias}`"
+                    >
+                      {{ xLabel[index] }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown"
                   >
                     <div
                       style="padding: 3px 16px 16px 16px"
@@ -142,8 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
@@ -275,18 +279,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="drag-indicator" size="13px" />
                   </template>
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip-12"
-                  :data-test="`dashboard-b-item-${itemB?.alias}`"
-                >
-                  {{ bLabel[index] }}
-                  <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
-                  <q-menu
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip-12"
+                      :data-test="`dashboard-b-item-${itemB?.alias}`"
+                    >
+                      {{ bLabel[index] }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown"
                   >
                     <div
                       style="padding: 3px 16px 16px 16px"
@@ -321,8 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
@@ -419,18 +427,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="drag-indicator" size="13px" />
               </template>
             </OButton>
-            <OButton
-              variant="primary"
-              size="chip-12"
-              :data-test="`dashboard-y-item-${itemY?.alias}`"
-            >
-              {{ yLabel[index] }}
-              <template #icon-right
-                ><OIcon name="arrow-drop-down" size="sm"
-              /></template>
-              <q-menu
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-y-item-${itemY?.alias}`"
+                >
+                  {{ yLabel[index] }}
+                  <template #icon-right
+                    ><OIcon name="arrow-drop-down" size="sm"
+                  /></template>
+                </OButton>
+              </template>
+              <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup"
+                class="field-function-menu-popup dashboard-query-builder-dropdown"
               >
                 <div
                   style="padding: 3px 16px 16px 16px"
@@ -469,8 +481,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </q-menu>
-            </OButton>
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
@@ -569,18 +581,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="drag-indicator" size="13px" />
                 </template>
               </OButton>
-              <OButton
-                variant="primary"
-                size="chip-12"
-                :data-test="`dashboard-z-item-${itemZ?.alias}`"
-              >
-                {{ zLabel[index] }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
-                /></template>
-                <q-menu
+              <ODropdown>
+                <template #trigger>
+                  <OButton
+                    variant="primary"
+                    size="chip-12"
+                    :data-test="`dashboard-z-item-${itemZ?.alias}`"
+                  >
+                    {{ zLabel[index] }}
+                    <template #icon-right
+                      ><OIcon name="arrow-drop-down" size="sm"
+                    /></template>
+                  </OButton>
+                </template>
+                <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown"
                 >
                   <div
                     style="padding: 3px 16px 16px 16px"
@@ -615,8 +631,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
-                </q-menu>
-              </OButton>
+                </div>
+              </ODropdown>
               <OButton
                 variant="outline"
                 size="icon-chip"
@@ -716,12 +732,14 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
   components: {
     OButtonGroup,
     OButton,
+    ODropdown,
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
@@ -1517,12 +1535,12 @@ export default defineComponent({
   padding: 0;
 }
 
-.q-menu {
+.dashboard-query-builder-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }
