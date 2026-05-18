@@ -123,6 +123,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "PromQLBuilderOptions",
@@ -132,7 +133,8 @@ export default defineComponent({
     OInput,
     OSelect,
     OTooltip,
-},
+    OSeparator,
+  },
   props: {
     dashboardPanelData: {
       type: Object,

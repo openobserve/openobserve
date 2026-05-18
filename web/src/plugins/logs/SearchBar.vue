@@ -2155,6 +2155,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OSeparator,
     OButtonGroup,
     ODialog,
     ODropdown,

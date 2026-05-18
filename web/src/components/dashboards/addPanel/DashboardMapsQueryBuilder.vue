@@ -301,6 +301,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
     SortByBtnGrp,

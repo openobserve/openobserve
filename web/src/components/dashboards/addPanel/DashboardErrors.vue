@@ -66,6 +66,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "DashboardErrorsComponent",
   components: {
+    OSeparator,
     OIcon,
   },
   props: ["errors"],

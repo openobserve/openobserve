@@ -599,6 +599,7 @@ export interface PatternAssociation {
 export default defineComponent({
   name: "AssociatedRegexPatterns",
   components: {
+    OSeparator,
     FullViewContainer,
     ConfirmDialog,
     OButton,

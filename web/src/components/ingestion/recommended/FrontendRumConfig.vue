@@ -60,6 +60,7 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 export default defineComponent({
   name: "rum-web-page",
   components: {
+    OSeparator,
     CopyContent,
     SanitizedHtmlRenderer,
   },

@@ -171,6 +171,7 @@ import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 export default defineComponent({
   name: "AddCondition",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
     OTabs,

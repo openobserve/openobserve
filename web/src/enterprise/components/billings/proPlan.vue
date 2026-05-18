@@ -161,7 +161,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "proPlan",
-  components: { OButton, OBadge, OIcon },
+  components: { OSeparator, OButton, OBadge, OIcon },
   props: [
     "planType",
     "billingProvider",

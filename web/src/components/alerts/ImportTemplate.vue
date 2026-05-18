@@ -211,7 +211,7 @@ import {
 
 export default defineComponent({
   name: "ImportTemplate",
-  components: { OInput, OSelect, BaseImport },
+  components: { OSeparator, OInput, OSelect, BaseImport },
   props: {
     destinations: {
       type: Array,

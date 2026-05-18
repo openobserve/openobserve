@@ -146,7 +146,7 @@ import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
   name: "QTablePagination",
-  components: { OButtonGroup, OButton },
+  components: { OSeparator, OButtonGroup, OButton },
 
   props: [
     "scope",

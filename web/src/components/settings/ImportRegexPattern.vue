@@ -555,6 +555,7 @@ export default defineComponent({
     };
   },
   components: {
+    OSeparator,
     BaseImport,
     AppTabs,
     OButton,

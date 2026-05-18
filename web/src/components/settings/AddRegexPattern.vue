@@ -354,6 +354,7 @@ export default defineComponent({
   },
   emit: ["close", "update:list", "update:open"],
   components: {
+    OSeparator,
     FullViewContainer,
     O2AIChat,
     OButton,

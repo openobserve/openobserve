@@ -232,6 +232,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default defineComponent({
   name: "BaseImport",
   components: {
+    OSeparator,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),

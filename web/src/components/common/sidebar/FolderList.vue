@@ -189,6 +189,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default defineComponent({  
     name: "FolderList",
     components: {
+      OSeparator,
       OIcon,
       AddDashboard,
       QTablePagination,

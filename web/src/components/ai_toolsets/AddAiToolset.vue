@@ -379,7 +379,7 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { OBadge, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
+  components: { OSeparator, OBadge, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();

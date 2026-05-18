@@ -350,7 +350,7 @@ import {
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
-import { copyToClipboard } from "quasar";
+import { copyToClipboard, useQuasar } from "quasar";
 import useNotifications from "@/composables/useNotifications";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";
@@ -392,6 +392,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
+    OSeparator,
     DateTimePickerDashboard,
     ShareButton,
     AutoRefreshInterval,

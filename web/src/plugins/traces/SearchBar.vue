@@ -471,6 +471,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OSeparator,
     DateTime,
     ShareButton,
     OToggleGroup,

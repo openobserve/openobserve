@@ -394,6 +394,7 @@ import {
 export default defineComponent({
   name: "ImportPipeline",
   components: {
+    OSeparator,
     BaseImport,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),

@@ -526,6 +526,7 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
 export default defineComponent({
   name: "Dashboards",
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OButton,

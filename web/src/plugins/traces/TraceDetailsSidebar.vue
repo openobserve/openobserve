@@ -961,6 +961,7 @@ export default defineComponent({
     },
   },
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,

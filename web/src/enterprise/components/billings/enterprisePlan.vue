@@ -95,7 +95,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
-  components: { OButton, OBadge, OIcon },
+  components: { OSeparator, OButton, OBadge, OIcon },
   props: ["features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();

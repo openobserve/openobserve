@@ -407,6 +407,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
+    OSeparator,
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,

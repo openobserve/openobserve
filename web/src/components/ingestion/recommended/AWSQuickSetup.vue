@@ -362,7 +362,7 @@ const COMPLETE_TEMPLATE_URL =
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+  components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
     OIcon,
     OBadge,
 },

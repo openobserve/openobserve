@@ -287,6 +287,7 @@ import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
   components: {
+    OSeparator,
     OTabPanels,
     OTabPanel,
     OButton,
