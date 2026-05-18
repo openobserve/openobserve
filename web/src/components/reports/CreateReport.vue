@@ -850,8 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OStep>
             </OStepper>
-
-          </q-form>
+          </form>
         </div>
       </div>
     </div>
