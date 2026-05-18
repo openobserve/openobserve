@@ -6,9 +6,7 @@ const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "serial" });
 
-test.use({
-  contextOptions: { slowMo: 500 },
-});
+test.use({ slowMo: 500 });
 
 test.describe("Pipeline Query Node - Field List", { tag: ['@all', '@pipelines', '@scheduledPipeline'] }, () => {
   let pageManager;
@@ -122,8 +120,10 @@ test.describe("Pipeline Query Node - Field List", { tag: ['@all', '@pipelines', 
     const scrollBefore = await pipelinePage.verifyPipelineFieldListScrollable();
     expect(scrollBefore.scrollable).toBe(true);
 
-    // Collapse Build Query then re-expand — toggle twice
+    // Collapse Build Query
     await pipelinePage.expandBuildQuerySection();
+    await pipelinePage.expectSqlEditorHidden();
+    // Re-expand Build Query
     await pipelinePage.expandBuildQuerySection();
     await pipelinePage.expectSqlEditorVisible();
 

@@ -2208,8 +2208,20 @@ export class PipelinesPage {
      * Wait for SQL editor to be hidden (e.g., after collapsing Build Query)
      */
     async expectSqlEditorHidden() {
-        await this.scheduledPipelineSqlEditor.waitFor({ state: 'hidden', timeout: 5000 });
-        testLogger.info('SQL editor is hidden');
+        // Quasar q-expansion-item collapses via height animation + overflow:hidden,
+        // not by hiding child elements, so we check the rendered height instead.
+        await this.scheduledPipelineSqlEditor.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                if (!el) return true;
+                const rect = el.getBoundingClientRect();
+                return rect.height === 0 || rect.bottom === 0;
+            },
+            '[data-test="scheduled-pipeline-sql-editor"]',
+            { timeout: 5000 }
+        );
+        testLogger.info('SQL editor is collapsed');
     }
 
     /**

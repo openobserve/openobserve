@@ -537,12 +537,16 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     const firstPipelineId = firstResult.data.pipeline_id || firstResult.data.id;
     expect(firstPipelineId).toBeTruthy();
 
+    let secondPipelineId = null;
     try {
       // Step 3: Attempt duplicate for same stream
       const duplicateResult = await pipelinePage.createRealtimePipeline(
         'e2e_dup_pipeline_second',
         DUPLICATE_TEST_STREAM
       );
+
+      // Capture ID before assertions so we can clean up if duplicate unexpectedly succeeds
+      secondPipelineId = duplicateResult.data?.pipeline_id || duplicateResult.data?.id;
 
       // Step 4: Verify API rejected with StreamInUse
       expect(duplicateResult.status).toBe(400);
@@ -552,9 +556,12 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
       testLogger.info('Test passed: duplicate realtime pipeline correctly rejected');
     } finally {
-      // Step 5: Always clean up the first pipeline
+      // Step 5: Always clean up both pipelines
       const deleteResult = await pipelinePage.deletePipelineById(firstPipelineId);
       expect([200, 204]).toContain(deleteResult.status);
+      if (secondPipelineId) {
+        await pipelinePage.deletePipelineById(secondPipelineId);
+      }
     }
   });
 
