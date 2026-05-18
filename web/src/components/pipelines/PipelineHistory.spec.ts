@@ -152,6 +152,38 @@ const ODialogStub = {
   `,
 };
 
+// Stub OTable — renders slots for empty/bottom to keep tests functional
+const OTableStub = {
+  name: "OTable",
+  inheritAttrs: false,
+  props: [
+    "data",
+    "columns",
+    "rowKey",
+    "pagination",
+    "currentPage",
+    "pageSize",
+    "totalCount",
+    "pageSizeOptions",
+    "sorting",
+    "sortBy",
+    "sortOrder",
+    "loading",
+    "showGlobalFilter",
+    "dense",
+    "bordered",
+    "stickyHeader",
+    "maxHeight",
+  ],
+  emits: ["pagination-change", "sort-change"],
+  template: `
+    <div data-test="o2-table-stub">
+      <slot name="empty" />
+      <slot name="bottom" :total-rows="totalCount" />
+    </div>
+  `,
+};
+
 function createWrapper(props: Record<string, unknown> = {}) {
   return mount(PipelineHistory, {
     props,
@@ -159,11 +191,7 @@ function createWrapper(props: Record<string, unknown> = {}) {
       plugins: [i18n, store],
       stubs: {
         ODialog: ODialogStub,
-        QTablePagination: {
-          template: '<div data-test="q-table-pagination-stub"></div>',
-          props: ["scope", "position", "resultTotal", "perPageOptions"],
-          emits: ["update:changeRecordPerPage"],
-        },
+        OTable: OTableStub,
         NoData: {
           template: '<div data-test="no-data-stub">No Data</div>',
         },
@@ -789,6 +817,40 @@ describe("PipelineHistory", () => {
         .trigger("click");
       await flushPromises();
 
+      expect(mockHttpGet).toHaveBeenCalled();
+    });
+  });
+
+  describe("OTable pagination and sort handlers", () => {
+    it("onPaginationChange updates pagination state and fetches history", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
+
+      const vm = wrapper.vm as any;
+      vm.onPaginationChange({ page: 3, size: 50 });
+      await flushPromises();
+
+      expect(vm.pagination.page).toBe(3);
+      expect(vm.pagination.rowsPerPage).toBe(50);
+      expect(mockHttpGet).toHaveBeenCalled();
+    });
+
+    it("onSortChange updates sort state, resets page to 1, and fetches history", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      vi.clearAllMocks();
+      mockHttpGet.mockResolvedValue({ data: { hits: [], total: 0 } });
+
+      const vm = wrapper.vm as any;
+      vm.pagination.page = 5;
+      vm.onSortChange({ column: "status", order: "asc" });
+      await flushPromises();
+
+      expect(vm.pagination.sortBy).toBe("status");
+      expect(vm.pagination.descending).toBe(false);
+      expect(vm.pagination.page).toBe(1);
       expect(mockHttpGet).toHaveBeenCalled();
     });
   });

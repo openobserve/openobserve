@@ -55,61 +55,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="scheduled-dashboards"
       :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
     >
-    <q-table
+    <OTable
       data-test="scheduled-dashboard-table"
-      ref="scheduledDashboardTableRef"
-      :rows="formattedReports"
+      :data="displayReports"
       :columns="columns"
       row-key="id"
-      :pagination="pagination"
-      :filter="scheduledFilterQuery"
-      :filter-method="filterData"
+      pagination="client"
+      :page-size="selectedPerPage"
+      :page-size-options="perPageOptionsList"
+      :show-global-filter="false"
+      :loading="loading"
       style="width: 100%"
       class="q-px-md"
-      @row-click="openReport"
     >
-      <template #no-data>
-        <template v-if="loading">
-          <div
-            class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
-          >
-            <OSpinner size="md" />
-          </div>
-        </template>
-        <template v-else>
-          <NoData />
-        </template>
-      </template>
-      <template #top="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'top'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
+      <template #cell-name="{ row }">
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
       </template>
 
-      <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
-        />
+      <template #cell-tab="{ row }">
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.tab }}</span>
       </template>
-    </q-table>
+
+      <template #cell-time_range="{ row }">
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.time_range }}</span>
+      </template>
+
+      <template #cell-frequency="{ row }">
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
+      </template>
+
+      <template #cell-last_triggered_at="{ row }">
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.last_triggered_at }}</span>
+      </template>
+
+      <template #cell-created_at="{ row }">
+        <span class="cursor-pointer" @click="openReport(row)">{{ row.created_at }}</span>
+      </template>
+
+      <template #empty>
+        <NoData />
+      </template>
+    </OTable>
     </div>
   </ODrawer>
 </template>
 
 <script setup lang="ts">
-import { QTable } from "quasar";
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
@@ -120,6 +114,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   open: {
@@ -185,8 +181,6 @@ const scheduledReports = ref<ScheduledDashboardReport[]>(
 
 const formattedReports = ref<ScheduledDashboardReport[]>([]);
 
-const scheduledDashboardTableRef = ref<InstanceType<typeof QTable> | null>();
-
 const store = useStore();
 
 watch(
@@ -212,8 +206,6 @@ onMounted(() => {
 });
 
 const formatReports = () => {
-  resultTotal.value = props.reports.length;
-
   props.reports.length > 0 &&
     props.reports.forEach((report: any, index) => {
       scheduledReports.value.push({
@@ -260,90 +252,81 @@ const filterReports = () => {
       };
     },
   );
-
-  resultTotal.value = formattedReports.value.length;
 };
 
-const columns: any = [
+const columns: OTableColumnDef[] = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    meta: { align: "left" },
+    size: 50,
   },
   {
-    name: "name",
-    field: "name",
-    label: t("reports.name"),
-    align: "left",
+    id: "name",
+    header: t("reports.name"),
+    accessorKey: "name",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "tab",
-    field: "tab",
-    label: t("reports.tab"),
-    align: "left",
+    id: "tab",
+    header: t("reports.tab"),
+    accessorKey: "tab",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "time_range",
-    field: "time_range",
-    label: t("reports.timeRange"),
-    align: "left",
+    id: "time_range",
+    header: t("reports.timeRange"),
+    accessorKey: "time_range",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "frequency",
-    field: "frequency",
-    label: t("reports.frequency"),
-    align: "left",
+    id: "frequency",
+    header: t("reports.frequency"),
+    accessorKey: "frequency",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "last_triggered_at",
-    field: "last_triggered_at",
-    label: t("reports.lastTriggeredAt"),
-    align: "left",
+    id: "last_triggered_at",
+    header: t("reports.lastTriggeredAt"),
+    accessorKey: "last_triggered_at",
     sortable: false,
+    meta: { align: "left" },
   },
   {
-    name: "created_at",
-    field: "created_at",
-    label: t("reports.createdAt"),
-    align: "left",
+    id: "created_at",
+    header: t("reports.createdAt"),
+    accessorKey: "created_at",
     sortable: false,
+    meta: { align: "left" },
   },
 ];
 
-const pagination: any = ref({
-  rowsPerPage: 20,
-});
+const selectedPerPage = ref(20);
+
+const perPageOptionsList = [5, 10, 20, 50, 100];
 
 const resultTotal = ref(0);
 
-const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "All", value: 0 },
-];
+const displayReports = computed(() => {
+  let reports = formattedReports.value;
+  if (scheduledFilterQuery.value) {
+    const query = scheduledFilterQuery.value.toLowerCase();
+    reports = reports.filter((row: any) =>
+      Object.values(row).some((v) =>
+        String(v).toLowerCase().includes(query),
+      ),
+    );
+  }
+  resultTotal.value = reports.length;
+  return reports;
+});
 
-const changePagination = (val: { label: string; value: any }) => {
-  pagination.value.rowsPerPage = val.value;
-  scheduledDashboardTableRef.value?.setPagination(pagination.value);
-};
-
-const filterData = (rows: any, terms: string) => {
-  return rows.filter((row: any) => {
-    return Object.values(row).some((value) => {
-      return String(value).toLowerCase().includes(terms.toLowerCase());
-    });
-  });
-};
-
-const openReport = (event: any, row: any) => {
+const openReport = (row: any) => {
   router.push({
     name: "createReport",
     query: {

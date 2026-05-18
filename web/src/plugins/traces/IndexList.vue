@@ -34,111 +34,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-pa-sm">{{ t("search.noResult") }}</div>
         </template>
     </OSelect>
-    <div class="index-table tw:h-[calc(100%-2.725rem)]!">
-      <q-table
-        data-test="log-search-index-list-fields-table"
-        :visible-columns="['name']"
-        :rows="visibleFieldRows"
-        row-key="name"
-        :filter="searchObj.data.stream.filterField"
-        :filter-method="filterFieldFn"
-        :pagination="{ rowsPerPage: 10000 }"
-        hide-header
-        hide-bottom
-        :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-        class="tw:w-full tw:h-full"
-        id="tracesFieldList"
-      >
-        <template #body-cell-name="props">
-          <!-- Group header row -->
-          <q-tr
-            v-if="props.row.label === true"
-            :props="props"
-            class="cursor-pointer text-bold"
-            @click="toggleGroup(props.row.group)"
-          >
-            <q-td
+    <div
+      class="index-table tw:h-[calc(100%-2.725rem)]!"
+      data-test="log-search-index-list-fields-table"
+    >
+        <OTable
+          :data="displayFieldRows"
+          :columns="fieldColumns"
+          row-key="name"
+          pagination="none"
+          :show-global-filter="false"
+          :row-class="rowClassFn"
+          @row-click="handleRowClick"
+          class="tw:w-full tw:h-full"
+        >
+          <template #cell-name="{ row }">
+            <!-- Group header row -->
+            <div
+              v-if="row.label === true"
               class="field_list field-group-header tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
               :class="store.state.theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'"
             >
               <div class="tw:w-[calc(100%-1.25rem)] ellipsis">
-                {{ props.row.name }} ({{ groupFieldCount[props.row.group] ?? 0 }})
+                {{ row.name }} ({{ groupFieldCount[row.group] ?? 0 }})
               </div>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
               >
-                <OIcon :name="expandGroupRows[props.row.group] !== false ? 'expand-more' : 'chevron-right'" size="sm" />
+                <OIcon :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'" size="sm" />
               </OButton>
-            </q-td>
-          </q-tr>
-          <!-- Field row -->
-          <q-tr
-            v-else
-            :props="props"
-            class="hover:tw:bg-[var(--o2-hover-accent)]!"
-          >
-            <q-td
-              :props="props"
+            </div>
+            <!-- Field row -->
+            <div
+              v-else
               class="field_list tw:rounded"
-              :class="props.row.enableVisibility && searchObj.data.stream.selectedFields.includes(props.row.name) ? 'selected' : ''"
+              :class="row.enableVisibility && searchObj.data.stream.selectedFields.includes(row.name) ? 'selected' : ''"
             >
               <FieldRow
-                :field="props.row"
+                :field="row"
                 :selected-fields="searchObj.data.stream.selectedFields"
                 :timestamp-column="store.state.zoConfig.timestamp_column"
                 :theme="store.state.theme"
                 :show-quick-mode="false"
-                :show-visibility-toggle="props.row.enableVisibility"
-                @add-to-filter="addToFilter(`${props.row.name}=''`)"
+                :show-visibility-toggle="row.enableVisibility"
+                @add-to-filter="addToFilter(`${row.name}=''`)"
                 @toggle-field="toggleField"
               >
                 <template #expansion="{ field }">
                   <basic-values-filter
                     :row="field"
-                    :active-include-values="activeIncludeFieldValues?.[props.row.name] ?? []"
-                    :active-exclude-values="activeExcludeFieldValues?.[props.row.name] ?? []"
+                    :active-include-values="activeIncludeFieldValues?.[row.name] ?? []"
+                    :active-exclude-values="activeExcludeFieldValues?.[row.name] ?? []"
                     :selected-fields="searchObj.data.stream.selectedFields"
-                    :show-visibility-toggle="props.row.enableVisibility"
+                    :show-visibility-toggle="row.enableVisibility"
                     @toggle-field="toggleField"
                   />
                 </template>
               </FieldRow>
-            </q-td>
-          </q-tr>
-        </template>
-        <template #top-right>
-          <OInput
-            v-show="searchObj.data.stream?.selectedStream?.value"
-            data-test="log-search-index-list-field-search-input"
-            v-model="searchObj.data.stream.filterField"
-            data-cy="index-field-search-input"
-            clearable
-            :debounce="1"
-            :placeholder="t('search.searchField')"
-            class="tw:p-0 tw:pb-[0.375rem]"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
-          <q-tr
-            v-if="searchObj.loadingStream"
-            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
-          >
-            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
+            </div>
+          </template>
+          <template #top>
+            <OInput
+              v-show="searchObj.data.stream?.selectedStream?.value"
+              data-test="log-search-index-list-field-search-input"
+              v-model="searchObj.data.stream.filterField"
+              data-cy="index-field-search-input"
+              clearable
+              :debounce="1"
+              :placeholder="t('search.searchField')"
+              class="tw:p-0 tw:pb-[0.375rem]"
+            >
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
+              </template>
+            </OInput>
+            <div
+              v-if="searchObj.loadingStream"
+              class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
+            >
               <div
                 class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
               >
                 <OSpinner size="sm" />
                 {{ t("traces.loadingStream") }}
               </div>
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
+            </div>
+          </template>
+        </OTable>
+      </div>
     </div>
-  </div>
 </template>
 
 <script lang="ts">
@@ -156,6 +141,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -167,6 +153,7 @@ export default defineComponent({
     OInput,
     OSpinner,
     OIcon,
+    OTable,
 },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {
@@ -340,6 +327,25 @@ export default defineComponent({
       ),
     );
 
+    const fieldColumns = [{ id: "name", header: "", accessorKey: "name" }];
+
+    const displayFieldRows = computed(() => {
+      const term = searchObj.data.stream.filterField;
+      if (!term) return visibleFieldRows.value;
+      return filterFieldFn(normalizedFieldList.value, term);
+    });
+
+    const rowClassFn = (row: any) => {
+      if (row.label === true) return "cursor-pointer text-bold";
+      return "";
+    };
+
+    const handleRowClick = (row: any, _event: MouseEvent) => {
+      if (row.label === true) {
+        toggleGroup(row.group);
+      }
+    };
+
     const isFieldEditable = (fieldName: string): boolean =>
       searchObj.meta.searchMode === "traces" &&
       !TRACES_LOCKED_FIELD_NAMES.has(fieldName);
@@ -371,6 +377,10 @@ export default defineComponent({
       expandGroupRows,
       toggleGroup,
       visibleFieldRows,
+      displayFieldRows,
+      fieldColumns,
+      rowClassFn,
+      handleRowClick,
       groupFieldCount,
     };
   },
@@ -407,35 +417,37 @@ export default defineComponent({
 
   .index-table {
     width: 100%;
-    // border: 1px solid rgba(0, 0, 0, 0.02);
 
-    .q-table {
+    :deep(table) {
       display: table;
       table-layout: fixed !important;
     }
-    tr {
+
+    :deep(thead) {
+      display: none;
+    }
+
+    :deep(tr) {
       margin-bottom: 1px;
     }
-    tbody,
-    tr,
-    td {
+
+    :deep(tbody),
+    :deep(tr),
+    :deep(td) {
       width: 100%;
       display: block;
       height: fit-content;
       overflow: hidden;
     }
 
-    .q-table__control,
+    :deep(.q-table__control),
     label.q-field {
       width: 100%;
     }
-    .q-table thead tr,
-    .q-table tbody td {
-      height: auto;
-    }
 
-    .q-table__top {
-      border-bottom: unset;
+    :deep(thead tr),
+    :deep(tbody td) {
+      height: auto;
     }
   }
 
@@ -553,7 +565,7 @@ export default defineComponent({
 
 <style lang="scss">
 .index-table {
-  .q-table {
+  table {
     width: 100%;
     table-layout: fixed;
 

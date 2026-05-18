@@ -56,6 +56,13 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
 
+// Only forward cell-slot templates for columns whose cell slot the parent actually provides.
+// If we forward an empty slot for every column, OTableBodyCell sees $slots.default as truthy
+// and renders the (empty) slot instead of falling through to the plain-text {{ displayValue }}.
+const cellSlotColumns = computed(() =>
+  props.columns.filter((col) => slots[`cell-${col.id}`]),
+);
+
 // ── Refs for virtual scroll & keyboard ──────────────────────────
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const columnIds = computed(() => props.columns.map((c) => c.id));
@@ -438,9 +445,9 @@ defineExpose({
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
           @cell-click="(params: any) => emit('cell-click', params)"
         >
-          <!-- Pass through named cell slots from parent -->
+          <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->
           <template
-            v-for="col in props.columns.filter(c => c.isAction || c.cell)"
+            v-for="col in cellSlotColumns"
             :key="`cell-${col.id}`"
             #[`cell-${col.id}`]="slotProps"
           >
