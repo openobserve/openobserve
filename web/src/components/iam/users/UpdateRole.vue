@@ -174,6 +174,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+/* TODO(quasar-menu-migration): This styles the popup of the <q-select> role
+   selector in this dialog. Re-target at the ODropdown content wrapper class
+   when that <q-select> migrates to OSelect. */
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);

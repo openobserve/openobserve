@@ -1172,6 +1172,9 @@ export default defineComponent({
   padding-right: 8px !important;
 }
 
+/* TODO(quasar-menu-migration): This styles the popup of the <q-select>
+   stream-type and stream selectors above. Re-target at the ODropdown content
+   wrapper class when those <q-select>s migrate to OSelect. */
 .q-menu {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);

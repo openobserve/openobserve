@@ -2060,6 +2060,11 @@ export default defineComponent({
           return;
         }
         // Don't close if there are any open dialogs/menus (they should handle ESC first)
+        // TODO(quasar-menu-migration): This selector only matches Quasar-portaled
+        // popups. Once the legacy q-dialog/q-menu usages in this view tree are
+        // migrated to ODialog/ODropdown, extend this to also detect the new
+        // wrappers (e.g. add `[role="dialog"][data-state="open"],
+        // [role="menu"][data-state="open"]`).
         const hasOpenDialog = document.querySelector('.q-dialog, .q-menu');
         if (hasOpenDialog) {
           return;

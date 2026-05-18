@@ -3402,6 +3402,9 @@ body.body--dark {
   border-radius: 0.5rem;
 }
 
+/* TODO(quasar-menu-migration): These rules style the popup of the <q-select>
+   in the trace search controls above. They will need to be re-targeted at the
+   ODropdown content wrapper class once that <q-select> migrates to OSelect. */
 .q-menu .q-item.q-item--active {
   background-color: rgba(25, 118, 210, 0.2) !important;
   font-weight: 600 !important;
