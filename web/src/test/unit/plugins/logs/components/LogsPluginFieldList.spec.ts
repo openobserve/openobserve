@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import FieldList from "@/plugins/logs/components/FieldList.vue";
+import FieldList from "@/plugins/logs/components/LogsPluginFieldList.vue";
 import i18n from "@/locales";
 
 // Stub OFieldList: renders slots and emits search

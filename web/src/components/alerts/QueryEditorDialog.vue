@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Left Section (25%) — Field Browser -->
             <div class="field-browser-panel" :class="store.state.theme === 'dark' ? 'field-browser-panel--dark' : 'field-browser-panel--light'">
-              <FieldList
+              <SearchFieldList
                 :fields="fieldListItems"
                 :stream-name="streamName"
                 :stream-type="streamType"
@@ -437,7 +437,7 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                   </div>
                   <div class="col" :style="fieldListInnerStyle">
-                    <FieldList :editMode="editMode" />
+                    <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
               </div>
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                   </div>
                   <div class="col" style="width: 100%">
-                    <FieldList :editMode="editMode" />
+                    <PanelFieldList :editMode="editMode" />
                   </div>
                 </div>
               </div>
@@ -689,7 +689,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 // ============================================================================
 
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
-import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
+import PanelFieldList from "@/components/dashboards/addPanel/PanelFieldList.vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
