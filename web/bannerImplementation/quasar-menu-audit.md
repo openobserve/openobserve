@@ -1,8 +1,8 @@
 # Quasar `q-menu` — Props & Emits Audit
 
 > Scanned **Vue files** under `web/src/`.  
-> Total: **~36 `<q-menu>` instances** across **23 files** (template usage only).  
-> An additional **14 files** carry `.q-menu` CSS selectors that must also be updated.  
+> Total: **37 `<q-menu>` instances** across **24 files** (template usage only).  
+> An additional **13 files** carry `.q-menu` CSS selectors that must also be updated (excluding 3 internal guards in `lib/overlay/Dialog`, `Drawer`, `Dropdown`).  
 > Counts represent occurrences across the entire codebase.
 
 ---
@@ -23,8 +23,8 @@
 
 | Prop               | Count | Notes                                                                                                                                    |
 | ------------------ | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `anchor`           | ~18   | Static position string — describes the point on the **trigger** to attach (e.g. `"bottom left"`, `"top middle"`, `"center right"`)       |
-| `self`             | ~18   | Static position string — describes the point on the **menu** aligned to `anchor` (e.g. `"top left"`, `"bottom middle"`, `"center left"`) |
+| `anchor`           | 13    | Static position string — describes the point on the **trigger** to attach (e.g. `"bottom left"`, `"top middle"`, `"center right"`)       |
+| `self`             | 13    | Static position string — describes the point on the **menu** aligned to `anchor` (e.g. `"top left"`, `"bottom middle"`, `"center left"`) |
 | `class`            | ~8    | Static CSS class on the menu panel                                                                                                       |
 | `:class`           | ~4    | Dynamic class, almost always theme-dependent: `store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'`                               |
 | `v-model`          | ~5    | Two-way binding controlling open state (e.g. `v-model="showDownloadMenu"`, `v-model="showAddMenu"`)                                      |
@@ -32,8 +32,9 @@
 | `transition-show`  | 2     | Entry animation token (e.g. `"jump-down"`) — Header.vue only                                                                             |
 | `transition-hide`  | 2     | Exit animation token (e.g. `"jump-up"`) — Header.vue only                                                                                |
 | `:offset`          | 2     | `[x, y]` pixel offset array (e.g. `[0, 0]`, `[8, 0]`)                                                                                    |
+| `auto-close`       | 1     | Boolean — Quasar's built-in "close on any child click" — Header.vue language sub-menu                                                    |
 | `content-style`    | 1     | Inline style on the popup panel (e.g. `"z-index: 10001"`) — AutoRefreshInterval.vue                                                      |
-| `no-route-dismiss` | 1     | Boolean — prevent menu from closing on route change — DateTimePicker.vue                                                                 |
+| `no-route-dismiss` | 3     | Boolean — prevent menu from closing on route change — `DateTimePicker.vue`, `DateTime.vue`, `CustomDateTimePicker.vue` |
 | `data-test`        | 1     | Test attribute (SyntaxGuide.vue traces)                                                                                                  |
 | `id`               | 1     | DOM `id` attribute (DateTimePicker.vue `id="date-time-menu"`)                                                                            |
 
@@ -50,31 +51,32 @@
 
 | Directive              | Count | Notes                                                                         |
 | ---------------------- | ----- | ----------------------------------------------------------------------------- |
-| `v-close-popup`        | ~20   | On `<q-item>`, `<div>`, or buttons inside the menu — causes the menu to close |
-| `v-close-popup="true"` | ~5    | Explicit boolean form, same effect                                            |
+| `v-close-popup`        | ~44   | On `<q-item>`, `<div>`, or buttons inside the menu — causes the menu to close. Count covers all 24 files that contain a `<q-menu>` |
+| `v-close-popup="true"` | (subset of above) | Explicit boolean form, same effect                                            |
 
 ---
 
 ## CSS `.q-menu` References
 
-These files do **not** use `<q-menu>` in their template but target Quasar's auto-applied `.q-menu` class in their `<style>` block. They must be updated to use the ODropdown content wrapper selector (add a custom class to `DropdownMenuContent` or wrap content in a scoped element).
+These files target Quasar's auto-applied `.q-menu` class in their `<style>` block or inline JS strings. They must be updated to use the ODropdown content wrapper selector (add a custom class to `DropdownMenuContent` or wrap content in a scoped element).
 
-| File                                                                                                        |
-| ----------------------------------------------------------------------------------------------------------- |
-| `src/plugins/traces/TraceDetails.vue` (4 rules: active, dark-active, focused, dark-focused state overrides) |
-| `src/plugins/traces/IndexList.vue` (1 rule)                                                                 |
-| `src/plugins/logs/components/FieldList.vue` (1 rule)                                                        |
-| `src/plugins/metrics/MetricList.vue` (2 rules)                                                              |
-| `src/components/dashboards/addPanel/FieldList.vue` (1 rule)                                                 |
-| `src/components/dashboards/addPanel/DashboardQueryBuilder.vue` (1 rule)                                     |
-| `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue` (1 rule)                               |
-| `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue` (1 rule)                                 |
-| `src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue` (1 rule)                              |
-| `src/components/promql/components/OperationsList.vue` (1 rule)                                              |
-| `src/components/promql/components/LabelFilterEditor.vue` (1 rule)                                           |
-| `src/components/iam/users/UpdateRole.vue` (1 rule)                                                          |
-| `src/plugins/logs/SearchBar.vue` (1 rule)                                                                   |
-| `src/plugins/metrics/MetricList.vue` (see above)                                                            |
+Some of these files **also** contain `<q-menu>` in their template — listed here for the CSS-side migration only. Internal `.q-menu` guards inside `lib/overlay/Dialog/ODialog.vue`, `lib/overlay/Drawer/ODrawer.vue`, and `lib/overlay/Dropdown/ODropdown.vue` are intentional cross-portal interop and are **not** part of this migration.
+
+| File                                                                          | Notes                                                                              |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src/plugins/traces/TraceDetails.vue`                                         | 4 rules: active, dark-active, focused, dark-focused state overrides                |
+| `src/plugins/traces/IndexList.vue`                                            | 1 rule                                                                             |
+| `src/plugins/metrics/MetricList.vue`                                          | 2 rules                                                                            |
+| `src/components/dashboards/addPanel/FieldList.vue`                            | 1 rule (CSS-only — no `<q-menu>` template usage)                                   |
+| `src/components/dashboards/addPanel/DashboardQueryBuilder.vue`                | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue`          | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue`            | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/dashboards/addPanel/DashboardGeoMapsQueryBuilder.vue`         | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/promql/components/OperationsList.vue`                         | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/promql/components/LabelFilterEditor.vue`                      | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/iam/users/UpdateRole.vue`                                     | 1 rule (CSS-only — overrides a popup created by a parent's `q-select` / `q-menu`)  |
+| `src/views/Dashboards/addPanel/AddCondition.vue`                              | 1 rule (also has template `<q-menu>`)                                              |
+| `src/components/alerts/IncidentDetailDrawer.vue`                              | Inline JS selector `.q-dialog, .q-menu` — used as a "popup is open" check          |
 
 ---
 

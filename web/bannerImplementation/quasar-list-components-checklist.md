@@ -86,100 +86,89 @@ Legend: `[ ]` = not done · `[x]` = done
 
 Replace the `q-menu` wrapper with `ODropdown`, delete `q-list`, replace clickable `q-item` with `ODropdownItem`, decompose `q-item-section` into `#icon-left` / `#default` / `#icon-right` slots.
 
-- [ ] `src/components/Header.vue` _(3 menus: org switcher, help menu, user profile menu — nested sub-menu)_
-- [ ] `src/plugins/logs/SearchBar.vue` _(4 menus: saved views, query options, history, syntax sub-menu — highest complexity)_
-- [ ] `src/components/shared/filter/FilterCreatorPopup.vue` _(1 menu)_
-- [ ] `src/components/dashboards/addPanel/DashboardQueryEditor.vue` _(1 menu)_
-- [ ] `src/components/dashboards/SelectDashboardDropdown.vue` _(1 menu)_
-- [ ] `src/components/dashboards/SelectTabDropdown.vue` _(1 menu)_
-- [ ] `src/components/dashboards/settings/SinglePanelMove.vue` _(1 menu)_
-- [ ] `src/components/cross-linking/CrossLinkDialog.vue` _(1 menu)_
-- [ ] `src/components/logstream/LlmEvaluationSettings.vue` _(1 menu)_
-- [ ] `src/components/pipeline/NodeForm/LlmEvaluation.vue` _(1 menu)_
-- [ ] `src/components/pipelines/PipelineHistory.vue` _(1 menu)_
-- [ ] `src/components/alerts/QueryEditorDialog.vue` _(1 menu)_
-- [ ] `src/plugins/traces/TraceDetails.vue` _(1 menu)_
-- [ ] `src/views/Dashboards/addPanel/AddCondition.vue` _(mixed A+B — menu AND select option)_
-- [ ] `src/views/Dashboards/addPanel/Group.vue` _(1 menu)_
-- [ ] `src/components/dashboards/addPanel/DrilldownPopUp.vue` _(mixed A+D — menu AND display rows)_
-- [ ] `src/components/alerts/steps/AlertSettings.vue` _(mixed A+D — menu AND display rows)_
+**Definition:** files that contain **both** `<q-menu>` and at least one of `<q-list>` / `<q-item>` / `<q-item-section>` / `<q-item-label>`. 10 files.
+
+- [ ] `src/components/Header.vue` _(3 `<q-menu>` instances — help menu, user profile, nested language sub-menu)_
+- [ ] `src/components/O2AIChat.vue` _(1 menu — chat history)_
+- [ ] `src/components/alerts/AlertList.vue` _(row action menu)_
+- [ ] `src/components/common/sidebar/FolderList.vue` _(folder context menu)_
+- [ ] `src/components/pipeline/PipelinesList.vue` _(2 row context menus)_
+- [ ] `src/components/promql/components/OperationsList.vue` _(field config menu — Pattern 4)_
+- [ ] `src/components/promql/components/LabelFilterEditor.vue` _(field config menu — mixed A+B, also has itemProps)_
+- [ ] `src/plugins/logs/SearchBar.vue` _(3 menus: suggestions, overflow, download — highest complexity, also has Edge Case 1 inner-section click pattern)_
+- [ ] `src/views/Dashboards/addPanel/AddCondition.vue` _(mixed A+B — menu AND OSelect option slot with itemProps)_
+- [ ] `src/views/Dashboards/addPanel/Group.vue` _(1 menu — add condition / add group)_
+
+> q-menu-only files (no list components inside) — `AutoRefreshInterval`, `CustomDateTimePicker`, `DateTime`, `DateTimePicker`, `DashboardGeoMapsQueryBuilder`, `DashboardMapsQueryBuilder`, `DashboardQueryBuilder`, `DashboardSankeyChartBuilder`, `DashboardJoinsOption`, `ServiceIdentitySetup`, `logs/SyntaxGuide`, `metrics/MetricLegends`, `metrics/SyntaxGuideMetrics`, `traces/SyntaxGuide` — only need the q-menu migration; tracked in `quasar-menu-migration-checklist.md`.
 
 ---
 
-### Context B — `q-select` `#option` slots (Migrate WITH OSelect, not independently)
+### Context B — `OSelect` / `q-select` `#option` slots (Migrate WITH OSelect, not independently)
 
-> These files contain `q-item v-bind="scope.itemProps"` inside a `q-select` `#option` slot.  
-> Migrate together with the `q-select → OSelect` change. See `quasar-form-migration-checklist.md`.
+> These files contain `q-item v-bind="(scope|props).itemProps"` inside an `OSelect` (or, in one remaining case, `q-select`) `#option` slot.  
+> Migrate together with the OSelect option-slot cleanup. See `quasar-form-migration-checklist.md`.
 
-- [ ] `src/components/dashboards/addPanel/ColorPaletteDropDown.vue`
-- [ ] `src/components/dashboards/addPanel/ConfigPanel.vue`
-- [ ] `src/components/dashboards/addPanel/PromQLChartConfig.vue`
-- [ ] `src/components/dashboards/settings/AddSettingVariable.vue`
-- [ ] `src/components/dashboards/settings/VariableQueryValueSelector.vue`
-- [ ] `src/components/dashboards/settings/VariableCustomValueSelector.vue`
-- [ ] `src/components/alerts/steps/QueryConfig.vue`
+**Definition:** files matching `grep -rl 'v-bind="(scope.|props.)?itemProps"'`. 9 files. Only `logstream/schema.vue` still uses a literal `<q-select>` — the rest already render through `<OSelect>` and just need the slot internals modernised.
+
 - [ ] `src/components/alerts/SemanticFieldGroupsConfig.vue`
-- [ ] `src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue`
-- [ ] `src/components/promql/components/LabelFilterEditor.vue`
-- [ ] `src/components/logstream/schema.vue`
+- [ ] `src/components/dashboards/addPanel/PromQLChartConfig.vue`
+- [ ] `src/components/logstream/schema.vue` _(only file still using `<q-select>`)_
 - [ ] `src/components/pipeline/ImportPipeline.vue`
-- [ ] `src/components/rum/PlayerEventsSidebar.vue`
-- [ ] `src/components/settings/ServiceIdentitySetup.vue`
-- [ ] `src/plugins/logs/IndexList.vue`
+- [ ] `src/components/pipeline/NodeForm/ExternalDestination.vue`
+- [ ] `src/components/promql/components/LabelFilterEditor.vue` _(mixed A+B)_
+- [ ] `src/components/reports/CreateReport.vue`
+- [ ] `src/plugins/metrics/MetricList.vue`
+- [ ] `src/views/Dashboards/addPanel/AddCondition.vue` _(mixed A+B)_
 
 ---
 
 ### Context C — Navigation Sidebar (Migrate as part of nav redesign — do not rush)
 
-> These files use `q-item` as a styled navigation link with deep CSS class selectors on `.q-item`.  
+> Files that use `q-item` as a styled navigation link with deep CSS class selectors on `.q-item`.  
 > Requires a full navigation redesign — coordinate with the nav team before touching.
 
 - [ ] `src/components/MenuLink.vue` _(core nav link component — ~200 lines of `.q-item` CSS)_
-- [ ] `src/components/common/sidebar/FolderList.vue` _(partially migrated to OTabs; minor q-item usage remains)_
-- [ ] `src/components/common/sidebar/SelectFolderDropDown.vue`
+
+> `common/sidebar/FolderList.vue` was previously categorised here; its remaining `<q-item>` usage is inside a `<q-menu>` context menu and is now covered by **Context A** above.  
+> `common/sidebar/SelectFolderDropDown.vue` no longer contains `q-item` / `q-list` — removed.
 
 ---
 
 ### Context D — Standalone Display Rows (Replace with native HTML + Tailwind)
 
-> These files use non-clickable `q-item` rows to display read-only info. Replace with `<li>` / `<div>` + Tailwind flex.
+> Files that use non-clickable `q-item` rows to display read-only info, with **no** `<q-menu>` wrapper and **no** `itemProps` binding. Replace with `<li>` / `<div>` + Tailwind flex.
+
+**Definition:** files in the 48-file total minus Context A (10) minus Context B unique (7) minus Context C (1). 30 files.
 
 - [ ] `src/components/alerts/AlertHistory.vue`
-- [ ] `src/components/alerts/ImportAlert.vue`
 - [ ] `src/components/alerts/ImportSemanticGroups.vue`
 - [ ] `src/components/alerts/ImportSemanticGroupsDrawer.vue`
-- [ ] `src/components/alerts/SemanticFieldGroupsConfig.vue`
-- [ ] `src/components/alerts/steps/AlertSettings.vue` _(mixed A+D)_
-- [ ] `src/components/anomaly_detection/steps/AnomalyAlerting.vue`
+- [ ] `src/components/alerts/QueryEditorDialog.vue`
+- [ ] `src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue`
 - [ ] `src/components/common/DualListSelector.vue`
 - [ ] `src/components/common/FieldValuesPanel.vue`
+- [ ] `src/components/cross-linking/CrossLinkDialog.vue`
 - [ ] `src/components/dashboards/AddDashboardFromGitHub.vue`
 - [ ] `src/components/dashboards/addPanel/AddAnnotation.vue`
-- [ ] `src/components/dashboards/addPanel/DrilldownPopUp.vue` _(mixed A+D)_
-- [ ] `src/components/dashboards/addPanel/FieldList.vue`
+- [ ] `src/components/dashboards/addPanel/ChartSelection.vue`
+- [ ] `src/components/dashboards/addPanel/StreamFieldSelect.vue`
+- [ ] `src/components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue`
 - [ ] `src/components/functions/EnrichmentTableList.vue`
 - [ ] `src/components/functions/FunctionList.vue`
 - [ ] `src/components/ingestion/recommended/AWSIntegrationTile.vue`
-- [ ] `src/components/O2AIChat.vue`
-- [ ] `src/components/pipeline/NodeForm/ExternalDestination.vue`
-- [ ] `src/components/pipeline/PipelinesList.vue`
-- [ ] `src/components/promql/components/OperationsList.vue`
-- [ ] `src/components/reports/CreateReport.vue`
 - [ ] `src/components/settings/BuiltInPatternsTab.vue`
-- [ ] `src/components/settings/DomainManagement.vue`
 - [ ] `src/components/settings/Nodes.vue`
-- [ ] `src/components/settings/ServiceIdentitySetup.vue` _(mixed B+D)_
+- [ ] `src/components/shared/filter/FilterCreatorPopup.vue`
 - [ ] `src/plugins/correlation/CorrelatedLogsTable.vue`
 - [ ] `src/plugins/correlation/TelemetryCorrelationDashboard.vue`
 - [ ] `src/plugins/logs/FunctionSelector.vue`
 - [ ] `src/plugins/logs/Index.vue`
-- [ ] `src/plugins/logs/IndexList.vue` _(mixed B+D)_
-- [ ] `src/plugins/logs/JsonPreview.vue`
 - [ ] `src/plugins/logs/TransformSelector.vue`
-- [ ] `src/plugins/metrics/MetricList.vue`
-- [ ] `src/plugins/traces/metrics/TracesAnalysisDashboard.vue`
+- [ ] `src/plugins/traces/Index.vue`
 - [ ] `src/plugins/traces/ServiceGraphNodeSidePanel.vue`
-- [ ] `src/plugins/traces/TraceDetailsSidebar.vue`
+- [ ] `src/plugins/traces/TraceDetailsSidebar.vue` _(Edge Case 2 — contains `q-virtual-scroll`; handled by OSelect)_
+- [ ] `src/plugins/traces/metrics/TracesAnalysisDashboard.vue`
 - [ ] `src/views/DetailTable.vue`
 - [ ] `src/views/RUM/SourceMaps.vue`
-- [ ] `src/plugins/logs/SearchBar.vue` _(mixed A+D)_
+
+> Removed from previous version (files contain **no** `q-list` / `q-item` / `q-item-section` / `q-item-label` at all): `alerts/ImportAlert.vue`, `alerts/steps/AlertSettings.vue`, `anomaly_detection/steps/AnomalyAlerting.vue`, `dashboards/addPanel/DrilldownPopUp.vue`, `dashboards/addPanel/FieldList.vue`, `settings/DomainManagement.vue`, `settings/ServiceIdentitySetup.vue`, `plugins/logs/IndexList.vue`, `plugins/logs/JsonPreview.vue`.

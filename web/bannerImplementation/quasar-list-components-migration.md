@@ -1,7 +1,7 @@
 # Quasar List Components → O2 / Native Migration Guide
 
 > Covers: `q-list`, `q-item`, `q-item-section`, `q-item-label`  
-> Source data from: `web/quasar-list-components-audit.md` (74 Vue files scanned)
+> Source data from: `quasar-list-components-audit.md` (48 Vue files scanned)
 
 ---
 
@@ -40,10 +40,10 @@ All dropdown-context replacements come from the `ODropdown` family located at `w
 ## Migration Order (Recommended)
 
 ```
-Context A — q-menu → ODropdown  (~15 files, direct 1:1 mapping, highest value, unblocked)
-Context D — display rows → native HTML + Tailwind  (~36 files, no new API needed)
-Context B — q-select #option slots  (coordinate with q-select → OSelect migration team)
-Context C — navigation (MenuLink.vue)  (long-term — full nav rework, do not rush)
+Context A — q-menu → ODropdown  (10 files, direct 1:1 mapping, highest value, unblocked)
+Context D — display rows → native HTML + Tailwind  (30 files, no new API needed)
+Context B — OSelect / q-select #option slots  (9 files, coordinate with the OSelect option-slot cleanup)
+Context C — navigation (MenuLink.vue only)  (1 file, long-term — full nav rework, do not rush)
 ```
 
 ---

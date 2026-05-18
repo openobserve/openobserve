@@ -1,7 +1,7 @@
 # Quasar `q-menu` → O2 `ODropdown` Migration Guide
 
 > Covers: `q-menu`  
-> Source data from: `web/.claude/agents/quasar-menu-audit.md` (~36 instances across 23 files)
+> Source data from: `quasar-menu-audit.md` (37 instances across 24 files)
 
 ---
 
@@ -9,7 +9,7 @@
 
 | Quasar Component | O2 Replacement                                                          | O2 Location                     | Template Usages | CSS References | O2 Status |
 | ---------------- | ----------------------------------------------------------------------- | ------------------------------- | --------------- | -------------- | --------- |
-| `q-menu`         | `ODropdown` + `ODropdownItem` + `ODropdownGroup` + `ODropdownSeparator` | `web/src/lib/overlay/Dropdown/` | ~36             | ~14 files      | ✅ Built  |
+| `q-menu`         | `ODropdown` + `ODropdownItem` + `ODropdownGroup` + `ODropdownSeparator` | `web/src/lib/overlay/Dropdown/` | 37              | 13 files       | ✅ Built  |
 
 > All O2 Dropdown components live in `web/src/lib/overlay/Dropdown/`.
 

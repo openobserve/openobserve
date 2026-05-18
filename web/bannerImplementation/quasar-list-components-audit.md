@@ -1,7 +1,8 @@
 # Quasar List Components — Props & Emits Audit
 
-> Scanned **74 Vue files** under `web/src/` that contain at least one of: `q-list`, `q-item`, `q-item-section`, `q-item-label`.  
-> Total occurrences: `q-list` × 46 · `q-item` × 179 · `q-item-section` × 260 · `q-item-label` × 138.  
+> Scanned **48 Vue files** under `web/src/` that contain at least one of: `q-list`, `q-item`, `q-item-section`, `q-item-label`.  
+> Total occurrences: `q-list` × 43 · `q-item` × 118 · `q-item-section` × 184 · `q-item-label` × 110.  
+> Counts derived from word-boundary grep: `grep -rohP "<q-(list\|item\|item-section\|item-label)(?![a-z-])" --include="*.vue" src/`.  
 > Props prefixed with `:` are dynamically bound (`:prop="expr"`); without prefix they are static string / boolean attributes.
 
 ---
@@ -26,7 +27,7 @@
 
 `q-list` is a structural flex-column container for `q-item` rows. It provides optional dividers, padding, and borders. It has no semantic role of its own — it renders as a `<div>` with CSS classes.
 
-**Total occurrences:** 46 across 26 files.
+**Total occurrences:** 43 across 28 files.
 
 ### Props
 
@@ -60,10 +61,10 @@
 `q-item` is a list row component. It is used in three distinct contexts in this codebase:
 
 1. **Inside `q-menu`** — clickable popup menu items (`clickable` + `@click` or `v-close-popup`)
-2. **Inside `q-select` `#option` slot** — custom option rows (`v-bind="scope.itemProps"` or `v-bind="props.itemProps"`)
+2. **Inside `q-select` / `OSelect` `#option` slot** — custom option rows (`v-bind="scope.itemProps"` or `v-bind="props.itemProps"`). NOTE: `q-select` itself now appears in only 1 file (`logstream/schema.vue`); the remaining `itemProps` patterns have moved inside `OSelect` slots and migrate as part of the OSelect work.
 3. **Standalone display row** — non-interactive key-value / info rows (no `clickable`, no `v-bind="itemProps"`)
 
-**Total occurrences:** 179 across 51 files.
+**Total occurrences:** 118 across 45 files.
 
 ### Props
 
@@ -101,7 +102,7 @@
 
 `q-item-section` is a flex child inside `q-item`. It handles three layout roles: main content column (default), icon/avatar column (`avatar`), and trailing content column (`side`).
 
-**Total occurrences:** 260 across 71 files.
+**Total occurrences:** 184 across 44 files.
 
 ### Props
 
@@ -135,7 +136,7 @@
 
 `q-item-label` renders text content inside a `q-item-section`. The `caption` prop renders smaller muted secondary text. The `header` prop renders as a standalone section heading outside any `q-item` (above a group of items in a list).
 
-**Total occurrences:** 138 across 48 files.
+**Total occurrences:** 110 across 36 files.
 
 ### Props
 
@@ -172,7 +173,9 @@
 | `q-item` has `clickable` prop | OR has `@click` / `v-close-popup`                        |
 | Parent is `q-menu`            | Direct parent or ancestor within the same template block |
 
-**Count:** ~12 `clickable` items, 4 `v-close-popup` items — approximately 15 files.
+**Count:** Files that contain BOTH `<q-menu>` and at least one list component — **10 files**: `Header.vue`, `O2AIChat.vue`, `alerts/AlertList.vue`, `common/sidebar/FolderList.vue`, `pipeline/PipelinesList.vue`, `promql/LabelFilterEditor.vue`, `promql/OperationsList.vue`, `logs/SearchBar.vue`, `views/Dashboards/addPanel/AddCondition.vue`, `views/Dashboards/addPanel/Group.vue`.
+
+(The other 14 q-menu-containing files — `DateTime*`, `SyntaxGuide*`, `MetricLegends`, `AutoRefreshInterval`, dashboard query/sankey/maps/geo builders, etc. — contain `<q-menu>` but no `q-list` / `q-item` inside; they are list-migration no-ops and only need q-menu migration.)
 
 **Migration target:** `ODropdown` + `ODropdownItem` + `ODropdownGroup` + `ODropdownSeparator`.
 
@@ -187,9 +190,9 @@
 | `q-item` has `v-bind="scope.itemProps"` / `v-bind="props.itemProps"` | The itemProps binding is the giveaway |
 | Direct parent is a `q-select` `#option` slot                         |                                       |
 
-**Count:** 21 `itemProps` bindings across 16 files.
+**Count:** 9 files currently contain a `v-bind="(scope|props).itemProps"` binding: `alerts/SemanticFieldGroupsConfig.vue`, `dashboards/addPanel/PromQLChartConfig.vue`, `logstream/schema.vue`, `pipeline/ImportPipeline.vue`, `pipeline/NodeForm/ExternalDestination.vue`, `promql/LabelFilterEditor.vue`, `reports/CreateReport.vue`, `plugins/metrics/MetricList.vue`, `views/Dashboards/addPanel/AddCondition.vue`. Of these, only `logstream/schema.vue` still uses a literal `<q-select>` — the rest are already inside `<OSelect>` with the legacy itemProps slot wiring carried over.
 
-**Migration target:** Handled automatically by the `q-select → OSelect` migration. The `#option` slot API changes — see `quasar-list-components-migration.md`.
+**Migration target:** Handled as part of the `OSelect` slot cleanup. The `#option` slot API changes — see `quasar-list-components-migration.md`.
 
 ---
 
@@ -202,7 +205,7 @@
 | Inside `MainLayout.vue`, `MenuLink.vue`, or nav-drawer context |                 |
 | Deep `.q-item` CSS class selectors in `<style>` block          |                 |
 
-**Count:** 3 files.
+**Count:** 1 confirmed file (`MenuLink.vue`). `common/sidebar/FolderList.vue` historically lived here but its current `<q-item>` usage is inside a `<q-menu>` context menu (counted under Context A); it has no sidebar-link `q-item` rows left.
 
 **Migration target:** Native `<router-link>` + Tailwind CSS. `MenuLink.vue` requires a full rewrite — do not rush.
 
@@ -217,7 +220,7 @@
 | `q-item` has no `clickable`, no `@click`, no `v-bind="itemProps"` |                 |
 | Content is display-only                                           |                 |
 
-**Count:** ~36 files.
+**Count:** ~28 files. These are the remaining list-component files once Context A (10), Context B (9, with overlaps), and Context C (`MenuLink.vue`) are subtracted from the total 48.
 
 **Migration target:** Native `<li>` / `<div>` with Tailwind flex classes. No new O2 component needed.
 
@@ -227,11 +230,11 @@
 
 | Component        | Total occurrences |   Files affected    |
 | ---------------- | :---------------: | :-----------------: |
-| `q-list`         |        46         |         26          |
-| `q-item`         |        179        |         51          |
-| `q-item-section` |        260        |         71          |
-| `q-item-label`   |        138        |         48          |
-| **Total**        |      **623**      | **74 unique files** |
+| `q-list`         |        43         |         28          |
+| `q-item`         |        118        |         45          |
+| `q-item-section` |        184        |         44          |
+| `q-item-label`   |        110        |         36          |
+| **Total**        |      **455**      | **48 unique files** |
 
 ---
 
@@ -276,11 +279,11 @@ Verified via targeted grep scans after the initial audit. These are the only cas
 
 **3 instances.** These items are `clickable` (adds hover state / cursor) but the actual action handler lives on a **child `q-item-section`**, not on the `q-item`.
 
-| File                             | Line  | Notes                                                                                                                 |
-| -------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------- |
-| `src/components/Header.vue`      | L472  | `<q-item clickable>` — child `q-item-section` opens a nested `q-menu`; the parent item has no click action of its own |
-| `src/plugins/logs/SearchBar.vue` | L1939 | `<q-item class="q-pa-xs saved-view-item" clickable>` — handler is on an inner section                                 |
-| `src/plugins/logs/SearchBar.vue` | L2041 | Same as above                                                                                                         |
+| File                             | Line | Notes                                                                                                                       |
+| -------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/components/Header.vue`      | 348  | `<q-item clickable>` (language row) — a child `<q-item-section side>` carries the chevron and the nested `<q-menu>` opens from inside the item |
+| `src/plugins/logs/SearchBar.vue` | 196  | `<q-item class="q-pa-xs saved-view-item" clickable v-close-popup>` — handler is on an inner `<q-item-section @click.stop="applySavedView(row)">` |
+| `src/plugins/logs/SearchBar.vue` | 307  | Same pattern, sibling `q-menu`                                                                                              |
 
 **What to do:** Before migrating these to `ODropdownItem`, inspect the child `q-item-section` for `@click.stop` or `v-close-popup`. The `@select` event on `ODropdownItem` replaces the combination of item + section click.
 
@@ -288,25 +291,18 @@ Verified via targeted grep scans after the initial audit. These are the only cas
 
 ### ⚠️ Edge Case 2 — `q-virtual-scroll` wrapping `q-item` rows
 
-**4 files** use both `q-virtual-scroll` and `q-item`. `ODropdown` has no built-in virtual scrolling. All 4 are **Context B** (inside `q-select #option` slot) — the virtual scroll is provided by `q-select` itself, not by list-component migration.
+**3 files** currently use both `q-virtual-scroll` and `q-item`. `ODropdown` has no built-in virtual scrolling. All 3 are **Context B** (inside an `OSelect` / `q-select` `#option` slot) — the virtual scroll is provided by the select itself, not by list-component migration.
 
 | File                                               | Context                            |
 | -------------------------------------------------- | ---------------------------------- |
-| `src/components/dashboards/addPanel/FieldList.vue` | `q-select` option slot (Context B) |
-| `src/plugins/metrics/MetricList.vue`               | `q-select` option slot (Context B) |
-| `src/plugins/traces/IndexList.vue`                 | `q-select` option slot (Context B) |
-| `src/views/Dashboards/addPanel/AddCondition.vue`   | `q-select` option slot (Context B) |
+| `src/plugins/metrics/MetricList.vue`               | OSelect option slot (Context B)    |
+| `src/plugins/traces/TraceDetailsSidebar.vue`       | OSelect option slot (Context B)    |
+| `src/views/Dashboards/addPanel/AddCondition.vue`   | Mixed — also has Context A `<q-menu>` |
 
-**What to do:** These are blocked on the OSelect migration. Do not touch these files during Context A (dropdown) migration. When OSelect ships, its virtual-scroll behaviour will be provided by the new component — verify the API supports it before migrating.
+**What to do:** These are blocked on / handled by the OSelect work. Do not touch the virtual-scroll option rows during Context A (dropdown) migration. Verify OSelect's virtual-scroll behaviour supports the current usage before migrating.
 
 ---
 
-### ⚠️ Edge Case 3 — File using both `q-btn-dropdown` and `q-item`
+### ✅ Edge Case 3 — `q-btn-dropdown` (no longer applicable)
 
-**1 file.** `q-btn-dropdown` renders its own inline dropdown that also contains `q-item` rows.
-
-| File                               | Notes                                                                                                                                                                                                                                          |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/plugins/logs/JsonPreview.vue` | Uses `q-btn-dropdown` whose popup body contains `q-item` + `q-item-section`. Must be migrated as a single unit — migrate `q-btn-dropdown` → `ODropdown` first, then migrate the `q-item` rows inside it to `ODropdownItem` in the same commit. |
-
-**What to do:** Do not migrate the `q-item` rows in this file independently — they will lose their trigger context. Co-ordinate with the `q-btn-dropdown → ODropdown` migration pass.
+The previous version of this audit flagged `src/plugins/logs/JsonPreview.vue` for a `q-btn-dropdown` whose popup contained `q-item` rows. As of this branch, **no Vue file uses `<q-btn-dropdown>` in its template** — the remaining string occurrences are JS comments / CSS class names. No coordination needed.
