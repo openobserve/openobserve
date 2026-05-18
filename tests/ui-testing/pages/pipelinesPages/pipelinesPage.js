@@ -2390,7 +2390,7 @@ export class PipelinesPage {
             const prev = Number(table.dataset.prevFieldCount ?? -1);
             table.dataset.prevFieldCount = String(count);
             return prev >= 0 && count === prev && count > 0;
-        }, { timeout: 8000 }).catch(() => {
+        }, null, { timeout: 8000 }).catch(() => {
             testLogger.info('Field list stabilization wait timed out — continuing with current count');
         });
         testLogger.info('Field list search cleared');
@@ -2418,7 +2418,7 @@ export class PipelinesPage {
         await this.page.waitForFunction(() => {
             const editor = document.querySelector('.monaco-editor');
             return editor !== null;
-        }, { timeout: 3000 });
+        }, null, { timeout: 3000 });
         // Additional small wait for query update to complete
         await this.page.waitForTimeout(500);
         testLogger.info('Watcher processing complete');
