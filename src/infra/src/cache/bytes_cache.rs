@@ -22,7 +22,6 @@ use std::{
 use bytes::Bytes;
 use config::{RwHashMap, metrics};
 
-// TODO: the memory size should counter the key * 2
 pub struct BytesCache {
     tag: String,
     readers: RwHashMap<String, Bytes>,
@@ -60,14 +59,17 @@ impl BytesCache {
     }
 
     pub fn put(&self, key: String, value: Bytes) {
-        let value_len = value.len() as i64;
+        let value_len = (value.len() + key.len() * 2) as i64;
         let old_len;
 
         // Serialize replacement with FIFO bookkeeping so concurrent puts for
         // the same key cannot double-count memory or entries.
         {
             let mut w = self.cacher.lock();
-            old_len = self.readers.get(&key).map(|r| r.len() as i64);
+            old_len = self
+                .readers
+                .get(&key)
+                .map(|r| (r.len() + key.len() * 2) as i64);
             w.push_back(key.clone());
             self.readers.insert(key, value);
         }
@@ -119,7 +121,7 @@ impl BytesCache {
             let mut removed_count = 0i64;
             for k in w.drain(0..batch) {
                 if let Some((_, removed)) = self.readers.remove(&k) {
-                    removed_total += removed.len() as i64;
+                    removed_total += (removed.len() + k.len() * 2) as i64;
                     removed_count += 1;
                 }
             }
