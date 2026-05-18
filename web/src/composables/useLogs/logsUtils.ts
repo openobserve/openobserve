@@ -757,12 +757,14 @@ export const logsUtils = () => {
 
   // validate if timestamp column alias is used for any field
   const checkTimestampAlias = (query: string): boolean => {
+    const tsCol =
+      timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
     const parsedSQL = fnParsedSQL(query);
 
     const columns = parsedSQL?.columns;
     if (Array.isArray(columns)) {
       const invalid = columns.some(
-        (field: any) => field.as === timestampColumnName,
+        (field: any) => field.as === tsCol,
       );
       if (invalid) {
         return false;
@@ -770,7 +772,7 @@ export const logsUtils = () => {
     }
 
     // Escape special regex characters in timestamp column name
-    const escapedTimestamp = timestampColumnName.replace(
+    const escapedTimestamp = tsCol.replace(
       /[.*+?^${}()|[\]\\]/g,
       "\\$&",
     );
