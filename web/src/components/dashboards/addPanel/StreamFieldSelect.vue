@@ -16,11 +16,9 @@
         class="o2-custom-select-dashboard"
       >
         <template v-slot:option="scope">
-          <q-expansion-item
-            expand-separator
-            group="streamGroup"
-            :default-opened="scope.index === 0 ? true : false"
-            header-class="text-weight-bold"
+          <OCollapsible
+            :model-value="openStreamGroups[scope.index] !== undefined ? openStreamGroups[scope.index] : scope.index === 0"
+            @update:model-value="(v) => (openStreamGroups[scope.index] = v)"
             :label="scope.opt.label"
             :data-test="`stream-field-select-group-${scope.index}`"
           >
@@ -37,7 +35,7 @@
                 </q-item-section>
               </q-item>
             </template>
-          </q-expansion-item>
+          </OCollapsible>
         </template>
       </OSelect>
     </div>
@@ -45,10 +43,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, PropType, inject } from "vue";
+import { defineComponent, ref, watch, PropType, inject, reactive } from "vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 export interface OptionChild {
   label: string;
@@ -76,7 +75,7 @@ export default defineComponent({
 
   emits: ["update:modelValue"],
 
-  components: { OSelect },
+  components: { OSelect, OCollapsible },
 
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
@@ -95,6 +94,7 @@ export default defineComponent({
     );
 
     const streamFieldSelect = ref<any>(null);
+    const openStreamGroups = reactive<Record<number, boolean>>({}); 
 
     async function loadStreamFields(streamName: string) {
       try {
@@ -239,6 +239,7 @@ export default defineComponent({
       filterFields,
       streamFieldSelect,
       updateInputValue,
+      openStreamGroups,
     };
   },
 });

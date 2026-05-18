@@ -386,10 +386,10 @@ class="tw:h-full tw:overflow-y-auto">
                 <div class="llm-content-box">
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="tw:mb-3">
-                    <q-expansion-item
+                    <OCollapsible
+                      v-model="sysInstrOpen"
                       icon="settings"
                       label="System Instructions"
-                      header-class="tw:text-xs tw:font-medium"
                     >
                       <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
@@ -399,7 +399,7 @@ class="tw:h-full tw:overflow-y-auto">
                           view-mode="formatted"
                         />
                       </div>
-                    </q-expansion-item>
+                    </OCollapsible>
                   </div>
                   <div
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
@@ -471,15 +471,16 @@ class="tw:h-full tw:overflow-y-auto">
             </div>
 
             <!-- Model Parameters (collapsible) -->
-            <q-expansion-item
+            <OCollapsible
               v-if="span.llm_request_parameters"
+              v-model="modelParamsOpen"
               label="Model Parameters"
               class="q-mt-md"
             >
               <pre class="model-params-json q-pa-sm">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
-            </q-expansion-item>
+            </OCollapsible>
           </div>
         </OTabPanel>
 
@@ -874,6 +875,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { date, type QTableProps, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -970,6 +972,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OCollapsible,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1037,6 +1040,8 @@ export default defineComponent({
 
     // Track fullscreen state
     const isFullscreen = ref(false);
+    const sysInstrOpen = ref(false);
+    const modelParamsOpen = ref(false);
 
     const showPendingFilter = false;
 
@@ -2049,6 +2054,8 @@ export default defineComponent({
         return map[color] || "default";
       },
       hasContent,
+      sysInstrOpen,
+      modelParamsOpen,
       parsedSystemInstructions,
       ioContainerRef,
       isFullscreen,

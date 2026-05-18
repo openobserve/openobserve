@@ -135,29 +135,26 @@
       </OInput>
 
       <div style="max-height: 400px; overflow-y: auto">
-        <q-list bordered separator>
-          <template v-for="category in categories" :key="category">
-            <q-expansion-item
-              :label="category"
-              default-opened
-              header-class="text-weight-medium"
-            >
-              <q-list>
-                <q-item
-                  v-for="op in getFilteredOperationsForCategory(category)"
-                  :key="op.id"
-                  clickable
-                  @click="addOperation(op); showOperationSelector = false"
-                >
-                  <q-item-section>
-                    <q-item-label>{{ op.name }}</q-item-label>
-                    <q-item-label caption>{{ op.documentation }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-expansion-item>
-          </template>
-        </q-list>
+        <div class="tw:border tw:border-border tw:rounded-md tw:divide-y tw:divide-border">
+          <OCollapsible
+            v-for="category in categories"
+            :key="category"
+            :default-open="true"
+            :label="category"
+          >
+            <div>
+              <div
+                v-for="op in getFilteredOperationsForCategory(category)"
+                :key="op.id"
+                class="tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
+                @click="addOperation(op); showOperationSelector = false"
+              >
+                <div class="tw:font-medium">{{ op.name }}</div>
+                <div class="tw:text-xs tw:text-text-secondary tw:mt-0.5">{{ op.documentation }}</div>
+              </div>
+            </div>
+          </OCollapsible>
+        </div>
       </div>
     </ODialog>
   </div>
@@ -172,6 +169,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
@@ -191,7 +189,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const showOperationSelector = ref(false);
-const searchQuery = ref("");
+
 
 // Access shared label options from meta
 const availableLabels = computed(

@@ -50,14 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Advanced Options -->
-          <q-expansion-item
-          class="tw:mt-2"
+          <OCollapsible
+            class="tw:mt-2"
             v-model="showAdvanced"
             icon="settings"
             label="Advanced Options"
             data-test="advanced-options-expansion"
           >
-            <q-card flat bordered class="q-pa-md tw:space-y-2 tw:mt-2 ">
+            <div class="q-pa-md tw:space-y-2 tw:mt-2">
               <!-- Chunk Period -->
               <div>
                 <div class="text-caption q-mb-xs">
@@ -124,8 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </q-card>
-          </q-expansion-item>
+            </div>
+          </OCollapsible>
 
       <!-- Error Message -->
       <div v-if="errorMessage" class="text-negative">
@@ -147,6 +147,7 @@ import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 interface Props {
   modelValue: boolean;

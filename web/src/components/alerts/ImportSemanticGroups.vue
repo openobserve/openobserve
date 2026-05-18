@@ -216,10 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Unchanged (Collapsed) -->
             <div v-if="diffData.unchanged.length > 0">
-              <q-expansion-item
+              <OCollapsible
+                v-model="unchangedOpen"
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check_circle"
-                header-class="text-grey-7 q-pa-xs"
               >
                 <q-list dense bordered separator class="compact-list">
                   <q-item
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </q-list>
-              </q-expansion-item>
+              </OCollapsible>
             </div>
           </div>
         </div>
@@ -352,6 +352,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { useRouter } from "vue-router";
@@ -388,6 +389,7 @@ const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
 const isImporting = ref(false);
+const unchangedOpen = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);
 const showModificationDialog = ref(false);

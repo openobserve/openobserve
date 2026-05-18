@@ -56,18 +56,13 @@
           </div>
           <div style="height: calc(100vh - 130px); overflow-y: auto">
             <div class="pattern-list-wrapper">
-              <q-expansion-item
-                expand-separator
-                ref="appliedPatternsExpandedRef"
+              <OCollapsible
+                v-model="appliedPatternsExpandedRef"
                 :label="`Applied Patterns (${appliedPatterns.length})`"
-                class="q-mt-sm tw:text-[14px] tw:font-[600] associated-regex-patterns-table"
+                class="q-mt-sm tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
-                <q-card class="q-pa-none q-ma-none" style="height: 100%">
-                  <q-card-section
-                    class="q-pa-none q-ma-none"
-                    style="height: 100%"
-                  >
+                <div style="height: 100%">
                     <OTable
                       style="height: 100%; overflow-y: auto"
                       data-test="associated-regex-patterns-applied-patterns-table"
@@ -106,24 +101,18 @@
                         </div>
                       </template>
                     </OTable>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
             </div>
             <OSeparator class="tw:mt-2" />
             <div class="pattern-list-wrapper">
-              <q-expansion-item
-                expand-separator
-                ref="allPatternsExpandedRef"
+              <OCollapsible
+                v-model="allPatternsExpandedRef"
                 :label="`All Patterns (${resultTotal})`"
-                class="q-mt-sm tw:text-[14px] tw:font-[600] associated-regex-patterns-table"
+                class="q-mt-sm tw:text-[14px] tw:font-[600]"
                 data-test="associated-regex-patterns-all-patterns-expansion-item"
               >
-                <q-card class="q-pa-none q-ma-none" style="height: 100%">
-                  <q-card-section
-                    class="q-pa-none q-ma-none"
-                    style="height: 100%"
-                  >
+                <div style="height: 100%">
                     <OTable
                       style="height: 100%; overflow-y: auto"
                       data-test="associated-regex-patterns-all-patterns-table"
@@ -164,9 +153,8 @@
                         </div>
                       </template>
                     </OTable>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
             </div>
           </div>
         </div>
@@ -585,6 +573,7 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -610,6 +599,7 @@ export default defineComponent({
     OCheckbox,
     OIcon,
     OTable,
+    OCollapsible,
   },
   props: {
     data: {
@@ -694,8 +684,8 @@ export default defineComponent({
     const testString = ref("");
     const policy = ref("Redact");
     const apply_at = ref<any>([]);
-    const appliedPatternsExpandedRef = ref<any>(null);
-    const allPatternsExpandedRef = ref<any>(null);
+    const appliedPatternsExpandedRef = ref(false);
+    const allPatternsExpandedRef = ref(false);
     const isFormDirty = ref(false);
     const queryEditorRef = ref<any>(null);
     const testLoading = ref(false);
@@ -759,8 +749,8 @@ export default defineComponent({
       //this is used to toggle the applied patterns and all patterns expansion items
       //so that we can show the applied patterns and all patterns in the applied patterns and all patterns list
       await nextTick();
-      appliedPatternsExpandedRef.value.toggle();
-      allPatternsExpandedRef.value.toggle();
+      appliedPatternsExpandedRef.value = !appliedPatternsExpandedRef.value;
+      allPatternsExpandedRef.value = !allPatternsExpandedRef.value;
       //this is done because we dont want to show the empty page at first when user lands at this page
       //so we select the first pattern from the applied patterns list if there are any applied patterns
       //other wise we show no pattern applied yet page
