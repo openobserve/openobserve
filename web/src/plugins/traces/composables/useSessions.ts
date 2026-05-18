@@ -63,6 +63,10 @@ export interface TurnDetail {
   /** Last assistant-role message in the turn — drives the ASSISTANT block. */
   assistantMessage: TurnMessage | null;
   model: string | null;
+  /** Number of LLM call spans (chat / text_completion / generate_content / embeddings). */
+  llmCalls: number;
+  /** Number of tool execution spans (execute_tool). */
+  toolCalls: number;
 }
 
 /**
@@ -91,6 +95,10 @@ export interface SessionRow {
   errorCount: number;
   /** Derived from error_count: any error span → "error", else "ok". */
   status: "ok" | "error";
+  /** First user from the session's users array (may be empty string). */
+  userId: string;
+  /** First user message in the session (truncated server-side). */
+  firstUserMessage: string;
 }
 
 /**
@@ -166,6 +174,7 @@ export function useSessions() {
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {
         const errorCount = Number(h.error_count) || 0;
+        const usersArr: string[] = Array.isArray(h.users) ? h.users : [];
         return {
           sessionId: h.session_id,
           firstSeenNanos: Number(h.start_time) || 0,
@@ -178,6 +187,8 @@ export function useSessions() {
           cost: Number(h.gen_ai_usage_cost) || 0,
           errorCount,
           status: errorCount > 0 ? "error" : "ok",
+          userId: usersArr[0] || "",
+          firstUserMessage: String(h.first_user_message || ""),
         };
       });
       total.value = Number(body.total) || 0;
@@ -410,7 +421,7 @@ export function useSessions() {
     endTime: number,
   ): Promise<TurnDetail> {
     if (!streamName || !traceId || !startTime || !endTime) {
-      return { traceId, userMessage: null, assistantMessage: null, model: null };
+      return { traceId, userMessage: null, assistantMessage: null, model: null, llmCalls: 0, toolCalls: 0 };
     }
     const safeId = traceId.replace(/'/g, "''");
 
@@ -432,7 +443,32 @@ export function useSessions() {
       LIMIT 50
     `;
 
-    const hits = await executeQuery(sql, startTime, endTime);
+    // Count LLM calls vs tool calls in parallel with the message fetch.
+    const countSql = `
+      SELECT
+        gen_ai_operation_name,
+        count(*) AS cnt
+      FROM "${streamName}"
+      WHERE trace_id = '${safeId}'
+        AND gen_ai_operation_name IS NOT NULL
+      GROUP BY gen_ai_operation_name
+    `;
+
+    const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
+
+    const [hits, countHits] = await Promise.all([
+      executeQuery(sql, startTime, endTime),
+      executeQuery(countSql, startTime, endTime),
+    ]);
+
+    let llmCalls = 0;
+    let toolCalls = 0;
+    for (const row of countHits || []) {
+      const op = String(row.gen_ai_operation_name || "").toLowerCase();
+      const n = Number(row.cnt) || 0;
+      if (LLM_OPS.has(op)) llmCalls += n;
+      else if (op === "execute_tool") toolCalls += n;
+    }
     // Lazy-import the message parser so this composable stays light
     // when only the list view is in use.
     const { messagesFromInput, messagesFromOutput, getModel } = await import(
@@ -490,7 +526,7 @@ export function useSessions() {
       }
     }
 
-    return { traceId, userMessage, assistantMessage, model };
+    return { traceId, userMessage, assistantMessage, model, llmCalls, toolCalls };
   }
 
   /**

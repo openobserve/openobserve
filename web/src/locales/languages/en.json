@@ -3270,9 +3270,12 @@
       "loading": "Loading sessions…",
       "tokenTooltip": "Input: {input} · Output: {output} · Total: {total}",
       "durationNs": "ns",
+      "unknownUser": "Unknown user",
       "columns": {
         "timestamp": "Timestamp",
         "sessionId": "Session ID",
+        "user": "User",
+        "firstMessage": "First message",
         "turns": "Turns",
         "duration": "Duration",
         "tokens": "Tokens",
@@ -3320,7 +3323,9 @@
         "output": "Output",
         "total": "Total",
         "cost": "Cost",
-        "spans": "Spans"
+        "spans": "Spans",
+        "llmCalls": "LLM calls",
+        "toolCalls": "Tool calls"
       }
     },
     "servicesCatalog": {

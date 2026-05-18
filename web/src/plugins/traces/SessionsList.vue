@@ -177,8 +177,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Session ID -->
         <template #cell-sessionId="{ item }">
           <span class="tw:font-mono tw:text-[0.75rem]">
-            {{ item.sessionId }}
+            {{ shortId(item.sessionId) }}
+            <q-tooltip>{{ item.sessionId }}</q-tooltip>
           </span>
+        </template>
+
+        <!-- User -->
+        <template #cell-userId="{ item }">
+          <span
+            v-if="item.userId"
+            class="tw:text-[0.75rem] tw:text-[var(--o2-text-primary)] tw:truncate tw:max-w-[160px] tw:block"
+          >
+            {{ item.userId }}
+          </span>
+          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
+            {{ t('traces.sessionsList.unknownUser') }}
+          </span>
+        </template>
+
+        <!-- First user message -->
+        <template #cell-firstUserMessage="{ item }">
+          <span
+            v-if="item.firstUserMessage"
+            class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
+          >
+            {{ item.firstUserMessage.length > 30 ? item.firstUserMessage.slice(0, 30) + '…' : item.firstUserMessage }}
+            <q-tooltip v-if="item.firstUserMessage.length > 30">{{ item.firstUserMessage }}</q-tooltip>
+          </span>
+          <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
         </template>
 
         <!-- Turns -->
@@ -325,7 +351,23 @@ const tableColumns = computed(() => [
     id: "sessionId",
     header: t('traces.sessionsList.columns.sessionId'),
     accessorKey: "sessionId",
-    size: 320,
+    size: 160,
+    enableSorting: false,
+    meta: { slot: true, align: "left" },
+  },
+  {
+    id: "userId",
+    header: t('traces.sessionsList.columns.user'),
+    accessorKey: "userId",
+    size: 180,
+    enableSorting: false,
+    meta: { slot: true, align: "left" },
+  },
+  {
+    id: "firstUserMessage",
+    header: t('traces.sessionsList.columns.firstMessage'),
+    accessorKey: "firstUserMessage",
+    size: 200,
     enableSorting: false,
     meta: { slot: true, align: "left" },
   },
@@ -475,6 +517,7 @@ function handleRowClick(row: SessionRow) {
       from: props.startTime,
       to: props.endTime,
       org_identifier: store.state.selectedOrganization?.identifier,
+      user_id: row.userId || undefined,
     },
   });
 }

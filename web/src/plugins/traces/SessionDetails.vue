@@ -105,16 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           map-options
           class="tw:w-[10rem] "
         />
-        <q-select
-          v-model="modelFilter"
-          :options="modelOptions"
-          dense
-          borderless
-          emit-value
-          map-options
-          class="tw:w-[14rem]"
-        />
-        <span
+<span
           class="tw:ml-auto tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]"
         >
           {{ t('traces.sessionDetail.turnsShown', { filtered: filteredTraces.length, total: traces.length, unit: traces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns') }) }}
@@ -127,17 +118,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:flex tw:items-center tw:gap-[0.75rem]">
           <span
-            v-if="detail.userId"
+            v-if="detail.userId || routeUserId"
             class="tw:inline-flex tw:items-center tw:justify-center tw:w-[36px] tw:h-[36px] tw:rounded-full tw:text-[12px] tw:font-semibold tw:text-white"
-            :style="{ background: userAvatarColor(detail.userId) }"
+            :style="{ background: userAvatarColor(detail.userId || routeUserId) }"
           >
-            {{ userInitials(detail.userId) }}
+            {{ userInitials(detail.userId || routeUserId) }}
           </span>
           <div class="tw:flex tw:flex-col">
             <span
               class="tw:text-[0.95rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:flex tw:items-center tw:gap-[0.5rem]"
             >
-              {{ detail.userId || t('traces.sessionDetail.unknownUser') }}
+              {{ detail.userId || routeUserId || t('traces.sessionDetail.unknownUser') }}
               <span
                 class="tw:text-[0.6rem] tw:font-semibold tw:px-[0.375rem] tw:py-[0.05rem] tw:rounded tw:bg-[var(--o2-tag-grey-1)] tw:text-[var(--o2-text-4)]"
               >
@@ -428,14 +419,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-                <div class="stat-section">
-                  <div class="stat-label">{{ t('traces.sessionDetail.stats.cost') }}</div>
-                  <div class="stat-value">${{ trace.cost.toFixed(4) }}</div>
+                <div class="stat-section stat-section--inline">
+                  <span class="stat-label">{{ t('traces.sessionDetail.stats.cost') }}</span>
+                  <span class="stat-value tw:text-[0.8rem]!">${{ trace.cost.toFixed(4) }}</span>
                 </div>
                 <div class="stat-section">
                   <div class="stat-label">{{ t('traces.sessionDetail.stats.spans') }}</div>
                   <div class="stat-rows">
-                    <div class="stat-row">
+                    <div v-if="turnDetail(trace.traceId)?.llmCalls" class="stat-row">
+                      <span>{{ t('traces.sessionDetail.stats.llmCalls') }}</span>
+                      <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.llmCalls }}</span>
+                    </div>
+                    <div v-if="turnDetail(trace.traceId)?.toolCalls" class="stat-row">
+                      <span>{{ t('traces.sessionDetail.stats.toolCalls') }}</span>
+                      <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.toolCalls }}</span>
+                    </div>
+                    <div class="stat-row stat-row--total">
                       <span>{{ t('traces.sessionDetail.stats.total') }}</span>
                       <span class="tw:tabular-nums">{{ trace.spanCount }}</span>
                     </div>
@@ -492,7 +491,6 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // Toolbar filters (all client-side over the in-memory turn list).
 const searchText = ref("");
 const statusFilter = ref<"all" | "ok" | "error">("all");
-const modelFilter = ref<string>("all");
 
 const sessionId = computed(() =>
   typeof route.query.session_id === "string" ? route.query.session_id : "",
@@ -506,6 +504,11 @@ const startTime = computed(() =>
 const endTime = computed(() =>
   typeof route.query.to === "string" ? Number(route.query.to) : 0,
 );
+// Passed from the sessions list so the header renders immediately
+// without waiting for fetchSession to complete.
+const routeUserId = computed(() =>
+  typeof route.query.user_id === "string" ? route.query.user_id : "",
+);
 
 const statusOptions = [
   { label: "All statuses", value: "all" },
@@ -513,21 +516,10 @@ const statusOptions = [
   { label: "Error", value: "error" },
 ];
 
-const modelOptions = computed(() => {
-  const models = new Set<string>();
-  traces.value.forEach((t) => t.model && models.add(t.model));
-  return [
-    { label: "All models", value: "all" },
-    ...Array.from(models).map((m) => ({ label: m, value: m })),
-  ];
-});
-
 const filteredTraces = computed(() => {
   const q = searchText.value.trim().toLowerCase();
   return traces.value.filter((t) => {
     if (statusFilter.value !== "all" && t.status !== statusFilter.value)
-      return false;
-    if (modelFilter.value !== "all" && t.model !== modelFilter.value)
       return false;
     if (q) {
       const hay = [t.traceId, t.model || ""].join(" ").toLowerCase();
@@ -860,12 +852,18 @@ onMounted(load);
 
   &--user {
     border-color: color-mix(in srgb, #0ea5e9 35%, transparent);
-    flex: 25 1 0;
+    flex-shrink: 0;
+
+    .msg-block__body {
+      // font-size 0.8rem × line-height 1.5 = 1.2rem per line; padding 0.625rem×2
+      min-height: calc(1 * 1.2rem + 1.25rem); // 1 line always visible
+      max-height: calc(3 * 1.2rem + 1.25rem); // 3 lines then scroll
+    }
   }
 
   &--assistant {
     border-color: color-mix(in srgb, #16a34a 35%, transparent);
-    flex: 75 1 0;
+    flex: 1 1 0;
   }
 
   &__header {
@@ -912,6 +910,16 @@ onMounted(load);
 .stat-section + .stat-section {
   padding-top: 0.5rem;
   border-top: 1px solid var(--o2-border-color);
+}
+
+.stat-section--inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .stat-label {
+    margin-bottom: 0;
+  }
 }
 
 .stat-label {
