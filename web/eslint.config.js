@@ -292,6 +292,10 @@ export default [
         //   element: 'q-form',
         //   message: 'Use <OForm> from "@/lib/forms/OForm.vue" instead of <q-form>.'
         // },
+        // {
+        //   element: 'q-virtual-scroll',
+        //   message: 'Use <OVirtualScroll> from "@/lib/core/VirtualScroll/OVirtualScroll.vue" instead of <q-virtual-scroll>.',
+        // },
       ],
       'no-restricted-imports': [
         'error',
