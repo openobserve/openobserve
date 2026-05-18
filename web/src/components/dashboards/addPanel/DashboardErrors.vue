@@ -64,7 +64,9 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "DashboardErrorsComponent",
-  components: { OIcon },
+  components: {
+    OIcon,
+  },
   props: ["errors"],
 
   setup(props, { emit }) {

@@ -49,11 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`ingestion.resetTokenBtnLabel`) }}
             </OButton>
           </span>
-          <q-input
+          <OInput
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
-            dense
-            borderless
             clearable
             class="tw:max-w-sm q-ml-md q-mb-xs right float-right indexlist-search-input"
             data-test="recommended-list-search-input"
@@ -61,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #prepend>
               <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
-          </q-input>
+          </OInput>
           <span
             class="text-subtitle bg-warning float-right q-pa-sm text-bold"
             v-if="
@@ -226,6 +224,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -250,7 +249,7 @@ import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, OTabs, ORouteTab, OButton,
+  components: { ConfirmDialog, OTabs, ORouteTab, OButton, OInput,
     OIcon,
 },
   setup() {

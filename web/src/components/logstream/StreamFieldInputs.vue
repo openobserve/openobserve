@@ -26,16 +26,14 @@
           data-test="add-stream-field-name-input"
           class="q-ml-none o2-input flex items-center"
         >
-          <q-input
+          <OInput
             v-model="field.name"
             :placeholder="t('logStream.fieldName') + ' *'"
             class="q-py-sm"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) => !!val.trim() || t('logStream.fieldRequired'),
-            ]"
+            :error="!!fieldNameErrors[index]"
+            :error-message="fieldNameErrors[index] || ''"
+            @update:model-value="fieldNameErrors[index] = ''"
+            @blur="!field.name.trim() && (fieldNameErrors[index as number] = t('logStream.fieldRequired'))"
             tabindex="0"
             :style="isInSchema ? { width: '40vw' } : { width: '250px' }"
           />
@@ -45,7 +43,7 @@
           data-test="alert-conditions-operator-select"
           class="q-ml-none o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.type"
             :options="fieldTypes"
             :popup-content-style="{ textTransform: 'capitalize' }"
@@ -66,7 +64,7 @@
           data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.index_type"
             :options="streamIndexType"
             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -98,7 +96,7 @@
           data-test="add-stream-field-type-select-input"
           class="q-ml-none flex items-end o2-input"
         >
-          <q-select
+          <OSelect
             v-model="field.type"
             :options="dataTypes"
             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -156,9 +154,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-defineProps({
+const props = defineProps({
   fields: {
     type: Array,
     default: () => [],
@@ -223,6 +223,7 @@ const dataTypes = [
 const store = useStore();
 
 const { t } = useI18n();
+const fieldNameErrors = ref<string[]>([]);
 
 const isFocused = ref(false);
 //repetitive need to refactor
@@ -293,8 +294,19 @@ const handleDataTypeBlur = () => {
   isDataTypeFocused.value = false;
 };
 
+const validate = () => {
+  const fields = props.fields as any[];
+  fields.forEach((field, index) => {
+    if (!field.name.trim()) {
+      fieldNameErrors.value[index] = t("logStream.fieldRequired");
+    }
+  });
+  return fields.every((field) => field.name.trim());
+};
+
 // Expose methods and data for testing
 defineExpose({
+  validate,
   deleteApiHeader,
   addApiHeader,
   disableOptions,

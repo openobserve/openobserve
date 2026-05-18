@@ -28,17 +28,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
         <div data-test="iam-groups-search-input">
-          <q-input
+          <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('iam.searchGroup')"
             >
               <template #prepend>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
         </div>
         <OButton
           data-test="iam-groups-add-group-btn"
@@ -133,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";

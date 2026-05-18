@@ -23,12 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ pipelineObj.currentSelectedPipeline.name }}
           </div>
           <div class="text-h6" v-if="pipelineObj.isEditPipeline == false">
-            <q-input
+            <OInput
               ref="pipelineNameInputRef"
               v-model="pipelineObj.currentSelectedPipeline.name"
               :placeholder="t('pipeline.pipelineName')"
-              borderless
-              dense
               hide-bottom-space
               class="tw:w-[300px]"
               :error="pipelineNameError"
@@ -47,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openJsonEditor"
             icon-left="code"
           >
-            <q-tooltip>{{ t('pipeline.editPipelineJson') }}</q-tooltip>
+            <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
           </OButton>
           <OButton
             data-test="add-pipeline-cancel-btn"
@@ -203,6 +201,8 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";

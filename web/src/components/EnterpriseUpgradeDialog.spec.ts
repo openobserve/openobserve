@@ -661,7 +661,7 @@ describe("EnterpriseUpgradeDialog", () => {
       await wrapper.setProps({ modelValue: true });
       await nextTick();
       expect((wrapper.vm as any).isLoadingLicense).toBe(true);
-      const skeletons = wrapper.findAll('[data-test-stub="q-skeleton"]');
+      const skeletons = wrapper.findAllComponents({ name: "OSkeleton" });
       expect(skeletons.length).toBeGreaterThan(0);
     });
 

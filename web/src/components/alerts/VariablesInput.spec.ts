@@ -62,15 +62,17 @@ describe("VariablesInput.vue", () => {
     it("should render the variable label with info tooltip", () => {
       wrapper = createWrapper();
       expect(wrapper.text()).toContain("Variable");
-      expect(wrapper.html()).toContain('info_outline');
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => i.props("name") === "info-outline")).toBe(true);
     });
 
     it("should display tooltip text about variables", () => {
       wrapper = createWrapper();
       // Check if the tooltip element exists in the component
       expect(wrapper.text()).toContain('Variable');
-      // The q-btn with info icon should exist (not the tooltip text since it's not rendered until hover)
-      expect(wrapper.html()).toContain('info_outline');
+      // The info-outline OIcon should exist (rendered as SVG, no name text in HTML)
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => i.props("name") === "info-outline")).toBe(true);
     });
   });
 
@@ -228,14 +230,14 @@ describe("VariablesInput.vue", () => {
 
     it("should have correct placeholder for key input", () => {
       wrapper = createWrapper({ variables: mockVariables });
-      const keyInput = wrapper.find('[data-test="alert-variables-key-input"]');
-      expect(keyInput.attributes('placeholder')).toBeDefined();
+      const keyInput = wrapper.findAllComponents({ name: "OInput" }).find((c) => c.attributes("data-test") === "alert-variables-key-input");
+      expect(keyInput?.props("placeholder")).toBeDefined();
     });
 
     it("should have correct placeholder for value input", () => {
       wrapper = createWrapper({ variables: mockVariables });
-      const valueInput = wrapper.find('[data-test="alert-variables-value-input"]');
-      expect(valueInput.attributes('placeholder')).toBeDefined();
+      const valueInput = wrapper.findAllComponents({ name: "OInput" }).find((c) => c.attributes("data-test") === "alert-variables-value-input");
+      expect(valueInput?.props("placeholder")).toBeDefined();
     });
 
     it("should have minimum width style for value input", () => {
@@ -254,7 +256,9 @@ describe("VariablesInput.vue", () => {
 
     it("should have dense attribute for inputs", () => {
       wrapper = createWrapper({ variables: mockVariables });
-      expect(wrapper.html()).toContain('dense');
+      // OInput migrated from q-input — verify input components exist
+      const inputs = wrapper.findAllComponents({ name: "OInput" });
+      expect(inputs.length).toBeGreaterThan(0);
     });
   });
 

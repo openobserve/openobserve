@@ -7,9 +7,7 @@
       data-test="dashboard-drilldown-help-btn"
       icon-left="help-outline"
     >
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
-        User Guide
-      </q-tooltip>
+      <OTooltip content="User Guide" side="bottom" align="center" />
     </OButton>
   </div>
   <Teleport to="body">
@@ -153,9 +151,10 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default {
-  components: { OButton },
+  components: { OButton, OTooltip },
   name: "DrilldownUserGuide",
   setup() {
     const store = useStore();

@@ -169,8 +169,6 @@ describe("RunningQueries", () => {
           "q-separator": true,
           "OIcon": true,
           "q-tooltip": true,
-          "q-badge": true,
-          "q-chip": true,
           "confirm-dialog": true,
           "query-list": true,
           "running-queries-list": true,

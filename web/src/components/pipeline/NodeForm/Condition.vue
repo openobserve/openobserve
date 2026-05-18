@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <div class="stream-routing-container q-px-md q-pt-md">
-      <q-form ref="routeFormRef" @submit.prevent="saveCondition">
+      <div>
         <div
           class="q-pt-sm showLabelOnTop text-bold text-h7"
           data-test="add-condition-query-input-title"
@@ -124,10 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-condition-save-btn"
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="saveCondition"
           >{{ t('alerts.save') }}</OButton>
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
   </ODrawer>
@@ -252,8 +252,6 @@ const originalStreamFields: Ref<any[]> = ref([]);
 const isValidName: Ref<boolean> = ref(true);
 
 const isAggregationEnabled = ref(false);
-
-const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 

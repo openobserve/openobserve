@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div class="step-content tw:px-3 tw:py-4">
-      <q-form ref="formRef" @submit.prevent>
+      <OForm ref="formRef" @submit.prevent>
         <!-- Query Mode Tabs -->
         <div class="tw:mb-4">
           <OToggleGroup
@@ -58,11 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
             >
-              <q-select
+              <OSelect
                 v-model="filter.field"
                 :options="filteredStreamFields"
-                dense
-                borderless
                 use-input
                 fill-input
                 hide-selected
@@ -86,20 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
-              <q-select
+              </OSelect>
+              <OSelect
                 v-model="filter.operator"
                 :options="filterOperators"
-                dense
-                borderless
                 class="alert-v3-select"
                 style="width: 110px"
               />
-              <q-input
+              <OInput
                 v-if="operatorNeedsValue(filter.operator)"
                 v-model="filter.value"
-                dense
-                borderless
                 :placeholder="t('alerts.placeholders.value')"
                 class="alert-v3-input"
                 style="max-width: 160px"
@@ -199,27 +193,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-negative tw:ml-1">*</span>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
-              <q-select
+              <OSelect
                 v-model="config.detection_function"
                 :options="detectionFunctions"
-                dense
-                borderless
-                hide-bottom-space
                 :rules="[(v) => !!v || 'Detection function is required']"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
                 style="width: 110px"
                 @update:model-value="onDetectionFunctionChange"
               />
-              <q-select
+              <OSelect
                 v-if="
                   config.detection_function &&
                   config.detection_function !== 'count'
                 "
                 v-model="config.detection_function_field"
                 :options="filteredDetectionFields"
-                dense
-                borderless
                 use-input
                 input-debounce="200"
                 :placeholder="
@@ -229,7 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :loading="loadingFields"
                 :rules="[(v) => !!v || 'Field is required']"
-                hide-bottom-space
                 data-test="anomaly-detection-function-field"
                 class="alert-v3-select"
                 style="width: 140px"
@@ -246,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-item-section>
                   </q-item>
                 </template>
-              </q-select>
+              </OSelect>
             </div>
           </div>
           <!-- Detection Resolution -->
@@ -262,38 +250,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.detectionResolutionTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.detectionResolutionTooltip')"
+                />
               </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <OInput
                   v-model.number="config.histogram_interval_value"
                   type="number"
-                  dense
-                  borderless
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-histogram-interval-value"
                 />
-                <q-select
+                <OSelect
                   v-model="config.histogram_interval_unit"
                   :options="intervalUnits"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  dense
-                  borderless
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-histogram-interval-unit"
@@ -328,38 +309,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
+              <OTooltip
+                side="right"
+                align="center"
                 max-width="300px"
-              >
-                <span style="font-size: 14px">{{
-                  t("alerts.anomaly.detectionResolutionTooltip")
-                }}</span>
-              </q-tooltip>
+                :content="t('alerts.anomaly.detectionResolutionTooltip')"
+              />
             </OIcon>
           </div>
           <div>
             <div class="tw:flex tw:items-center tw:gap-0">
-              <q-input
+              <OInput
                 v-model.number="config.histogram_interval_value"
                 type="number"
-                dense
-                borderless
                 min="1"
                 class="alert-v3-input"
                 style="width: 87px"
                 data-test="anomaly-histogram-interval-value"
               />
-              <q-select
+              <OSelect
                 v-model="config.histogram_interval_unit"
                 :options="intervalUnits"
                 option-label="label"
                 option-value="value"
                 emit-value
                 map-options
-                dense
-                borderless
                 class="alert-v3-select"
                 style="min-width: 100px"
                 data-test="anomaly-histogram-interval-unit"
@@ -393,38 +367,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.checkEveryTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.checkEveryTooltip')"
+                />
               </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <OInput
                   v-model.number="config.schedule_interval_value"
                   type="number"
-                  dense
-                  borderless
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-schedule-interval-value"
                 />
-                <q-select
+                <OSelect
                   v-model="config.schedule_interval_unit"
                   :options="intervalUnits"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  dense
-                  borderless
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-schedule-interval-unit"
@@ -455,38 +422,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.lookBackWindowTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.lookBackWindowTooltip')"
+                />
               </OIcon>
             </div>
             <div>
               <div class="tw:flex tw:items-center tw:gap-0">
-                <q-input
+                <OInput
                   v-model.number="config.detection_window_value"
                   type="number"
-                  dense
-                  borderless
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-detection-window-value"
                 />
-                <q-select
+                <OSelect
                   v-model="config.detection_window_unit"
                   :options="intervalUnits"
                   option-label="label"
                   option-value="value"
                   emit-value
                   map-options
-                  dense
-                  borderless
                   class="alert-v3-select"
                   style="min-width: 100px"
                   data-test="anomaly-detection-window-unit"
@@ -522,26 +482,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  max-width="300px"
-                >
-                  <span style="font-size: 14px">
+                <OTooltip side="right" align="center" max-width="300px">
+                  <template #content><span style="font-size: 14px">
                     How many days of historical data to use for training. Min 1
                     day. Seasonality is auto-detected: &lt;7 days → hour-of-day;
                     ≥7 days → hour-of-day + day-of-week.
-                  </span>
-                </q-tooltip>
+                  </span></template>
+                </OTooltip>
               </OIcon>
             </div>
             <div class="tw:flex tw:flex-col">
-              <q-input
+              <OInput
                 v-model.number="config.training_window_days"
                 type="number"
-                dense
-                borderless
-                hide-bottom-space
                 :min="1"
                 :rules="[(v) => v >= 1 || 'Minimum 1 day']"
                 data-test="anomaly-training-window"
@@ -575,26 +528,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                 "
               >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
-                >
-                  <span style="font-size: 14px">{{
-                    t("alerts.anomaly.retrainEveryTooltip")
-                  }}</span>
-                </q-tooltip>
+                  :content="t('alerts.anomaly.retrainEveryTooltip')"
+                />
               </OIcon>
             </div>
-            <q-select
+            <OSelect
               v-model="config.retrain_interval_days"
               :options="retrainIntervalOptions"
               option-label="label"
               option-value="value"
               emit-value
               map-options
-              dense
-              borderless
               data-test="anomaly-retrain-interval"
               class="alert-v3-select"
               style="max-width: 200px"
@@ -617,15 +565,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
               "
             >
-              <q-tooltip
-                anchor="center right"
-                self="center left"
-                max-width="300px"
-              >
-                <span style="font-size: 14px">{{
-                  t("alerts.anomaly.sensitivityTooltip")
-                }}</span>
-              </q-tooltip>
+                <OTooltip
+                  side="right"
+                  align="center"
+                  max-width="300px"
+                  :content="t('alerts.anomaly.sensitivityTooltip')"
+                />
             </OIcon>
           </div>
           <div style="width: calc(100% - 190px)">
@@ -655,15 +600,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="loadPreview"
                 >
                   {{ t("alerts.anomaly.loadData") }}
-                  <q-tooltip v-if="!config.stream_name">{{
-                    t("alerts.anomaly.selectStreamFirstTooltip")
-                  }}</q-tooltip>
-                  <q-tooltip
-                    v-else-if="
-                      config.query_mode === 'custom_sql' && !config.custom_sql
-                    "
-                    >{{ t("alerts.anomaly.enterSqlFirst") }}</q-tooltip
-                  >
+                  <OTooltip v-if="!config.stream_name" :content="t('alerts.anomaly.selectStreamFirstTooltip')" />
+                  <OTooltip
+                    v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql"
+                    :content="t('alerts.anomaly.enterSqlFirst')"
+                  />
                 </OButton>
               </div>
 
@@ -710,15 +651,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="sensitivity-slider-col tw:flex tw:flex-col tw:items-center"
                 >
-                  <q-range
-                    ref="sliderRef"
+                  <ORange
                     v-model="thresholdRange"
                     :min="0"
                     :max="100"
                     :step="1"
                     vertical
                     reverse
-                    color="primary"
                     label-always
                     markers
                     :marker-labels="[
@@ -737,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-form>
+      </OForm>
     </div>
   </div>
 </template>
@@ -765,6 +704,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import ORange from "@/lib/forms/Range/ORange.vue";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -776,6 +720,11 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OIcon,
+    OTooltip,
+    OInput,
+    OSelect,
+    OForm,
+    ORange,
 },
 
   props: {
@@ -1469,48 +1418,11 @@ export default defineComponent({
   margin-top: 14px;
   height: 145px !important;
 
-  --slider-accent: color-mix(
-    in srgb,
-    var(--q-primary) 55%,
-    var(--o2-primary-background)
-  );
-
-  // Selection track
-  :deep(.q-slider__selection) {
-    background: var(--slider-accent) !important;
-  }
-
-  // Thumbs
-  :deep(.q-slider__thumb) {
-    color: var(--slider-accent) !important;
-
-    circle {
-      stroke: var(--slider-accent) !important;
-      fill: var(--slider-accent) !important;
-    }
-  }
-
-  // Value labels (number plates)
-  :deep(.q-slider__pin-value-marker-bg) {
-    background: var(--slider-accent) !important;
-  }
-
-  :deep(.q-slider__pin-value-marker) {
-    color: white !important;
-    font-size: 10px !important;
-  }
-
-  // Ruler tick marks — light grey
-  :deep(.q-slider__markers) {
-    color: var(--o2-border) !important;
-    opacity: 0.8;
-  }
-
-  // Marker labels (scale numbers)
-  :deep(.q-slider__marker-labels-container) {
-    color: var(--o2-text-secondary);
-    font-size: 9px;
-  }
+  // Override ORange design tokens with the primary action color
+  --color-slider-track-fill: var(--o2-primary-color);
+  --color-slider-thumb: var(--o2-primary-color);
+  --color-slider-thumb-border: white;
+  --color-slider-value: var(--o2-text-secondary);
 }
 
 // Reuse alerts wizard frequency toggle button styles

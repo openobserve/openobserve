@@ -90,6 +90,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "QueryPlanNode",
+  components: {
+    OIcon,
+  },
   props: {
     node: {
       type: Object as PropType<OperatorNode>,

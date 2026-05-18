@@ -612,27 +612,18 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.formatStatus(null)).toBe("Unknown");
     });
 
-    it("getStatusChipColor should return correct colors", async () => {
+    it("getStatusChipVariant should return correct variants", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusChipColor("firing")).toBe("red-1");
-      expect(vm.getStatusChipColor("error")).toBe("red-1");
-      expect(vm.getStatusChipColor("ok")).toBe("green-1");
-      expect(vm.getStatusChipColor("success")).toBe("green-1");
-      expect(vm.getStatusChipColor("skipped")).toBe("amber-1");
-      expect(vm.getStatusChipColor("pending")).toBe("blue-1");
-      expect(vm.getStatusChipColor("unknown")).toBe("grey-3");
-    });
-
-    it("getStatusChipTextColor should return correct text colors", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusChipTextColor("firing")).toBe("red-9");
-      expect(vm.getStatusChipTextColor("error")).toBe("red-9");
-      expect(vm.getStatusChipTextColor("ok")).toBe("green-9");
-      expect(vm.getStatusChipTextColor("success")).toBe("green-9");
-      expect(vm.getStatusChipTextColor("skipped")).toBe("amber-9");
-      expect(vm.getStatusChipTextColor("pending")).toBe("blue-9");
+      expect(vm.getStatusChipVariant("firing")).toBe("error-soft");
+      expect(vm.getStatusChipVariant("error")).toBe("error-soft");
+      expect(vm.getStatusChipVariant("anomaly")).toBe("error-soft");
+      expect(vm.getStatusChipVariant("ok")).toBe("success-soft");
+      expect(vm.getStatusChipVariant("success")).toBe("success-soft");
+      expect(vm.getStatusChipVariant("normal")).toBe("success-soft");
+      expect(vm.getStatusChipVariant("skipped")).toBe("warning-soft");
+      expect(vm.getStatusChipVariant("pending")).toBe("primary-soft");
+      expect(vm.getStatusChipVariant("unknown")).toBe("default-soft");
     });
 
     it("getRowClass should return error class for error/firing status", async () => {

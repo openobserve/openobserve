@@ -456,19 +456,19 @@ const getAvatarColor = (username: string): string => {
 // Get event icon
 const getEventIcon = (event: any): string => {
   switch (event.type) {
-    case "Created": return "add_circle";
+    case "Created": return "add-circle";
     case "Alert": return "notifications";
     case "SeverityUpgrade":
     case "SeverityOverride": return "warning";
-    case "Acknowledged": return "check_circle";
+    case "Acknowledged": return "check-circle";
     case "Resolved": return "check";
     case "Reopened": return "replay";
-    case "DimensionsUpgraded": return "upgrade";
+    case "DimensionsUpgraded": return "arrow-upward";
     case "TitleChanged": return "edit";
-    case "AssignmentChanged": return "person_add";
+    case "AssignmentChanged": return "person";
     case "ai_analysis_begin": return "psychology";
     case "ai_analysis_complete": return "check";
-    case "ai_analysis_failed": return "error_outline";
+    case "ai_analysis_failed": return "error-outline";
     default: return "circle";
   }
 };

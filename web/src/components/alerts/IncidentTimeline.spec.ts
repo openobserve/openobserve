@@ -237,10 +237,10 @@ describe("IncidentTimeline - getEventIcon", () => {
     (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
   });
 
-  it("returns add_circle for Created", async () => {
+  it("returns add-circle for Created", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventIcon({ type: "Created" })).toBe("add_circle");
+    expect((w.vm as any).getEventIcon({ type: "Created" })).toBe("add-circle");
   });
 
   it("returns notifications for Alert", async () => {

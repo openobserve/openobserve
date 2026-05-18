@@ -657,8 +657,10 @@ describe("AlertWizardRightColumn.vue", () => {
         .find((s) => s.text().includes("Preview"));
       const toggleBtn = previewSection?.find(".expand-toggle-btn");
 
-      // Check the actual rendered icon attribute or HTML
-      expect(toggleBtn?.html()).toContain("expand_more");
+      // Check the OIcon component name prop
+      const icon = toggleBtn?.findComponent({ name: "OIcon" });
+      expect(icon?.exists()).toBe(true);
+      expect(icon?.props("name")).toMatch(/expand[-_]more/);
     });
 
     it("should show expand_less icon when section is expanded", async () => {
@@ -670,8 +672,10 @@ describe("AlertWizardRightColumn.vue", () => {
         .find((s) => s.text().includes("Preview"));
       const toggleBtn = previewSection?.find(".expand-toggle-btn");
 
-      // Check the actual rendered icon attribute or HTML
-      expect(toggleBtn?.html()).toContain("expand_less");
+      // Check the OIcon component name prop
+      const icon = toggleBtn?.findComponent({ name: "OIcon" });
+      expect(icon?.exists()).toBe(true);
+      expect(icon?.props("name")).toMatch(/expand[-_]less/);
     });
 
     it("should update icon when toggling preview", async () => {
@@ -682,7 +686,8 @@ describe("AlertWizardRightColumn.vue", () => {
         .findAll(".collapsible-section")
         .find((s) => s.text().includes("Preview"));
       let toggleBtn = previewSection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_less");
+      let icon = toggleBtn?.findComponent({ name: "OIcon" });
+      expect(icon?.props("name")).toMatch(/expand[-_]less/);
 
       await wrapper.vm.togglePreview();
       await nextTick();
@@ -691,7 +696,8 @@ describe("AlertWizardRightColumn.vue", () => {
         .findAll(".collapsible-section")
         .find((s) => s.text().includes("Preview"));
       toggleBtn = previewSection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_more");
+      icon = toggleBtn?.findComponent({ name: "OIcon" });
+      expect(icon?.props("name")).toMatch(/expand[-_]more/);
     });
 
     it("should update icon when toggling summary", async () => {
@@ -702,7 +708,8 @@ describe("AlertWizardRightColumn.vue", () => {
         .findAll(".collapsible-section")
         .find((s) => s.text().includes("Summary"));
       let toggleBtn = summarySection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_less");
+      let icon = toggleBtn?.findComponent({ name: "OIcon" });
+      expect(icon?.props("name")).toMatch(/expand[-_]less/);
 
       await wrapper.vm.toggleSummary();
       await nextTick();
@@ -711,7 +718,8 @@ describe("AlertWizardRightColumn.vue", () => {
         .findAll(".collapsible-section")
         .find((s) => s.text().includes("Summary"));
       toggleBtn = summarySection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_more");
+      icon = toggleBtn?.findComponent({ name: "OIcon" });
+      expect(icon?.props("name")).toMatch(/expand[-_]more/);
     });
   });
 

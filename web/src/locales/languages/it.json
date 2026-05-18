@@ -1589,7 +1589,8 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "allFolders": "Tutte le cartelle"
   },
   "panel": {
     "header": "Pannello",

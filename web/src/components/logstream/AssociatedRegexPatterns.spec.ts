@@ -128,6 +128,8 @@ describe('AssociatedRegexPatterns.vue', () => {
         vm: {
           filterPattern: '',
           allPatterns: [],
+          filteredAppliedPatterns: [],
+          filteredAllPatterns: [],
           selectedPatterns: [],
           listLoading: false,
           resultTotal: 0,
@@ -527,6 +529,8 @@ describe('AssociatedRegexPatterns.vue', () => {
       const requiredProperties = [
         'filterPattern',
         'allPatterns',
+        'filteredAppliedPatterns',
+        'filteredAllPatterns',
         'selectedPatterns',
         'listLoading',
         'resultTotal',
@@ -1351,7 +1355,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       const requiredProperties = [
         'filterPattern',
-        'allPatterns', 
+        'allPatterns',
+        'filteredAppliedPatterns',
+        'filteredAllPatterns',
         'selectedPatterns',
         'listLoading',
         'resultTotal',

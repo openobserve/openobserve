@@ -202,9 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
-                    <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                      {{ t('about.enterprise_offer.tooltip.high_availability_mode_only') }}
-                    </q-tooltip>
+                    <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -229,6 +227,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -282,6 +281,7 @@ export default defineComponent({
     OButton,
     ODialog,
     OSkeleton,
+    OTooltip,
   },
   props: {
     modelValue: {

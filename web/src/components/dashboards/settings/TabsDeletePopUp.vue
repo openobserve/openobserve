@@ -156,10 +156,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-radio {
-  margin-bottom: 10px;
-}
-
 .radio-group {
   display: flex;
   flex-direction: column;

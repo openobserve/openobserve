@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
           <div class="full-width tw:flex tw:justify-end tw:gap-3">
 
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('organization.search')"
             >
               <template #prepend>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           
             <OButton
               variant="primary"
@@ -102,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onUpdated, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, copyToClipboard } from "quasar";
@@ -113,6 +111,7 @@ import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -232,33 +231,6 @@ export default defineComponent({
           name: router.currentRoute.value.query?.to_be_updated_org_name || "",
           identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
         };
-      }
-    });
-
-    onUpdated(() => {
-      if (
-        router.currentRoute.value.query.action == "add"
-      ) {
-        showAddOrganizationDialog.value = true;
-      }
-      else if (
-        router.currentRoute.value.query.action == "update"
-      ) {
-        showAddOrganizationDialog.value = true;
-        toBeUpdatedOrganization.value = {
-          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
-          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
-        };
-      }
-
-      if (router.currentRoute.value.query.action == "invite") {
-        organizations.value.map((org) => {
-          if (org.identifier == router.currentRoute.value.query.id) {
-            organization.value = org;
-            showJoinOrganizationDialog.value = true;
-          }
-        });
       }
     });
 

@@ -19,17 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content">
       <div v-if="toolMetadata" class="tool-metadata q-mb-sm">
-        <q-badge
+        <OBadge
           v-if="toolMetadata.name"
-          :label="`Tool: ${toolMetadata.name}`"
-          color="orange"
+          variant="warning"
           class="q-mr-sm"
-        />
-        <q-badge
+        >{{ `Tool: ${toolMetadata.name}` }}</OBadge>
+        <OBadge
           v-if="toolMetadata.callId"
-          :label="`Call ID: ${toolMetadata.callId}`"
-          color="grey"
-        />
+          variant="default"
+        >{{ `Call ID: ${toolMetadata.callId}` }}</OBadge>
       </div>
       <div class="tool-data">
         <CodeQueryEditor
@@ -268,6 +266,7 @@ const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
 import OButton from '@/lib/core/Button/OButton.vue';
+import OBadge from '@/lib/core/Badge/OBadge.vue';
 
 const INITIAL_LINE_LIMIT = 15;
 

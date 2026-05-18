@@ -27,14 +27,10 @@
             <div class="tmm-label-hint">
               {{ t("modelPricing.modelNameHint") }}
             </div>
-            <q-input
+            <OInput
               ref="modelInputRef"
               v-model="testModelName"
-              dense
-              borderless
               placeholder="e.g. gpt-4-turbo"
-              spellcheck="false"
-              autocomplete="off"
               class="tmm-model-input"
               data-test="test-match-model-input"
             >
@@ -53,7 +49,7 @@
                   <OIcon name="close" size="xs" />
                 </OButton>
               </template>
-            </q-input>
+            </OInput>
           </div>
         </div>
 
@@ -147,12 +143,12 @@
                     }}</code>
                   </div>
                 </div>
-                <q-badge
-                  :color="sourceColor(testResult.matched)"
-                  text-color="white"
-                  :label="sourceLabel(testResult.matched)"
+                <OBadge
+                  :variant="sourceColor(testResult.matched)"
                   class="tmm-source-badge"
-                />
+                >
+                  {{ sourceLabel(testResult.matched) }}
+                </OBadge>
               </div>
 
               <!-- Priority flow -->
@@ -255,6 +251,9 @@ import modelPricingService from "@/services/model_pricing";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -381,10 +380,10 @@ function operatorSymbol(op: string) {
   return map[op] || op;
 }
 
-function sourceColor(model: any) {
+function sourceColor(model: any): BadgeVariant {
   if (!model.source || model.source === "org") return "primary";
-  if (model.source === "meta_org") return "secondary";
-  return "grey-8";
+  if (model.source === "meta_org") return "default-outline";
+  return "default";
 }
 function sourceLabel(model: any) {
   if (!model.source || model.source === "org") return "Your Org";

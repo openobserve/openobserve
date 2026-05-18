@@ -59,12 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
             @mouseleave="onMouseLeave"
           >
-            <q-chip
+            <OBadge
+              size="sm"
               class="wildcard-chip q-my-none q-mx-none"
               :class="wildcardChipColor(tok.value, tok.sampleValues)"
             >
               {{ wildcardLabel(tok.value, tok.sampleValues) }}
-            </q-chip>
+            </OBadge>
           </span>
         </template>
       </div>
@@ -144,6 +145,7 @@ import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {

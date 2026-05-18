@@ -1589,7 +1589,8 @@
     "configSectionDrilldown": "Detaya inme",
     "configSectionComparison": "Karşılaştırma",
     "configSectionMarkLines": "Çizgileri İşaretle",
-    "configSectionBackground": "Arkaplan"
+    "configSectionBackground": "Arkaplan",
+    "allFolders": "Tüm Klasörler"
   },
   "panel": {
     "header": "Panel",

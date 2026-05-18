@@ -58,28 +58,23 @@
                 <div class="relative-period-name">Custom</div>
                 <div class="row q-gutter-sm">
                   <div class="col">
-                    <q-input
+                    <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
-                      dense
-                      filled
-                      min="1"
+                      :min="1"
                     />
                   </div>
                   <div class="col">
-                    <q-select
+                    <OSelect
                       v-model="picker.data.selectedDate.relative.period"
                       :options="relativePeriodsSelect"
-                      dense
-                      filled
                       emit-value
-                      style="width: 100px"
                       @update:model-value="updateCustomPeriod"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel() }}</div>
                       </template>
-                    </q-select>
+                    </OSelect>
                   </div>
                 </div>
               </div>
@@ -92,10 +87,13 @@
 </template>
 
 <script setup>
+// Copyright 2026 OpenObserve Inc.
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { ref, reactive, watch, computed } from "vue";
 import { useStore } from "vuex";
 

@@ -35,12 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon size="20px">
         <img :src="aiIcon" alt="AI" class="ai-icon-img" />
       </OIcon>
-      <q-tooltip>
-        {{
-          disableAiReason ||
-          t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
-        }}
-      </q-tooltip>
+      <OTooltip side="top" align="center">
+        <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
+      </OTooltip>
     </OButton>
   </div>
 </template>
@@ -80,13 +77,11 @@ import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   inheritAttrs: false,
-  components: { OButton,
-    OIcon,
-},
+  components: { OButton, OIcon, OTooltip },
   props: {
     editorId: {
       type: String,

@@ -50,21 +50,18 @@
             <div class="dimension-section-header">
               <OIcon name="link" size="xs" />
               <span class="dimension-section-title">Matched Dimensions</span>
-              <q-tooltip>These stable dimensions were used to find related telemetry</q-tooltip>
+              <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
             <div class="service-dimensions">
-              <q-chip
+              <OBadge
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
                 size="sm"
-                dense
-                square
-                color="positive"
-                text-color="white"
+                variant="success"
               >
                 <span class="dimension-key">{{ key }}:</span>
                 <span class="dimension-value">{{ value }}</span>
-              </q-chip>
+              </OBadge>
             </div>
           </div>
 
@@ -77,21 +74,18 @@
             <div class="dimension-section-header">
               <OIcon name="tune" size="xs" />
               <span class="dimension-section-title">Additional Filters Available</span>
-              <q-tooltip>These additional dimensions can be used for more specific filtering</q-tooltip>
+              <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
             <div class="service-dimensions">
-              <q-chip
+              <OBadge
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"
                 size="sm"
-                dense
-                square
-                outline
-                color="grey-7"
+                variant="default-outline"
               >
                 <span class="dimension-key">{{ key }}:</span>
                 <span class="dimension-value">{{ value }}</span>
-              </q-chip>
+              </OBadge>
             </div>
           </div>
 
@@ -100,16 +94,14 @@
             v-if="!correlationResult.correlationData"
             class="service-dimensions"
           >
-            <q-chip
+            <OBadge
               v-for="(value, key) in correlationResult.service.dimensions"
               :key="key"
               size="sm"
-              dense
-              square
             >
               <span class="dimension-key">{{ key }}:</span>
               <span class="dimension-value">{{ value }}</span>
-            </q-chip>
+            </OBadge>
           </div>
         </div>
 
@@ -206,6 +198,7 @@ import type { TelemetryContext, CorrelationQuery } from "@/utils/telemetryCorrel
 import type { CorrelationResult } from "@/utils/telemetryCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 interface Props {

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div class="scrollable-content">
-        <q-form greedy ref="addVariableForm" @submit="onSubmit">
+        <OForm greedy ref="addVariableForm" @submit="onSubmit" class="tw:px-0.5">
           <div class="q-mt-md">
             <div class="q-mb-md">
             <OSelect
@@ -90,11 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-body1 text-bold q-mt-md">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="row">
+            <div class="row tw:gap-4">
               <div class="textbox col">
                 <OInput
                   v-model="variableData.name"
-                  class="tw:mr-2"
                   :label="t('dashboard.nameOfVariable') + ' *'"
                   :error-message="fieldErrors.name"
                   :error="!!fieldErrors.name"
@@ -120,12 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></div>
             </div>
             <div v-if="variableData.type == 'query_values'">
-              <div class="row">
+              <div class="row tw:gap-x-4 tw:items-end">
                 <OSelect
                   v-model="variableData.query_data.stream_type"
                   :label="t('dashboard.selectStreamType') + ' *'"
                   :options="streamTypeOptions"
-                  class="tw:flex-1 tw:mr-2"
+                  class="tw:flex-1"
                   :error-message="fieldErrors.streamType"
                   :error="!!fieldErrors.streamType"
                   @update:model-value="streamTypeUpdated(); fieldErrors.streamType = ''"
@@ -212,10 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                   </OIcon>
                 </div>
-                <div class="row items-center" style="width: 100%">
+                <div>
                   <div
-                    class="row no-wrap items-center tw:gap-x-3 tw:mb-4"
-                    style="width: 100%"
+                    class="tw:flex tw:flex-row tw:items-center tw:gap-x-2 tw:mb-4 tw:w-full tw:min-w-0"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
@@ -231,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!!filterNameErrors[index as number]"
                       @update:model-value="filterUpdated(index, $event); filterNameErrors[index as number] = ''"
                       data-test="dashboard-query-values-filter-name-selector"
-                      style="max-width: 41%; width: 41%; flex-shrink: 0"
+                      class="tw:flex-[2] tw:min-w-0"
                     >
                       <template #empty>
                         <span class="tw:italic tw:text-gray-400">No Data Found</span>
@@ -239,8 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OSelect>
                     <OSelect
                       v-model="filter.operator"
-                      style="width: 18%; flex-shrink: 0"
-                      class="operator"
+                      class="operator tw:flex-[1.5] tw:min-w-0"
                       :error-message="filterOperatorErrors[index as number]"
                       :error="!!filterOperatorErrors[index as number]"
                       @update:model-value="filterOperatorErrors[index as number] = ''"
@@ -276,18 +273,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
                       debounce="1000"
-                      style="
-                        margin-top: none !important;
-                        width: 41% !important;
-                        padding-bottom: 0px !important;
-                        flex-shrink: 0;
-                      "
+                      class="tw:flex-[2] tw:min-w-0"
+                      style="margin-top: 0 !important; padding-bottom: 0 !important;"
                       placeholder="Enter Value"
                     ></CommonAutoComplete>
                     <OButton
                       variant="ghost"
                       size="icon"
-                      style="flex-shrink: 0"
+                      class="tw:flex-shrink-0"
                       @click="removeFilter(index)"
                       :data-test="`dashboard-variable-adhoc-close-${index}`"
                       icon-left="close"
@@ -505,7 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- escape single quotes toggle -->
-          <div>
+          <div class="q-mt-sm">
             <OSwitch
               v-model="variableData.escapeSingleQuotes"
               :label="t('dashboard.escapeSingleQuotes')"
@@ -523,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OSwitch>
           </div>
-        </q-form>
+        </OForm>
       </div>
       <div class="sticky-footer">
         <OButton
@@ -575,6 +568,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -592,7 +586,7 @@ import useNotifications from "@/composables/useNotifications";
 export default defineComponent({
   name: "AddSettingVariable",
   props: ["variableName", "dashboardVariablesList", "isFromAddPanel"],
-  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip,
+  components: { DashboardHeader, CommonAutoComplete, OButton, OToggleGroup, OToggleGroupItem, OSelect, OInput, OSwitch, OCheckbox, OTooltip, OForm,
     OIcon,
 },
   emits: ["close", "save"],
@@ -1705,6 +1699,7 @@ export default defineComponent({
 }
 .scrollable-content {
   overflow-y: auto;
+  padding-inline: 3px;
   max-height: calc(100vh - 190px);
   &::-webkit-scrollbar {
     width: 6px;

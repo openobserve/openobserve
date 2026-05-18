@@ -32,61 +32,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Summary toolbar — sidebar-style badge chips. -->
     <div class="thread-summary">
-      <q-chip
-        dense
-        square
+      <OBadge
+        size="sm"
         class="thread-chip thread-chip--steps"
         :title="`${summary.turnCount} LLM step${summary.turnCount === 1 ? '' : 's'}`"
       >
-        <OIcon name="auto-awesome" size="xs" class="q-mr-xs" />
+        <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span class="thread-chip__label">Steps</span>
         <span class="thread-chip__value">{{ summary.turnCount }}</span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip dense square class="thread-chip thread-chip--tools">
-        <OIcon name="build" size="xs" class="q-mr-xs" />
+      <OBadge size="sm" class="thread-chip thread-chip--tools">
+        <template #icon><OIcon name="build" size="xs" /></template>
         <span class="thread-chip__label">Tools</span>
         <span class="thread-chip__value">{{ summary.toolCallCount }}</span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip dense square class="thread-chip thread-chip--duration">
-        <OIcon name="schedule" size="xs" class="q-mr-xs" />
+      <OBadge size="sm" class="thread-chip thread-chip--duration">
+        <template #icon><OIcon name="schedule" size="xs" /></template>
         <span class="thread-chip__label">Duration</span>
         <span class="thread-chip__value">
           {{ formatDuration(summary.totalDurationNs) }}
         </span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip dense square class="thread-chip thread-chip--cost">
-        <OIcon name="payments" size="xs" class="q-mr-xs" />
+      <OBadge size="sm" class="thread-chip thread-chip--cost">
+        <template #icon><OIcon name="payments" size="xs" /></template>
         <span class="thread-chip__label">Cost</span>
         <span class="thread-chip__value">
           {{ formatCost(summary.totalCost) }}
         </span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip
+      <OBadge
         v-if="summary.dominantModel"
-        dense
-        square
+        size="sm"
         class="thread-chip thread-chip--model"
         :title="summary.dominantModel"
       >
-        <OIcon name="bolt" size="xs" class="q-mr-xs" />
+        <template #icon><OIcon name="bolt" size="xs" /></template>
         <span class="thread-chip__label">Model</span>
         <span class="thread-chip__value">{{ summary.dominantModel }}</span>
-      </q-chip>
+      </OBadge>
 
-      <q-chip
+      <OBadge
         v-if="summary.errorCount > 0"
-        dense
-        square
+        size="sm"
         class="thread-chip thread-chip--error"
       >
-        <OIcon name="error-outline" size="xs" class="q-mr-xs" />
+        <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span class="thread-chip__label">Errors</span>
         <span class="thread-chip__value">{{ summary.errorCount }}</span>
-      </q-chip>
+      </OBadge>
 
     </div>
 
@@ -348,6 +345,7 @@ import {
   type TraceGroup,
 } from "./threadView.utils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 const store = useStore();
 

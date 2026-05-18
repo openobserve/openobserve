@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="hero-page__inline-logo-wrap"
               >
                 <img :src="p.image" :alt="p.label" class="hero-page__inline-logo" />
-                <q-tooltip>{{ p.label }}</q-tooltip>
+                <OTooltip :content="p.label" />
               </div>
             </div>
           </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ent-empty__logo-wrap"
           >
             <img :src="p.image" :alt="p.label" class="ent-empty__logo" />
-            <q-tooltip>{{ p.label }}</q-tooltip>
+            <OTooltip :content="p.label" />
           </div>
         </div>
       </div>
@@ -187,13 +187,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-subtitle1" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
-              <q-badge
-                color="positive"
-                style="font-size: 11px; border-radius: 20px; padding: 2px 8px; margin-top: 4px;"
+              <OBadge
+                variant="success"
+                style="font-size: 11px; padding: 2px 8px; margin-top: 4px;"
               >
                 <OIcon name="check-circle" size="11px" style="margin-right: 3px;" />
                 {{ t("storage_settings.active") }}
-              </q-badge>
+              </OBadge>
             </div>
           </div>
           <OButton
@@ -276,6 +276,8 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();

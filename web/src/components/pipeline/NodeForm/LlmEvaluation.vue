@@ -30,82 +30,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
-      <q-form @submit="saveLlmEvaluationNode">
+      <div>
         <!-- Node Name -->
         <div class="o2-input full-width q-py-sm">
-          <q-input
+          <OInput
             v-model="nodeName"
             :label="t('pipeline.nodeName') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val) => !!val || t('common.nameRequired')]"
+            :error="!!nodeNameError"
+            :error-message="nodeNameError"
+            @update:model-value="nodeNameError = ''"
             data-test="llm-evaluation-node-name-input"
           />
         </div>
 
         <!-- LLM Span Identifier -->
         <div class="o2-input full-width q-py-sm">
-          <q-select
+          <OSelect
             v-model="llmSpanIdentifier"
-            :options="filteredStreamFields"
+            :options="streamFields"
+            labelKey="label"
+            valueKey="value"
+            searchable
             :label="t('pipeline.llmSpanIdentifierLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
-            use-input
-            input-debounce="300"
-            emit-value
-            map-options
             :loading="loadingFields"
-            @filter="filterStreamFields"
             data-test="llm-evaluation-span-identifier-select"
           >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("pipeline.noFieldsFound") }}
-                </q-item-section>
-              </q-item>
+            <template #empty>
+              <span>{{ t("pipeline.noFieldsFound") }}</span>
             </template>
-          </q-select>
+          </OSelect>
         </div>
 
         <!-- Evaluation Template Selection -->
         <div class="o2-input full-width q-py-sm flex items-center gap-2">
-          <q-select
+          <OSelect
             v-model="selectedTemplate"
             :options="availableTemplates"
-            option-value="id"
-            option-label="name"
+            labelKey="name"
             :label="t('pipeline.evaluationTemplate')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
             style="flex: 1"
-            stack-label
-            outlined
-            filled
-            dense
             :loading="loadingTemplates"
             data-test="llm-evaluation-template-select"
           >
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("pipeline.noTemplatesFound") }}
-                </q-item-section>
-              </q-item>
+            <template #empty>
+              <span>{{ t("pipeline.noTemplatesFound") }}</span>
             </template>
-          </q-select>
+          </OSelect>
           <OButton
             variant="ghost-muted"
             size="icon-xs-sq"
@@ -119,16 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Enable Sampling Toggle -->
-        <q-toggle
+        <OSwitch
           v-model="enableSampling"
           :label="t('pipeline.enableSampling')"
-          class="q-mb-sm tw:h-[36px] o2-toggle-button-lg -tw:ml-4"
-          size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
           data-test="llm-evaluation-enable-sampling-toggle"
         />
 
@@ -138,14 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("pipeline.samplingRate") }}:
             {{ (samplingRate * 100).toFixed(0) }}%
           </div>
-          <q-slider
+          <OSlider
             v-model="samplingRate"
             :min="0"
             :max="1"
             :step="0.01"
-            color="primary"
-            label
-            :label-value="(samplingRate * 100).toFixed(0) + '%'"
             data-test="llm-evaluation-sampling-rate-slider"
           />
         </div>
@@ -172,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           >{{ t('alerts.save') }}</OButton>
         </div>
-      </q-form>
+      </div>
     </div>
     </div>
   </ODrawer>
@@ -195,10 +155,14 @@ import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSlider from "@/lib/forms/Slider/OSlider.vue";
 
 export default defineComponent({
   name: "LlmEvaluation",
-  components: { ConfirmDialog, OButton, ODrawer },
+  components: { ConfirmDialog, OButton, ODrawer, OInput, OSelect, OSwitch, OSlider },
   props: {
     open: {
       type: Boolean,
@@ -212,6 +176,7 @@ export default defineComponent({
     const q = useQuasar();
     const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
+    const nodeNameError = ref("");
     const internalOpen = ref(!!props.open);
     watch(() => props.open, (v: boolean) => { internalOpen.value = !!v; });
     function handleDrawerClose(v: boolean) {
@@ -395,6 +360,7 @@ export default defineComponent({
 
     const saveLlmEvaluationNode = () => {
       if (!nodeName.value || nodeName.value.trim() === "") {
+        nodeNameError.value = t("common.nameRequired");
         q.notify({
           type: "negative",
           message: t("common.nameRequired"),
@@ -433,6 +399,7 @@ export default defineComponent({
       t,
       store,
       nodeName,
+      nodeNameError,
       enableSampling,
       samplingRate,
       llmSpanIdentifier,
