@@ -3326,6 +3326,10 @@
         "spans": "Spans",
         "llmCalls": "LLM calls",
         "toolCalls": "Tool calls"
+      },
+      "fullscreen": {
+        "expandTurn": "View turn in full screen",
+        "close": "Close"
       }
     },
     "servicesCatalog": {

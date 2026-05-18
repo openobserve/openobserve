@@ -263,14 +263,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ trace.traceId }}
               </span>
-              <q-icon
-                name="open_in_new"
-                size="14px"
-                class="tw:text-[var(--o2-text-muted)] tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
+              <OButton
+                variant="outline"
+                size="icon"
+                :title="t('traces.sessionDetail.openTrace')"
                 @click.stop="openTrace(trace.traceId)"
               >
-                <q-tooltip>{{ t('traces.sessionDetail.openTrace') }}</q-tooltip>
-              </q-icon>
+                <q-icon name="open_in_new" size="14px" />
+              </OButton>
+              <OButton
+                v-if="isExpanded(trace.traceId) && !turnDetailLoading[trace.traceId]"
+                variant="outline"
+                size="icon"
+                :title="t('traces.sessionDetail.fullscreen.expandTurn')"
+                @click.stop="openFullscreen(trace.traceId)"
+              >
+                <q-icon name="fullscreen" size="13px" />
+              </OButton>
             </span>
           </div>
 
@@ -456,6 +465,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
   </div>
+
+  <!-- Fullscreen turn dialog -->
+  <q-dialog v-model="fullscreenOpen" maximized>
+    <div class="fullscreen-turn-dialog" v-if="fullscreenTraceId && fullscreenTrace">
+      <!-- Header — mirrors the inline turn-header row -->
+      <div
+        class="fullscreen-turn-dialog__header"
+        :class="{
+          'fullscreen-turn-dialog__header--error': fullscreenTrace.status === 'error',
+          'fullscreen-turn-dialog__header--ok': fullscreenTrace.status === 'ok',
+        }"
+      >
+        <span class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+          {{ t('traces.sessionDetail.turnLabel') }} {{ originalTurnIndex(fullscreenTraceId) + 1 }}
+        </span>
+        <span class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-muted)]">
+          {{ formatTimestamp(fullscreenTrace.startTimeMicros) }}
+        </span>
+        <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
+          · {{ formatDuration(fullscreenTrace.durationNanos) }}
+        </span>
+        <span class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">
+          · ${{ fullscreenTrace.cost.toFixed(4) }}
+        </span>
+        <span
+          class="tw:rounded tw:px-[0.375rem] tw:py-[0.05rem] tw:text-[0.65rem] tw:font-semibold tw:capitalize tw:inline-flex tw:items-center tw:gap-[0.25rem]"
+          :class="statusBadgeClass(fullscreenTrace.status)"
+        >
+          <q-icon
+            :name="fullscreenTrace.status === 'error' ? 'close' : 'check'"
+            size="10px"
+          />
+          {{ fullscreenTrace.status }}
+        </span>
+        <span
+          v-if="fullscreenTrace.tokens"
+          class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+        >
+          {{ formatTokens(fullscreenTrace.inputTokens) }} → {{ formatTokens(fullscreenTrace.outputTokens) }} (Σ {{ formatTokens(fullscreenTrace.tokens) }})
+        </span>
+        <span class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.375rem]">
+          <span class="tw:text-[0.7rem] tw:font-mono tw:text-[var(--o2-text-muted)]">
+            {{ fullscreenTraceId }}
+          </span>
+          <OButton
+            variant="outline"
+            size="icon"
+            :title="t('traces.sessionDetail.openTrace')"
+            @click="openTrace(fullscreenTraceId)"
+          >
+            <q-icon name="open_in_new" size="14px" />
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon"
+            :title="t('traces.sessionDetail.fullscreen.close')"
+            @click="fullscreenOpen = false"
+          >
+            <q-icon name="fullscreen_exit" size="16px" />
+          </OButton>
+        </span>
+      </div>
+
+      <!-- Two panels: user 50% / assistant 50% -->
+      <div class="fullscreen-turn-dialog__body">
+        <!-- User panel -->
+        <div class="fullscreen-panel fullscreen-panel--user">
+          <div class="fullscreen-panel__header">
+            <span class="fullscreen-panel__role">{{ t('traces.sessionDetail.roles.user') }}</span>
+            <q-icon
+              v-if="turnDetail(fullscreenTraceId)?.userMessage"
+              name="content_copy"
+              size="14px"
+              class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
+              @click="copyText(turnDetail(fullscreenTraceId)?.userMessage?.content)"
+            />
+          </div>
+          <div class="fullscreen-panel__content">
+            {{ turnDetail(fullscreenTraceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
+          </div>
+        </div>
+
+        <!-- Assistant panel -->
+        <div class="fullscreen-panel fullscreen-panel--assistant">
+          <div class="fullscreen-panel__header">
+            <span class="fullscreen-panel__role">
+              {{ t('traces.sessionDetail.roles.assistant') }}
+              <span
+                v-if="turnDetail(fullscreenTraceId)?.model"
+                class="tw:text-[var(--o2-text-muted)] tw:ml-[0.25rem] tw:normal-case tw:font-normal"
+              >
+                · {{ turnDetail(fullscreenTraceId)?.model }}
+              </span>
+            </span>
+            <q-icon
+              v-if="turnDetail(fullscreenTraceId)?.assistantMessage"
+              name="content_copy"
+              size="14px"
+              class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
+              @click="copyText(turnDetail(fullscreenTraceId)?.assistantMessage?.content)"
+            />
+          </div>
+          <div class="fullscreen-panel__content">
+            {{ turnDetail(fullscreenTraceId)?.assistantMessage?.content || t('traces.sessionDetail.noAssistantMessage') }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </q-dialog>
   </div>
 </template>
 
@@ -496,6 +614,20 @@ const error = ref<string | null>(null);
 const turnDetails = reactive<Record<string, TurnDetail>>({});
 const turnDetailLoading = reactive<Record<string, boolean>>({});
 const expandedTurns = reactive<Record<string, boolean>>({});
+
+// Fullscreen turn viewer
+const fullscreenOpen = ref(false);
+const fullscreenTraceId = ref<string | null>(null);
+const fullscreenTrace = computed(() =>
+  fullscreenTraceId.value
+    ? traces.value.find((t) => t.traceId === fullscreenTraceId.value) ?? null
+    : null,
+);
+
+function openFullscreen(traceId: string) {
+  fullscreenTraceId.value = traceId;
+  fullscreenOpen.value = true;
+}
 
 // Toolbar filters (all client-side over the in-memory turn list).
 const searchText = ref("");
@@ -978,6 +1110,98 @@ onMounted(load);
     border-top: 1px dashed var(--o2-border-color);
     padding-top: 0.125rem;
     margin-top: 0.125rem;
+  }
+}
+
+.fullscreen-turn-dialog {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--o2-card-bg-solid);
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--o2-border-color);
+    background: var(--o2-card-bg);
+    flex-shrink: 0;
+    border-left: 3px solid transparent;
+
+    &--ok {
+      border-left-color: var(--o2-service-health-healthy, #16a34a);
+      background: color-mix(
+        in srgb,
+        var(--o2-service-health-healthy, #16a34a) 4%,
+        var(--o2-card-bg)
+      );
+    }
+
+    &--error {
+      border-left-color: var(--o2-service-health-critical);
+      background: color-mix(
+        in srgb,
+        var(--o2-service-health-critical) 4%,
+        var(--o2-card-bg)
+      );
+    }
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+}
+
+.fullscreen-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  & + & {
+    border-top: 1px solid var(--o2-border-color);
+  }
+
+  &--user {
+    border-left: 3px solid color-mix(in srgb, #0ea5e9 60%, transparent);
+  }
+
+  &--assistant {
+    border-left: 3px solid color-mix(in srgb, #16a34a 60%, transparent);
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--o2-border-color);
+    background: var(--o2-card-bg);
+    flex-shrink: 0;
+  }
+
+  &__role {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--o2-text-primary);
+    text-transform: capitalize;
+    display: flex;
+    align-items: center;
+  }
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.7;
+    color: var(--o2-text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 }
 </style>
