@@ -31,12 +31,6 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
     overscan = 5,
   } = options;
 
-  // Firefox needs a small base offset to avoid a 1px gap at the top.
-  const isFirefox =
-    typeof document !== "undefined" &&
-    typeof CSS !== "undefined" &&
-    CSS.supports("-moz-appearance", "none");
-
   const scrollMargin = ref(0);
 
   /**
@@ -78,6 +72,8 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
 
   const virtualItems = computed(() => virtualizer.value.getVirtualItems());
   const totalSize = computed(() => virtualizer.value.getTotalSize());
+  /** Visible-only range (no overscan) as reported by the virtualizer. */
+  const visibleRange = computed(() => virtualizer.value.range);
 
   function scrollToIndex(
     index: number,
@@ -97,10 +93,10 @@ export function useVirtualScroll(options: UseVirtualScrollOptions) {
   return {
     virtualItems,
     totalSize,
+    visibleRange,
     scrollMargin,
     scrollToIndex,
     scrollToTop,
     measure,
-    isFirefox,
   };
 }

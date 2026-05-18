@@ -43,7 +43,7 @@ const scrollTargetRef = computed(() => props.scrollTarget ?? null);
 
 const itemsRef = computed(() => props.items);
 
-const { virtualItems, totalSize, scrollToIndex, scrollToTop, measure } =
+const { virtualItems, totalSize, visibleRange, scrollToIndex, scrollToTop, measure } =
   useVirtualScroll({
     items: itemsRef,
     parentRef,
@@ -52,14 +52,15 @@ const { virtualItems, totalSize, scrollToIndex, scrollToTop, measure } =
     overscan: props.overscan,
   });
 
-// Emit virtual-scroll event on mount and whenever the visible range changes.
+// Emit virtual-scroll event on mount and whenever the rendered range changes.
 watch(virtualItems, (items) => {
   if (!items.length) return;
+  const range = visibleRange.value;
   emit("virtual-scroll", {
     startIndex: items[0].index,
     endIndex: items[items.length - 1].index,
-    visibleStartIndex: items[0].index,
-    visibleEndIndex: items[items.length - 1].index,
+    visibleStartIndex: range?.startIndex ?? items[0].index,
+    visibleEndIndex: range?.endIndex ?? items[items.length - 1].index,
   });
 }, { immediate: true });
 
