@@ -309,7 +309,7 @@ defineExpose({
       <div class="tw:relative tw:max-w-xs">
         <OIcon
           name="search"
-          size="0.9rem"
+          size="sm"
           class="tw:absolute tw:left-2 tw:top-1/2 tw:-translate-y-1/2 tw:text-text-secondary"
         />
         <input
@@ -423,6 +423,7 @@ defineExpose({
           :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
           :expansion-enabled="expansion.isEnabled.value"
           :is-expanded-fn="(row: TData) => expansion.isExpanded(row)"
+          :get-row-expansion-enabled="props.getRowExpansionEnabled"
           :highlight-text="props.highlightText"
           :should-highlight-column="highlighting.shouldHighlightColumn"
           :get-highlighted-html="highlighting.getHighlightedHtml"
@@ -442,7 +443,13 @@ defineExpose({
           :measure-element="isVirtual ? measureElement : undefined"
           @toggle-selection="selection.toggleRow"
           @toggle-expansion="expansion.toggleRow"
-          @row-click="(row: TData, evt: MouseEvent) => emit('row-click', row, evt)"
+          @row-click="(row: TData, evt: MouseEvent) => {
+            const canExpand = typeof props.expandOnRowClick === 'function'
+              ? props.expandOnRowClick(row)
+              : props.expandOnRowClick;
+            if (canExpand) expansion.toggleRow(row);
+            emit('row-click', row, evt);
+          }"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
           @cell-click="(params: any) => emit('cell-click', params)"
         >
