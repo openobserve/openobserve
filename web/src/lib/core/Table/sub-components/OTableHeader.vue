@@ -276,7 +276,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-secondary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs tw:select-none tw:relative`,
           'table-head',
           dense ? 'tw:h-6' : 'tw:h-7',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
@@ -403,7 +403,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-secondary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs tw:select-none tw:relative`,
           dense ? 'tw:h-7 tw:group' : 'tw:h-8 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
