@@ -130,12 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #after-list="bottomProps">
           <FieldListPagination
-            :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
+            data-test-prefix="logs-page"
+            :show-schema-toggle="showUserDefinedSchemaToggle"
             :show-quick-mode="searchObj.meta.quickMode"
             :use-user-defined-schemas="searchObj.meta.useUserDefinedSchemas"
             :show-only-interesting-fields="showOnlyInterestingFields"
-            :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
-            :selected-fields-btn-group-option="selectedFieldsBtnGroupOption"
+            :schema-toggle-options="userDefinedSchemaBtnGroupOption"
+            :interesting-fields-toggle-options="selectedFieldsBtnGroupOption"
             :current-page="bottomProps.currentPage"
             :pages-number="bottomProps.totalPages"
             :is-first-page="bottomProps.isFirstPage"
@@ -230,13 +231,13 @@ export default defineComponent({
       () => import("@/components/common/FieldList.vue"),
     ),
     FieldRow: defineAsyncComponent(
-      () => import("@/plugins/logs/components/FieldRow.vue"),
+      () => import("@/components/common/FieldRow.vue"),
     ),
     FieldExpansion: defineAsyncComponent(
-      () => import("@/plugins/logs/components/FieldExpansion.vue"),
+      () => import("@/components/common/FieldExpansion.vue"),
     ),
     FieldListPagination: defineAsyncComponent(
-      () => import("@/plugins/logs/components/FieldListPagination.vue"),
+      () => import("@/components/common/FieldListPagination.vue"),
     ),
     OButton,
     OSelect,
