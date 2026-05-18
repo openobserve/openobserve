@@ -2268,8 +2268,27 @@ export class PipelinesPage {
         await this.streamNameLabel.fill('');
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.streamNameLabel.fill(streamName);
-        await this.page.getByRole("option", { name: streamName, exact: true }).waitFor({ state: 'visible', timeout: 5000 });
-        await this.page.getByRole("option", { name: streamName, exact: true }).click();
+        // Wait for an option whose trimmed text content exactly matches.
+        // getByRole name matching with exact:true may fail when option
+        // labels include extra context (e.g. size, type).
+        await this.page.waitForFunction(
+            (name) => {
+                const options = document.querySelectorAll('[role="option"]');
+                return Array.from(options).some(el => el.textContent.trim() === name);
+            },
+            streamName,
+            { timeout: 5000 }
+        );
+        // Find and click the option with exact trimmed text content.
+        const options = this.page.getByRole("option");
+        const optCount = await options.count();
+        for (let i = 0; i < optCount; i++) {
+            const text = await options.nth(i).textContent();
+            if (text.trim() === streamName) {
+                await options.nth(i).click();
+                break;
+            }
+        }
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
@@ -2378,10 +2397,17 @@ export class PipelinesPage {
     async clearPipelineFieldSearch() {
         const searchInput = this.pipelineFieldSearchInput;
         await searchInput.fill('');
+        // Scroll the virtual-scroll table to trigger full rendering after
+        // the filter reset. Without scrolling, only the visible batch
+        // (~21 rows) is rendered, making the restored count inaccurate.
+        await this.pipelineFieldTable.evaluate((el) => {
+            const scrollContainer = el.querySelector('.q-table__middle, .q-virtual-scroll__container');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                scrollContainer.scrollTop = 0;
+            }
+        });
         // Wait for the field list count to stabilize after clearing.
-        // Quasar's virtual-scroll q-table batches rows incrementally, so
-        // poll until two consecutive reads return the same count — avoids
-        // hardcoded thresholds that break on partial data or schema changes.
         await this.page.waitForFunction(() => {
             const table = document.querySelector('[data-test="log-search-index-list-fields-table"]');
             if (!table) return false;
