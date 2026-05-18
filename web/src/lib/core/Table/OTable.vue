@@ -467,7 +467,7 @@ defineExpose({
 
         <!-- ── Footer (sticky totals row) ─────────────────────── -->
         <tfoot
-          v-if="table.getFooterGroups().length"
+          v-if="table.getFooterGroups().some(fg => fg.headers.some(h => h.column.columnDef.footer))"
           data-test="o2-table-footer"
           class="tw:sticky tw:bottom-0 tw:z-10"
         >
