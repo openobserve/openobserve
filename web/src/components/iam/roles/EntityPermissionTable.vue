@@ -36,6 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="handlePermissionChange(row, col)"
         />
       </template>
+      <template #empty>
+        <NoData />
+      </template>
     </OTable>
   </div>
 </template>
@@ -45,6 +48,7 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";

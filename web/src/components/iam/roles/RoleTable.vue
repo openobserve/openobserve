@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useI18n } from "vue-i18n";
@@ -92,6 +93,10 @@ const columns: OTableColumnDef[] = [
           <q-icon :name="outlinedDelete" />
         </OButton>
       </div>
+    </template>
+
+    <template #empty>
+      <NoData />
     </template>
 
     <!-- Bottom: bulk action in pagination bar -->

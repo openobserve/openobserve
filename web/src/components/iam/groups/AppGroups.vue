@@ -15,20 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
-    <div>
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div class="card-container tw:mb-[0.625rem]">
-    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
-      >
-    <div
-      data-test="iam-groups-section-title"
-      class="q-table__title tw:font-[600]"
-    >
-      {{ t("iam.groups") }}
-    </div>
-    <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-        <div data-test="iam-groups-search-input">
-          <OInput
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
+        <div
+          data-test="iam-groups-section-title"
+          class="q-table__title tw:font-[600]"
+        >
+          {{ t("iam.groups") }}
+        </div>
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
+          <div data-test="iam-groups-search-input">
+            <OInput
               v-model="filterQuery"
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('iam.searchGroup')"
@@ -37,20 +35,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
+          </div>
+          <OButton
+            data-test="iam-groups-add-group-btn"
+            variant="primary"
+            size="sm"
+            @click="addGroup"
+          >
+            {{ t('iam.addGroup') }}
+          </OButton>
         </div>
-        <OButton
-          data-test="iam-groups-add-group-btn"
-          variant="primary"
-          size="sm"
-          @click="addGroup"
-        >
-          {{ t('iam.addGroup') }}
-        </OButton>
       </div>
     </div>
-    </div>
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container"  style="height: calc(100vh - var(--navbar-height) - 92px)">      
+    <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
         <OTable
           data-test="iam-groups-table-section"
           :data="rows"
@@ -89,6 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
+          <template #empty>
+            <NoData />
+          </template>
           <template #bottom>
             <OButton
               v-if="selectedGroups.length > 0"
@@ -102,8 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
         </OTable>
-    </div>
-    </div>
     </div>
     <AddGroup
       v-model:open="showAddGroup"
@@ -134,6 +132,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
