@@ -2214,14 +2214,15 @@ export class PipelinesPage {
      */
     async expectSqlEditorHidden() {
         // Quasar q-expansion-item collapses via height animation + overflow:hidden,
-        // not by hiding child elements, so we check the rendered height instead.
+        // not by hiding child elements, so we check getClientRects instead.
+        // getClientRects returns an empty list when the element is not rendered
+        // (e.g., inside a parent with zero height + overflow: hidden).
         await this.scheduledPipelineSqlEditor.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
                 if (!el) return true;
-                const rect = el.getBoundingClientRect();
-                return rect.height === 0 || rect.bottom === 0;
+                return el.getClientRects().length === 0;
             },
             '[data-test="scheduled-pipeline-sql-editor"]',
             { timeout: 5000 }
@@ -2261,12 +2262,12 @@ export class PipelinesPage {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
-        // Clear and type character by character — pressSequentially fires
-        // per-keyboard-event that Quasar autocomplete needs for filtering,
-        // unlike fill() which may not trigger filtering on re-selection
+        // Clear the input to reset Quasar autocomplete state, then wait
+        // for the dropdown to show all options before typing the new value.
+        // This ensures the filter runs with a clean slate on re-selection.
         await this.streamNameLabel.fill('');
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
-        await this.streamNameLabel.pressSequentially(streamName);
+        await this.streamNameLabel.fill(streamName);
         await this.page.getByRole("option", { name: streamName, exact: true }).waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole("option", { name: streamName, exact: true }).click();
         testLogger.info(`Stream '${streamName}' selected`);
@@ -2377,6 +2378,18 @@ export class PipelinesPage {
     async clearPipelineFieldSearch() {
         const searchInput = this.pipelineFieldSearchInput;
         await searchInput.fill('');
+        // Wait for the field list to fully repopulate after clearing the search.
+        // Quasar's filtered q-table may batch-render rows, so we check that
+        // rows have settled before counting.
+        await this.page.waitForFunction(() => {
+            const labels = document.querySelectorAll('.field_label');
+            // A reasonable minimum — if we were searching and had matches,
+            // after clearing we should see at least 30 fields (more than
+            // the initial batch of ~25 virtual rows).
+            return labels.length >= 30;
+        }, { timeout: 8000 }).catch(() => {
+            testLogger.info('Field list repopulation wait timed out — continuing with partial count');
+        });
         testLogger.info('Field list search cleared');
     }
 
