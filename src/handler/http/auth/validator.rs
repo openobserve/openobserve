@@ -366,7 +366,8 @@ pub async fn validate_credentials(
         return Ok(build_token_validation_response(&user));
     }
 
-    if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
+    if !user_password.is_empty()
+        && (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
     {
         return Ok(build_token_validation_response(&user));
