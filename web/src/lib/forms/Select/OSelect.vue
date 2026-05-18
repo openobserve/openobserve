@@ -839,6 +839,8 @@ const fieldWidthClass = computed(() => {
               'tw:bg-select-content-bg',
             ]"
             :style="dropdownStyle"
+            @click.stop
+            @pointerdown.stop
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"

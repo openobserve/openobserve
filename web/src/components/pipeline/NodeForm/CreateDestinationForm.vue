@@ -21,21 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="col-12 pipeline-add-remote-destination-form"
     >
       <!-- Stepper for Create New Destination -->
-      <q-stepper
+      <OStepper
         v-model="step"
         ref="stepper"
-        color="primary"
         animated
-        flat
-        class="modern-stepper"
       >
         <!-- Step 1: Choose Destination Type -->
-        <q-step
+        <OStep
           :name="1"
           title="Choose Type"
-          icon="category"
+          icon="edit"
           :done="step > 1"
-          :header-nav="step > 1"
+          :navigable="step > 1"
         >
           <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
@@ -74,15 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </q-step>
+        </OStep>
 
         <!-- Step 2: Connection Details -->
-        <q-step
+        <OStep
           :name="2"
           title="Connection"
-          icon="settings_ethernet"
+          icon="compare-arrows"
           :done="step > 2"
-          :header-nav="step > 2"
+          :navigable="step > 2"
         >
           <div class="text-subtitle2 q-mb-lg" style="font-weight: 500">
             Connection Details
@@ -442,8 +439,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </q-card-section>
           </q-card>
-        </q-step>
-      </q-stepper>
+        </OStep>
+      </OStepper>
 
       <!-- Form buttons -->
       <div class="flex justify-start q-mb-md">
@@ -508,6 +505,8 @@ import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -1371,39 +1370,6 @@ defineExpose({
   }
 }
 
-// Stepper Styles
-.modern-stepper {
-  box-shadow: none;
-
-  :deep(.q-stepper__header) {
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  :deep(.q-stepper__tab) {
-    padding: 16px 24px;
-  }
-
-  :deep(.q-stepper__tab--active) {
-    color: #1976d2;
-    font-weight: 600;
-  }
-
-  :deep(.q-stepper__tab--done) {
-    color: #4caf50;
-  }
-
-  :deep(.q-stepper__dot) {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-    background: var(--o2-primary-btn-bg);
-  }
-
-  :deep(.q-stepper__step-inner) {
-    padding: 10px 0;
-  }
-}
-
 // Connection Notes Card
 .connection-notes-card {
   border-radius: 8px;
@@ -1452,16 +1418,7 @@ defineExpose({
 </style>
 
 <style lang="scss">
-.pipeline-add-remote-destination-form .modern-stepper .q-stepper__tab {
-  padding: 5px 5px 15px 5px !important;
-  min-height: 35px !important;
-}
-
 .create-destination-form {
-  .q-stepper {
-    background: transparent !important;
-  }
-
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0.275rem 0 0 !important;
   }

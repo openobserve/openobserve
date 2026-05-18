@@ -4,14 +4,15 @@
  */
 
 import type { Component } from 'vue'
+import type { IconName } from '@/lib/core/Icon/OIcon.types'
 
 export interface OStepProps {
   /** Step identifier ΓÇö unique within the stepper, matched against OStepper's v-model */
   name: number
   /** Step header label shown in the indicator row */
   title: string
-  /** Lucide icon component shown in the step indicator (replaced by checkmark when done) */
-  icon?: Component | null
+  /** OIcon name string or Lucide component shown in the step indicator (replaced by checkmark when done) */
+  icon?: IconName | Component | null
   /** Marks this step as completed ΓÇö shows a checkmark. Typically :done="step > N". Default: false */
   done?: boolean
   /**

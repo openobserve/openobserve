@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         backgroundColor:
           store.state.theme === 'dark'
-            ? 'transparent'
+            ? 'var(--o2-header-menu-bg)'
             : 'var(--color-primary-100)',
       }"
       @click.stop="onDropDownClick"
@@ -68,7 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-panel-query-tab-visibility-${index}`"
               >
                 <OTooltip
-                  :content="dashboardPanelData.layout.hiddenQueries.includes(index) ? t('dashboard.showQueryResults') : t('dashboard.hideQueryResults')"
+                  :content="
+                    dashboardPanelData.layout.hiddenQueries.includes(index)
+                      ? t('dashboard.showQueryResults')
+                      : t('dashboard.hideQueryResults')
+                  "
                 />
               </OIcon>
               <OIcon
@@ -95,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
       </div>
-      <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0 ">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -105,7 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            <img :src="getImageURL('images/common/function.svg')" style="width: 16px; height: 16px" />
+            <img
+              :src="getImageURL('images/common/function.svg')"
+              :style="{
+                width: '16px',
+                height: '16px',
+                filter: store.state.theme === 'dark' ? 'invert(1)' : 'none',
+              }"
+            />
           </template>
         </OSwitch>
         <QueryTypeSelector></QueryTypeSelector>
@@ -284,7 +295,7 @@ export default defineComponent({
     OSwitch,
     OTooltip,
     OIcon,
-},
+  },
   emits: ["searchdata", "run-query"],
   methods: {
     searchData() {

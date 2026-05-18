@@ -134,10 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </tr>
               <tr>
                 <td>
-                  <OTime v-model="data.selectedDate.absolute.startTime" />
+                  <OTime class="tw:w-full" v-model="data.selectedDate.absolute.startTime" />
                 </td>
                 <td>
-                  <OTime v-model="data.selectedDate.absolute.endTime" />
+                  <OTime class="tw:w-full" v-model="data.selectedDate.absolute.endTime" />
                 </td>
               </tr>
             </table>
@@ -544,6 +544,11 @@ export default defineComponent({
 }
 
 .startEndTime {
+  width: calc(100% - 0.8rem);
+  margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  td {
+    width: 50%;
+  }
   .q-field {
     padding-bottom: 0.125rem;
   }

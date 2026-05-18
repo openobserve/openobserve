@@ -68,7 +68,7 @@ const contentStyle = computed(() => ({
 }));
 
 const contentClasses = computed(() => [
-  "tw:z-[7000] tw:px-2.5 tw:py-1.5",
+  "tw:z-[10100] tw:px-2.5 tw:py-1.5",
   "tw:bg-[var(--color-tooltip-bg)] tw:rounded-md",
   "tw:text-xs tw:text-[var(--color-tooltip-text)] tw:leading-relaxed",
   "tw:data-[state=delayed-open]:animate-in tw:data-[state=delayed-open]:fade-in-0 tw:data-[state=delayed-open]:zoom-in-95",
