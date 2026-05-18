@@ -74,9 +74,9 @@ vi.mock("@/components/rum/SearchBar.vue", () => ({
   },
 }));
 
-vi.mock("@/components/common/sidebar/FieldList.vue", () => ({
+vi.mock("@/components/common/sidebar/SearchFieldList.vue", () => ({
   default: {
-    name: "FieldList",
+    name: "SearchFieldList",
     template: '<div data-test="field-list">Field List</div>',
   },
 }));

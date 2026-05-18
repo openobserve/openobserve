@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #before>
           <div class="card-container tw:p-[0.325rem] tw:h-full">
-            <FieldList
+            <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
                 startTime: dateTime.startTime,
@@ -182,7 +182,7 @@ import {
   b64DecodeUnicode,
   b64EncodeUnicode,
 } from "@/utils/zincutils";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";

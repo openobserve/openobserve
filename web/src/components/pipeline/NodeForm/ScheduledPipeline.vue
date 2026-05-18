@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="flex: 1; min-height: 0; overflow: hidden"
                       class="pipeline-field-list-wrapper"
                     >
-                      <FieldList
+                      <GroupedFieldList
                         :fields="streamFields"
                         :theme="store.state.theme"
                         :show-pagination="false"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </template>
                           </FieldRow>
                         </template>
-                      </FieldList>
+                      </GroupedFieldList>
                     </div>
                   </div>
                 </div>
@@ -1163,7 +1163,7 @@ import DateTime from "@/components/DateTime.vue";
 
 import useLogs from "@/composables/useLogs";
 
-import FieldList from "@/components/common/FieldList.vue";
+import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
 import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import useStreams from "@/composables/useStreams";

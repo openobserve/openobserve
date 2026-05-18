@@ -62,12 +62,35 @@
         <div
           v-else
           class="o-field-list__row"
+          :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
+          :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
           @click="(e: MouseEvent) => onRowClick(row, e)"
           @dblclick="(e: MouseEvent) => onRowDblClick(row, e)"
+          @dragstart="(e: DragEvent) => onDragStart(row, e)"
+          @dragend="(e: DragEvent) => onDragEnd(row, e)"
+          @dragover.prevent
         >
           <div class="o-field-list__field-content">
-            <slot name="field-row" :row="row" :index="row._index">
+            <slot
+              name="field-row"
+              :row="row"
+              :index="row._index"
+              :draggable="draggable"
+              :is-drag-enabled="isDragEnabled(row, row._index ?? 0)"
+            >
+              <OIcon
+                v-if="draggable"
+                name="drag-indicator"
+                size="sm"
+                :class="[
+                  'o-field-list__drag-icon',
+                  isDragEnabled(row, row._index ?? 0)
+                    ? 'o-field-list__drag-icon--enabled'
+                    : 'o-field-list__drag-icon--disabled',
+                ]"
+                data-test="o-field-list-drag-indicator"
+              />
               <OIcon
                 :name="getTypeIcon(row.type)"
                 size="sm"
@@ -117,6 +140,9 @@ const props = withDefaults(
     showSearch?: boolean;
     showPagination?: boolean;
     expandedIds?: string[];
+    draggable?: boolean;
+    dragEnabledFn?: (row: FieldItem, index: number) => boolean;
+    sortFn?: (a: FieldItem, b: FieldItem) => number;
   }>(),
   {
     search: "",
@@ -129,6 +155,9 @@ const props = withDefaults(
     showSearch: true,
     showPagination: true,
     expandedIds: () => [],
+    draggable: false,
+    dragEnabledFn: undefined,
+    sortFn: undefined,
   },
 );
 
@@ -139,6 +168,8 @@ const emit = defineEmits<{
   "row-click": [row: FieldItem, event: MouseEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
+  "drag-start": [row: FieldItem, event: DragEvent];
+  "drag-end": [row: FieldItem, event: DragEvent];
 }>();
 
 const scrollContainerRef = ref<HTMLElement | null>(null);
@@ -175,19 +206,28 @@ function onSearchChange(value: string) {
 
 const filteredFields = computed(() => {
   const term = searchModel.value?.trim().toLowerCase();
-  if (!term) return props.fields;
+  let result: FieldItem[];
+  if (!term) {
+    result = props.fields;
+  } else {
+    result = props.fields.filter((row) => {
+      if (row.isGroup) {
+        return props.fields.some(
+          (f) =>
+            !f.isGroup &&
+            (f.group === row.group || f.stream === row.groupName) &&
+            f.name.toLowerCase().includes(term),
+        );
+      }
+      return row.name.toLowerCase().includes(term);
+    });
+  }
 
-  return props.fields.filter((row) => {
-    if (row.isGroup) {
-      return props.fields.some(
-        (f) =>
-          !f.isGroup &&
-          (f.group === row.group || f.stream === row.groupName) &&
-          f.name.toLowerCase().includes(term),
-      );
-    }
-    return row.name.toLowerCase().includes(term);
-  });
+  if (props.sortFn) {
+    result = [...result].sort(props.sortFn);
+  }
+
+  return result;
 });
 
 // ── Pagination ──────────────────────────────────────────────────────
@@ -266,6 +306,27 @@ watch(
 
 function isExpanded(row: FieldItem): boolean {
   return localExpandedIds.value.has(row.name);
+}
+
+// ── Drag-and-drop ───────────────────────────────────────────────────
+
+function isDragEnabled(row: FieldItem, index: number): boolean {
+  if (!props.draggable) return false;
+  if (row.isGroup) return false;
+  if (props.dragEnabledFn) return props.dragEnabledFn(row, index);
+  return true;
+}
+
+function onDragStart(row: FieldItem, event: DragEvent) {
+  if (!isDragEnabled(row, row._index ?? 0)) {
+    event.preventDefault();
+    return;
+  }
+  emit("drag-start", row, event);
+}
+
+function onDragEnd(row: FieldItem, event: DragEvent) {
+  emit("drag-end", row, event);
 }
 
 // ── Row events ──────────────────────────────────────────────────────
@@ -434,6 +495,25 @@ defineExpose({ scrollToTop });
     justify-content: center;
     width: 1rem;
     color: var(--o2-text-muted);
+  }
+
+  // ---------- drag icon ----------
+  &__drag-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    color: var(--o2-text-muted);
+
+    &--enabled {
+      cursor: grab;
+    }
+
+    &--disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
   }
 
   // ---------- field name (truncated) ----------

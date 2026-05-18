@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="index-table tw:h-[calc(100%-2.725rem)]!"
       data-test="log-search-index-list-fields-table"
     >
-      <FieldList
+      <GroupedFieldList
         ref="fieldListRef"
         :fields="normalizedFieldList"
         :search="searchObj.data.stream.filterField"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #after-list="bottomProps">
-          <FieldListPagination
+          <GroupedFieldListPagination
             data-test-prefix="traces-page"
             :current-page="bottomProps.currentPage"
             :pages-number="bottomProps.totalPages"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </FieldList>
+      </GroupedFieldList>
     </div>
   </div>
 </template>
@@ -194,8 +194,8 @@ export default defineComponent({
     OInput,
     OSpinner,
     OIcon,
-    FieldList: defineAsyncComponent(
-      () => import("@/components/common/FieldList.vue"),
+    GroupedFieldList: defineAsyncComponent(
+      () => import("@/components/common/GroupedFieldList.vue"),
     ),
     FieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
