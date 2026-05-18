@@ -250,18 +250,18 @@ export default class DashboardVariables {
     await nameInput.click();
     await nameInput.fill(variableName);
 
-    // Select stream type
+    // Select stream type — each OSelect forwards parent data-test to popover (`*-popover`) and options (`*-option`).
     await this.page.locator('[data-test="dashboard-variable-stream-type-select"]').click();
 
     // Wait for options to be available
-    await this.page.waitForSelector('[role="listbox"]', { state: 'visible', timeout: 15000 });
+    await this.page.waitForSelector('[data-test="dashboard-variable-stream-type-select-popover"]', { state: 'visible', timeout: 15000 });
 
     // Longer delay to ensure options are fully rendered (especially when tests run in parallel)
     await this.page.waitForTimeout(500);
 
     // Use JavaScript evaluation to click the option to avoid DOM detachment issues
     const clicked = await this.page.evaluate((streamTypeName) => {
-      const options = document.querySelectorAll('[role="option"]');
+      const options = document.querySelectorAll('[data-test="dashboard-variable-stream-type-select-option"]');
       for (const option of options) {
         if (option.textContent.trim() === streamTypeName) {
           option.click();
@@ -276,15 +276,17 @@ export default class DashboardVariables {
     }
 
     // Wait for dropdown to close with longer timeout
-    await this.page.waitForSelector('[role="listbox"]', { state: 'hidden', timeout: 10000 });
+    await this.page.waitForSelector('[data-test="dashboard-variable-stream-type-select-popover"]', { state: 'hidden', timeout: 10000 });
 
     // Select stream
     const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]');
     await streamSelector.click();
-    await this.page.waitForSelector('[role="listbox"]', { state: 'visible', timeout: 10000 });
+    await this.page.waitForSelector('[data-test="dashboard-variable-stream-select-popover"]', { state: 'visible', timeout: 10000 });
     await this.page.keyboard.type(stream, { delay: 50 });
 
-    const streamOption = this.page.getByRole("option", { name: stream, exact: true });
+    const streamOption = this.page
+      .locator('[data-test="dashboard-variable-stream-select-option"]', { hasText: stream })
+      .first();
     await streamOption.waitFor({ state: "visible", timeout: 5000 });
     await streamOption.click();
 
@@ -295,13 +297,15 @@ export default class DashboardVariables {
 
     await this.page.waitForFunction(
       () => {
-        const options = document.querySelectorAll('[role="option"]');
+        const options = document.querySelectorAll('[data-test="dashboard-variable-field-select-option"]');
         return options.length > 0;
       },
       { timeout: 10000, polling: 100 }
     );
 
-    const fieldOption = this.page.getByRole("option", { name: field, exact: true });
+    const fieldOption = this.page
+      .locator('[data-test="dashboard-variable-field-select-option"]', { hasText: field })
+      .first();
     await fieldOption.waitFor({ state: "visible", timeout: 5000 });
     await fieldOption.click();
 
@@ -399,8 +403,9 @@ export default class DashboardVariables {
     await variableInput.waitFor({ state: "visible", timeout: 10000 });
     await variableInput.click();
 
-    // Wait for dropdown to open
-    await this.page.waitForSelector('[role="listbox"]', { state: 'visible', timeout: 5000 });
+    // Wait for dropdown to open — OSelect popover for the variable selector
+    // is named `variable-selector-${name}-inner-popover` (VariableQueryValueSelector forwards data-test).
+    await this.page.waitForSelector(`[data-test="variable-selector-${variableName}-inner-popover"]`, { state: 'visible', timeout: 5000 });
   }
 
   /**

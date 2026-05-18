@@ -103,7 +103,8 @@ export class AlertsPage {
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
             advancedTabBtn: 'button:has-text("Advanced")',
-            visibleDropdownMenu: '[role="menu"]:visible',
+            // ODropdown content carries data-test="o-dropdown-content"
+            visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
 
             // Query Editor Dialog selectors
             // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
@@ -1835,8 +1836,10 @@ export class AlertsPage {
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
         const dataTest = AlertsPage.TAB_DATA_TESTS[tabName];
-        const selector = dataTest ? `[data-test="${dataTest}"]` : `[role="tab"]:has-text("${tabName}")`;
-        const tab = this.page.locator(selector);
+        if (!dataTest) {
+            throw new Error(`No data-test mapping for incident detail tab: ${tabName}. Add it to AlertsPage.TAB_DATA_TESTS and ensure the source tab has a matching data-test.`);
+        }
+        const tab = this.page.locator(`[data-test="${dataTest}"]`);
         await tab.first().waitFor({ state: 'visible', timeout: 10000 });
         await tab.first().click();
         await this.page.waitForTimeout(1500);
@@ -3414,7 +3417,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getConditionTab() {
-        return this.page.locator('[data-test*="condition"], [role="tab"]:has-text("Condition")');
+        return this.page.locator('[data-test*="condition"]');
     }
 
     /**

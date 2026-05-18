@@ -519,37 +519,35 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-attributes-table"
             >
               <template #field-dropdown="{ field, value: fieldValue }">
-                <q-item
-                  v-for="action in filterActions"
-                  :key="action.operator"
-                  clickable
-                  v-close-popup
-                  @click.stop="
-                    $emit('apply-filter-immediately', {
-                      field,
-                      value: getFilterValue(field, fieldValue),
-                      operator: action.operator,
-                    })
-                  "
-                >
-                  <q-item-section>
-                    <q-item-label>
-                      <span class="tw:mr-1 tw:inline-flex">
-                        <OButton variant="ghost" size="icon-xs-circle">
-                          <OIcon
-                            color="currentColor"
-                            class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                          >
-                            <component :is="action.iconComponent" />
-                          </OIcon>
-                        </OButton>
-                      </span>
-                      <span class="tw:text-[0.85rem]!">{{
-                        $t("traces.applyAndSearch")
-                      }}</span>
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
+                <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                  <li
+                    v-for="action in filterActions"
+                    :key="action.operator"
+                    :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
+                    class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                    @click.stop="
+                      $emit('apply-filter-immediately', {
+                        field,
+                        value: getFilterValue(field, fieldValue),
+                        operator: action.operator,
+                      })
+                    "
+                  >
+                    <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                      <OButton variant="ghost" size="icon-xs-circle">
+                        <OIcon
+                          color="currentColor"
+                          class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                        >
+                          <component :is="action.iconComponent" />
+                        </OIcon>
+                      </OButton>
+                    </span>
+                    <span class="tw:text-[0.85rem]!">{{
+                      $t("traces.applyAndSearch")
+                    }}</span>
+                  </li>
+                </ul>
               </template>
             </json-preview>
           </div>
@@ -578,37 +576,35 @@ class="tw:h-5! tw:text-[0.75rem]!">
               <template #cell-value="{ item }">
                 <AttributeValueCell :field="item.field" :value="item.value">
                   <template #dropdown="{ field, value: fieldValue }">
-                    <q-item
-                      v-for="action in filterActions"
-                      :key="action.operator"
-                      clickable
-                      v-close-popup
-                      @click.stop="
-                        $emit('apply-filter-immediately', {
-                          field,
-                          value: getFilterValue(field, fieldValue),
-                          operator: action.operator,
-                        })
-                      "
-                    >
-                      <q-item-section>
-                        <q-item-label>
-                          <span class="tw:mr-1 tw:inline-flex">
-                            <OButton variant="ghost" size="icon-xs-circle">
-                              <OIcon
-                                color="currentColor"
-                                class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                              >
-                                <component :is="action.iconComponent" />
-                              </OIcon>
-                            </OButton>
-                          </span>
-                          <span class="tw:text-[0.85rem]!">{{
-                            $t("traces.applyAndSearch")
-                          }}</span>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
+                    <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                      <li
+                        v-for="action in filterActions"
+                        :key="action.operator"
+                        :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
+                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                        @click.stop="
+                          $emit('apply-filter-immediately', {
+                            field,
+                            value: getFilterValue(field, fieldValue),
+                            operator: action.operator,
+                          })
+                        "
+                      >
+                        <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                          <OButton variant="ghost" size="icon-xs-circle">
+                            <OIcon
+                              color="currentColor"
+                              class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                            >
+                              <component :is="action.iconComponent" />
+                            </OIcon>
+                          </OButton>
+                        </span>
+                        <span class="tw:text-[0.85rem]!">{{
+                          $t("traces.applyAndSearch")
+                        }}</span>
+                      </li>
+                    </ul>
                   </template>
                 </AttributeValueCell>
               </template>

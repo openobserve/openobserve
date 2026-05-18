@@ -23,11 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
         size="lg"
-      >
-        <template #tooltip>
-          <OTooltip :content="t('search.toggleFunctionEditor')" :side-offset="2" />
-        </template>
-      </OSwitch>
+      />
+      <OTooltip :content="t('search.toggleFunctionEditor')" :side-offset="2" />
     </div>
     <ODropdown v-model:open="functionModel" side="bottom" align="start">
       <template #trigger>
@@ -41,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
         </OButton>
       </template>
-      <q-list data-test="logs-search-saved-function-list" class="tw:py-0">
+      <div data-test="logs-search-saved-function-list" class="tw:py-0">
         <!-- Search Input -->
         <div>
           <OInput
@@ -58,17 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="filteredFunctionOptions.length">
-          <q-item
-            class="tw:border-b saved-view-item"
-            clickable
+          <ODropdownItem
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
-            @click="applyFunction(item, true)"
+            :data-test="`logs-search-saved-function-${item.name}`"
+            class="tw:border-b saved-view-item"
+            @select="applyFunction(item, true)"
           >
-            <q-item-section>
-              <q-item-label>{{ item.name }}</q-item-label>
-            </q-item-section>
-          </q-item>
+            {{ item.name }}
+          </ODropdownItem>
         </div>
         <div v-else>
           <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
@@ -79,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-list>
+      </div>
     </ODropdown>
     <OButton
       data-test="logs-search-bar-save-function-btn"
@@ -99,6 +94,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

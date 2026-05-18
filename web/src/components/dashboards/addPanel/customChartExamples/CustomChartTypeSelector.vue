@@ -70,25 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
           <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
-          <q-list dense>
-            <q-item
+          <ul class="chart-category-list tw:flex tw:flex-col">
+            <li
               v-for="(category, index) in chartCategories"
               :key="index"
-              clickable
-              v-ripple
-              :active="selectedCategory === category.chartLabel"
               @click="scrollToCategory(category.chartLabel)"
-              class="sidebar-item"
+              class="sidebar-item tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer"
               :class="{
                 'active-category': selectedCategory === category.chartLabel,
               }"
               data-test="chart-category-item"
             >
-              <q-item-section>
-                <q-item-label>{{ category.chartLabel }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
+              <span class="tw:text-sm">{{ category.chartLabel }}</span>
+            </li>
+          </ul>
         </q-card>
 
         <!-- Right Content Area -->
@@ -353,6 +348,12 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .sidebar {
+  .chart-category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
   .sidebar-item {
     border-radius: 4px;
     margin-bottom: 4px;

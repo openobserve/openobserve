@@ -235,9 +235,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('alerts.placeholders.savedFunctions')"
                       >
                         <template #empty>
-                          <q-item>
-                            <q-item-section>{{ t("search.noResult") }}</q-item-section>
-                          </q-item>
+                          <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                            {{ t("search.noResult") }}
+                          </div>
                         </template>
                       </OSelect>
                       <!-- Apply VRL -->

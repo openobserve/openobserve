@@ -23,19 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #prepend><OIcon name="search" size="sm" /></template>
       </OInput>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
-        <q-list dense>
-          <q-item
+        <ul class="tw:flex tw:flex-col">
+          <li
             v-for="(item, index) in filteredSelected"
             :key="item.value"
-            clickable
+            data-test="dual-list-selector-left-item"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            :class="{ 'tw:bg-muted/30': leftSelected.includes(item.value) }"
             @click="toggleLeftSelection(item.value)"
-            :active="leftSelected.includes(item.value)"
           >
-            <q-item-section avatar>
+            <div class="tw:flex tw:items-center tw:shrink-0">
               <span class="tw:text-xs tw:font-bold">{{ index + 1 }}</span>
-            </q-item-section>
-            <q-item-section>{{ item.label }}</q-item-section>
-            <q-item-section side>
+            </div>
+            <div class="tw:flex tw:flex-1 tw:min-w-0 tw:text-sm">{{ item.label }}</div>
+            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
               <div class="tw:flex tw:gap-1">
                 <OButton
                   variant="ghost"
@@ -61,15 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="delete" size="xs" />
                 </OButton>
               </div>
-            </q-item-section>
-          </q-item>
-          <div
+            </div>
+          </li>
+          <li
             v-if="filteredSelected.length === 0"
             class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-grey-6 tw:text-center tw:text-sm tw:justify-center"
           >
             No items selected
-          </div>
-        </q-list>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -120,29 +121,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #prepend><OIcon name="search" size="sm" /></template>
       </OInput>
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
-        <q-list dense>
-          <q-item
+        <ul class="tw:flex tw:flex-col">
+          <li
             v-for="item in filteredAvailable"
             :key="item.value"
-            clickable
+            data-test="dual-list-selector-right-item"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            :class="{ 'tw:bg-muted/30': rightSelected.includes(item.value) }"
             @click="toggleRightSelection(item.value)"
-            :active="rightSelected.includes(item.value)"
           >
-            <q-item-section>
+            <div class="tw:flex tw:items-center tw:shrink-0">
               <OCheckbox
                 :model-value="rightSelected.includes(item.value)"
                 @click.stop="toggleRightSelection(item.value)"
               />
-            </q-item-section>
-            <q-item-section>{{ item.label }}</q-item-section>
-          </q-item>
-          <div
+            </div>
+            <div class="tw:flex tw:flex-1 tw:min-w-0 tw:text-sm">{{ item.label }}</div>
+          </li>
+          <li
             v-if="filteredAvailable.length === 0"
             class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-grey-6 tw:text-center tw:text-sm tw:justify-center"
           >
             No items available
-          </div>
-        </q-list>
+          </li>
+        </ul>
       </div>
     </div>
   </div>

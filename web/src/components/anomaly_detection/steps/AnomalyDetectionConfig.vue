@@ -74,15 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @filter="filterFieldOptions"
               >
                 <template #no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">
-                      {{
-                        config.stream_name
-                          ? t("alerts.anomaly.noFieldsFound")
-                          : t("alerts.anomaly.selectStreamFirst")
-                      }}
-                    </q-item-section>
-                  </q-item>
+                  <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                    {{
+                      config.stream_name
+                        ? t("alerts.anomaly.noFieldsFound")
+                        : t("alerts.anomaly.selectStreamFirst")
+                    }}
+                  </div>
                 </template>
               </OSelect>
               <OSelect
@@ -224,15 +222,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @filter="filterDetectionFieldOptions"
               >
                 <template #no-option>
-                  <q-item>
-                    <q-item-section class="text-grey">
-                      {{
-                        config.stream_name
-                          ? t("alerts.anomaly.noFieldsFound")
-                          : t("alerts.anomaly.selectStreamFirst")
-                      }}
-                    </q-item-section>
-                  </q-item>
+                  <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                    {{
+                      config.stream_name
+                        ? t("alerts.anomaly.noFieldsFound")
+                        : t("alerts.anomaly.selectStreamFirst")
+                    }}
+                  </div>
                 </template>
               </OSelect>
             </div>

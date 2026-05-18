@@ -303,10 +303,10 @@ export default class DashboardPanelTime {
 
     // Wait for any existing dropdowns to close (.date-time-dialog wrapper still
     // exists post-migration on the ODropdown content wrapper; .q-menu is the
-    // legacy popup covers the new ODropdown)
+    // legacy popup covers the new ODropdown; ODropdown content carries data-test="o-dropdown-content")
     await this.page.locator('.date-time-dialog').waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
     await this.page.locator('.q-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
-    await this.page.locator('[role="menu"][data-state="open"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+    await this.page.locator('[data-test="o-dropdown-content"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
     // Wait for network to settle before clicking
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

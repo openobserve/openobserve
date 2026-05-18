@@ -828,9 +828,9 @@ export default defineComponent({
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
 
-    const triggerExpand = (props: any) => {
+    const triggerExpand = (row: any) => {
       // Open drawer instead of inline expansion
-      const alert = props.row;
+      const alert = row;
 
       // LAZY CONVERSION: Convert conditions on-demand only when expanding
       // This improves performance by avoiding conversion of all alerts on list load

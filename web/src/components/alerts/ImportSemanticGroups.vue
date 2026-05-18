@@ -122,28 +122,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
               </div>
-              <q-list dense bordered separator class="compact-list">
-                <q-item
+              <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <li
                   v-for="group in diffData.additions"
                   :key="group.id"
-                  clickable
+                  data-test="semantic-groups-addition-item"
+                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer hover:tw:bg-muted/50"
                   @click="toggleAddition(group.id)"
-                  class="compact-item"
                 >
-                  <q-item-section side top>
+                  <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
                     <OCheckbox
                       :model-value="selectedAdditions.includes(group.id)"
                       @update:model-value="toggleAddition(group.id)"
                     />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
-                    <q-item-label caption lines="1">
+                  </div>
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:px-2">
+                    <span class="tw:text-[13px] tw:font-medium">{{ group.display }}</span>
+                    <span class="tw:block tw:text-[11px] tw:text-muted-foreground tw:truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
                       <OBadge v-if="group.normalize" variant="primary" class="q-ml-xs">norm</OBadge>
-                    </q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
+                    </span>
+                  </div>
+                  <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -151,9 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="visibility" size="sm" />
                     </OButton>
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                  </div>
+                </li>
+              </ul>
             </div>
 
             <!-- Modifications -->
@@ -162,27 +162,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
               </div>
-              <q-list dense bordered separator class="compact-list">
-                <q-item
+              <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
-                  clickable
+                  data-test="semantic-groups-modification-item"
+                  class="compact-item tw:flex tw:items-start tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px] tw:cursor-pointer hover:tw:bg-muted/50"
                   @click="toggleModification(mod.proposed.id)"
-                  class="compact-item"
                 >
-                  <q-item-section side top>
+                  <div class="tw:flex tw:items-start tw:shrink-0 tw:pt-1">
                     <OCheckbox
                       :model-value="selectedModifications.includes(mod.proposed.id)"
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ mod.proposed.display }}</q-item-label>
-                    <q-item-label caption lines="1">
+                  </div>
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:px-2">
+                    <span class="tw:text-[13px] tw:font-medium">{{ mod.proposed.display }}</span>
+                    <span class="tw:block tw:text-[11px] tw:text-muted-foreground tw:truncate">
                       {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
-                    </q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
+                    </span>
+                  </div>
+                  <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -190,9 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="compare" size="sm" />
                     </OButton>
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                  </div>
+                </li>
+              </ul>
             </div>
 
             <!-- Unchanged (Collapsed) -->
@@ -614,18 +614,6 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 .compact-item {
   min-height: 44px;
   padding: 4px 8px;
-
-  :deep(.q-item__section--main) {
-    padding: 0 8px;
-  }
-
-  :deep(.q-item__label) {
-    font-size: 13px;
-  }
-
-  :deep(.q-item__label--caption) {
-    font-size: 11px;
-  }
 }
 
 .field-chips-container {

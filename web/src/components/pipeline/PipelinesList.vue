@@ -193,7 +193,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="more-vert"
                     />
                   </template>
-                  <ODropdownItem @select="exportPipeline(row)">
+                  <ODropdownItem
+                    :data-test="`pipeline-list-${row.name}-export-action`"
+                    @select="exportPipeline(row)"
+                  >
                     <template #icon-left>
                       <OIcon size="sm" name="download" />
                     </template>
@@ -210,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row.source.source_type === 'scheduled' &&
                       config.isEnterprise == 'true'
                     "
+                    :data-test="`pipeline-list-${row.name}-backfill-action`"
                     @select="openBackfillDialog(row)"
                   >
                     <template #icon-left>
@@ -218,14 +222,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Create Backfill
                   </ODropdownItem>
                   <ODropdownSeparator />
-                  <ODropdownItem variant="destructive" @select="openDeleteDialog(row)">
+                  <ODropdownItem
+                    :data-test="`pipeline-list-${row.name}-delete-action`"
+                    variant="destructive"
+                    @select="openDeleteDialog(row)"
+                  >
                     <template #icon-left>
                       <OIcon name="delete" size="sm" />
                     </template>
                     {{ t("pipeline.delete") }}
                   </ODropdownItem>
                   <ODropdownSeparator v-if="row.last_error" />
-                  <ODropdownItem v-if="row.last_error" @select="showErrorDialog(row)">
+                  <ODropdownItem
+                    v-if="row.last_error"
+                    :data-test="`pipeline-list-${row.name}-view-error-action`"
+                    @select="showErrorDialog(row)"
+                  >
                     <template #icon-left>
                       <OIcon size="sm" name="error" />
                     </template>

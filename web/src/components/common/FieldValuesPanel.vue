@@ -117,11 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field values list -->
-      <div v-for="value in displayValues" :key="value.key">
-        <q-list dense>
-          <q-item
-            tag="label"
-            class="q-pr-none"
+      <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+        <li v-for="value in displayValues" :key="value.key">
+          <label
+            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
             <!-- Checkbox for multi-select — uses :model-value + @update to
@@ -131,13 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="showMultiSelect"
               :model-value="selectedValues"
               :value="value.key"
-              class="q-mr-xs"
+              class="tw:shrink-0"
               @update:model-value="handleUserCheckboxChange"
               @click.stop
             />
 
             <div
-              class="flex row wrap justify-between"
+              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0"
               :style="
                 showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
               "
@@ -158,9 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ formatLargeNumber(value.count) }}
               </div>
             </div>
-          </q-item>
-        </q-list>
-      </div>
+          </label>
+        </li>
+      </ul>
     </div>
 
     <!-- View more values / loading more indicator -->

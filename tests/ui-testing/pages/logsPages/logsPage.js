@@ -198,7 +198,7 @@ export class LogsPage {
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
-        this.shareLinkTooltip = '[role="tooltip"], .q-tooltip';
+        this.shareLinkTooltip = '[data-test="o-tooltip-content"]';
         this.successNotification = '.q-notification__message';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
@@ -228,6 +228,7 @@ export class LogsPage {
         this.applyDimensionFiltersEmbedded = '[data-test="apply-dimension-filters-embedded"]';
         this.metricSelectorButton = '[data-test="metric-selector-button"]';
         // Correlation tabs in detail drawer (tab names, not data-test)
+        // TODO(data-test): Reka Tabs render real ARIA roles; add data-test to the correlation tabs in web/src/plugins/logs/JsonPreview.vue (and AppTabs.vue if needed) — currently only flattened/unflattened exist; the trace details sidebar uses data-test="trace-details-sidebar-tabs-correlated-logs/metrics".
         this.correlatedLogsTab = '[role="tablist"] [role="tab"]:has-text("Logs"):not([data-test="log-detail-json-tab"]):not([data-test="log-detail-table-tab"])';
         this.correlatedMetricsTab = '[role="tab"]:has-text("Metrics")';
         this.correlatedTracesTab = '[role="tab"]:has-text("Traces")';
@@ -2666,7 +2667,7 @@ export class LogsPage {
         // Wait for tabs to appear - correlation tabs are enterprise feature
         await this.page.waitForTimeout(2000);
 
-        // Check for correlation tabs by looking for tabs with specific text
+        // TODO(data-test): Reka Tabs render real ARIA roles; add data-test on each correlation tab in web/src/plugins/logs/JsonPreview.vue so we don't need to rely on hasText filters.
         const logsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' });
         const metricsTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
         const tracesTab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
@@ -2682,6 +2683,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedLogsTab() {
+        // TODO(data-test): add data-test to correlated-logs tab in web/src/plugins/logs/JsonPreview.vue (or wherever correlation tabs render)
         const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Logs' }).last();
         await tab.click();
         testLogger.info('Clicked Correlated Logs tab');
@@ -2693,6 +2695,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedMetricsTab() {
+        // TODO(data-test): add data-test to correlated-metrics tab in web/src/plugins/logs/JsonPreview.vue (or wherever correlation tabs render)
         const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Metrics' });
         await tab.click();
         testLogger.info('Clicked Correlated Metrics tab');
@@ -2704,6 +2707,7 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickCorrelatedTracesTab() {
+        // TODO(data-test): add data-test to correlated-traces tab in web/src/plugins/logs/JsonPreview.vue (or wherever correlation tabs render)
         const tab = this.page.locator('[role="tablist"]').locator('[role="tab"]').filter({ hasText: 'Traces' });
         await tab.click();
         testLogger.info('Clicked Correlated Traces tab');
@@ -2759,7 +2763,8 @@ export class LogsPage {
     }
 
     async expectNoContextMenuVisible() {
-        const contextMenu = this.page.locator('[role="menu"]:visible');
+        // ODropdown content carries data-test="o-dropdown-content"
+        const contextMenu = this.page.locator('[data-test="o-dropdown-content"]:visible');
         await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
         testLogger.info('No context menu visible');
     }
@@ -3926,7 +3931,7 @@ export class LogsPage {
 
         if (isQuickModeOn) {
             testLogger.info('Quick Mode is ON - turning it OFF for include/exclude functionality');
-            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
             await this.page.waitForTimeout(1000);
         } else {
             testLogger.info('Quick Mode is already OFF');
@@ -4155,7 +4160,7 @@ export class LogsPage {
         const isOn = await toggleInner.evaluate(node => node.classList.contains('q-toggle__inner--truthy')).catch(() => false);
 
         if (desiredState !== isOn) {
-            await this.page.locator(this.quickModeToggle).locator('[role="switch"]').click();
+            await this.page.locator('[data-test="logs-search-bar-quick-mode-toggle"]').click();
             await this.page.waitForTimeout(500);
         }
         await this.page.keyboard.press('Escape');
@@ -4447,7 +4452,8 @@ export class LogsPage {
      */
     async isTooltipVisible(timeout = 3000) {
         try {
-            await this.page.locator('[role="tooltip"], .q-tooltip').first().waitFor({
+            // TODO(data-test): OTooltip (reka-ui TooltipContent) has no data-test; add one in web/src/lib/overlay/Tooltip/OTooltip.vue to remove role="tooltip" fallback.
+            await this.page.locator('[role="tooltip"]').first().waitFor({
                 state: 'visible',
                 timeout
             });
@@ -4469,7 +4475,8 @@ export class LogsPage {
      */
     async getTooltipText(timeout = 3000) {
         try {
-            return await this.page.locator('[role="tooltip"], .q-tooltip').first().textContent({ timeout });
+            // TODO(data-test): OTooltip (reka-ui TooltipContent) has no data-test; add one in web/src/lib/overlay/Tooltip/OTooltip.vue to remove role="tooltip" fallback.
+            return await this.page.locator('[role="tooltip"]').first().textContent({ timeout });
         } catch {
             return null;
         }
@@ -6724,7 +6731,8 @@ export class LogsPage {
      * Get tooltip element
      */
     async getTooltip() {
-        return this.page.locator('.q-tooltip, .q-menu, [role="tooltip"]').first();
+        // TODO(data-test): OTooltip / ODropdown overlays need data-test attributes; using role="tooltip" fallback for now.
+        return this.page.locator('[role="tooltip"]').first();
     }
 
     /**

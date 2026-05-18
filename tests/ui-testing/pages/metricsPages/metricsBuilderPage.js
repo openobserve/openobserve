@@ -225,7 +225,7 @@ export class MetricsBuilderPage {
 
     /**
      * Open label filter menu at index. LabelFilterEditor chip menu is now an
-     * ODropdown ([role="menu"][data-state="open"]) — fall back to legacy .q-menu.
+     * ODropdown — falls back to legacy .q-menu until source exposes a data-test.
      * @param {number} index - 0-based index
      */
     async openLabelFilterMenu(index) {
@@ -236,8 +236,8 @@ export class MetricsBuilderPage {
 
     /**
      * Select a label name from the label filter dropdown. Inside the migrated
-     * ODropdown, the label picker is an OSelect (Reka Listbox) — options carry
-     * role="option". Fall back to legacy .q-menu .q-item for q-select.
+     * ODropdown, the label picker is an OSelect (Reka Listbox). Falls back to
+     * legacy .q-menu .q-item for q-select until OSelect forwards a data-test.
      * @param {string} labelName
      */
     async selectLabel(labelName) {
@@ -541,14 +541,17 @@ export class MetricsBuilderPage {
         const qtSelect = this.page.locator(this.queryTypeSelect);
         if (await qtSelect.isVisible({ timeout: 3000 })) {
             await qtSelect.click();
-            // OSelect (Reka Listbox) post-migration, q-select pre-migration
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+            // OSelect forwards its parent data-test (`${parentDataTest}-popover`)
+            const popover = this.page.locator('[data-test="dashboard-promql-builder-query-type-popover"]');
+            await popover.waitFor({ state: 'visible', timeout: 5000 });
 
             const label = queryType === 'range' ? 'Range' : 'Instant';
-            const option = this.page.locator(`[role="option"]:has-text("${label}"), .q-menu .q-item:has-text("${label}")`).first();
+            const option = this.page
+                .locator('[data-test="dashboard-promql-builder-query-type-option"]', { hasText: label })
+                .first();
             if (await option.isVisible({ timeout: 3000 })) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }

@@ -146,18 +146,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-subtitle2 text-weight-bold q-mb-sm">
                     Source Map Files ({{ props.row.files.length }})
                   </div>
-                  <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
-                    <q-item v-for="(file, index) in props.row.files" :key="index">
-                      <q-item-section>
-                        <q-item-label caption>Source File</q-item-label>
-                        <q-item-label class="text-code">{{ file.source_file_name }}</q-item-label>
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label caption>Source Map File</q-item-label>
-                        <q-item-label class="text-code">{{ file.source_map_file_name }}</q-item-label>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
+                  <ul
+                    class="rounded-borders tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                    style="max-height: 400px; overflow-y: auto;"
+                  >
+                    <li
+                      v-for="(file, index) in props.row.files"
+                      :key="index"
+                      data-test="source-maps-file-item"
+                      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                    >
+                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                        <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
+                        <span class="text-code tw:text-sm">{{ file.source_file_name }}</span>
+                      </div>
+                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                        <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
+                        <span class="text-code tw:text-sm">{{ file.source_map_file_name }}</span>
+                      </div>
+                    </li>
+                  </ul>
                 </div>
               </q-td>
             </q-tr>

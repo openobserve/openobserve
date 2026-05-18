@@ -80,11 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #empty>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    No alerts found
-                  </q-item-section>
-                </q-item>
+                <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                  No alerts found
+                </div>
               </template>
             </OSelect>
             <OButton

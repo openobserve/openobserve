@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :name="tab.name"
           :label="tab.label"
           :icon="tab.icon"
+          :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
           class="tw:min-h-[3rem]"
         />
       </OTabs>

@@ -969,7 +969,8 @@ export class AlertCreationWizard {
         // Attempt 3: Try clicking on the operator area and selecting from dropdown
         if (!toggleSuccessful) {
             try {
-                const operatorSelect = this.page.locator('.step-conditions .alert-conditions-operator, .step-conditions .condition-operator-toggle, .step-conditions button:has-text("AND"):not([role="tab"]), .step-conditions [class*="operator-toggle"]').first();
+                // TODO(data-test): step-conditions AND/OR operator toggle has no stable data-test in web/src/components/alerts/conditions/; add one to the operator toggle button to drop these class/text fallbacks.
+                const operatorSelect = this.page.locator('.step-conditions .alert-conditions-operator, .step-conditions .condition-operator-toggle, .step-conditions [class*="operator-toggle"]').first();
                 if (await operatorSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
                     await operatorSelect.click();
                     await this.page.waitForTimeout(500);

@@ -196,44 +196,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('common.resources')" />
                 </OButton>
               </template>
-              <q-list
-                dense
+              <div
                 class="tw:min-w-[12rem]!"
                 data-test="service-graph-node-panel-workload-fields-menu"
               >
                 <template v-for="env in detectedEnvironments" :key="env.key">
-                  <q-item-label
-                    header
-                    class="tw:text-xs tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide"
+                  <div
+                    class="tw:text-xs tw:px-3 tw:pb-0 tw:py-[0.375rem]! tw:uppercase tw:tracking-wide tw:text-muted-foreground"
                   >
                     {{ env.label }}
-                  </q-item-label>
-                  <q-item
+                  </div>
+                  <ODropdownItem
                     v-for="cfg in availableResourceTabConfigs.filter(
                       (c) => c.environment === env.key,
                     )"
                     :key="cfg.id"
-                    tag="label"
-                    clickable
                     :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
                     class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
+                    @select="(e) => { e.preventDefault(); toggleWorkloadField(cfg.id); }"
                   >
-                    <q-item-section side class="tw:pr-[0rem]!">
-                      <OCheckbox
-                        v-model="selectedWorkloadFields"
-                        :value="cfg.id"
-                        size="xs"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="tw:text-xs">
-                        {{ cfg.label }}
-                        <OTooltip :content="cfg.groupField" />
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
+                    <template #icon-left>
+                      <span @click.stop>
+                        <OCheckbox
+                          v-model="selectedWorkloadFields"
+                          :value="cfg.id"
+                          size="xs"
+                        />
+                      </span>
+                    </template>
+                    <span class="tw:text-xs">
+                      {{ cfg.label }}
+                      <OTooltip :content="cfg.groupField" />
+                    </span>
+                  </ODropdownItem>
                 </template>
-              </q-list>
+              </div>
             </ODropdown>
           </div>
           <OTabPanels v-model="activeTab" animated>
@@ -1243,6 +1240,16 @@ export default defineComponent({
     // IDs of alias entries the user has checked in the dropdown
     const selectedWorkloadFields = ref<string[]>([]);
 
+    // Toggle a workload field id in the selected set — invoked when the user
+    // selects the surrounding ODropdownItem (in addition to clicking the
+    // OCheckbox directly).
+    const toggleWorkloadField = (id: string) => {
+      const current = selectedWorkloadFields.value;
+      selectedWorkloadFields.value = current.includes(id)
+        ? current.filter((entry) => entry !== id)
+        : [...current, id];
+    };
+
     // Computed: Service Metrics
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
@@ -2093,6 +2100,7 @@ export default defineComponent({
       // Workload Field Discovery
       resolvedWorkloadFields,
       selectedWorkloadFields,
+      toggleWorkloadField,
       // Metrics Tab
       metricsCorrelationLoading,
       metricsCorrelationError,

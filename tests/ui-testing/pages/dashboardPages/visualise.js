@@ -222,11 +222,9 @@ export default class LogsVisualise {
     await this.page
       .locator('[data-test="log-search-index-list-select-stream"]')
       .click({ force: true });
-    // Stream picker is OSelect (Reka Listbox role=option) post-migration;
-    // legacy q-select uses div.q-item.
+    // OSelect forwards parent data-test to ListboxItems (`*-option`).
     await this.page
-      .locator('[role="option"], div.q-item')
-      .getByText(`${stream}`)
+      .locator('[data-test="log-search-index-list-select-stream-option"]', { hasText: stream })
       .first()
       .click();
   }

@@ -72,46 +72,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ filteredDashboards.length }} dashboard(s) available
           </div>
 
-          <q-list
-            :bordered="filteredDashboards.length > 0"
-            dense
-            class="rounded-borders dashboard-list tw:my-2"
+          <ul
+            class="dashboard-list tw:my-2 tw:flex tw:flex-col tw:rounded"
+            :class="filteredDashboards.length > 0 ? 'tw:border tw:border-border' : ''"
           >
-            <q-item
+            <li
               v-for="dashboard in filteredDashboards"
               :key="dashboard.name"
-              clickable
-              v-ripple
-              dense
               @click="toggleDashboard(dashboard)"
-              class="tw:py-1 tw:transition-colors tw:duration-200"
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'selected-item tw:bg-primary/5 tw:border-l-4 tw:border-primary'
-                  : 'tw:border-l-4 tw:border-transparent hover:tw:bg-gray-50',
+                  ? 'selected-item tw:bg-primary/5 tw:border-primary'
+                  : 'tw:border-transparent hover:tw:bg-gray-50',
               ]"
               data-test="add-dashboard-github-item"
             >
-              <q-item-section side class="tw:pr-2">
+              <div class="tw:shrink-0 tw:pr-2">
                 <OCheckbox
                   :model-value="isSelected(dashboard)"
                   @update:model-value="toggleDashboard(dashboard)"
                 />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="text-weight-medium tw:text-sm">
+              </div>
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm tw:font-medium">
                   {{ dashboard.displayName }}
-                </q-item-label>
-                <q-item-label
-                  caption
+                </span>
+                <span
                   v-if="dashboard.description"
-                  class="tw:text-xs"
+                  class="tw:block tw:text-xs tw:text-muted-foreground"
                 >
                   {{ dashboard.description }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
+                </span>
+              </div>
+            </li>
+          </ul>
         </div>
 
     <!-- Folder Selection Dialog -->
@@ -578,19 +573,22 @@ export default defineComponent({
 .dashboard-list {
   max-height: calc(100dvh - 230px);
   overflow-y: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 
   .selected-item {
     background-color: var(--o2-tab-bg) !important;
   }
 
   .body--light & {
-    .q-item:hover:not(.selected-item) {
+    li:hover:not(.selected-item) {
       background-color: var(--o2-hover-gray);
     }
   }
 
   .body--dark & {
-    .q-item:hover:not(.selected-item) {
+    li:hover:not(.selected-item) {
       background-color: var(--o2-hover-gray);
     }
   }
