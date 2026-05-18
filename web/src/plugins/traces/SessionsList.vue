@@ -335,7 +335,7 @@ const tableColumns = computed(() => [
     accessorKey: "turns",
     size: 90,
     enableSorting: false,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "center" },
   },
   {
     id: "durationNanos",
@@ -343,15 +343,15 @@ const tableColumns = computed(() => [
     accessorKey: "durationNanos",
     size: 120,
     enableSorting: false,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "center" },
   },
   {
     id: "tokens",
     header: t('traces.sessionsList.columns.tokens'),
     accessorKey: "tokens",
-    size: 110,
+    size: 250,
     enableSorting: false,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "center" },
   },
   {
     id: "cost",
@@ -359,7 +359,7 @@ const tableColumns = computed(() => [
     accessorKey: "cost",
     size: 100,
     enableSorting: false,
-    meta: { slot: true, align: "right" },
+    meta: { slot: true, align: "center" },
   },
   {
     id: "status",
@@ -367,7 +367,7 @@ const tableColumns = computed(() => [
     accessorKey: "status",
     size: 100,
     enableSorting: false,
-    meta: { slot: true, align: "left", disableCellAction: true },
+    meta: { slot: true, align: "center", disableCellAction: true },
   },
 ]);
 
