@@ -229,9 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
-                      <q-item-label>{{
+                      <span class="tw:text-sm">{{
                         searchObj.data.additionalErrorMsg
-                      }}</q-item-label>
+                      }}</span>
                     </div>
                   </div>
                   <div

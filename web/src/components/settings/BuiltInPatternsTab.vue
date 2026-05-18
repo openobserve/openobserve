@@ -88,26 +88,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pattern Cards -->
-        <q-list bordered separator>
-          <q-item
+        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+          <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="pattern-item"
+            class="pattern-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
             :data-test="`pattern-item-${index}`"
           >
-            <q-item-section side>
+            <div class="tw:flex tw:items-center tw:shrink-0">
               <OCheckbox
                 v-model="pattern.selected"
                 @update:model-value="updateSelection"
                 :data-test="`pattern-checkbox-${index}`"
               />
-            </q-item-section>
+            </div>
 
-            <q-item-section>
-              <q-item-label class="text-weight-bold">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+              <span class="tw:text-sm tw:font-bold">
                 {{ pattern.name }}
-              </q-item-label>
-              <q-item-label caption lines="2">
+              </span>
+              <span class="tw:block tw:text-xs tw:text-muted-foreground tw:line-clamp-2">
                 <div class="q-mb-xs">
                   <OBadge
                     v-for="tag in pattern.tags.slice(0, 3)"
@@ -125,10 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ pattern.pattern.substring(0, 100)
                   }}{{ pattern.pattern.length > 100 ? "..." : "" }}
                 </div>
-              </q-item-label>
-            </q-item-section>
+              </span>
+            </div>
 
-            <q-item-section side>
+            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
               <OButton
                 variant="ghost"
                 size="icon"
@@ -138,20 +138,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="more-vert" size="xs" />
                 <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
-            </q-item-section>
-          </q-item>
+            </div>
+          </li>
 
-          <q-item v-if="filteredPatterns.length === 0">
-            <q-item-section class="text-center text-grey-6">
+          <li v-if="filteredPatterns.length === 0" class="tw:flex tw:items-center tw:px-3 tw:py-2">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:text-center tw:text-grey-6">
               <div class="q-pa-xl">
                 <OIcon name="search-off" size="50px" />
                 <div class="q-mt-md">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
               </div>
-            </q-item-section>
-          </q-item>
-        </q-list>
+            </div>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -208,18 +208,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-weight-bold q-mb-xs">
             {{ t('regex_patterns.valid_examples') }}
           </div>
-          <q-list dense bordered>
-            <q-item
+          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+            <li
               v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
               :key="idx"
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1"
             >
-              <q-item-section>
-                <q-item-label caption class="text-wrap" style="word-break: break-all">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span
+                  class="tw:block tw:text-xs tw:text-muted-foreground tw:text-wrap"
+                  style="word-break: break-all"
+                >
                   {{ example.substring(0, 200) }}{{ example.length > 200 ? '...' : '' }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
+                </span>
+              </div>
+            </li>
+          </ul>
         </div>
       </div>
     </ODialog>

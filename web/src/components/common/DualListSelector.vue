@@ -63,11 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </q-item-section>
           </q-item>
-          <q-item v-if="filteredSelected.length === 0">
-            <q-item-section class="text-grey-6 text-center tw:text-sm">
-              No items selected
-            </q-item-section>
-          </q-item>
+          <div
+            v-if="filteredSelected.length === 0"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-grey-6 tw:text-center tw:text-sm tw:justify-center"
+          >
+            No items selected
+          </div>
         </q-list>
       </div>
     </div>
@@ -135,11 +136,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item-section>
             <q-item-section>{{ item.label }}</q-item-section>
           </q-item>
-          <q-item v-if="filteredAvailable.length === 0">
-            <q-item-section class="text-grey-6 text-center tw:text-sm">
-              No items available
-            </q-item-section>
-          </q-item>
+          <div
+            v-if="filteredAvailable.length === 0"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-grey-6 tw:text-center tw:text-sm tw:justify-center"
+          >
+            No items available
+          </div>
         </q-list>
       </div>
     </div>

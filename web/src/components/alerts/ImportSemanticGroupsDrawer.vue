@@ -189,17 +189,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="check_circle"
               header-class="text-grey-7"
             >
-              <q-list bordered separator>
-                <q-item v-for="group in diffData.unchanged" :key="group.id">
-                  <q-item-section>
-                    <q-item-label>{{ group.display }}</q-item-label>
-                    <q-item-label caption
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <li
+                  v-for="group in diffData.unchanged"
+                  :key="group.id"
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                >
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:text-sm">{{ group.display }}</span>
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground"
                       >{{ group.id }} •
-                      {{ group.fields.length }} fields</q-item-label
+                      {{ group.fields.length }} fields</span
                     >
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                  </div>
+                </li>
+              </ul>
             </q-expansion-item>
           </div>
         </div>

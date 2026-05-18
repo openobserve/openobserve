@@ -1087,13 +1087,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Metric items -->
-            <q-item
+            <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              dense
-              class="metric-list-item"
+              class="metric-list-item tw:flex tw:items-center tw:gap-2"
             >
-              <q-item-section side>
+              <div class="tw:flex tw:items-center tw:shrink-0">
                 <OCheckbox
                   :model-value="
                     selectedMetricStreams.some(
@@ -1103,11 +1102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="toggleMetricStream(stream)"
                   size="xs"
                 />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="metric-label">{{ stream.stream_name }}</q-item-label>
-              </q-item-section>
-            </q-item>
+              </div>
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="metric-label">{{ stream.stream_name }}</span>
+              </div>
+            </div>
           </template>
         </template>
       </template>

@@ -202,18 +202,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon="check_circle"
                 header-class="text-grey-7 q-pa-xs"
               >
-                <q-list dense bordered separator class="compact-list">
-                  <q-item
+                <ul class="compact-list tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                  <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    class="compact-item"
+                    class="compact-item tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:min-h-[44px]"
                   >
-                    <q-item-section>
-                      <q-item-label>{{ group.display }}</q-item-label>
-                      <q-item-label caption>{{ group.id }} • {{ group.fields.length }} fields</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
+                    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:px-2">
+                      <span class="tw:text-[13px]">{{ group.display }}</span>
+                      <span class="tw:block tw:text-[11px] tw:text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
+                    </div>
+                  </li>
+                </ul>
               </q-expansion-item>
             </div>
           </div>

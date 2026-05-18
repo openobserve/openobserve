@@ -105,54 +105,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
           style="width: 100%; height: calc(100vh - 200px)"
         >
-          <template #cell-expand="{ row }">
-            <div class="cursor-pointer" @click="toggleExpand(row)">
-              <OButton
-                variant="ghost"
-                size="icon-xs-sq"
-              >
-                <OIcon
-                  :name="expandedRow !== row.id ? 'expand-more' : 'expand-less'"
-                  size="14px"
-                />
-              </OButton>
-            </div>
-            <div
-              v-if="expandedRow === row.id"
-              class="expanded-details tw:mt-3 tw:p-3"
-            >
-              <div class="text-subtitle2 text-weight-bold tw:mb-3">
-                Source Map Files ({{ row.files.length }})
-              </div>
-              <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
-                <q-item v-for="(file, index) in row.files" :key="index">
-                  <q-item-section>
-                    <q-item-label caption>Source File</q-item-label>
-                    <q-item-label class="text-code">{{ file.source_file_name }}</q-item-label>
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label caption>Source Map File</q-item-label>
-                    <q-item-label class="text-code">{{ file.source_map_file_name }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </div>
-          </template>
-
-          <template #cell-service="{ row }">
-            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.service }}</div>
-          </template>
-
-          <template #cell-version="{ row }">
-            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.version }}</div>
-          </template>
-
-          <template #cell-environment="{ row }">
-            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.env }}</div>
-          </template>
-
-          <template #cell-file_count="{ row }">
-            <div class="cursor-pointer" @click="toggleExpand(row)">{{ row.fileCount }}</div>
+          <template v-slot:body="props">
+            <q-tr :props="props">
+              <q-td v-for="col in props.cols" :key="col.name" :props="props">
+                <template v-if="col.name === 'expand'">
+                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      :icon="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
+                    >
+                      <q-icon
+                        :name="expandedRow !== getRowKey(props.row) ? 'expand_more' : 'expand_less'"
+                        size="14px"
+                      />
+                    </OButton>
+                  </div>
+                </template>
+                <template v-else-if="col.name === 'actions'">
+                  <OButton
+                    :data-test="`source-maps-${props.row.service}-delete`"
+                    variant="ghost-destructive"
+                    size="icon-sm"
+                    title="Delete"
+                    @click="confirmDeleteSourceMap(props.row)"
+                  >
+                    <q-icon :name="outlinedDelete" size="16px" />
+                  </OButton>
+                </template>
+                <template v-else>
+                  <div class="cursor-pointer" @click="toggleExpand(props.row)">
+                    {{ col.value }}
+                  </div>
+                </template>
+              </q-td>
+            </q-tr>
+            <q-tr v-show="expandedRow === getRowKey(props.row)" :props="props">
+              <q-td colspan="100%">
+                <div class="expanded-details q-pa-md">
+                  <div class="text-subtitle2 text-weight-bold q-mb-sm">
+                    Source Map Files ({{ props.row.files.length }})
+                  </div>
+                  <q-list bordered separator class="rounded-borders" style="max-height: 400px; overflow-y: auto;">
+                    <q-item v-for="(file, index) in props.row.files" :key="index">
+                      <q-item-section>
+                        <q-item-label caption>Source File</q-item-label>
+                        <q-item-label class="text-code">{{ file.source_file_name }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label caption>Source Map File</q-item-label>
+                        <q-item-label class="text-code">{{ file.source_map_file_name }}</q-item-label>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </div>
+              </q-td>
+            </q-tr>
           </template>
 
           <template #cell-uploaded_at="{ row }">

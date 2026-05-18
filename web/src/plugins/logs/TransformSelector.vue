@@ -96,21 +96,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
           </div>
           <div v-else>
-            <q-item>
-              <q-item-section>
-                <q-item-label
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span
                   v-if="searchObj.data.transformType === 'function'"
-                  >{{ t("search.savedFunctionNotFound") }}</q-item-label
+                  class="tw:text-sm"
+                  >{{ t("search.savedFunctionNotFound") }}</span
                 >
-                <q-item-label
+                <span
                   v-if="searchObj.data.transformType === 'action'"
-                  >{{ t("search.actionsNotFound") }}</q-item-label
+                  class="tw:text-sm"
+                  >{{ t("search.actionsNotFound") }}</span
                 >
-                <q-item-label v-if="!searchObj.data.transformType">{{
+                <span v-if="!searchObj.data.transformType" class="tw:text-sm">{{
                   t("search.selectTransformType")
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
+                }}</span>
+              </div>
+            </div>
           </div>
         </q-list>
       </ODropdown>

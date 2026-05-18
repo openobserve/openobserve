@@ -272,26 +272,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-            <q-list separator>
-              <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="q-pa-md">
-                <q-item-section>
-                  <q-item-label class="text-weight-bold">Job {{ index + 1 }}</q-item-label>
-                  <q-item-label caption>{{ job.url }}</q-item-label>
-                  <q-item-label caption class="q-mt-sm">
-                    <OBadge :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'">
-                      {{ job.status }}
-                    </OBadge>
-                  </q-item-label>
-                  <q-item-label caption v-if="job.status === 'completed'" class="q-mt-sm">
+          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
+                <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
+                <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+                  <OBadge :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'">
+                    {{ job.status }}
+                  </OBadge>
+                </span>
+                <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
-                  </q-item-label>
-                  <q-item-label caption v-if="job.status === 'failed'" class="q-mt-sm text-negative">
+                  </span>
+                  <span v-if="job.status === 'failed'" class="tw:block tw:text-xs tw:text-negative tw:mt-2">
                     Error: {{ job.error_message }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
+                  </span>
+                </div>
+              </li>
+            </ul>
           </div>
           <div v-else class="text-center q-pa-md text-grey-7">
             No URL jobs found
