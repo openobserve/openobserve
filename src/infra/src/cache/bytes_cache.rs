@@ -22,6 +22,8 @@ use std::{
 use bytes::Bytes;
 use config::{RwHashMap, metrics};
 
+// NOTE: for this cache, if you insert a key that already exists,
+// it will drop the second key and value
 pub struct BytesCache {
     tag: String,
     readers: RwHashMap<String, Bytes>,
@@ -59,48 +61,26 @@ impl BytesCache {
     }
 
     pub fn put(&self, key: String, value: Bytes) {
-        let value_len = (value.len() + key.len() * 2) as i64;
-        let old_len;
+        // NOTE: if key already exists, drop the second key and value
+        if self.readers.contains_key(&key) {
+            return;
+        }
 
-        // Serialize replacement with FIFO bookkeeping so concurrent puts for
-        // the same key cannot double-count memory or entries.
+        let value_len = (value.len() + key.len() * 2) as i64;
+
         {
             let mut w = self.cacher.lock();
-            old_len = self
-                .readers
-                .get(&key)
-                .map(|r| (r.len() + key.len() * 2) as i64);
             w.push_back(key.clone());
             self.readers.insert(key, value);
         }
 
-        // Update memory tracking and metrics
-        match old_len {
-            Some(len) => {
-                let diff = value_len - len;
-                if diff != 0 {
-                    self.current_memory.fetch_add(diff, Ordering::Relaxed);
-                    if diff > 0 {
-                        metrics::BYTES_CACHE_MEMORY_SIZE
-                            .with_label_values(&[&self.tag])
-                            .add(diff);
-                    } else {
-                        metrics::BYTES_CACHE_MEMORY_SIZE
-                            .with_label_values(&[&self.tag])
-                            .sub(-diff);
-                    }
-                }
-            }
-            None => {
-                self.current_memory.fetch_add(value_len, Ordering::Relaxed);
-                metrics::BYTES_CACHE_ENTRY_COUNT
-                    .with_label_values(&[&self.tag])
-                    .inc();
-                metrics::BYTES_CACHE_MEMORY_SIZE
-                    .with_label_values(&[&self.tag])
-                    .add(value_len);
-            }
-        }
+        self.current_memory.fetch_add(value_len, Ordering::Relaxed);
+        metrics::BYTES_CACHE_ENTRY_COUNT
+            .with_label_values(&[&self.tag])
+            .inc();
+        metrics::BYTES_CACHE_MEMORY_SIZE
+            .with_label_values(&[&self.tag])
+            .add(value_len);
 
         // GC: evict oldest entries if over memory limit
         if self.current_memory.load(Ordering::Relaxed) > self.max_bytes as i64 {

@@ -119,6 +119,7 @@ impl PuffinFooterBytesReader {
 
 impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
+        // the location is unique key for the footer cache
         let cache_key = format!("puffin_footer_{}", self.source.location);
 
         let payload = match FOOTER_DATA_CACHE.get(&cache_key) {
