@@ -129,9 +129,9 @@ const pagination = useTablePagination(table, {
 // ── Sorting ─────────────────────────────────────────────────────
 const sorting = useTableSorting(table, {
   sorting: props.sorting,
-  sortBy: props.sortBy,
-  sortOrder: props.sortOrder,
-  sortFieldMap: props.sortFieldMap,
+  get sortBy() { return props.sortBy; },
+  get sortOrder() { return props.sortOrder; },
+  get sortFieldMap() { return props.sortFieldMap; },
 }, emit);
 
 // ── Selection ───────────────────────────────────────────────────
