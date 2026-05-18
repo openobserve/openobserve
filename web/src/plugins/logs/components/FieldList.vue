@@ -6,35 +6,38 @@
     :fields="visibleFields"
     :search="filterField"
     :search-placeholder="t('search.searchField')"
-    :page-size="50"
-    :page-size-options="[50]"
+    :current-page="pagination.page"
+    :page-size="pagination.rowsPerPage"
+    :page-size-options="[pagination.rowsPerPage]"
     row-key="name"
     :loading="loadingStream"
-    :show-pagination="false"
+    :show-pagination="true"
     @update:search="$emit('update:filter-field', $event)"
+    @update:current-page="(page: number) => $emit('set-page', page)"
   >
     <!-- Group header -->
     <template #group-header="{ row, groupName }">
       <div
-        class="field-group-header tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+        class="field-group-header tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
         :class="[theme === 'dark' ? 'text-grey-5' : 'bg-grey-3']"
-        @click="$emit('toggle-group', groupName)"
+        @click="$emit('toggle-group', row.group)"
       >
-        <div class="tw:w-[calc(100%-1.25rem)] ellipsis">
+        <div class="tw:flex-1 tw:min-w-0">
           {{ groupName }} ({{
-            showOnlyInterestingFields
-              ? interestingExpandedGroupRowsFieldCount[groupName]
-              : expandGroupRowsFieldCount[groupName]
+            (showOnlyInterestingFields
+              ? interestingExpandedGroupRowsFieldCount[row.group]
+              : expandGroupRowsFieldCount[row.group]) ?? 0
           }})
         </div>
         <OButton
-          v-if="expandGroupRowsFieldCount[groupName] > 0"
+          v-if="(expandGroupRowsFieldCount[row.group] ?? 0) > 0"
           variant="ghost"
           size="icon-xs-sq"
+          class="tw:flex-shrink-0"
         >
           <OIcon
             :name="
-              expandGroupRows[groupName] ? 'expand-more' : 'chevron-right'
+              expandGroupRows[row.group] ? 'expand-more' : 'chevron-right'
             "
             size="14px"
           />
@@ -123,7 +126,7 @@
     </template>
 
     <!-- After list: pagination + toggles -->
-    <template #after-list>
+    <template #after-list="bottomProps">
       <FieldListPagination
         :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
         :show-quick-mode="showQuickMode"
@@ -131,15 +134,15 @@
         :show-only-interesting-fields="showOnlyInterestingFields"
         :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
         :selected-fields-btn-group-option="selectedFieldsBtnGroupOption"
-        :current-page="pagination.page"
-        :pages-number="pagesNumber"
-        :is-first-page="pagination.page <= 1"
-        :is-last-page="pagination.page >= pagesNumber"
-        :total-fields-count="totalFieldsCount"
+        :current-page="bottomProps.currentPage"
+        :pages-number="bottomProps.totalPages"
+        :is-first-page="bottomProps.isFirstPage"
+        :is-last-page="bottomProps.isLastPage"
+        :total-fields-count="bottomProps.totalRows"
         @toggle-schema="$emit('toggle-schema', $event)"
         @toggle-interesting-fields="$emit('toggle-interesting-fields', $event)"
-        @first-page="$emit('set-page', 1)"
-        @last-page="$emit('set-page', pagesNumber)"
+        @first-page="bottomProps.firstPage()"
+        @last-page="bottomProps.lastPage()"
         @set-page="$emit('set-page', $event)"
         @reset-fields="$emit('reset-fields')"
       />
@@ -248,15 +251,9 @@ const visibleFields = computed(() => {
     .map((row) => ({
       ...row,
       isGroup: !!row.label,
-      groupName: row.group || row.name,
+      groupName: row.label ? row.name : (row.group || row.name),
       _index: row._index ?? 0,
     }));
-});
-
-const pagesNumber = computed(() => {
-  return (
-    Math.ceil(props.totalFieldsCount / Math.max(1, props.pagination.rowsPerPage)) || 1
-  );
 });
 
 // ---------------------------------------------------------------------------
@@ -282,7 +279,7 @@ defineExpose({
 .field-group-header {
   font-weight: 600;
   font-size: 0.75rem;
-  padding: 0.25rem 0.325rem;
+  padding: 0.125rem 0.325rem;
   cursor: pointer;
 }
 </style>

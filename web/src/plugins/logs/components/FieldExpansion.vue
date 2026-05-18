@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     hide-expand-icon
     v-model="isExpanded"
     :label="field.name"
-    class="hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
+    class="tw:w-full tw:rounded-[0.25rem]"
     @before-show="(event: any) => handleBeforeShow(event)"
     @before-hide="() => handleBeforeHide()"
   >
     <template v-slot:header>
       <div
-        class="flex content-center ellipsis full-width field-expansion-header"
+        class="flex content-center ellipsis full-width field-expansion-header tw:relative"
         :title="field.name"
         :data-test="`log-search-expand-${field.name}-field-btn`"
       >
@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`logs-field-list-item-${field.name}`"
         >
           <div
-            class="ellipsis tw:max-w-[calc(100%-1.5rem)]!"
-            style="display: inline-block"
+            class="ellipsis tw:flex tw:flex-1 tw:min-w-0"
           >
             <span v-if="field.dataType" class="field-type-container">
               <OIcon
@@ -63,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
         </div>
-        <div class="field_overlay tw:rounded-[0.25rem] tw:overflow-hidden">
+        <div class="field_overlay">
           <span v-if="field.isSchemaField" style="margin-right: 0.375rem">
             <OButton
               :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
@@ -110,8 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <q-card>
-      <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+    <q-card class="tw:w-full tw:shadow-none! tw:rounded-none!">
+      <q-card-section class="tw:pl-4 tw:pr-0 tw:py-0">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"
           :field-name="field.name"
@@ -202,9 +201,52 @@ const handleBeforeHide = () => {
 </script>
 
 <style scoped lang="scss">
+// Unified expanded box — wraps header + panel
+:deep(.q-expansion-item__container) {
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+// Header row when expanded
+:deep(.q-expansion-item--expanded .q-expansion-item__container .q-item) {
+  background-color: var(--o2-hover-accent);
+}
+
 :deep(.q-expansion-item__container .q-item) {
   padding-left: 0 !important;
   padding-right: 0 !important;
+  min-height: 24px !important;
+}
+
+// Expanded panel body
+:deep(.q-expansion-item--expanded .q-expansion-item__content) {
+  background-color: var(--o2-hover-accent);
+}
+
+:deep(.q-expansion-item__content) {
+  width: 100%;
+}
+
+:deep(.q-card) {
+  width: 100%;
+  box-shadow: none !important;
+  border-radius: 0;
+  border: none;
+  background-color: transparent;
+}
+
+:deep(.q-card__section) {
+  padding: 0 !important;
+}
+
+// Unified border when expanded
+:deep(.q-expansion-item--expanded .q-expansion-item__container) {
+  border: 1px solid var(--o2-border-color);
+}
+
+// Margin bottom on the whole expanded unit
+:deep(.q-expansion-item--expanded) {
+  margin-bottom: 0.375rem;
 }
 
 .field_overlay {
@@ -212,12 +254,13 @@ const handleBeforeHide = () => {
   right: 0;
   top: 0;
   bottom: 0;
+  display: none;
   align-items: center;
   padding: 0 0.25rem;
-  background: var(--q-dark);
+  background-color: var(--o2-hover-accent);
 }
 
-:deep(.q-expansion-item):hover .field_overlay {
+.field-expansion-header:hover .field_overlay {
   display: flex;
 }
 </style>
