@@ -238,7 +238,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
@@ -256,7 +256,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const route = useRoute();
     const rowData: any = ref({});

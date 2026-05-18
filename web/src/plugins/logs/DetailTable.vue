@@ -399,7 +399,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -520,7 +520,6 @@ export default defineComponent({
     const { searchObj } = searchState();
     const {fnParsedSQL, hasAggregation} = logsUtils();
 
-    const $q = useQuasar();
 
     // Watch for initialTab prop changes to update tab
     watch(

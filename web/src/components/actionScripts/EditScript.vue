@@ -513,7 +513,6 @@ import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -574,7 +573,6 @@ const step = ref(1);
 
 const formData = ref(defaultActionScript);
 
-const q = useQuasar();
 
 const actionTypes = [
   {

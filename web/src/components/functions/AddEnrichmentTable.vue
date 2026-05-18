@@ -219,7 +219,6 @@ import { defineComponent, ref, computed } from "vue";
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -267,7 +266,6 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const indexOptions = ref([]);
     const { t } = useI18n();
-    const q = useQuasar();
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const isFetchingStreams = ref(false);

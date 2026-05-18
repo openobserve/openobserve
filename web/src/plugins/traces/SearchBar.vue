@@ -437,7 +437,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
@@ -538,7 +537,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 

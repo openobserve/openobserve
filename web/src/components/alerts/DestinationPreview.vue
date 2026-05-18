@@ -259,7 +259,6 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
@@ -281,7 +280,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
-const $q = useQuasar();
 const { t } = useI18n();
 
 const isOpen = computed({

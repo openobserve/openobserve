@@ -330,7 +330,6 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OFile from "@/lib/forms/File/OFile.vue";
-import { useQuasar } from "quasar";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -367,7 +366,6 @@ const emit = defineEmits<{
   (e: "apply", groups: SemanticGroup[]): void;
 }>();
 
-const q = useQuasar();
 
 const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);

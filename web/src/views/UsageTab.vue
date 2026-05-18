@@ -640,7 +640,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import orgService from "@/services/organizations";
 import config from "@/aws-exports";
 import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
@@ -659,7 +658,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 
 const summary = ref<any>([]);
 const no_data_ingest = ref(false);

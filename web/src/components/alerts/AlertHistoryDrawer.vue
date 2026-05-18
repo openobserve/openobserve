@@ -502,7 +502,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -521,7 +521,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 // Composables
 const { t } = useI18n();
 const store = useStore();
-const $q = useQuasar();
 
 // Props & Emits
 interface Props {

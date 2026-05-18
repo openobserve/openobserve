@@ -203,7 +203,7 @@ import { useI18n } from "vue-i18n";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import type { TemplateData, Template } from "@/ts/interfaces/index";
@@ -233,7 +233,6 @@ const formData: Ref<Template> = ref({
   title: "",
 });
 const store = useStore();
-const q = useQuasar();
 const editorRef: any = ref(null);
 const isUpdatingTemplate = ref(false);
 const nameError = ref('');

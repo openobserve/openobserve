@@ -153,7 +153,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
@@ -200,7 +199,6 @@ export default defineComponent({
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
-    const q = useQuasar();
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {

@@ -269,7 +269,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
@@ -299,7 +298,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const quasar = useQuasar();
     const { searchObj } = useMetrics();
     const streamOptions: any = ref(props.metricsList || []);
     const selectedMetricLabels = ref([]);

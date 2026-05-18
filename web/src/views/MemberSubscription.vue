@@ -49,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLocalOrganization, getPath } from "../utils/zincutils";
@@ -112,7 +111,6 @@ export default defineComponent({
   },
   setup() {
     const $store = useStore();
-    const $q = useQuasar();
     const $router = useRouter();
 
     return {

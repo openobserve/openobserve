@@ -836,7 +836,7 @@ import {
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -1054,7 +1054,6 @@ export default defineComponent({
 
     const { t } = useI18n();
 
-    const $q = useQuasar();
 
     const router = useRouter();
 

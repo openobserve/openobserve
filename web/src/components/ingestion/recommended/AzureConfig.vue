@@ -234,7 +234,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -271,7 +270,6 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     let endpoint: any = null;
     try {

@@ -541,7 +541,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -577,7 +576,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
     const loading = ref(false);

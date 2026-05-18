@@ -242,7 +242,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import AddServiceAccount from "./AddServiceAccount.vue";
@@ -274,7 +273,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const { track } = useReo();
     const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);

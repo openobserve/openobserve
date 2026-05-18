@@ -128,7 +128,6 @@ import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import Usage from "./usage.vue";
@@ -148,7 +147,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "usage"));
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");

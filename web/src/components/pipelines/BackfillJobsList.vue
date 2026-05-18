@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -315,7 +315,6 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const router = useRouter();
-const $q = useQuasar();
 const store = useStore();
 
 // Refs

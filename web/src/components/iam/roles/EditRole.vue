@@ -280,7 +280,6 @@ import {
   getResourcePermission,
   getRoleUsers,
 } from "@/services/iam";
-import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
@@ -325,7 +324,6 @@ const { permissionsState } = usePermissions();
 
 const router = useRouter();
 
-const q = useQuasar();
 
 const store = useStore();
 

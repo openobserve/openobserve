@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
@@ -133,7 +133,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { QTooltip, useQuasar } from "quasar";
+import { QTooltip } from "quasar";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 
@@ -51,7 +51,6 @@ const props = defineProps<{
   dataTest?: string;
 }>();
 
-const $q = useQuasar();
 const { getOrSetServiceColor } = useTraces();
 
 const rootColor = computed(

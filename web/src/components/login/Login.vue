@@ -165,7 +165,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 
 import { useI18n } from "vue-i18n";
@@ -195,7 +194,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const { t } = useI18n();
     const name = ref("");
     const password = ref("");

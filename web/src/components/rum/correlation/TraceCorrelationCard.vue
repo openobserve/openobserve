@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -223,7 +223,6 @@ const props = defineProps({
   },
 });
 
-const q = useQuasar();
 const router = useRouter();
 
 const {

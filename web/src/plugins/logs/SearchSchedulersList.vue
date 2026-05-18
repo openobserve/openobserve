@@ -271,7 +271,7 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -316,7 +316,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const $q = useQuasar();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18n();

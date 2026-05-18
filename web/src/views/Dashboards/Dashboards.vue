@@ -474,7 +474,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useQuasar, date, debounce } from "quasar";
+import { date, debounce } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
@@ -540,7 +540,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);

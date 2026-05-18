@@ -339,7 +339,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -368,7 +367,6 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");

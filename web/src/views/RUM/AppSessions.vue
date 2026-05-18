@@ -187,7 +187,7 @@ import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
@@ -227,7 +227,6 @@ const props = defineProps({
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
-const q = useQuasar();
 
 const { sessionState } = useSession();
 const store = useStore();

@@ -1174,7 +1174,6 @@ import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, {
@@ -1229,7 +1228,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
 
     // Copy to clipboard state

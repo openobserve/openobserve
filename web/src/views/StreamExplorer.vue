@@ -37,7 +37,6 @@ import { defineComponent, onBeforeMount, onMounted, ref, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import StreamDataTable from "@/components/logstream/explore/StreamDataTable.vue";
-import { useQuasar } from "quasar";
 import search from "@/services/search";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";
@@ -77,7 +76,6 @@ export default defineComponent({
       queryResults: {} as any,
       streamType: "",
     });
-    const q = useQuasar();
 
     const tableData = ref({
       rows: [],

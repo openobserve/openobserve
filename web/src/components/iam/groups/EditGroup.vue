@@ -96,7 +96,6 @@ import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -114,7 +113,6 @@ const router = useRouter();
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const groupDetails = ref({
   group_name: "dev",

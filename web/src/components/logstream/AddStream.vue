@@ -149,7 +149,6 @@ import type { Ref } from "vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -189,7 +188,6 @@ const submitForm = () => {
 
 const store = useStore();
 
-const q = useQuasar();
 
 const { track } = useReo();
 

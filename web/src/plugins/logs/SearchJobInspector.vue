@@ -378,7 +378,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -441,7 +440,6 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const $q = useQuasar();
 
     const loading = ref(false);
     const errorMessage = ref("");

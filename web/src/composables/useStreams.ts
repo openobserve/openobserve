@@ -17,7 +17,6 @@ import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef, reactive } from "vue";
 import { ref } from "vue";
-import { useQuasar } from "quasar";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -47,7 +46,6 @@ const useStreams = () => {
     metadata: computed(() => store.state.streams.metadata),
   };
 
-  const q = useQuasar();
 
   const getStreams = async (
     _streamName: string = "",

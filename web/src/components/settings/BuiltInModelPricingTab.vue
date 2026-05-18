@@ -174,7 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -209,7 +208,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const models = ref<BuiltInModel[]>([]);
     const loading = ref(false);

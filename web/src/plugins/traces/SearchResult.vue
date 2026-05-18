@@ -168,7 +168,6 @@ import {
   ref,
   watch,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -230,7 +229,6 @@ export default defineComponent({
   setup(_props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    useQuasar();
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();

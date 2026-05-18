@@ -199,7 +199,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
@@ -244,7 +243,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);

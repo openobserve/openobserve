@@ -284,7 +284,6 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
@@ -317,7 +316,6 @@ export default defineComponent({
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
 
-    const $q = useQuasar();
     const expansionItems = reactive({
       name: true,
       value_for_maps: true,

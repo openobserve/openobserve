@@ -90,7 +90,6 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -110,7 +109,6 @@ const spanIdFieldName = ref(
   store.state?.organizationData?.organizationSettings?.span_id_field_name,
 );
 
-const q = useQuasar();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);

@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { convertUnixToQuasarFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -246,7 +245,6 @@ export default defineComponent({
 
     const resultTotal = ref(0);
 
-    const $q = useQuasar();
 
     const listLoading = ref(false);
 

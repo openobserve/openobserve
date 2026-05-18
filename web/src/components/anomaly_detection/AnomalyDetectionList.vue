@@ -232,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { date } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -260,7 +259,6 @@ export default defineComponent({
   setup(props) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const loading = ref(false);
     const configs = ref<any[]>([]);

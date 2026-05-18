@@ -58,7 +58,6 @@ import {
   useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
-import { useQuasar } from "quasar";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -72,7 +71,6 @@ export default defineComponent({
     const store = useStore();
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref({});
-    const q = useQuasar();
     const router: any = useRouter();
     const showInvitations = ref(false);
     const { identify } = useReo();

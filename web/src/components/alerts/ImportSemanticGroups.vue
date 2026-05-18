@@ -313,7 +313,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
@@ -339,7 +338,6 @@ interface SemanticGroupDiff {
 }
 
 const router = useRouter();
-const q = useQuasar();
 const store = useStore();
 
 const jsonFile = ref<File | null>(null);

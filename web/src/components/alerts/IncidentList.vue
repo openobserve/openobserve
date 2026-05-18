@@ -175,7 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, { Incident } from "@/services/incidents";
@@ -203,7 +202,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
 
     const qTableRef: any = ref(null);

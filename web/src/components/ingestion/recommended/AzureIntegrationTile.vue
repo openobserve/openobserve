@@ -92,7 +92,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type { AzureIntegration } from "@/utils/azureIntegrations";
 import {
@@ -114,7 +113,6 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const q = useQuasar();
     const router = useRouter();
 
     let endpoint: any = null;

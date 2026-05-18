@@ -279,7 +279,6 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -300,7 +299,6 @@ export default defineComponent({
     const router = useRouter();
     const pageData = ref("Page Data");
     const { t } = useI18n();
-    const $q = useQuasar();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
 

@@ -246,7 +246,7 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
@@ -291,7 +291,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const $q = useQuasar();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18n();

@@ -341,7 +341,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -369,7 +368,6 @@ interface Domain {
 }
 
 const { t } = useI18n();
-const q = useQuasar();
 
 // Dialog state for domain/email removal confirmations
 const confirmRemoveDomainOpen = ref(false);

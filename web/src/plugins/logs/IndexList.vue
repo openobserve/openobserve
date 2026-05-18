@@ -153,7 +153,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import {
@@ -227,7 +226,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const {
       reorderSelectedFields,
       getFilterExpressionByFieldType,

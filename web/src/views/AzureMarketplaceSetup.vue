@@ -171,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
@@ -198,7 +197,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");

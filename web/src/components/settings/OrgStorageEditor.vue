@@ -399,7 +399,6 @@ import { ref, computed, onMounted, reactive, watch } from "vue";
 defineOptions({ name: "OrgStorageEditor" });
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
@@ -421,7 +420,6 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const step = ref(1);
 const selectedProvider = ref("");

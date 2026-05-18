@@ -515,7 +515,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import serviceStreamsService from "@/services/service_streams";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -534,7 +533,6 @@ const emit = defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
 
-const q = useQuasar();
 const { t } = useI18n();
 
 interface ServiceRecord {

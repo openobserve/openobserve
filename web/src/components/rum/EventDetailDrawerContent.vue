@@ -533,7 +533,7 @@ import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
@@ -583,7 +583,6 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
 const { t } = useI18n();
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);

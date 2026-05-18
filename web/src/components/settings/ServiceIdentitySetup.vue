@@ -1471,7 +1471,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
@@ -1522,7 +1521,6 @@ const props = defineProps<{
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 // ─── State ────────────────────────────────────────────────────────────────────

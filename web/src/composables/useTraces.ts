@@ -21,7 +21,7 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
@@ -192,7 +192,6 @@ export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
-  const $q = useQuasar();
 
   const { loadSemanticGroups } = useServiceCorrelation();
 

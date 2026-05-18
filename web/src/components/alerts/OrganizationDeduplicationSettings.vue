@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
 import GroupHeader from "@/components/common/GroupHeader.vue";
@@ -162,7 +161,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 interface FieldAlias {

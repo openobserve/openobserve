@@ -491,7 +491,6 @@ import { ref, computed, onBeforeMount, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
@@ -511,7 +510,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
 
 const qTableRef = ref<any>(null);
 const models = ref<any[]>([]);

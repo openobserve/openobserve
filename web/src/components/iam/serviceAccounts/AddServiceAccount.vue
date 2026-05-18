@@ -68,7 +68,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -107,7 +106,6 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(false);
     const beingUpdated: any = ref(false);

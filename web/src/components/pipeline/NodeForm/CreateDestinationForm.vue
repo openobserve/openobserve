@@ -470,7 +470,6 @@ import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -490,7 +489,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
 

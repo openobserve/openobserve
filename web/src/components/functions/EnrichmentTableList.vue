@@ -306,7 +306,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch, reactive } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -359,7 +358,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});

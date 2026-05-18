@@ -60,7 +60,6 @@ import { createGroup } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -87,7 +86,6 @@ const emits = defineEmits(["update:open", "added:group"]);
 
 const name = ref(props.group?.name || "");
 
-const q = useQuasar();
 
 const { track } = useReo();
 

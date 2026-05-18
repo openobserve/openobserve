@@ -60,7 +60,6 @@ import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -101,7 +100,6 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const $q = useQuasar();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 

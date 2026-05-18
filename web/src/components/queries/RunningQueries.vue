@@ -167,7 +167,7 @@ import {
   toRaw,
   watch,
 } from "vue";
-import { useQuasar, type QTableProps, QTable } from "quasar";
+import { type QTableProps, QTable } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
@@ -360,7 +360,6 @@ export default defineComponent({
     };
     const filterQuery = ref("");
 
-    const q = useQuasar();
 
     const localTimeToMicroseconds = () => {
       // Create a Date object representing the current local time

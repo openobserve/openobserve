@@ -342,7 +342,6 @@ import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
@@ -434,7 +433,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const $q = useQuasar();
     const { t } = useI18n();
     const metaData = ref();
     const showViewPanel = ref(false);

@@ -60,7 +60,6 @@ import { createRole, updateRole } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { useQuasar } from "quasar";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -91,7 +90,6 @@ const name = ref(props.role?.name || "");
 
 const store = useStore();
 
-const q = useQuasar();
 
 const isValidRoleName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9_]+$/;

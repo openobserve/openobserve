@@ -138,7 +138,6 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -158,7 +157,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
 const baseImportRef = ref<any>(null);
 const modelPricingErrorsToDisplay = ref<any[]>([]);
 const userSelectedModelPricingName = ref<string[]>([]);

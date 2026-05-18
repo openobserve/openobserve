@@ -873,7 +873,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, type PropType, defineAsyncComponent, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { b64EncodeUnicode, getUUID, convertMinutesToCron, getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval, describeCron, getImageURL } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
@@ -992,7 +991,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const localTab = ref(props.tab);
     const columnSelectError = ref(false);

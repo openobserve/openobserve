@@ -119,7 +119,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -147,7 +146,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
@@ -303,7 +301,6 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("common.pleaseWait"),
-        variant: "warning",
       });
 
       aiToolsetsService

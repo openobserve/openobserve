@@ -425,7 +425,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, type PropType, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import { debounce } from "lodash-es";
@@ -512,7 +511,6 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 const store = useStore();
-const q = useQuasar();
 const { buildQueryPayload } = useQuery();
 const { sqlParser } = useParser();
 

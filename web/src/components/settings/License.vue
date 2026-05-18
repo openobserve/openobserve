@@ -429,7 +429,6 @@ import {
   computed,
   defineAsyncComponent,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
@@ -460,7 +459,6 @@ export default defineComponent({
     OTextarea,
 },
   setup() {
-    const $q = useQuasar();
     const { t } = useI18n();
     const loading = ref(false);
     const updating = ref(false);

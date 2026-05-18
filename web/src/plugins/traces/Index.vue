@@ -311,7 +311,7 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { date, copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -389,7 +389,6 @@ const activeTab = computed(() => {
   return "search";
 });
 const router = useRouter();
-const $q = useQuasar();
 const { t } = useI18n();
 const {
   searchObj,

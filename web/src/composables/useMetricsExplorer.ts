@@ -16,7 +16,6 @@
 import { reactive, computed } from "vue";
 import StreamService from "@/services/stream";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const colors = [
@@ -120,7 +119,6 @@ let dashboardPanelData = reactive({ ...getDefaultDashboardPanelData() });
 
 const useMetricsExplorer = () => {
   const store = useStore();
-  const $q = useQuasar();
 
   const cleanupDraggingFields = () => {
     dashboardPanelData.meta.dragAndDrop.currentDragArea = null;

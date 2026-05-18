@@ -25,7 +25,6 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
 import { getImageURL } from "@/utils/zincutils";
-import { useQuasar} from "quasar";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 
@@ -83,7 +82,6 @@ const defaultObject = {
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
 export default function useDragAndDrop() {
-  const $q = useQuasar();
 
   const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges  } =
     useVueFlow();

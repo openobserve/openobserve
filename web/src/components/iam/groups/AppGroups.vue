@@ -140,7 +140,6 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getGroups, deleteGroup, bulkDeleteGroups } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -162,7 +161,6 @@ const { groupsState } = usePermissions();
 
 const filterQuery = ref("");
 
-const q = useQuasar();
 
 const deleteConformDialog = ref({
   show: false,

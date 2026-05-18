@@ -153,7 +153,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
 import config from "@/aws-exports";
-import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -231,7 +230,6 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const router = useRouter();
 

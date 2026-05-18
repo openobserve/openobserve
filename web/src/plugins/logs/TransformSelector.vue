@@ -146,7 +146,6 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
@@ -165,7 +164,6 @@ const store = useStore();
 
 const functionModel = ref(false);
 
-const $q = useQuasar();
 
 const transformTypes = computed(() => {
   return [

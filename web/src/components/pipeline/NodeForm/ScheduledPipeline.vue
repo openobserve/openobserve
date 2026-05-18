@@ -1063,7 +1063,7 @@ import {
 } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";

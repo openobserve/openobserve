@@ -93,7 +93,6 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import useTraces from "@/composables/useTraces";
@@ -136,7 +135,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const { searchObj } = useTraces();
     const queryEditorRef = ref(null);

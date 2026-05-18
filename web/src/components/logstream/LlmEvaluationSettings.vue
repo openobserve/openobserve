@@ -267,7 +267,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import pipelineService from "@/services/pipelines";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -297,7 +296,6 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const loading = ref(true);
     const enabled = ref(false);

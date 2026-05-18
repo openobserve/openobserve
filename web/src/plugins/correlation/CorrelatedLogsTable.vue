@@ -252,7 +252,7 @@ import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
-import { date, copyToClipboard, useQuasar } from "quasar";
+import { date, copyToClipboard } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
@@ -279,7 +279,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 const { searchObj } = searchState();
 const { loadKeyFields } = useServiceCorrelation();
 

@@ -205,7 +205,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -289,7 +288,6 @@ const afterFlattening = ref(
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
-const q = useQuasar();
 
 const store = useStore();
 

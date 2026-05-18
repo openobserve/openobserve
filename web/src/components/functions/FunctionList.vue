@@ -186,7 +186,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -229,7 +228,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});

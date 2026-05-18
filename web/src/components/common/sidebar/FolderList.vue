@@ -149,7 +149,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
     watch,
   } from "vue";
   import { useStore } from "vuex";
-  import { useQuasar, date, debounce } from "quasar";
+  import { date, debounce } from "quasar";
   import { useI18n } from "vue-i18n";
 
   import dashboardService from "@/services/dashboards";

@@ -173,7 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -208,7 +207,6 @@ export default defineComponent({
   emits: ["update:modelValue", "added"],
   setup(props, { emit }) {
     const store = useStore();
-    const q = useQuasar();
 
     const show = computed({
       get: () => props.modelValue,

@@ -283,7 +283,7 @@ import { useRouter } from "vue-router";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
@@ -310,7 +310,6 @@ const { t } = useI18n();
 const router = useRouter();
 const { track } = useReo();
 const store = useStore();
-const q = useQuasar();
 
 // ── Folder state ──────────────────────────────────────────────────────────────
 const splitterModel = ref(200);

@@ -1,13 +1,11 @@
 import pipelines from "@/services/pipelines";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 export const usePipelines = () => {
     const store = useStore();
-    const $q = useQuasar();
 
     async function getUsedStreamsList() {
         const org_identifier = store.state.selectedOrganization.identifier;

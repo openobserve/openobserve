@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, date, copyToClipboard } from "quasar";
+import { date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -159,7 +159,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
     const loading = ref(false);
@@ -328,7 +327,6 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait while processing delete request...",
-          variant: "warning",
         });
         CipherKeysService.delete(
           store.state.selectedOrganization.identifier,

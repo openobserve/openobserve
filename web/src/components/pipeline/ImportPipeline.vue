@@ -376,7 +376,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
 import destinationService from "@/services/alert_destination";
@@ -433,7 +432,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    const q = useQuasar();
     const { getStreams } = useStreams();
     const { getPipelineDestinations } = usePipelines();
 

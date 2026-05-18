@@ -914,7 +914,6 @@ import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -1003,7 +1002,6 @@ const step = ref(1);
 
 const formData = ref(defaultReport);
 
-const q = useQuasar();
 
 const { track } = useReo();
 

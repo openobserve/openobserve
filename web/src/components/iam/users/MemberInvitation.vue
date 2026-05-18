@@ -63,7 +63,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { validateEmail } from "@/utils/zincutils";
 import organizationsService from "@/services/organizations";
@@ -85,7 +84,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const userEmail: any = ref("");
     const options = ref();

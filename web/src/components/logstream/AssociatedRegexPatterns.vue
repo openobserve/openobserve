@@ -390,7 +390,7 @@ import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, w
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
-import { debounce, useQuasar } from 'quasar';
+import { debounce } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
@@ -480,7 +480,6 @@ export default defineComponent({
         const debouncedEmit = debounce((pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
           emit("updateAppliedPattern", pattern, fieldName, patternId, attribute);
         }, 300);
-        const $q = useQuasar();
         const userClickedPattern = ref<any>(null);
         const isPatternValid = ref(false);
         const testString = ref("");

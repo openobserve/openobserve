@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { ref, computed, watch } from 'vue';
-import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 
 // Services
@@ -71,7 +70,6 @@ function parseEmailRecipients(recipients: string | string[]): string[] {
  * Provides functionality for template management, validation, testing, and creation
  */
 export function usePrebuiltDestinations() {
-  const $q = useQuasar();
   const { t } = useI18n();
   const store = useStore();
 

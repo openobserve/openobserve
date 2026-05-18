@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -221,7 +220,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 
 // Delete dialog state
 const deleteDialog = ref({

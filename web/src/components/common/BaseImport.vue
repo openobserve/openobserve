@@ -220,7 +220,6 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -338,7 +337,6 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const q = useQuasar();
 
     // State
     const jsonStr = ref<any>("");

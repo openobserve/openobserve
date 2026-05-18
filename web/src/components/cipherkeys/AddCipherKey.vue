@@ -179,7 +179,6 @@ import { ref, onBeforeMount, onActivated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import {
   isValidResourceName,
   maxLengthCharValidation,
@@ -200,7 +199,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();
-const $q = useQuasar();
 const store = useStore();
 const addCipherKeyFormRef: any = ref();
 const nameError = ref('');

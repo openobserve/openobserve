@@ -182,7 +182,6 @@ import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";

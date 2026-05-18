@@ -253,7 +253,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -364,7 +363,6 @@ export default {
     const schemaToBeSearch = ref({});
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
-    const $q = useQuasar();
     const unflattendData: any = ref("");
     const loading = ref(false);
 

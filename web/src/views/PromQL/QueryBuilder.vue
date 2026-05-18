@@ -88,7 +88,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useQuasar } from "quasar";
 import { PromVisualQuery } from "@/components/promql/types";
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
@@ -98,7 +97,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const $q = useQuasar();
 
 // State
 const visualQuery = ref<PromVisualQuery>({

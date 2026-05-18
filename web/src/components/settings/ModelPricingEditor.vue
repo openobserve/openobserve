@@ -517,7 +517,6 @@ import { ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
@@ -531,7 +530,6 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const q = useQuasar();
 
 const saving = ref(false);
 const existingModels = ref<any[]>([]);

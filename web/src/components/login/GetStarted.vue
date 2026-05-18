@@ -93,7 +93,6 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import { useStore } from 'vuex'
-import { useQuasar } from 'quasar'
   import billings from '@/services/billings'
 import { toast } from "@/lib/feedback/Toast/useToast";
 const hearAboutUs = ref('')
@@ -101,7 +100,6 @@ const whereDoYouWork = ref('')
 const isAgree = ref(false)
 const store = useStore()
 const emit = defineEmits(['removeFirstTimeLogin'])
-const $q = useQuasar();
 const isSubmitting = ref(false);
 
 const validateForm = () => {

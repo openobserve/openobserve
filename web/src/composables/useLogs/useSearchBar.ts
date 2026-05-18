@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -43,7 +42,6 @@ export const useSearchBar = () => {
 
   const store = useStore();
   const router = useRouter();
-  const $q = useQuasar();
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 

@@ -315,7 +315,7 @@ import { useI18n } from "vue-i18n";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { debounce, useQuasar } from "quasar";
+import { debounce } from "quasar";
 import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
@@ -365,7 +365,6 @@ export default defineComponent({
 
     const store = useStore();
 
-    const q = useQuasar();
 
     const isHovered = ref(false);
 

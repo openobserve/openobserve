@@ -170,7 +170,6 @@ import usePipelines from "@/composables/usePipelines";
 
 import AddStream from "@/components/logstream/AddStream.vue";
 
-import { useQuasar } from "quasar";
 
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -188,7 +187,6 @@ function handleDrawerClose(v: boolean) {
   }
 }
 
-const $q = useQuasar();
 
 const { t } = useI18n();
 

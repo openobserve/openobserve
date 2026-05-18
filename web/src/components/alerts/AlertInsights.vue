@@ -286,7 +286,6 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
@@ -305,7 +304,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 // Check if enterprise features are enabled

@@ -875,7 +875,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { cloneDeep } from "lodash-es";
-import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
+import { date, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";

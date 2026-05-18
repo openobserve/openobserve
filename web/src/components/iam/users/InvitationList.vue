@@ -103,7 +103,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import NoData from "@/components/shared/grid/NoData.vue";
 import usersService from "@/services/users";
@@ -128,7 +127,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const invitations = ref([]);
     const confirmAccept = ref(false);
     const confirmReject = ref(false);

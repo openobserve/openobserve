@@ -163,7 +163,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -211,7 +210,6 @@ interface StreamRoute {
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const router = useRouter();
 

@@ -75,7 +75,7 @@
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard as quasarCopyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard as quasarCopyToClipboard } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -117,7 +117,6 @@ export default {
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const slots = useSlots();
 
     const hasFieldDropdownSlot = computed(() => !!slots["field-dropdown"]);

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { reactive, onBeforeMount, nextTick } from "vue";
 import { useStore } from "vuex";
@@ -43,7 +42,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
-  const $q = useQuasar();
 
   let {
     searchObj,

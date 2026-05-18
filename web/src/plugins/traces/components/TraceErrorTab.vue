@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
@@ -261,7 +261,6 @@ const props = defineProps<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const spanRef = computed(() => props.span);
 

@@ -155,7 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { evalTemplateService } from "@/services/eval-template.service";
@@ -169,7 +168,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 const { t } = useI18n();
-const q = useQuasar();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();

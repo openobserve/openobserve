@@ -2000,7 +2000,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
+import { copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -2307,7 +2307,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);

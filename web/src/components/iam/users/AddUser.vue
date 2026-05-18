@@ -249,7 +249,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import userServiece from "@/services/users";
 import {
   getImageURL,
@@ -327,7 +326,6 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);

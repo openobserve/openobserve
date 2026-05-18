@@ -312,7 +312,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import destinationService from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
@@ -352,7 +351,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const { isActionsEnabled } = useActions();
 
     const baseImportRef = ref<any>(null);

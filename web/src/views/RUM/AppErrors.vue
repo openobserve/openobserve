@@ -143,7 +143,6 @@ import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
-import { useQuasar } from "quasar";
 import {
   applyFilterTerm,
   removeFieldCondition,
@@ -255,7 +254,6 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const q = useQuasar();
 
 onBeforeMount(() => {
   restoreUrlQueryParams();

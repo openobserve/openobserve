@@ -1318,7 +1318,6 @@ import "highlight.js/styles/github-dark.css";
 import { marked } from "marked";
 import { MarkedOptions } from "marked";
 import DOMPurify from "dompurify";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
@@ -1430,7 +1429,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const $q = useQuasar();
     const router = useRouter();
     const inputMessage = ref(
       props.aiChatInputContext ? props.aiChatInputContext : "",

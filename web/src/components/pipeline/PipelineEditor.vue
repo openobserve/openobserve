@@ -198,7 +198,6 @@ import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -432,7 +431,6 @@ const { getStreams } = useStreams();
 
 const nodeRows = ref<(string | null)[]>([]);
 
-const q = useQuasar();
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);

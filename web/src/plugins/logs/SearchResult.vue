@@ -533,7 +533,7 @@ import {
   watch,
   nextTick,
 } from "vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -825,7 +825,6 @@ export default defineComponent({
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
     const patternSummaryText = ref("");

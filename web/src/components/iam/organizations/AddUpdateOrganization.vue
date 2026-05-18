@@ -74,7 +74,6 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
-import { useQuasar } from "quasar";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue = () => {
@@ -118,7 +117,6 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
 
     const isValidOrgName = computed(() => {
       const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;

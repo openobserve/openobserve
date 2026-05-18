@@ -187,7 +187,6 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -217,7 +216,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
 
     const extendTrialDataRow = ref();

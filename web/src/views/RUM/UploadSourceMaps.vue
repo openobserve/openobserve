@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -160,7 +159,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const $q = useQuasar();
 
 // Form data
 const formData = ref({

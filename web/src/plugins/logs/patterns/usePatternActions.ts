@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -27,7 +26,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 } from "./patternUtils";
 
 export const usePatternActions = () => {
-  const $q = useQuasar();
   const store = useStore();
   const router = useRouter();
   const { searchObj } = searchState();

@@ -122,7 +122,6 @@
 import { computed, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -177,7 +176,6 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);

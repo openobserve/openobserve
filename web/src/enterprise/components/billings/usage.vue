@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script lang="ts">
   import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick } from "vue";
   import { useStore } from "vuex";
-  import { useQuasar, date } from "quasar";
+  import { date } from "quasar";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
   import { convertBillingData } from "@/utils/billing/convertBillingData";
@@ -269,7 +269,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
     },
     setup() {
       const { t } = useI18n();
-      const $q = useQuasar();
       const store = useStore();
       const router = useRouter();
       const dataLoading = ref(false);

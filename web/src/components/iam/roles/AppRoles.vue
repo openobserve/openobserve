@@ -93,7 +93,6 @@ import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -112,7 +111,6 @@ const router = useRouter();
 
 const store = useStore();
 
-const q = useQuasar();
 
 const deleteConformDialog = ref({
   show: false,

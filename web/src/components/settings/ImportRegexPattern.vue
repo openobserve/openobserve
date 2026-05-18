@@ -211,7 +211,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useQuasar } from "quasar";
 
 import AppTabs from "../common/AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -235,7 +234,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const baseImportRef = ref<any>(null);
 
     const regexPatternErrorsToDisplay = ref<any[]>([]);

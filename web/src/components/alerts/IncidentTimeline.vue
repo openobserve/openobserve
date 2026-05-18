@@ -318,7 +318,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { date } from "quasar";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
@@ -339,7 +338,6 @@ interface Props {
 const props = defineProps<Props>();
 
 const store = useStore();
-const q = useQuasar();
 
 const events = ref<any[]>([]);
 const loading = ref(false);

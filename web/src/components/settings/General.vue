@@ -413,7 +413,6 @@ import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";

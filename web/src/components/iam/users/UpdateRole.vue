@@ -67,7 +67,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
@@ -100,7 +99,6 @@ export default defineComponent({
   setup() {
     const store: any = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const roleOptions = ["admin"];
     const orgMemberData: any = ref(defaultValue());
     const updateUserForm: any = ref(null);

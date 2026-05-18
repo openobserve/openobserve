@@ -155,7 +155,6 @@ import {
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
@@ -222,7 +221,6 @@ export default defineComponent({
     });
     const indexOptions = ref([]);
     const { t } = useI18n();
-    const $q = useQuasar();
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const streams: any = ref({});

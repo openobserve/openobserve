@@ -521,7 +521,6 @@ import type { Ref, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -564,7 +563,6 @@ const props = defineProps({
   },
 });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const q = useQuasar();
 const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();

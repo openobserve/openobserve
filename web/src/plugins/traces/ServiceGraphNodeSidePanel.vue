@@ -593,7 +593,6 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
@@ -760,7 +759,6 @@ export default defineComponent({
   emits: ["close", "view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const { t } = useI18n();
     const router = useRouter();
 

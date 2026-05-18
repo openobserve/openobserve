@@ -488,7 +488,6 @@ import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
@@ -513,7 +512,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const { t } = useI18n();
 const router = useRouter();
 
-const q = useQuasar();
 
 const filterQuery = ref("");
 

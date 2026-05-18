@@ -46,7 +46,6 @@ import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { getFoldersList, getPanelId } from "@/utils/commons";
 import { addPanel } from "@/utils/commons";
-import { useQuasar } from "quasar";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
@@ -80,7 +79,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
     const filteredDashboards: Ref<any[]> = ref([]);
     const selectedDashboard: any = ref(null);
 

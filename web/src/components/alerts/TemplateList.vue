@@ -162,7 +162,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -185,7 +184,6 @@ const AddTemplate = defineAsyncComponent(
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
-const q = useQuasar();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
 const columns: OTableColumnDef[] = [

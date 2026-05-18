@@ -710,7 +710,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { date, useQuasar, debounce } from "quasar";
+import { date, debounce } from "quasar";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -792,7 +792,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});

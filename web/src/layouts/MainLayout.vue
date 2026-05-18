@@ -147,7 +147,6 @@ import {
   QBtnDropdown,
   QIcon,
   QSelect,
-  useQuasar,
 } from "quasar";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import Header from "../components/Header.vue";
@@ -290,7 +289,6 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);

@@ -404,7 +404,6 @@ import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -434,7 +433,6 @@ export default defineComponent({
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
-    const $q = useQuasar();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);

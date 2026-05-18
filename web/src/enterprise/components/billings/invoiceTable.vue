@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import NoData from "@/components/shared/grid/NoData.vue";
 import BillingService from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -63,7 +62,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
-const $q = useQuasar();
 const store = useStore();
 
 const columns: OTableColumnDef[] = [
