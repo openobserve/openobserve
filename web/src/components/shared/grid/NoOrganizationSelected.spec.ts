@@ -32,7 +32,7 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should display the organization selection image", () => {
-    const image = wrapper.find('img');
+    const image = wrapper.find('[data-test="no-organization-selected-image"]');
     expect(image.exists()).toBe(true);
     expect(image.attributes('src')).toBe('/mocked/images/common/selectOrganization.svg');
   });

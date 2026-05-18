@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex column justify-center q-pa-xs" style="font-size: 1.5rem">
     <img
+      data-test="no-panel-image"
       :src="getImageURL('images/common/clipboard_icon.svg')"
       style="width: 230px; margin: 5vh auto 2rem"
       alt=""

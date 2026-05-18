@@ -337,6 +337,7 @@
                 :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
               >
                 <img
+                  data-test="associated-regex-patterns-no-pattern-image"
                   :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
                   style="width: 125px"
                   alt=""

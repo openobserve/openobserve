@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #separator>
         <div
+          data-test="errors-list-splitter-drag-grip"
           class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:top-[0.625rem]"
         >
           <OIcon name="drag-indicator" size="xs" />

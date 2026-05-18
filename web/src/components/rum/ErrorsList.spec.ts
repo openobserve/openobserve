@@ -155,8 +155,7 @@ describe("ErrorsList Component", () => {
     });
 
     it("should render separator drag grip", () => {
-      const separator = wrapper.find('[data-test="separator-section"]');
-      expect(separator.find(".bg-primary").exists()).toBe(true);
+      expect(wrapper.find('[data-test="errors-list-splitter-drag-grip"]').exists()).toBe(true);
     });
   });
 

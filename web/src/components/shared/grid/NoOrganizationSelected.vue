@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="font-size: 1.5rem"
     >
       <img
+        data-test="no-organization-selected-image"
         :src="getImageURL('images/common/selectOrganization.svg')"
         style="width: 200px; height: 200px; margin-top: 20vh"
         alt=""

@@ -92,7 +92,7 @@ describe("NoPanel", () => {
     });
 
     it("should render an img element", () => {
-      expect(wrapper.find("img").exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-panel-image"]').exists()).toBe(true);
     });
 
     it("should call getImageURL with the clipboard icon path", () => {
@@ -102,7 +102,7 @@ describe("NoPanel", () => {
     });
 
     it("should set img src to the value returned by getImageURL", () => {
-      const img = wrapper.find("img");
+      const img = wrapper.find('[data-test="no-panel-image"]');
       expect(img.attributes("src")).toBe(
         "/mock/images/common/clipboard_icon.svg",
       );
@@ -183,7 +183,7 @@ describe("NoPanel", () => {
       await wrapper.setProps({ viewOnly: true });
       // getImageURL is not expected to be called again — image is already rendered
       // The image still exists in the DOM regardless of viewOnly
-      expect(wrapper.find("img").exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-panel-image"]').exists()).toBe(true);
     });
   });
 });

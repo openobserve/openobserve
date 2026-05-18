@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="font-size: 1.5rem"
     >
       <img
+        data-test="no-regex-patterns-image"
         :src="getImageURL('images/regex_pattern/no_data_regex_pattern.svg')"
         style="width: 125px; margin: 20vh auto 1rem"
         alt=""
