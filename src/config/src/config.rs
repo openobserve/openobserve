@@ -1435,12 +1435,6 @@ pub struct Common {
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
     #[env_config(
-        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
-        default = false,
-        help = "Enable to use large partition for index. This will apply for all streams"
-    )]
-    pub align_partitions_for_index: bool,
-    #[env_config(
         name = "ZO_CONFIG_WATCHER_INTERVAL",
         default = 30,
         help = "Config file watcher interval in seconds. Set to 0 to disable"
