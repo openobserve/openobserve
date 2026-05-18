@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selection="multiple"
               v-model:selected-ids="selectedFunctionIds"
               :show-global-filter="false"
-              :default-columns="false"
               width="100%"
               :style="hasVisibleRows
                   ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
@@ -70,30 +69,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-actions="{ row }">
-                <OButton
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('function.updateTitle')"
-                  data-test="function-list-edit-function-btn"
-                  @click="showAddUpdateFn({ row })"
-                  icon-left="edit"
-                />
-                <OButton
-                  variant="ghost-destructive"
-                  size="icon-circle-sm"
-                  :title="t('function.delete')"
-                  data-test="function-list-delete-function-btn"
-                  @click="showDeleteDialogFn({ row })"
-                  icon-left="delete"
-                />
-                <OButton
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="'Associated Pipelines'"
-                  @click="getAssociatedPipelines({ row })"
-                >
-                  <OIcon name="account-tree" size="xs" />
-                </OButton>
+                <div class="tw:flex tw:items-center actions-container">
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    :title="t('function.updateTitle')"
+                    data-test="function-list-edit-function-btn"
+                    @click="showAddUpdateFn({ row })"
+                    icon-left="edit"
+                  />
+                  <OButton
+                    variant="ghost-destructive"
+                    size="icon-circle-sm"
+                    :title="t('function.delete')"
+                    data-test="function-list-delete-function-btn"
+                    @click="showDeleteDialogFn({ row })"
+                    icon-left="delete"
+                  />
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    :title="'Associated Pipelines'"
+                    @click="getAssociatedPipelines({ row })"
+                  >
+                    <OIcon name="account-tree" size="xs" />
+                  </OButton>
+                </div>
               </template>
 
               <template #bottom="scope">
@@ -247,6 +248,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
+        sortable: false,
         size: 67,
         meta: { align: "left" },
       },
@@ -255,6 +257,7 @@ export default defineComponent({
         accessorKey: "name",
         header: t("function.name"),
         sortable: true,
+        size: 'auto',
         meta: { align: "left" },
       },
       {
