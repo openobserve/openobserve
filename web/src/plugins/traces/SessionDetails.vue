@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="tw:text-[0.7rem] tw:font-mono tw:text-[var(--o2-text-muted)]"
               >
-                {{ shortId(trace.traceId) }}
+                {{ trace.traceId }}
               </span>
               <q-icon
                 name="open_in_new"
