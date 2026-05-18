@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-item-section v-if="icon" avatar>
       <div class="icon-wrapper">
-        <OIcon :name="icon" size="sm" />
+        <OIcon :name="icon" size="md" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-item-section>
     <q-item-section v-else-if="iconComponent" avatar>
       <div class="icon-wrapper">
-        <component :is="iconComponent" class="o-icon tw:size-4" />
+        <component :is="iconComponent" class="o-icon tw:size-6" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge"
