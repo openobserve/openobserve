@@ -187,7 +187,6 @@ export default defineComponent({
       options,
       inviteUser,
       currentUserRole,
-      $q
     };
   },
 });

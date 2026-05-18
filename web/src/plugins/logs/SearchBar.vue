@@ -4938,7 +4938,6 @@ export default defineComponent({
     // [END] explain query functionality
 
     return {
-      $q,
       t,
       store,
       router,

@@ -798,7 +798,6 @@ const useLogs = () => {
     routeToSearchSchedule,
     processPostPaginationData,
     router,
-    $q,
     clearSearchObj,
     loadVisualizeData,
     loadPatternsData,

@@ -656,7 +656,6 @@ export default defineComponent({
 
 
     return {
-      $q,
       t,
       router,
       store,

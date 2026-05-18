@@ -564,7 +564,6 @@ export default defineComponent({
 
     return {
       t,
-      $q,
       emit,
       disableColor,
       beingUpdated,

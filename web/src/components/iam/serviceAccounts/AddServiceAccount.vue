@@ -141,7 +141,6 @@ export default defineComponent({
 
     return {
       t,
-      $q,
       store,
       router,
       formData,
