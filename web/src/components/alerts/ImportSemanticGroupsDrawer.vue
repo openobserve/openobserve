@@ -185,10 +185,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Unchanged (Collapsed) -->
           <div v-if="diffData.unchanged.length > 0">
-            <q-expansion-item
+            <OCollapsible
+              v-model="unchangedOpen"
               :label="`Unchanged (${diffData.unchanged.length})`"
               icon="check_circle"
-              header-class="text-grey-7"
             >
               <q-list bordered separator>
                 <q-item v-for="group in diffData.unchanged" :key="group.id">
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-item-section>
                 </q-item>
               </q-list>
-            </q-expansion-item>
+            </OCollapsible>
           </div>
         </div>
       </div>
@@ -335,6 +335,7 @@ import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -373,6 +374,7 @@ const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
+const unchangedOpen = ref(false);
 const isLoading = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);

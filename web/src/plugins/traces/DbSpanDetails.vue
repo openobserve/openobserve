@@ -1,7 +1,10 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+
+const performanceOpen = ref(false);
 
 const props = defineProps<{
   span: Record<string, any>;
@@ -140,14 +143,13 @@ const metadataRows = computed(() =>
       </q-card-section>
     </q-card>
 
-    <q-expansion-item
+    <OCollapsible
       v-if="hasPerformanceData"
+      v-model="performanceOpen"
       label="Performance"
-      dense
       data-test="traces-db-span-details-performance"
     >
-      <q-card flat>
-        <q-card-section class="tw:py-2 tw:px-3">
+      <div class="tw:py-2 tw:px-3">
           <div class="tw:grid tw:grid-cols-2 tw:gap-x-4 tw:gap-y-1">
             <template v-if="span.db_response_returned_rows">
               <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
@@ -179,8 +181,7 @@ const metadataRows = computed(() =>
               </div>
             </template>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-expansion-item>
+      </div>
+    </OCollapsible>
   </div>
 </template>

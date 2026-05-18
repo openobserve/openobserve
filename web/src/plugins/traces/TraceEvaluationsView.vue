@@ -162,11 +162,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <!-- Template Evaluation Criteria (shown when a template with content is active) -->
               <div v-if="selectedTemplateData?.content" class="tw:mb-4">
-                <q-expansion-item
+                <OCollapsible
                   icon="description"
                   :label="isTemplateMismatch(record) ? $t('traces.evaluations.criteriaDifferentTemplate') : $t('traces.evaluations.criteriaFromTemplate')"
-                  header-class="tw:text-[10px] tw:font-bold tw:text-[var(--o2-text-secondary)]"
-                  dense
                 >
                   <!-- Mismatch notice inside the criteria panel -->
                   <div
@@ -182,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <div class="tw:mt-1 tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:italic">
                     {{ $t("traces.evaluations.criteriaSyntaxNote") }}
                   </div>
-                </q-expansion-item>
+                </OCollapsible>
               </div>
 
               <!-- Critical Issues -->
@@ -270,11 +268,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <div class="tw:flex tw:flex-col tw:divide-y tw:divide-[var(--o2-border-color)]">
                 <!-- System Prompt (Expandable) -->
-                <q-expansion-item
+                <OCollapsible
                   v-if="parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).system"
                   icon="settings"
                   :label="$t('traces.evaluations.systemPrompt')"
-                  header-class="tw:text-xs tw:font-medium"
                 >
                   <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
                     <LLMContentRenderer
@@ -283,15 +280,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       :viewMode="'formatted'"
                     />
                   </div>
-                </q-expansion-item>
+                </OCollapsible>
 
                 <!-- User Messages -->
-                <q-expansion-item
+                <OCollapsible
                   v-if="parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).user.length > 0"
                   icon="person"
+                  :model-value="true"
                   :label="$t('traces.evaluations.userMessages')"
-                  default-opened
-                  header-class="tw:text-xs tw:font-medium"
                 >
                   <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
                     <LLMContentRenderer
@@ -300,15 +296,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       :viewMode="'formatted'"
                     />
                   </div>
-                </q-expansion-item>
+                </OCollapsible>
 
                 <!-- Assistant Response -->
-                <q-expansion-item
+                <OCollapsible
                   v-if="record.gen_ai_output_messages"
                   icon="smart_toy"
+                  :model-value="true"
                   :label="$t('traces.evaluations.assistantResponse')"
-                  default-opened
-                  header-class="tw:text-xs tw:font-medium"
                 >
                   <div class="tw:p-4 tw:bg-[var(--o2-code-bg)]">
                     <LLMContentRenderer
@@ -317,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       :viewMode="'json'"
                     />
                   </div>
-                </q-expansion-item>
+                </OCollapsible>
               </div>
             </div>
           </div>
@@ -451,6 +446,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 export default defineComponent({
   name: "TraceEvaluationsView",
@@ -461,7 +457,8 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OBadge,
-},
+    OCollapsible,
+  },
   props: {
     evalData: {
       type: Array as PropType<any[]>,
@@ -1220,16 +1217,7 @@ body.body--dark .dim-template-highlight {
   }
 }
 
-// Expansion Item Tweaks
-:deep(.q-expansion-item__container) {
-  .q-item {
-    min-height: 40px;
-    padding: 8px 16px;
-    &:hover {
-      background: var(--o2-surface);
-    }
-  }
-}
+
 
 // Ungrounded highlighting
 :deep(.ungrounded-highlight) {

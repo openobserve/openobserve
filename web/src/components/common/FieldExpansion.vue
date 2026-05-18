@@ -15,16 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-expansion-item
-    dense
-    hide-expand-icon
-    v-model="isExpanded"
-    :label="field.name"
-    class="tw:w-full tw:rounded-[0.25rem]"
-    @before-show="(event: any) => handleBeforeShow(event)"
-    @before-hide="() => handleBeforeHide()"
+  <OCollapsible
+    :model-value="isExpanded"
+    @update:model-value="handleToggle"
+    class="field-expansion-item tw:w-full tw:rounded-[0.375rem] tw:overflow-hidden"
   >
-    <template v-slot:header>
+    <template #trigger>
       <div
         class="flex content-center ellipsis full-width field-expansion-header tw:relative"
         :title="field.name"
@@ -110,8 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <q-card class="tw:w-full tw:shadow-none! tw:rounded-none!">
-      <q-card-section class="tw:pl-4 tw:pr-0 tw:py-0">
+    <div class="tw:pl-4 tw:pr-0 tw:py-0">
         <slot name="body">
           <FieldValuesPanel
             ref="fieldValuesPanelRef"
@@ -129,9 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @search-field-values="(fn: string, t: string) => emit('search-field-values', fn, t)"
           />
         </slot>
-      </q-card-section>
-    </q-card>
-  </q-expansion-item>
+    </div>
+  </OCollapsible>
 </template>
 
 <script setup lang="ts">
@@ -139,6 +133,7 @@ import { computed, ref, watch } from "vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 interface Props {
   field: any;
@@ -244,6 +239,12 @@ const handleBeforeHide = () => {
   emit("before-hide", props.field);
 };
 
+const handleToggle = (val: boolean) => {
+  isExpanded.value = val;
+  if (val) handleBeforeShow(null);
+  else handleBeforeHide();
+};
+
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
@@ -265,46 +266,23 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
   color: var(--o2-text-muted);
 }
 
-:deep(.q-expansion-item__container) {
-  border-radius: 0.375rem;
-  overflow: hidden;
-}
-
-:deep(.q-expansion-item--expanded .q-expansion-item__container .q-item) {
-  background-color: var(--o2-hover-accent);
-}
-
-:deep(.q-expansion-item__container .q-item) {
+:deep(.field-expansion-item button[data-state]) {
   padding-left: 0 !important;
   padding-right: 0 !important;
   min-height: 24px !important;
 }
 
-:deep(.q-expansion-item--expanded .q-expansion-item__content) {
+:deep(.field-expansion-item button[data-state="open"]) {
   background-color: var(--o2-hover-accent);
 }
 
-:deep(.q-expansion-item__content) {
+:deep(.field-expansion-item .o-collapsible-content) {
+  background-color: var(--o2-hover-accent);
   width: 100%;
 }
 
-:deep(.q-card) {
-  width: 100%;
-  box-shadow: none !important;
-  border-radius: 0;
-  border: none;
-  background-color: transparent;
-}
-
-:deep(.q-card__section) {
-  padding: 0 !important;
-}
-
-:deep(.q-expansion-item--expanded .q-expansion-item__container) {
+:deep(.field-expansion-item[data-state="open"]) {
   border: 1px solid var(--o2-border-color);
-}
-
-:deep(.q-expansion-item--expanded) {
   margin-bottom: 0.375rem;
 }
 

@@ -33,12 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- How it works explanation -->
-      <q-expansion-item
-        dense
-        dense-toggle
+      <OCollapsible
+        v-model="howItWorksOpen"
         icon="help_outline"
         :label="t('settings.correlation.howItWorksTitle')"
-        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
+        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
         :class="
           store.state.theme === 'dark'
             ? 'bg-grey-9 tw:border-gray-700'
@@ -106,22 +105,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-expansion-item>
+      </OCollapsible>
 
       <!-- Semantic Field Groups - Collapsible Section -->
-      <q-expansion-item
+      <OCollapsible
         v-model="semanticSectionExpanded"
         icon="category"
         :label="t('settings.correlation.semanticFieldTitle')"
         :caption="t('settings.correlation.semanticFieldDescription')"
-        header-class="section-header"
-        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid expanstion-item-o2"
+        class="tw:mb-4 tw:rounded-lg tw:border tw:border-solid"
         :class="
           store.state.theme === 'dark'
             ? 'tw:border-gray-700'
             : 'tw:border-gray-200'
         "
-        default-opened
       >
         <div class="tw:p-4">
           <SemanticFieldGroupsConfig
@@ -139,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t('common.save') }}</OButton>
           </div>
         </div>
-      </q-expansion-item>
+      </OCollapsible>
     </div>
   </div>
 </template>
@@ -150,6 +147,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
@@ -184,6 +182,7 @@ const emit = defineEmits<{
 const loading = ref(true);
 const savingSemanticMappings = ref(false);
 const semanticSectionExpanded = ref(true);
+const howItWorksOpen = ref(false);
 const localSemanticGroups = ref<SemanticFieldGroup[]>([]);
 
 const handleSemanticGroupsUpdate = (groups: SemanticFieldGroup[]) => {
@@ -370,10 +369,6 @@ loadConfig();
 
 :deep(.section-header) {
   font-weight: 600;
-}
-
-:deep(.q-expansion-item__content) {
-  background: var(--o2-card-bg);
 }
 
 :deep(.tooltip-text) {
