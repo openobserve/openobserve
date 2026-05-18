@@ -332,8 +332,8 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     match stream_type {
         // file retention is always hourly for logs, metrics, and traces
         StreamType::Logs | StreamType::Metrics | StreamType::Traces => PartitionTimeLevel::Hourly,
-        // for file list dump streams, we want to compact by day
-        StreamType::Filelist => PartitionTimeLevel::Daily,
+        // for file list dump streams, we want to compact by hoursly now, earlier it was daily
+        StreamType::Filelist => PartitionTimeLevel::Hourly,
         _ => PartitionTimeLevel::default(),
     }
 }
@@ -1019,7 +1019,7 @@ mod tests {
 
         // Test Filelist stream type
         let level = get_partition_time_level(StreamType::Filelist);
-        assert_eq!(level, PartitionTimeLevel::Daily);
+        assert_eq!(level, PartitionTimeLevel::Hourly);
     }
 
     #[test]
