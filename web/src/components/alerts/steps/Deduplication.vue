@@ -129,7 +129,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "Step5Deduplication",
-  components: { OInput, OSelect, OTooltip },
+  components: { OIcon, OInput, OSelect, OTooltip },
   props: {
     deduplication: {
       type: Object as PropType<any>,

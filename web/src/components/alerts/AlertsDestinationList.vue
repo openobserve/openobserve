@@ -93,13 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-type="{ row }">
           <div class="tw:flex tw:items-center tw:gap-2">
             <template v-if="getPrebuiltTypeName(row)">
-              <span
+              <OBadge
                 :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
-                class="tw:inline-block tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:uppercase tw:text-white"
-                style="background-color: var(--o2-primary-color)"
-              >
-                {{ getPrebuiltTypeName(row) }}
-              </span>
+                variant="primary"
+                class="tw:text-xs"
+              >{{ getPrebuiltTypeName(row) }}</OBadge>
               <OIcon
                 name="auto-awesome"
                 size="sm"
@@ -107,13 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template v-else>
-              <span
+              <OBadge
                 data-test="destination-type-badge-custom"
-                class="tw:inline-block tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:uppercase tw:text-white"
-                style="background-color: #374151"
-              >
-                {{ getCustomDestinationLabel(row) }}
-              </span>
+                variant="default"
+                class="tw:text-xs"
+              >{{ getCustomDestinationLabel(row) }}</OBadge>
               <OIcon
                 name="settings"
                 size="sm"
@@ -155,22 +151,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template
-          v-if="selectedDestinations.length > 0"
-          #bottom
-        >
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
-            {{ selectedDestinations.length }} selected
-          </span>
-          <OButton
-            data-test="destination-list-delete-destinations-btn"
-            variant="outline"
-            size="sm"
-            icon-left="delete"
-            @click="openBulkDeleteDialog"
-          >
-            Delete
-          </OButton>
+        <template #bottom="scope">
+          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[300px] tw:mr-sm">
+                  {{ resultTotal }} {{ t('alert_destinations.header') }}
+                </div>
+            <OButton
+              v-if="selectedDestinations.length > 0"
+              data-test="destination-list-delete-destinations-btn"
+              variant="outline"
+              size="sm"
+              class="q-mr-sm"
+              @click="openBulkDeleteDialog"
+            >
+              <OIcon name="delete" size="sm" />
+              <span class="tw:ml-2">Delete</span>
+            </OButton>
+          <QTablePagination
+            :scope="scope"
+            :position="'bottom'"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            @update:changeRecordPerPage="changePagination"
+          />
+          </div>
         </template>
       </OTable>
     </div>
@@ -240,6 +244,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OBadge from '@/lib/core/Badge/OBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
@@ -257,6 +263,8 @@ export default defineComponent({
     ImportDestination,
     OButton,
     OInput,
+    OCheckbox,
+    OBadge,
     OTable,
   },
   setup() {

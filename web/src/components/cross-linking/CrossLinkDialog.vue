@@ -47,16 +47,26 @@
               {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
-              <q-chip
+              <OBadge
                 v-for="(field, idx) in form.fields"
                 :key="idx"
-                removable
+                variant="default"
+                size="sm"
                 class="tw:max-w-[250px]"
-                @remove="form.fields.splice(idx, 1)"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
                 <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
-              </q-chip>
+                <template #trailing>
+                  <button
+                    type="button"
+                    :aria-label="`Remove ${field.name}`"
+                    class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                    @click="form.fields.splice(idx, 1)"
+                  >
+                    <OIcon name="close" size="xs" />
+                  </button>
+                </template>
+              </OBadge>
             </div>
             <div class="tw:flex tw:gap-2 tw:items-center">
               <OSelect
@@ -113,6 +123,8 @@ import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
@@ -124,7 +136,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, ODialog, OInput, OSelect },
+  components: { CrossLinkUserGuide, OBadge, OButton, ODialog, OIcon, OInput, OSelect },
   props: {
     modelValue: {
       type: Boolean,

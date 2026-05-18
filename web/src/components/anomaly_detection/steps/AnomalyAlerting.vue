@@ -72,6 +72,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
+              <template #selected-item="{ index, opt, removeAtIndex }">
+                <OBadge
+                  v-if="index < visibleChipCount"
+                  variant="default"
+                  size="sm"
+                >
+                  {{ typeof opt === "object" ? opt.name : opt }}
+                  <template #trailing>
+                    <button
+                      type="button"
+                      aria-label="Remove"
+                      class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                      @click="removeAtIndex(index)"
+                    >
+                      <OIcon name="close" size="xs" />
+                    </button>
+                  </template>
+                </OBadge>
+                <span
+                  v-if="
+                    index === visibleChipCount &&
+                    config.alert_destination_ids.length > visibleChipCount
+                  "
+                  class="tw:text-[13px] tw:text-gray-500 tw:ml-1 tw:whitespace-nowrap"
+                >
+                  +{{ config.alert_destination_ids.length - visibleChipCount }}
+                </span>
+              </template>
               <template #empty>
                 <span>{{ t('alerts.anomaly.noDestinationsFound') }}</span>
               </template>
@@ -130,11 +158,13 @@ import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "AnomalyAlerting",
   components: { OButton, OSwitch, OSelect, OTooltip,
     OIcon,
+    OBadge,
 },
 
   props: {

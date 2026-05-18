@@ -63,12 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty><NoData /></template>
 
         <template #cell-kind="{ row }">
-          <span
-            class="tw:inline-block tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:uppercase tw:text-white"
-            :style="{ backgroundColor: kindBadgeColor(row.kind) }"
-          >
-            {{ row.kind }}
-          </span>
+          <OBadge
+            :variant="kindBadgeVariant(row.kind)"
+            size="sm"
+          >{{ row.kind.toUpperCase() }}</OBadge>
         </template>
 
         <template #cell-actions="{ row }">
@@ -125,20 +123,11 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-
-import NoData from "@/components/shared/grid/NoData.vue";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
-import aiToolsetsService from "@/services/ai_toolsets";
-
-const KIND_COLORS: Record<string, string> = {
-  mcp: "#1d4ed8",
-  cli: "#15803d",
-  skill: "#7e22ce",
-  generic: "#374151",
+const KIND_VARIANTS: Record<string, string> = {
+  mcp: "primary",
+  cli: "success",
+  skill: "primary-soft",
+  generic: "default",
 };
 
 export default defineComponent({
@@ -149,6 +138,7 @@ export default defineComponent({
     AddAiToolset,
     OButton,
     OIcon,
+    OBadge,
     OInput,
     OTable,
 },
@@ -339,7 +329,7 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
-    const kindBadgeColor = (kind: string) => KIND_COLORS[kind] ?? "grey-6";
+    const kindBadgeVariant = (kind: string) => KIND_VARIANTS[kind] ?? "default";
 
     return {
       t,
@@ -359,7 +349,7 @@ export default defineComponent({
       confirmDeleteToolset,
       cancelDelete,
       deleteToolset,
-      kindBadgeColor,
+      kindBadgeVariant,
     };
   },
 });

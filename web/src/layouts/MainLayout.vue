@@ -1145,6 +1145,7 @@ export default defineComponent({
       showGetStarted,
       removeFirstTimeLogin,
       sendToAiChat,
+      aiChatPayload,
       aiChatInputContext,
       aiChatAppendMode,
       userClickedOrg,

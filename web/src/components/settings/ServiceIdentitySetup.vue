@@ -1262,35 +1262,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Header section with cardinality details -->
             <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
               <span class="tw:font-medium">Cardinality:</span>
-              <q-badge
-                :color="
+              <OBadge
+                :variant="
                   cardinalityColor(
                     dimensionAnalytics[primaryDim?.group_id]
                       ?.cardinality_class || 'Unknown',
                   )
                 "
-                rounded
                 class="tw:px-2"
               >
                 {{
                   dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0
                 }}
                 unique values
-              </q-badge>
-              <q-badge
-                outline
-                :color="
-                  cardinalityColor(
-                    dimensionAnalytics[primaryDim?.group_id]
-                      ?.cardinality_class || 'Unknown',
-                  )
-                "
+              </OBadge>
+              <OBadge
+                :variant="`${cardinalityColor(
+                  dimensionAnalytics[primaryDim?.group_id]
+                    ?.cardinality_class || 'Unknown',
+                )}-outline`"
               >
                 {{
                   dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
                   "Unknown"
                 }}
-              </q-badge>
+              </OBadge>
             </div>
 
             <!-- Two-pane Layout for Streams and Values -->
@@ -1485,6 +1481,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -3087,16 +3085,16 @@ function pluralize(val: string): string {
   return val + "s";
 }
 
-/** Returns a Quasar color token for a cardinality class */
-function cardinalityColor(cardClass: string): string {
-  const map: Record<string, string> = {
-    VeryLow: "positive",
-    Low: "positive",
+/** Returns a BadgeVariant token for a cardinality class */
+function cardinalityColor(cardClass: string): BadgeVariant {
+  const map: Record<string, BadgeVariant> = {
+    VeryLow: "success",
+    Low: "success",
     Medium: "warning",
-    High: "negative",
-    VeryHigh: "negative",
+    High: "error",
+    VeryHigh: "error",
   };
-  return map[cardClass] ?? "grey";
+  return map[cardClass] ?? "default";
 }
 
 /** Get the best available cardinality class for a group */
@@ -3275,7 +3273,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
         recommended: g.recommended,
         uniqueValues: dim?.cardinality ?? g.unique_values ?? null,
         cardinalityLabel: cardClass,
-        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "grey",
+        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "default",
       };
     });
 }

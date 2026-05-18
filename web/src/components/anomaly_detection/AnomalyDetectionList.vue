@@ -44,19 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #cell-status="{ row }">
         <div class="tw:flex tw:items-center tw:gap-2">
-          <q-badge
-            :color="statusColor(row)"
-            :label="statusLabel(row)"
-          >
+          <OBadge :variant="statusColor(row)" data-test="anomaly-detection-status-badge">
+            {{ statusLabel(row) }}
             <OSpinner
               v-if="row.status === 'training'"
               size="xs"
               class="q-ml-xs"
             />
-          </q-badge>
-          <q-tooltip v-if="row.status === 'failed'">
-            {{ row.last_error || t("alerts.anomalyStatus.failed") }}
-          </q-tooltip>
+          </OBadge>
+          <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
         </div>
       </template>
 
@@ -244,12 +240,14 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OButton, ODialog, OIcon, OSpinner, OTable },
+  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
 
   props: {
     org_identifier: {
@@ -295,14 +293,14 @@ export default defineComponent({
       configs.value.map((c, i) => ({ ...c, "#": i + 1 }))
     );
 
-    const statusColor = (row: any) => {
-      if (!row.enabled) return "grey";
+    const statusColor = (row: any): BadgeVariant => {
+      if (!row.enabled) return "default";
       switch (row.status) {
-        case "ready":     return "positive";
-        case "training":  return "info";
-        case "failed":    return "negative";
-        case "waiting":   return "grey";
-        default:          return "grey";
+        case "ready":     return "success";
+        case "training":  return "primary";
+        case "failed":    return "error";
+        case "waiting":   return "default";
+        default:          return "default";
       }
     };
 

@@ -50,14 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-correlation_reason="{ row }">
-        <span
+        <OBadge
           data-test="correlation-reason-badge"
-          class="tw:inline-flex tw:items-center tw:px-2 tw:py-0.5 tw:rounded-full tw:text-xs tw:font-medium tw:border"
-          :class="getReasonClasses(row.correlation_reason)"
-          :title="getReasonTooltip(row.correlation_reason)"
+          :variant="getReasonVariant(row.correlation_reason)"
         >
           {{ getReasonLabel(row.correlation_reason) }}
-        </span>
+          <OTooltip :content="getReasonTooltip(row.correlation_reason)" side="top" />
+        </OBadge>
       </template>
     </OTable>
   </div>
@@ -67,6 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, PropType, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { date } from "quasar";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
@@ -82,6 +84,8 @@ interface IncidentAlert {
 export default defineComponent({
   name: "IncidentAlertTriggersTable",
   components: {
+    OBadge,
+    OTooltip,
     OTable,
   },
   props: {
@@ -129,18 +133,48 @@ export default defineComponent({
       return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
     };
 
-    const getReasonColor = (reason: string) => {
+    const getReasonVariant = (reason: string): BadgeVariant => {
       switch (reason) {
         case "service_discovery":
-          return "blue";
+          return "primary-outline";
         case "primary_match":
-          return "purple";
+          return "primary-outline";
         case "secondary_match":
-          return "orange";
+          return "warning-outline";
         case "alert_id":
-          return "grey";
+          return "default-outline";
         default:
-          return "grey";
+          return "default-outline";
+      }
+    };
+
+    const getReasonClasses = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return "tw:border-blue-500 tw:text-blue-500";
+        case "primary_match":
+          return "tw:border-purple-500 tw:text-purple-500";
+        case "secondary_match":
+          return "tw:border-orange-500 tw:text-orange-500";
+        case "alert_id":
+          return "tw:border-gray-500 tw:text-gray-500";
+        default:
+          return "tw:border-gray-500 tw:text-gray-500";
+      }
+    };
+
+    const getReasonClasses = (reason: string) => {
+      switch (reason) {
+        case "service_discovery":
+          return "tw:border-blue-500 tw:text-blue-500";
+        case "primary_match":
+          return "tw:border-purple-500 tw:text-purple-500";
+        case "secondary_match":
+          return "tw:border-orange-500 tw:text-orange-500";
+        case "alert_id":
+          return "tw:border-gray-500 tw:text-gray-500";
+        default:
+          return "tw:border-gray-500 tw:text-gray-500";
       }
     };
 
@@ -196,7 +230,7 @@ export default defineComponent({
     return {
       columns,
       formatTimestamp,
-      getReasonColor,
+      getReasonVariant,
       getReasonLabel,
       getReasonTooltip,
       getReasonClasses,

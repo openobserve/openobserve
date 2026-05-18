@@ -399,10 +399,9 @@ describe("AlertList - basic rendering", () => {
     expect(wrapper.find('[data-test="alert-list-add-alert-btn"]').exists()).toBe(true);
   });
 
-  it("has a splitter and table", async () => {
+  it("renders the alert list table", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-splitter"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-list-table"]').exists()).toBe(true);
   });
 });
@@ -540,10 +539,19 @@ describe("AlertList - row actions", () => {
     const first = (wrapper.vm as any).filteredResults[0];
     const initial = first.enabled;
 
-    // Click the pause/start button for this row
-    const btn = wrapper.find(`[data-test="alert-list-${first.name}-pause-start-alert"]`);
-    expect(btn.exists()).toBe(true);
-    await btn.trigger("click");
+    // Click the pause/start button for this row.
+    // The button is rendered by the OButton wrapper component; firing a DOM
+    // click on the inner <button> does not invoke the OButton's @click emit,
+    // so we emit the click directly on the OButton component instance.
+    const obComponent = wrapper
+      .findAllComponents({ name: "OButton" })
+      .find(
+        (c: any) =>
+          c.attributes("data-test") ===
+          `alert-list-${first.name}-pause-start-alert`,
+      );
+    expect(obComponent).toBeTruthy();
+    await obComponent!.vm.$emit("click", new MouseEvent("click"));
     await flushPromises();
 
     const updated = (wrapper.vm as any).filteredResults.find((r: any) => r.uuid === first.uuid);

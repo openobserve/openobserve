@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import {
+  computed,
   nextTick,
   onBeforeMount,
   onMounted,

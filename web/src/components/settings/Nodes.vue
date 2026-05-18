@@ -487,14 +487,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.super_cluster_enabled"
             #cell-region="{ row }"
           >
-            <q-badge class="badge-region q-mr-xs"
+            <OBadge variant="default" class="badge-region q-mr-xs"
               >{{ row.region }}
               <OTooltip :content="t('nodes.region')" />
-            </q-badge>
-            <q-badge class="badge-cluster"
+            </OBadge>
+            <OBadge variant="default" class="badge-cluster"
               >{{ row.cluster }}
               <OTooltip :content="t('nodes.cluster')" />
-            </q-badge>
+            </OBadge>
           </template>
 
           <template #cell-tcp="{ row }">
@@ -556,6 +556,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -568,6 +569,7 @@ export default defineComponent({
     OTooltip,
     ORange,
     OIcon,
+    OBadge,
     OTable,
   },
   setup() {

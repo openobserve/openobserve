@@ -278,9 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-item-label class="text-weight-bold">Job {{ index + 1 }}</q-item-label>
                   <q-item-label caption>{{ job.url }}</q-item-label>
                   <q-item-label caption class="q-mt-sm">
-                    <q-badge :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : job.status === 'processing' ? 'primary' : 'grey'">
+                    <OBadge :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'">
                       {{ job.status }}
-                    </q-badge>
+                    </OBadge>
                   </q-item-label>
                   <q-item-label caption v-if="job.status === 'completed'" class="q-mt-sm">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
@@ -330,6 +330,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
@@ -347,6 +348,7 @@ export default defineComponent({
     OTooltip,
     OCheckbox,
     OIcon,
+    OBadge,
     OTable,
 },
   emits: [

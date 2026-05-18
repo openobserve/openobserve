@@ -231,70 +231,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-details-history-table"
                 @pagination-change="onPaginationChange"
               >
-                <template #cell-#="{ row }">
-                  <span
-                    class="tw:text-[13px] tw:tabular-nums"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-500'
-                        : 'tw:text-gray-400'
-                    "
-                  >
-                    {{ (currentPage - 1) * selectedPerPage + row.index + 1 }}
-                  </span>
+                <template v-slot:body="props">
+                  <q-tr :props="props" :class="getRowClass(props.row.status)">
+                    <q-td
+                      v-for="col in historyTableColumns"
+                      :key="col.name"
+                      :props="props"
+                    >
+                      <template v-if="col.name === '#'">
+                        <span
+                          class="tw:text-[13px] tw:tabular-nums"
+                          :class="
+                            store.state.theme === 'dark'
+                              ? 'tw:text-gray-500'
+                              : 'tw:text-gray-400'
+                          "
+                        >
+                          {{
+                            (currentPage - 1) * selectedPerPage +
+                            props.rowIndex +
+                            1
+                          }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'status'">
+                        <q-chip
+                          dense
+                          size="sm"
+                          :icon="getStatusChipIcon(props.row.status)"
+                          :label="formatStatus(props.row.status)"
+                          :color="getStatusChipColor(props.row.status)"
+                          :text-color="getStatusChipTextColor(props.row.status)"
+                          class="tw:cursor-default"
+                          data-test="alert-history-status-chip"
+                        >
+                          <OTooltip
+                            v-if="props.row.error"
+                            :max-width="'300px'"
+                            :content="props.row.error"
+                          />
+                        </q-chip>
+                      </template>
+                      <template v-else-if="col.name === 'timestamp'">
+                        <span class="tw:text-[13px]">{{
+                          formatTimestamp(props.row.timestamp)
+                        }}</span>
+                        <OTooltip :content="formatTimestampFull(props.row.timestamp)" />
+                      </template>
+                      <template v-else-if="col.name === 'evaluation_time'">
+                        <span class="tw:text-[13px] tw:tabular-nums">
+                          {{
+                            props.row.evaluation_took_in_secs
+                              ? props.row.evaluation_took_in_secs.toFixed(3) +
+                                "s"
+                              : "—"
+                          }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'query_time'">
+                        <span class="tw:text-[13px] tw:tabular-nums">
+                          {{
+                            props.row.query_took
+                              ? props.row.query_took + "ms"
+                              : "—"
+                          }}
+                        </span>
+                      </template>
+                      <template v-else-if="col.name === 'anomaly_count'">
+                        <span
+                          class="tw:text-[13px] tw:tabular-nums"
+                          :class="
+                            props.row.anomaly_count > 0
+                              ? 'tw:text-red-500 tw:font-medium'
+                              : ''
+                          "
+                        >
+                          {{
+                            props.row.anomaly_count != null
+                              ? props.row.anomaly_count
+                              : "—"
+                          }}
+                        </span>
+                      </template>
+                    </q-td>
+                  </q-tr>
                 </template>
-                <template #cell-status="{ row }">
-                  <q-chip
-                    dense
-                    size="sm"
-                    :icon="getStatusChipIcon(row.status)"
-                    :label="formatStatus(row.status)"
-                    :color="getStatusChipColor(row.status)"
-                    :text-color="getStatusChipTextColor(row.status)"
-                    class="tw:cursor-default"
-                    data-test="alert-history-status-chip"
-                  >
-                    <OTooltip
-                      v-if="row.error"
-                      :max-width="'300px'"
-                      :content="row.error"
-                    />
-                  </q-chip>
-                </template>
-                <template #cell-timestamp="{ row }">
-                  <span class="tw:text-[13px]">{{
-                    formatTimestamp(row.timestamp)
-                  }}</span>
-                  <OTooltip :content="formatTimestampFull(row.timestamp)" />
-                </template>
-                <template #cell-evaluation_time="{ row }">
-                  <span class="tw:text-[13px] tw:tabular-nums">
-                    {{
-                      row.evaluation_took_in_secs
-                        ? row.evaluation_took_in_secs.toFixed(3) + "s"
-                        : "—"
-                    }}
-                  </span>
-                </template>
-                <template #cell-query_time="{ row }">
-                  <span class="tw:text-[13px] tw:tabular-nums">
-                    {{ row.query_took ? row.query_took + "ms" : "—" }}
-                  </span>
-                </template>
-                <template #cell-anomaly_count="{ row }">
-                  <span
-                    class="tw:text-[13px] tw:tabular-nums"
-                    :class="
-                      row.anomaly_count > 0
-                        ? 'tw:text-red-500 tw:font-medium'
-                        : ''
-                    "
-                  >
-                    {{ row.anomaly_count != null ? row.anomaly_count : "—" }}
-                  </span>
-                </template>
-                <template #cell-error></template>
-                <template #bottom="{ totalRows }">
+
+                <template #bottom="scope">
                   <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
                     <div
                       class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]"
@@ -486,6 +509,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import alertsService from "@/services/alerts";
@@ -710,41 +734,22 @@ const getStatusChipIcon = (status: string) => {
   }
 };
 
-const getStatusChipColor = (status: string) => {
+const getStatusChipVariant = (status: string) => {
   switch (status?.toLowerCase()) {
     case "firing":
     case "error":
     case "anomaly":
-      return "red-1";
+      return "error-soft";
     case "ok":
     case "success":
     case "normal":
-      return "green-1";
+      return "success-soft";
     case "skipped":
-      return "amber-1";
+      return "warning-soft";
     case "pending":
-      return "blue-1";
+      return "primary-soft";
     default:
-      return "grey-3";
-  }
-};
-
-const getStatusChipTextColor = (status: string) => {
-  switch (status?.toLowerCase()) {
-    case "firing":
-    case "error":
-    case "anomaly":
-      return "red-9";
-    case "ok":
-    case "success":
-    case "normal":
-      return "green-9";
-    case "skipped":
-      return "amber-9";
-    case "pending":
-      return "blue-9";
-    default:
-      return "grey-8";
+      return "default-soft";
   }
 };
 

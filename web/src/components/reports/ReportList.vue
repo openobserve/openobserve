@@ -133,20 +133,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Name column: badges for type/preview -->
                 <template #cell-name="{ row }">
                   <span>{{ row.name }}</span>
-                  <q-badge
+                  <OBadge
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
-                    color="teal"
+                    variant="primary-outline"
                     class="q-ml-xs"
-                    label="PNG"
-                    outline
-                  />
-                  <q-badge
+                  >
+                    PNG
+                  </OBadge>
+                  <OBadge
                     v-if="row.imagePreview"
-                    color="blue-grey"
+                    variant="default-outline"
                     class="q-ml-xs"
-                    label="Preview"
-                    outline
-                  />
+                  >
+                    Preview
+                  </OBadge>
                 </template>
 
                 <!-- Folder column -->
@@ -298,6 +298,7 @@ import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const MoveAcrossFolders = defineAsyncComponent(

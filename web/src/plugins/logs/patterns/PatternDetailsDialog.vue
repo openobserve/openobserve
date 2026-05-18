@@ -146,12 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                 @mouseleave="onMouseLeave"
               >
-                <q-chip
+                <OBadge
+                  size="sm"
                   class="wildcard-chip-detail q-my-none q-mx-none"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
                   {{ wildcardLabel(tok.value, tok.sampleValues) }}
-                </q-chip>
+                </OBadge>
               </span>
             </template>
           </div>
@@ -184,14 +185,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-type="{ row }">
               <div class="text-left">
-                <q-chip
+                <OBadge
                   size="sm"
                   :class="
                     store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'
                   "
                 >
                   {{ row.var_type || "unknown" }}
-                </q-chip>
+                </OBadge>
               </div>
             </template>
           </OTable>
@@ -283,6 +284,7 @@ import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

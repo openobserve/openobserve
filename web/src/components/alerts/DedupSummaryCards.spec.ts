@@ -163,15 +163,15 @@ describe("DedupSummaryCards", () => {
       wrapper = await mountComponent();
       expect(existsByTestId(wrapper, "dedup-filter-icon")).toBe(true);
       const icon = findByTestId(wrapper, "dedup-filter-icon");
-      const qIcon = icon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("filter_alt");
+      const qIcon = icon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("filter-alt");
     });
 
     it("should render info icon with tooltip", async () => {
       wrapper = await mountComponent();
       expect(existsByTestId(wrapper, "dedup-info-icon")).toBe(true);
       const icon = findByTestId(wrapper, "dedup-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
+      const tooltip = icon.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
     });
 
@@ -243,7 +243,7 @@ describe("DedupSummaryCards", () => {
       wrapper = await mountComponent();
       expect(existsByTestId(wrapper, "suppression-info-icon")).toBe(true);
       const icon = findByTestId(wrapper, "suppression-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
+      const tooltip = icon.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
     });
 
@@ -266,15 +266,15 @@ describe("DedupSummaryCards", () => {
       wrapper = await mountComponent();
       expect(existsByTestId(wrapper, "pending-batches-icon")).toBe(true);
       const icon = findByTestId(wrapper, "pending-batches-icon");
-      const qIcon = icon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("group_work");
+      const qIcon = icon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("group-work");
     });
 
     it("should render info icon with tooltip", async () => {
       wrapper = await mountComponent();
       expect(existsByTestId(wrapper, "pending-batches-info-icon")).toBe(true);
       const icon = findByTestId(wrapper, "pending-batches-info-icon");
-      const tooltip = icon.findComponent({ name: "QTooltip" });
+      const tooltip = icon.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
     });
 
@@ -541,9 +541,9 @@ describe("DedupSummaryCards", () => {
       const batchesIcon = findByTestId(wrapper, "pending-batches-info-icon");
 
       // Check that icons contain tooltip components
-      expect(dedupIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
-      expect(suppressionIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
-      expect(batchesIcon.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(dedupIcon.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+      expect(suppressionIcon.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+      expect(batchesIcon.findComponent({ name: "OTooltip" }).exists()).toBe(true);
 
       // Verify tooltip content is present in icon HTML
       expect(dedupIcon.html().length).toBeGreaterThan(0);

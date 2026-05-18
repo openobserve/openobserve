@@ -21,14 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="o2-card-title q-pt-sm">{{ t("billing.enterpriseLabel") }}</div>
         <div class="o2-card-subtitle q-mt-sm">{{ t("billing.enterpriseSubtitle") }}</div>
       </div>
-      <q-chip
-        color="indigo-1"
-        text-color="indigo-10"
-        :label="t('billing.discountTag')"
+      <OBadge
+        variant="primary-soft"
         class="q-mt-sm text-caption q-px-sm q-py-md"
         style="border-radius: 0px"
-        dense
-      />
+      >
+        {{ t('billing.discountTag') }}
+      </OBadge>
     </div>
 
     <q-separator spaced />
@@ -80,11 +79,13 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { siteURL } from "@/constants/config";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "enterprisePlan",
   components: { OButton,
+    OBadge,
     OIcon,
 },
   props: ["features", "pricingError"],

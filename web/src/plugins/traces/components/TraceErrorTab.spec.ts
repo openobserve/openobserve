@@ -386,7 +386,7 @@ describe("TraceErrorTab", () => {
 
       // The generic banner includes a OIcon with name="error"
       const errorIcons = wrapper
-        .findAllComponents({ name: "QIcon" })
+        .findAllComponents({ name: "OIcon" })
         .filter((c) => c.props("name") === "error");
       expect(errorIcons.length).toBeGreaterThanOrEqual(1);
     });

@@ -21,15 +21,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="o2-card-title q-pt-sm">{{ t("billing.proPlanLabel") }}</div>
         <div class="o2-card-subtitle q-mt-sm">{{ t("billing.proPlanSubtitle") }}</div>
       </div>
-      <q-chip
+      <OBadge
         v-if="planType == planName"
-        color="indigo-1"
-        text-color="indigo-10"
-        :label="t('billing.subscribed')"
+        variant="primary-soft"
         class="q-mt-sm text-caption q-px-sm q-py-md"
         style="border-radius: 0px"
-        dense
-      />
+      >
+        {{ t('billing.subscribed') }}
+      </OBadge>
     </div>
 
     <q-separator spaced />
@@ -72,25 +71,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row justify-between q-pa-md">
       <!-- AWS Marketplace billing - show managed externally message -->
       <div v-if="billingProvider === 'aws'" class="full-width text-center">
-        <q-chip
-          color="green-2"
-          text-color="green-10"
+        <OBadge
+          variant="success-soft"
           icon="check_circle"
-          label="Managed via AWS Marketplace"
           class="q-px-md q-py-sm"
-        />
+        >
+          Managed via AWS Marketplace
+        </OBadge>
         <div class="text-caption text-grey-7 q-mt-sm">
           Billing is handled through your AWS account
         </div>
       </div>
       <div v-else-if="billingProvider === 'azure'" class="full-width text-center">
-        <q-chip
-          color="green-2"
-          text-color="green-10"
+        <OBadge
+          variant="success-soft"
           icon="check_circle"
-          label="Managed via Azure Marketplace"
           class="q-px-md q-py-sm"
-        />
+        >
+          Managed via Azure Marketplace
+        </OBadge>
         <div class="text-caption text-grey-7 q-mt-sm">
           Billing is handled through your Azure account
         </div>
@@ -100,13 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="subscriptionType === 'external-contract'"
         class="full-width text-center"
       >
-        <q-chip
-          color="grey-3"
-          text-color="grey-8"
+        <OBadge
+          variant="default"
           icon="description"
-          label="Managed via contract"
           class="q-px-md q-py-sm"
-        />
+        >
+          Managed via contract
+        </OBadge>
         <div class="text-caption text-grey-7 q-mt-sm">
           Billing is handled through your contract — contact your account manager for changes
         </div>
@@ -138,11 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "proPlan",
   components: { OButton,
+    OBadge,
     OIcon,
 },
   props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],

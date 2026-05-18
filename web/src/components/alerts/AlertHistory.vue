@@ -276,15 +276,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="col-6">
                   <div class="text-caption text-grey-7 q-mb-xs">Status</div>
-                  <q-chip
-                    :color="getStatusColor(selectedRow.status)"
-                    text-color="white"
-                    size="0.8rem"
-                    dense
-                    outline
+                  <OBadge
+                    :variant="getStatusVariant(selectedRow.status)"
+                    size="sm"
                   >
                     {{ selectedRow.status }}
-                  </q-chip>
+                  </OBadge>
                 </div>
               </div>
             </div>
@@ -496,6 +493,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -845,22 +843,22 @@ const formatDuration = (microseconds: number) => {
   return `${seconds}s`;
 };
 
-const getStatusColor = (status: string) => {
+const getStatusVariant = (status: string) => {
   switch (status?.toLowerCase()) {
     case "success":
     case "ok":
     case "completed":
-      return "positive";
+      return "success-outline";
     case "error":
     case "failed":
-      return "negative";
+      return "error-outline";
     case "warning":
-      return "warning";
+      return "warning-outline";
     case "pending":
     case "running":
-      return "info";
+      return "primary-outline";
     default:
-      return store.state.theme === "dark" ? "white" : "black";
+      return "default-outline";
   }
 };
 

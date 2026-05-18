@@ -209,9 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <tr>
                         <td class="tw:font-semibold">{{ t("about.status_lbl") }}</td>
                         <td>
-                          <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                          <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                             {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
-                          </q-badge>
+                          </OBadge>
                         </td>
                       </tr>
                       <tr>
@@ -282,6 +282,7 @@ import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vu
 import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
@@ -290,6 +291,7 @@ export default defineComponent({
     FeatureComparisonTable,
     OButton,
     OIcon,
+    OBadge,
     OSpinner,
   },
   setup() {

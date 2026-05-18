@@ -85,11 +85,6 @@ describe("CrossLinkDialog Component", () => {
               '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
             emits: ["click"],
           },
-          "q-chip": {
-            template:
-              '<span class="q-chip" :data-test="$attrs[\'data-test\']"><slot /><button class="remove" @click="$emit(\'remove\')">x</button></span>',
-            emits: ["remove"],
-          },
         },
       },
     });

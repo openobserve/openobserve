@@ -75,16 +75,18 @@
 
             <div class="text-subtitle2 q-mb-sm">Current Status:</div>
             <div>
-              <q-badge
+              <OBadge
                 v-if="isServiceStreamsEnabled"
-                color="positive"
-                label="Service Streams: Enabled"
-              />
-              <q-badge
+                variant="success"
+              >
+                Service Streams: Enabled
+              </OBadge>
+              <OBadge
                 v-else
-                color="negative"
-                label="Service Streams: Disabled"
-              />
+                variant="error"
+              >
+                Service Streams: Disabled
+              </OBadge>
             </div>
             <div class="q-mt-xs text-caption text-grey-7">
               Note: This is a demo using simulated data. In production,
@@ -141,6 +143,7 @@ import TelemetryCorrelationPanel from "@/components/TelemetryCorrelationPanel.vu
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 // Demo state
 const showCorrelation = ref(false);

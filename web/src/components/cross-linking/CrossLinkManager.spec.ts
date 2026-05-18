@@ -55,14 +55,6 @@ describe("CrossLinkManager Component", () => {
               '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
             emits: ["click"],
           },
-          "q-chip": {
-            template:
-              '<span class="q-chip"><slot /></span>',
-          },
-          "q-badge": {
-            template:
-              '<span class="q-badge">{{ $attrs.label }}</span>',
-          },
         },
       },
     });
@@ -150,10 +142,10 @@ describe("CrossLinkManager Component", () => {
       );
     });
 
-    it("should display field chips", () => {
+    it("should display field badges", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      const chips = wrapper.findAll(".q-chip");
-      expect(chips.length).toBeGreaterThan(0);
+      const badges = wrapper.findAllComponents({ name: "OBadge" });
+      expect(badges.length).toBeGreaterThan(0);
     });
   });
 

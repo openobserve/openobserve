@@ -182,8 +182,6 @@ const globalStubs = {
   "q-select": { template: "<select />", props: ["modelValue", "dense", "filled", "options", "emitValue", "mapOptions"] },
   "q-table": { template: '<div class="q-table"><slot name="no-data" /></div>', props: ["rows", "columns", "pagination", "filter", "loading", "dense"] },
   "q-tooltip": { template: "<span><slot /></span>" },
-  "q-chip": { template: "<span class='q-chip'><slot /></span>", props: ["dense", "size", "color", "textColor"] },
-  "q-badge": { template: "<span><slot /></span>", props: ["color"] },
   "q-card": { template: "<div><slot /></div>" },
   "q-card-section": { template: "<div><slot /></div>" },
   "q-card-actions": { template: "<div><slot /></div>" },

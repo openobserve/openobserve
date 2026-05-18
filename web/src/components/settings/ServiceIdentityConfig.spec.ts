@@ -134,8 +134,6 @@ const globalStubs = {
   "OIcon": { template: "<span />", props: ["name", "size", "color"] },
   "q-btn": { template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>', props: ["label", "flat", "dense", "loading", "disable"], emits: ["click"] },
   "q-expansion-item": { template: '<div class="expansion-item"><slot /><slot name="header" /></div>', props: ["label", "icon", "dense", "class", "modelValue"], emits: ["update:modelValue"] },
-  "q-chip": { template: "<span class='q-chip'><slot /></span>", props: ["dense", "size", "color", "textColor", "removable"], emits: ["remove"] },
-  "q-badge": { template: "<span><slot /></span>" },
   "q-input": { template: '<input />', props: ["modelValue", "dense", "filled", "clearable", "placeholder"] },
   "q-item": { template: "<div class='q-item' @click=\"$emit('click')\"><slot /></div>", emits: ["click"] },
   "q-item-section": { template: "<div><slot /></div>", props: ["side", "avatar"] },

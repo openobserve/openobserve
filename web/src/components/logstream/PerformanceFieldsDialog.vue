@@ -26,18 +26,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Full Text Search ({{ fieldsByType.fts.length }})
       </div>
       <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
-        <q-chip
+        <OBadge
           v-for="field in fieldsByType.fts"
           :key="field.name"
-          :color="store.state.theme === 'dark' ? 'blue-9' : 'blue-2'"
-          :text-color="store.state.theme === 'dark' ? 'blue-2' : 'blue-9'"
+          variant="primary-soft"
           size="sm"
           class="q-mr-xs q-mb-xs"
-          removable
-          @remove="$emit('remove-field', 'fts', field.name)"
         >
           {{ field.name }}
-        </q-chip>
+          <template #trailing>
+            <button
+              type="button"
+              :aria-label="`Remove ${field.name}`"
+              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              @click="$emit('remove-field', 'fts', field.name)"
+            >
+              <OIcon name="close" size="xs" />
+            </button>
+          </template>
+        </OBadge>
       </div>
     </div>
 
@@ -46,18 +53,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Secondary Index ({{ fieldsByType.secondaryIndex.length }})
       </div>
       <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
-        <q-chip
+        <OBadge
           v-for="field in fieldsByType.secondaryIndex"
           :key="field.name"
-          :color="store.state.theme === 'dark' ? 'green-9' : 'green-2'"
-          :text-color="store.state.theme === 'dark' ? 'green-2' : 'green-9'"
+          variant="success-soft"
           size="sm"
           class="q-mr-xs q-mb-xs"
-          removable
-          @remove="$emit('remove-field', 'secondaryIndex', field.name)"
         >
           {{ field.name }}
-        </q-chip>
+          <template #trailing>
+            <button
+              type="button"
+              :aria-label="`Remove ${field.name}`"
+              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              @click="$emit('remove-field', 'secondaryIndex', field.name)"
+            >
+              <OIcon name="close" size="xs" />
+            </button>
+          </template>
+        </OBadge>
       </div>
     </div>
   </ODialog>
@@ -67,6 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, PropType } from "vue";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export interface PerformanceField {
   name: string;
@@ -75,7 +91,7 @@ export interface PerformanceField {
 
 export default defineComponent({
   name: "PerformanceFieldsDialog",
-  components: { ODialog },
+  components: { ODialog, OBadge, OIcon },
   props: {
     modelValue: {
       type: Boolean,

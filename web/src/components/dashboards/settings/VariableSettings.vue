@@ -105,24 +105,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="item-scope">
                 <div class="scope-info">
-                  <q-badge
-                    color="primary"
+                  <OBadge
+                    variant="primary"
                     v-if="getScopeType(variable) === 'global'"
                   >
                     Global
-                  </q-badge>
-                  <q-badge
-                    color="secondary"
+                  </OBadge>
+                  <OBadge
+                    variant="primary-soft"
                     v-else-if="getScopeType(variable) === 'tabs'"
                   >
                     {{ variable.tabs?.length || 0 }} Tabs
-                  </q-badge>
-                  <q-badge
-                    color="teal"
+                  </OBadge>
+                  <OBadge
+                    variant="primary-outline"
                     v-else-if="getScopeType(variable) === 'panels'"
                   >
                     {{ variable.panels?.length || 0 }} Panels
-                  </q-badge>
+                  </OBadge>
 
                   <OTooltip
                     v-if="getScopeType(variable) === 'tabs' && variable.tabs?.length"
@@ -223,6 +223,7 @@ import useNotifications from "@/composables/useNotifications";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -236,6 +237,7 @@ export default defineComponent({
     OButton,
     OIcon,
     ODialog,
+    OBadge,
     OTooltip,
   },
   emits: ["save"],
@@ -525,11 +527,6 @@ export default defineComponent({
     .scope-info {
       display: flex;
       align-items: center;
-
-      .q-badge {
-        font-size: 0.8rem;
-        padding: 4px 8px;
-      }
     }
   }
 

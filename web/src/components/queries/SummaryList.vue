@@ -81,7 +81,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { NoData, OTable, OButton, X, OSpinner },
+  components: { NoData, OTable, OButton, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,

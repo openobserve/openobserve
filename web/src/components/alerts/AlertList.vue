@@ -752,6 +752,12 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
@@ -777,6 +783,11 @@ export default defineComponent({
     OIcon,
     ODialog,
     OSpinner,
+    OBadge,
+    OInput,
+    OSelect,
+    OSwitch,
+    OTooltip,
     OTable,
   },
   emits: [
@@ -1576,6 +1587,57 @@ export default defineComponent({
         filterAlertsByTab();
       }
     });
+    const showAddUpdateFn = async (props: any) => {
+      //made this async because we need to wait for the router to navigate
+      //so that we can get the alert_type from the query params
+      formData.value = props.row;
+      let action;
+      try {
+        if (!props.row) {
+          isUpdated.value = false;
+          action = "Add Alert";
+          await router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              action: "add",
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+              alert_type: activeTab.value,
+            },
+          });
+        } else {
+          isUpdated.value = true;
+          action = "Update Alert";
+          await router.push({
+            name: "alertList",
+            query: {
+              ...router.currentRoute.value.query,
+              alert_id: props.row.id,
+              action: "update",
+              name: props.row.name,
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+        }
+        addAlert();
+        if (config.enableAnalytics == "true") {
+          segment.track("Button Click", {
+            button: action,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Alerts",
+          });
+        }
+        track("Button Click", {
+          button: action,
+          page: "Add Alert",
+        });
+      } catch (error) {
+        console.error("Navigation failed:", error);
+      }
+    };
     watch(
       () => router.currentRoute.value.query.action,
       async (action) => {
@@ -1830,57 +1892,6 @@ export default defineComponent({
           message: e.data.message,
           timeout: 2000,
         });
-      }
-    };
-    const showAddUpdateFn = async (props: any) => {
-      //made this async because we need to wait for the router to navigate
-      //so that we can get the alert_type from the query params
-      formData.value = props.row;
-      let action;
-      try {
-        if (!props.row) {
-          isUpdated.value = false;
-          action = "Add Alert";
-          await router.push({
-            name: "alertList",
-            query: {
-              ...router.currentRoute.value.query,
-              action: "add",
-              org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
-              alert_type: activeTab.value,
-            },
-          });
-        } else {
-          isUpdated.value = true;
-          action = "Update Alert";
-          await router.push({
-            name: "alertList",
-            query: {
-              ...router.currentRoute.value.query,
-              alert_id: props.row.id,
-              action: "update",
-              name: props.row.name,
-              org_identifier: store.state.selectedOrganization.identifier,
-              folder: activeFolderId.value,
-            },
-          });
-        }
-        addAlert();
-        if (config.enableAnalytics == "true") {
-          segment.track("Button Click", {
-            button: action,
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            page: "Alerts",
-          });
-        }
-        track("Button Click", {
-          button: action,
-          page: "Add Alert",
-        });
-      } catch (error) {
-        console.error("Navigation failed:", error);
       }
     };
     const refreshList = async (folderId?: string) => {
@@ -2760,6 +2771,7 @@ export default defineComponent({
       folders,
       splitterModel,
       alertStateLoadingMap,
+      toggleAlertState,
       templates,
       routeTo,
       refreshDestination,

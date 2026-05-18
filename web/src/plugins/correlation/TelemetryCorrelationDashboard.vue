@@ -215,12 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="0.875rem"
                             />
                             <span>{{ group.label }}</span>
-                            <q-badge
-                              color="grey-6"
-                              text-color="white"
-                              :label="group.streams.length"
+                            <OBadge
+                              variant="default"
                               class="tw:ml-1"
-                            />
+                            >{{ group.streams.length }}</OBadge>
                           </div>
                           <div class="metric-group-actions">
                             <OButton
@@ -316,20 +314,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tw:flex tw:items-center tw:gap-1 tw:px-1">
                       <component :is="group.icon" />
                       <span>{{ group.label }}</span>
-                      <q-badge
-                        dense
-                        :color="
-                          activeMetricGroupTab === group.id
-                            ? 'primary'
-                            : 'grey-5'
-                        "
-                        text-color="white"
-                        :label="
-                          groupedSelectedMetricStreams.byGroup[group.id]
-                            ?.length ?? 0
-                        "
+                      <OBadge
+                        :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
                         class="tw:ml-0.5"
-                      />
+                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
                     </div>
                   </OTab>
                 </OTabs>
@@ -503,9 +491,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('correlation.viewInTraces') }}
                     <OTooltip :content="t('correlation.viewInTraces')" side="top" />
                   </OButton>
-                  <q-chip dense color="primary" text-color="white">
+                  <OBadge variant="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                  </q-chip>
+                  </OBadge>
                 </div>
               </div>
             </div>
@@ -702,12 +690,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="0.875rem"
                           />
                           <span>{{ group.label }}</span>
-                          <q-badge
-                            color="grey-6"
-                            text-color="white"
-                            :label="group.streams.length"
+                          <OBadge
+                            variant="default"
                             class="tw:ml-1"
-                          />
+                          >{{ group.streams.length }}</OBadge>
                         </div>
                         <div class="metric-group-actions">
                           <OButton
@@ -811,18 +797,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                     />
                     <span>{{ group.label }}</span>
-                    <q-badge
-                      dense
-                      :color="
-                        activeMetricGroupTab === group.id ? 'primary' : 'grey-5'
-                      "
-                      text-color="white"
-                      :label="
-                        groupedSelectedMetricStreams.byGroup[group.id]
-                          ?.length ?? 0
-                      "
+                    <OBadge
+                      :variant="activeMetricGroupTab === group.id ? 'primary' : 'default'"
                       class="tw:ml-0.5"
-                    />
+                    >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OBadge>
                   </div>
                 </OTab>
               </OTabs>
@@ -978,9 +956,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <q-chip dense color="primary" text-color="white">
+              <OBadge variant="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-              </q-chip>
+              </OBadge>
               <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
                 <OButton
                   variant="ghost"
@@ -1083,12 +1061,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="0.875rem"
                 />
                 <span>{{ group.label }}</span>
-                <q-badge
-                  color="grey-6"
-                  text-color="white"
-                  :label="group.streams.length"
+                <OBadge
+                  variant="default"
                   class="tw:ml-1"
-                />
+                >{{ group.streams.length }}</OBadge>
               </div>
               <div class="metric-group-actions">
                 <OButton
@@ -1188,6 +1164,7 @@ import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
