@@ -266,7 +266,7 @@ size="xs" class="warning" />{{
                   </q-item-label>
                 </q-item-section>
               </q-item>
-              <q-separator />
+              <OSeparator />
             </div>
 
             <!-- Documentation link -->
@@ -277,7 +277,7 @@ size="xs" class="warning" />{{
                 </q-item-label>
               </q-item-section>
             </q-item>
-            <q-separator />
+            <OSeparator />
 
             <!-- About page link -->
             <q-item
@@ -344,7 +344,7 @@ size="xs" class="warning" />{{
                 }}</q-item-label>
               </q-item-section>
             </q-item>
-            <q-separator />
+            <OSeparator />
 
             <!-- Language selector -->
             <q-item clickable>
@@ -412,7 +412,7 @@ name="language" class="padding-none" />
                 </q-list>
               </q-menu>
             </q-item>
-            <q-separator />
+            <OSeparator />
 
             <!-- Theme management -->
             <q-item
@@ -430,7 +430,7 @@ name="color-lens" class="padding-none" />
                 <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
               </q-item-section>
             </q-item>
-            <q-separator />
+            <OSeparator />
 
             <!-- Logout -->
             <q-item
@@ -469,6 +469,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({

@@ -502,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator />
+              <OSeparator />
 
               <!-- === SAVED VIEWS GROUP (moved from toolbar at <= 1500px) === -->
 
@@ -540,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveSavedViewToMenu" />
+              <OSeparator v-if="shouldMoveSavedViewToMenu" />
 
               <!-- === ACTIONS GROUP === -->
 
@@ -561,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveSavedViewToMenu" />
+              <OSeparator v-if="shouldMoveSavedViewToMenu" />
 
               <!-- Syntax Guide -->
               <q-item class="q-pa-sm saved-view-item syntax-guide-menu-item">
@@ -623,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveShareToMenu" />
+              <OSeparator v-if="shouldMoveShareToMenu" />
 
               <q-item
                 data-test="search-history-item-btn"
@@ -642,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator />
+              <OSeparator />
               <q-item
                 style="min-width: 150px"
                 class="q-pa-sm saved-view-item download-menu-parent"
@@ -736,7 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator />
+              <OSeparator />
               <q-item
                 v-if="searchObj.meta.sqlMode"
                 data-test="logs-search-bar-explain-query-menu-btn"
@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator v-if="searchObj.meta.sqlMode" />
+              <OSeparator v-if="searchObj.meta.sqlMode" />
               <q-item
                 v-if="config.isEnterprise == 'true'"
                 data-test="search-scheduler-create-new-btn"
@@ -800,7 +800,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator v-if="config.isEnterprise == 'true'" />
+              <OSeparator v-if="config.isEnterprise == 'true'" />
               <q-item
                 v-if="
                   config.isEnterprise == 'true' &&

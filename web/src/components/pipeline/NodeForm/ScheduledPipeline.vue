@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width scheduled-pipeline-container">
-    <!-- <q-separator /> -->
+    <!-- <OSeparator /> -->
 
     <div class="q-mb-sm stepper-header tw:w-full tw:flex tw:h-full">
       <div
