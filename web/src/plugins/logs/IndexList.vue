@@ -534,16 +534,8 @@ export default defineComponent({
     const fieldListRef = ref<HTMLElement | null>(null);
 
     const scrollToTop = () => {
-      if (fieldListRef.value) {
-        // Find the scrollable container within the q-table
-        // fieldListRef.value is a component instance, need to access $el for DOM
-        const scrollContainer = fieldListRef.value.$el?.querySelector(
-          ".q-table__middle.scroll",
-        );
-        if (scrollContainer) {
-          scrollContainer.scrollTop = 0;
-        }
-      }
+      // Use FieldList's exposed scrollToTop which works with OFieldList/OTable
+      (fieldListRef.value as any)?.scrollToTop?.();
     };
 
     const resetPagination = () => {

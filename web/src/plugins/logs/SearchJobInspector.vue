@@ -277,83 +277,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Profile Data Table -->
       <div v-if="!loading  && profileData && profileData.events" class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-242px)]">
-          <q-table
-            :rows="hierarchicalEvents"
+          <OTable
+            :data="hierarchicalEvents"
             :columns="columns"
             row-key="id"
-            :pagination="{ rowsPerPage: 0 }"
-            hide-pagination
+            pagination="none"
+            :show-global-filter="false"
+            :get-cell-style="getCellStyle"
             style="width: 100%; height: calc(100vh - 242px)"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             data-test="inspector-events-table"
           >
-            <!-- Index column with expand/collapse -->
-            <template v-slot:body-cell-index="props">
-              <q-td
-                :props="props"
-                class="tree-cell"
-                :class="{
-                  'tree-has-children': props.row.level > 0,
-                  'tree-is-parent': props.row.children && props.row.children.length > 0,
-                  'tree-last-child': props.row.isLastChild
-                }"
-                :style="props.row.level > 0 ? {
-                  '--tree-level': props.row.level,
-                  '--tree-indent': `${props.row.level * 30}px`
-                } : {}"
+            <template #cell-index="{ row }">
+              <div
+                :style="{ paddingLeft: getPaddingLeft(row.level) }"
+                class="row items-center no-wrap tree-node-content"
               >
+                <div class="tree-icon-wrapper">
+                  <OIcon
+                    v-if="row.children && row.children.length > 0"
+                    :name="row.expanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'"
+                    size="xs"
+                    class="cursor-pointer tree-expand-icon"
+                    @click="toggleNode(row)"
+                  />
+                </div>
+                <span class="tree-index-text">
+                  {{ row.index }}
+                </span>
+              </div>
+            </template>
+
+            <template #cell-duration="{ row }">
+              <div class="duration-cell">
                 <div
-                  :style="{ paddingLeft: getPaddingLeft(props.row.level) }"
-                  class="row items-center no-wrap tree-node-content"
-                >
-                  <!-- Always reserve space for expand icon to keep alignment consistent -->
-                  <div class="tree-icon-wrapper">
-                    <OIcon
-                      v-if="props.row.children && props.row.children.length > 0"
-                      :name="
-                        props.row.expanded
-                          ? 'keyboard_arrow_down'
-                          : 'keyboard_arrow_right'
-                      "
-                      size="xs"
-                      class="cursor-pointer tree-expand-icon"
-                      @click="toggleNode(props.row)"
-                    />
-                  </div>
-                  <span class="tree-index-text">
-                    {{ props.row.index }}
-                  </span>
-                </div>
-              </q-td>
+                  class="duration-bar"
+                  :style="{
+                    width: calculateBarWidth(row.duration) + '%',
+                    backgroundColor: getDurationColor(row.duration),
+                  }"
+                ></div>
+                <span class="duration-text">{{ formatDuration(row.duration) }}</span>
+              </div>
             </template>
 
-            <!-- Duration column with bar -->
-            <template v-slot:body-cell-duration="props">
-              <q-td :props="props">
-                <div class="duration-cell">
-                  <div
-                    class="duration-bar"
-                    :style="{
-                      width: calculateBarWidth(props.row.duration) + '%',
-                      backgroundColor: getDurationColor(props.row.duration),
-                    }"
-                  ></div>
-                  <span class="duration-text">{{ formatDuration(props.row.duration) }}</span>
-                </div>
-              </q-td>
+            <template #cell-desc="{ row }">
+              <div class="text-caption">{{ row.desc || '-' }}</div>
             </template>
 
-            <!-- Description column -->
-            <template v-slot:body-cell-desc="props">
-              <q-td :props="props">
-                <div class="text-caption">{{ props.row.desc || '-' }}</div>
-              </q-td>
-            </template>
-
-            <template #no-data>
+            <template #empty>
               <no-data />
             </template>
-          </q-table>
+          </OTable>
         </div>
       </div>
     </div>
@@ -413,6 +388,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 interface ProfileEvent {
   timestamp: string;
@@ -457,6 +434,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OIcon,
+    OTable,
 },
   setup() {
     const router = useRouter();
@@ -479,47 +457,47 @@ export default defineComponent({
     const startTime = computed(() => route.query.start_time ? parseInt(route.query.start_time as string) : undefined);
     const endTime = computed(() => route.query.end_time ? parseInt(route.query.end_time as string) : undefined);
 
-    const columns = computed(() => [
+    const columns = computed<OTableColumnDef[]>(() => [
       {
-        name: "index",
-        label: "#",
-        field: "index",
-        align: "left" as const,
-        style: `width: ${indexColumnWidth.value}px; min-width: ${indexColumnWidth.value}px; max-width: ${indexColumnWidth.value}px`,
+        id: "index",
+        header: "#",
+        accessorKey: "index",
+        meta: { align: "left", cellClass: "tree-cell" },
+        size: indexColumnWidth.value,
       },
       {
-        name: "duration",
-        label: "Duration",
-        field: "duration",
-        align: "left" as const,
-        style: "width: 200px",
+        id: "duration",
+        header: "Duration",
+        accessorKey: "duration",
+        meta: { align: "left" },
+        size: 200,
       },
       {
-        name: "node_name",
-        label: "Node Name",
-        field: "node_name",
-        align: "left" as const,
-        style: "width: 200px",
+        id: "node_name",
+        header: "Node Name",
+        accessorKey: "node_name",
+        meta: { align: "left" },
+        size: 200,
       },
       {
-        name: "search_role",
-        label: "Role",
-        field: "search_role",
-        align: "left" as const,
-        style: "width: 100px",
+        id: "search_role",
+        header: "Role",
+        accessorKey: "search_role",
+        meta: { align: "left" },
+        size: 100,
       },
       {
-        name: "component",
-        label: "Operation",
-        field: "component",
-        align: "left" as const,
-        style: "width: 250px",
+        id: "component",
+        header: "Operation",
+        accessorKey: "component",
+        meta: { align: "left" },
+        size: 250,
       },
       {
-        name: "desc",
-        label: "Description",
-        field: "desc",
-        align: "left" as const,
+        id: "desc",
+        header: "Description",
+        accessorKey: "desc",
+        meta: { align: "left" },
       },
     ]);
 
@@ -674,6 +652,17 @@ export default defineComponent({
       return `${44 + (level - 1) * 12}px`;
     };
 
+    const getCellStyle = ({ columnId, row }: { columnId: string; row: any; value: any }) => {
+      if (columnId !== 'index' || !row || row.level === undefined || row.level === 0) return {};
+      return {
+        '--tree-level': String(row.level),
+        '--tree-indent': `${row.level * 30}px`,
+        '--tree-has-children': '1',
+        '--tree-is-parent': (row.children && row.children.length > 0) ? '1' : '0',
+        '--tree-last-child': row.isLastChild ? '1' : '0',
+      };
+    };
+
     const calculateBarWidth = (duration: number) => {
       return (duration / maxDuration.value) * 100;
     };
@@ -794,6 +783,8 @@ export default defineComponent({
       hierarchicalEvents,
       toggleNode,
       getPaddingLeft,
+      getCellStyle,
+      indexColumnWidth,
       calculateBarWidth,
       getDurationColor,
       formatDuration,
@@ -889,81 +880,76 @@ export default defineComponent({
   word-break: break-all;
 }
 
-// Tree connector styles - simplified with Quasar patterns
+// Tree connector styles — use attribute selectors since conditions are on inline style custom properties
 .tree-cell {
   position: relative;
   overflow: visible !important;
 }
 
-// Vertical and horizontal tree connector lines
-.tree-has-children {
-  // Vertical line connecting parent to children - always at 22px for all levels
-  &::before {
-    content: '';
-    position: absolute;
-    left: 22px;
-    top: -50%;
-    height: 150%;
-    width: 1.5px;
-    background-color: var(--q-primary);
-    opacity: 0.7;
-    z-index: 1;
-  }
+// Vertical line connecting parent to children — always at 22px
+.tree-cell[style*="--tree-has-children:1"]::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: -50%;
+  height: 150%;
+  width: 1.5px;
+  background-color: var(--q-primary);
+  opacity: 0.7;
+  z-index: 1;
+}
 
-  // Horizontal line from vertical line to child's dot - length varies by level
-  &::after {
-    content: '';
-    position: absolute;
-    left: 22px;
-    top: 50%;
-    width: calc((var(--tree-level) - 1) * 12px + 16px);
-    height: 1.5px;
-    background-color: var(--q-primary);
-    opacity: 0.7;
-    z-index: 1;
-  }
+// Last child: only show vertical line up to middle
+.tree-cell[style*="--tree-last-child:1"]::before {
+  top: -50%;
+  height: 100%;
+}
 
-  // Last child: only show vertical line up to middle
-  &.tree-last-child::before {
-    top: -50%;
-    height: 100%;
-  }
+// Horizontal line from vertical line to child's dot
+.tree-cell[style*="--tree-has-children:1"]::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  width: calc((var(--tree-level) - 1) * 12px + 16px);
+  height: 1.5px;
+  background-color: var(--q-primary);
+  opacity: 0.7;
+  z-index: 1;
 }
 
 // Content container
 .tree-node-content {
   position: relative;
   z-index: 2;
-  min-height: 24px; // Ensure consistent row height
-
-  // Junction dot for child nodes
-  &::before {
-    .tree-has-children & {
-      content: '';
-      position: absolute;
-      left: calc((var(--tree-level, 1) - 1) * 12px + 38px);
-      top: 50%;
-      width: 7px;
-      height: 7px;
-      background-color: var(--q-primary);
-      opacity: 0.7;
-      border: 2px solid var(--q-background);
-      border-radius: 0; // Default square for leaf nodes
-      transform: translateY(-50%);
-      z-index: 3;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
-    }
-
-    // Circular dot for parent nodes (nodes with children)
-    .tree-is-parent & {
-      border-radius: 50%;
-    }
-  }
+  min-height: 24px;
 }
 
-// Expand/collapse icon wrapper - always takes up consistent space
+// Junction dot for child nodes
+.tree-cell[style*="--tree-has-children:1"] .tree-node-content::before {
+  content: '';
+  position: absolute;
+  left: calc((var(--tree-level, 1) - 1) * 12px + 38px);
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  background-color: var(--q-primary);
+  opacity: 0.7;
+  border: 2px solid var(--q-background);
+  border-radius: 0; // Default square for leaf nodes
+  transform: translateY(-50%);
+  z-index: 3;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+// Circular dot for parent nodes (nodes with children)
+.tree-cell[style*="--tree-is-parent:1"] .tree-node-content::before {
+  border-radius: 50%;
+}
+
+// Expand/collapse icon wrapper — consistent space
 .tree-icon-wrapper {
-  width: 20px; // Fixed width to reserve space for icon
+  width: 20px;
   height: 20px;
   display: inline-flex;
   align-items: center;
@@ -976,14 +962,14 @@ export default defineComponent({
 .tree-expand-icon {
   flex-shrink: 0;
   vertical-align: middle;
-
-  // Add left margin for child nodes to center it in the available space
-  .tree-has-children & {
-    margin-left: 4px;
-  }
 }
 
-// Index text - consistent spacing
+// Add left margin for child nodes to center icon in available space
+.tree-cell[style*="--tree-has-children:1"] .tree-expand-icon {
+  margin-left: 4px;
+}
+
+// Index text — consistent spacing
 .tree-index-text {
   display: inline-block;
 }

@@ -53,124 +53,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </div>
-      <q-table
+      <OTable
         data-test="alert-templates-list-table"
-        ref="qTableRef"
-        :rows="visibleRows"
+        :data="visibleRows"
         :columns="columns"
         row-key="name"
+        :selected-ids="selectedTemplateIds"
         selection="multiple"
-        v-model:selected="selectedTemplates"
-        style="width: 100%"
-        :rows-per-page-options="[0]"
-        :pagination="pagination"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="
-          hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
-            : 'width: 100%'
-        "
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[5, 10, 20, 50, 100]"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        @update:selected-ids="handleSelectedIdsUpdate"
       >
-        <template #no-data>
+        <template #empty>
           <NoData />
         </template>
-        <template v-slot:body-selection="scope">
-          <OCheckbox
-            v-model="scope.selected"
-            class="o2-table-checkbox"
-          />
-        </template>
-        <template v-slot:header="props">
-          <q-tr :props="props">
-            <!-- Adding this block to render the select-all checkbox -->
-            <q-th v-if="columns.length > 0" auto-width>
-              <OCheckbox
-                v-model="props.selected"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-table-checkbox-dark'
-                    : 'o2-table-checkbox-light'
-                "
-                class="o2-table-checkbox"
-              />
-            </q-th>
-
-            <!-- render the table headers -->
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :class="col.classes"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <OButton
-              title="Export Template"
-              class="q-ml-xs"
-              variant="ghost"
-              size="icon-circle-sm"
-              @click.stop="exportTemplate(props.row)"
-              data-test="destination-export"
-            >
-              <OIcon name="download" size="sm" />
-            </OButton>
-            <OButton
-              :data-test="`alert-template-list-${props.row.name}-update-template`"
-              class="q-ml-xs"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('alert_templates.edit')"
-              @click="editTemplate(props.row)"
-            >
-              <OIcon name="edit" size="sm" />
-            </OButton>
-            <OButton
-              :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              class="q-ml-xs"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('alert_templates.delete')"
-              @click="conformDeleteDestination(props.row)"
-            >
-              <OIcon name="delete" size="sm" />
-            </OButton>
-          </q-td>
-        </template>
-        <template #bottom="scope">
-          <div
-            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+        <template #cell-actions="{ row }">
+          <OButton
+            title="Export Template"
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
+            @click.stop="exportTemplate(row)"
+            data-test="destination-export"
           >
-            <div
-              class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
-            >
-              {{ resultTotal }} {{ t("alert_templates.header") }}
-            </div>
-            <OButton
-              v-if="selectedTemplates.length > 0"
-              data-test="template-list-delete-templates-btn"
-              variant="outline"
-              size="sm"
-              class="q-mr-sm"
-              @click="openBulkDeleteDialog"
-            >
-              <OIcon name="delete" size="sm" />
-              <span class="tw:ml-2">Delete</span>
-            </OButton>
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </div>
+            <OIcon name="download" size="sm" />
+          </OButton>
+          <OButton
+            :data-test="`alert-template-list-${row.name}-update-template`"
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
+            :title="t('alert_templates.edit')"
+            @click="editTemplate(row)"
+          >
+            <OIcon name="edit" size="sm" />
+          </OButton>
+          <OButton
+            :data-test="`alert-template-list-${row.name}-delete-template`"
+            class="q-ml-xs"
+            variant="ghost"
+            size="icon-circle-sm"
+            :title="t('alert_templates.delete')"
+            @click="conformDeleteDestination(row)"
+          >
+            <OIcon name="delete" size="sm" />
+          </OButton>
         </template>
-      </q-table>
+        <template
+          v-if="selectedTemplates.length > 0"
+          #bottom
+        >
+          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+            {{ selectedTemplates.length }} selected
+          </span>
+          <OButton
+            data-test="template-list-delete-templates-btn"
+            variant="outline"
+            size="sm"
+            icon-left="delete"
+            @click="openBulkDeleteDialog"
+          >
+            Delete
+          </OButton>
+        </template>
+      </OTable>
     </div>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
       <AddTemplate
@@ -211,7 +162,7 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -221,9 +172,9 @@ import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ImportTemplate from "./ImportTemplate.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 
 const AddTemplate = defineAsyncComponent(
@@ -236,43 +187,34 @@ const router = useRouter();
 const q = useQuasar();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
-const columns: any = ref<QTableProps["columns"]>([
+const columns: OTableColumnDef[] = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
-    style: "width: 67px",
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    size: 67,
+    meta: { align: "left" },
   },
   {
-    name: "name",
-    field: "name",
-    label: t("alert_templates.name"),
-    align: "left",
+    id: "name",
+    header: t("alert_templates.name"),
+    accessorKey: "name",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "actions",
-    field: "actions",
-    label: t("alert_templates.actions"),
-    align: "center",
-    sortable: false,
-    classes: "actions-column",
+    id: "actions",
+    header: t("alert_templates.actions"),
+    isAction: true,
+    pinned: "right",
+    size: 120,
+    meta: { align: "center" },
   },
-]);
+];
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
-const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
 const resultTotal = ref<number>(0);
-const selectedPerPage = ref<number>(20);
-const qTableRef = ref<any>(null);
 
 const confirmDelete: Ref<{
   visible: boolean;
@@ -280,16 +222,16 @@ const confirmDelete: Ref<{
 }> = ref({ visible: false, data: null });
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
-const pagination: any = ref({
-  page: 1,
-  rowsPerPage: 20, // 0 means all rows
-});
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
 const filterQuery = ref("");
+
+const selectedTemplateIds = computed(() =>
+  selectedTemplates.value.map((item: any) => item.name),
+);
+
+const handleSelectedIdsUpdate = (ids: string[]) => {
+  const map = new Map(templates.value.map((r: any) => [r.name, r]));
+  selectedTemplates.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+};
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
@@ -482,8 +424,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value) return templates.value || [];
   return filterData(templates.value || [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
 // Watch visibleRows to sync resultTotal with search filter
 watch(
   visibleRows,

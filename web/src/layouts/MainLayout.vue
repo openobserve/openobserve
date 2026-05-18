@@ -38,13 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-language="selectedLanguage"
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
-        :filtered-organizations="filteredOrganizations"
-        :search-query="searchQuery"
-        :rows-per-page="rowsPerPage"
+        :organizations="orgOptions"
         :is-hovered="isHovered"
         :get-btn-logo="getBtnLogo"
         @update:selected-org="selectedOrg = $event"
-        @update:search-query="searchQuery = $event"
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
@@ -321,24 +318,6 @@ export default defineComponent({
       autoSend: boolean;
       id: number;
     } | null>(null);
-    const rowsPerPage = ref(10);
-    const searchQuery = ref("");
-
-    const filteredOrganizations = computed(() => {
-      //we will return all organizations if searchQuery is empty
-      //else we will search based upon label or identifier that we get from the search query
-      //if anyone of the orgs matches either label or identifier then we will return that orgs
-      if (!searchQuery.value) return orgOptions.value;
-      const toBeSearched = searchQuery.value.toLowerCase().trim();
-      return orgOptions.value.filter((org: any) => {
-        const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
-        const identifierMatch = org.identifier
-          ?.toLowerCase()
-          .includes(toBeSearched);
-        return labelMatch || identifierMatch;
-      });
-    });
-
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
     )
@@ -1123,14 +1102,11 @@ export default defineComponent({
       prefetchRoute(routePath);
     };
 
-    //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
-    //to make sync with the user clicked org
-    //we dont need search query after selectedOrg has been changed so resetting it
+    // Sync the user-clicked org with the selected org
     watch(
       selectedOrg,
       (newVal) => {
         userClickedOrg.value = newVal;
-        searchQuery.value = "";
       },
       { immediate: true },
     );
@@ -1173,9 +1149,6 @@ export default defineComponent({
       aiChatInputContext,
       aiChatAppendMode,
       userClickedOrg,
-      searchQuery,
-      filteredOrganizations,
-      rowsPerPage,
       verifyStreamExist,
       filterMenus,
       updateActionsMenu,

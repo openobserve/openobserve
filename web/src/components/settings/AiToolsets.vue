@@ -49,80 +49,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Table -->
-      <q-table
-        ref="qTable"
-        :rows="visibleRows"
+      <OTable
+        :data="visibleRows"
         :columns="columns"
         row-key="id"
-        :pagination="pagination"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="
-          hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'
-        "
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[20, 50, 100]"
+        sorting="client"
+        :default-columns="false"
+        :show-global-filter="false"
       >
-        <template #no-data><NoData /></template>
+        <template #empty><NoData /></template>
 
-        <template v-slot:header="props">
-          <q-tr :props="props">
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :class="col.classes"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
+        <template #cell-kind="{ row }">
+          <OBadge
+            :variant="kindBadgeVariant(row.kind)"
+            size="sm"
+          >{{ row.kind.toUpperCase() }}</OBadge>
         </template>
 
-        <template v-slot:body-cell-kind="props">
-          <q-td :props="props">
-            <OBadge
-              :variant="kindBadgeVariant(props.row.kind)"
-              size="sm"
-            >{{ props.row.kind.toUpperCase() }}</OBadge>
-          </q-td>
+        <template #cell-actions="{ row }">
+          <OButton
+            :data-test="`ai-toolset-${row.name}-edit`"
+            variant="ghost"
+            size="icon-xs-sq"
+            :title="t('common.edit')"
+            @click="editToolset(row)"
+            icon-left="edit"
+          />
+          <OButton
+            :data-test="`ai-toolset-${row.name}-delete`"
+            variant="ghost-destructive"
+            size="icon-xs-sq"
+            :title="t('common.delete')"
+            @click="confirmDeleteToolset(row)"
+            icon-left="delete"
+          />
         </template>
-
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <OButton
-              :data-test="`ai-toolset-${props.row.name}-edit`"
-              variant="ghost"
-              size="icon-xs-sq"
-              :title="t('common.edit')"
-              @click="editToolset(props.row)"
-              icon-left="edit"
-            />
-            <OButton
-              :data-test="`ai-toolset-${props.row.name}-delete`"
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              :title="t('common.delete')"
-              @click="confirmDeleteToolset(props.row)"
-              icon-left="delete"
-            />
-          </q-td>
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t("aiToolset.header") }}
-            </div>
-            <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </div>
-        </template>
-      </q-table>
+      </OTable>
     </div>
 
     <!-- Add / Edit form -->
@@ -154,14 +119,15 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, QTableProps } from "quasar";
+import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
@@ -177,7 +143,6 @@ const KIND_VARIANTS: Record<string, string> = {
 export default defineComponent({
   name: "PageAiToolsets",
   components: {
-    QTablePagination,
     NoData,
     ConfirmDialog,
     AddAiToolset,
@@ -185,6 +150,7 @@ export default defineComponent({
     OIcon,
     OBadge,
     OInput,
+    OTable,
 },
   setup() {
     const store = useStore();
@@ -194,33 +160,25 @@ export default defineComponent({
 
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
-    const qTable: any = ref(null);
     const loading = ref(false);
     const filterQuery = ref("");
 
-    const columns = ref<QTableProps["columns"]>([
-      { name: "#", label: "#", field: "#", align: "left", style: "width: 52px" },
-      { name: "name", field: "name", label: t("aiToolset.name"), align: "left", sortable: true },
-      { name: "kind", field: "kind", label: t("aiToolset.kind"), align: "left", sortable: true, style: "width: 110px" },
-      { name: "description", field: "description", label: t("aiToolset.description"), align: "left" },
+    const columns: OTableColumnDef[] = [
+      { id: "#", header: "#", accessorKey: "#", size: 52, meta: { align: "left" } },
+      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
+      { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, size: 110, meta: { align: "left" } },
+      { id: "description", header: t("aiToolset.description"), accessorKey: "description", meta: { align: "left" } },
       {
-        name: "actions",
-        field: "actions",
-        label: t("aiToolset.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
+        id: "actions",
+        header: t("aiToolset.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 80,
+        meta: { align: "center" },
       },
-    ]);
-
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
     ];
+
     const resultTotal = ref(0);
-    const pagination: any = ref({ rowsPerPage: 20 });
-    const selectedPerPage = ref(20);
 
     const confirmDelete: Ref<{ visible: boolean; data: any }> = ref({
       visible: false,
@@ -303,8 +261,6 @@ export default defineComponent({
       );
     });
 
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
     watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
 
     // -----------------------------------------------------------------------
@@ -336,12 +292,6 @@ export default defineComponent({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
-    };
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
     };
 
     // -----------------------------------------------------------------------
@@ -394,25 +344,18 @@ export default defineComponent({
     return {
       t,
       store,
-      qTable,
       loading,
       tabledata,
       columns,
       showAddDialog,
-      pagination,
-      perPageOptions,
-      selectedPerPage,
       resultTotal,
       filterQuery,
       visibleRows,
-      hasVisibleRows,
       confirmDelete,
-      "delete": "delete",
       addToolset,
       editToolset,
       hideAddDialog,
       getData,
-      changePagination,
       confirmDeleteToolset,
       cancelDelete,
       deleteToolset,

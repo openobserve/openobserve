@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -107,169 +107,138 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:w-full tw:h-full tw:pr-[0.625rem]">
       <div
+        data-test="pipeline-history-table"
         class="pipeline-history-table card-container tw:h-[calc(100vh-127px)]"
       >
-        <q-table
-          data-test="pipeline-history-table"
-          ref="qTable"
-          :rows="rows"
+        <OTable
+          :data="rows"
           :columns="columns"
           row-key="id"
-          v-model:pagination="pagination"
-          :rows-per-page-options="rowsPerPageOptions"
-          @request="onRequest"
+          pagination="server"
+          :current-page="pagination.page"
+          :page-size="pagination.rowsPerPage"
+          :total-count="pagination.rowsNumber"
+          :page-size-options="pageSizeOptions"
+          sorting="server"
+          :sort-by="pagination.sortBy"
+          :sort-order="pagination.descending ? 'desc' : 'asc'"
           :loading="loading"
-          binary-state-sort
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          style="width: 100%; height: calc(100vh - 127px)"
+          :show-global-filter="false"
+          dense
+          bordered
+          sticky-header
+          @pagination-change="onPaginationChange"
+          @sort-change="onSortChange"
         >
-          <template #no-data>
-            <div class="tw:h-[calc(100vh-136px)] full-width">
-              <no-data />
-            </div>
+          <template #cell-timestamp="{ row }">
+            {{ formatDate(row.timestamp) }}
           </template>
 
-          <template #body-cell-timestamp="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.timestamp) }}
-            </q-td>
+          <template #cell-start_time="{ row }">
+            {{ formatDate(row.start_time) }}
           </template>
 
-          <template #body-cell-start_time="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.start_time) }}
-            </q-td>
+          <template #cell-end_time="{ row }">
+            {{ formatDate(row.end_time) }}
           </template>
 
-          <template #body-cell-end_time="props">
-            <q-td :props="props">
-              {{ formatDate(props.row.end_time) }}
-            </q-td>
-          </template>
-
-          <template #body-cell-status="props">
-            <q-td :props="props">
-              <OBadge
-                :variant="getStatusVariant(props.row.status)"
-                size="sm"
-              >
-                {{ props.row.status }}
-              </OBadge>
-            </q-td>
-          </template>
-
-          <template #body-cell-is_realtime="props">
-            <q-td :props="props">
-              <OIcon
-                :name="props.row.is_realtime ? 'check-circle' : 'schedule'"
-                :color="props.row.is_realtime ? 'positive' : 'grey'"
-                size="xs"
-              >
-                <OTooltip
-                  :content="props.row.is_realtime ? 'Real-time' : 'Scheduled'"
-                  side="top"
-                />
-              </OIcon>
-            </q-td>
-          </template>
-
-          <template #body-cell-is_silenced="props">
-            <q-td :props="props">
-              <OIcon
-                :name="props.row.is_silenced ? 'volume-off' : 'volume-up'"
-                :color="props.row.is_silenced ? 'grey' : 'positive'"
-                size="20px"
-              >
-                <OTooltip
-                  :content="props.row.is_silenced ? 'Silenced' : 'Not Silenced'"
-                  side="top"
-                />
-              </OIcon>
-            </q-td>
-          </template>
-
-          <template #body-cell-duration="props">
-            <q-td :props="props">
-              {{ formatDuration(props.row.end_time - props.row.start_time) }}
-            </q-td>
-          </template>
-
-          <template #body-cell-is_partial="props">
-            <q-td :props="props">
-              <OIcon
-                v-if="
-                  props.row.is_partial !== null &&
-                  props.row.is_partial !== undefined
-                "
-                :name="props.row.is_partial ? 'warning' : 'check-circle'"
-                :color="props.row.is_partial ? 'warning' : 'positive'"
-                size="xs"
-              >
-                <OTooltip
-                  :content="
-                    props.row.is_partial
-                      ? 'Partial Results'
-                      : 'Complete Results'
-                  "
-                  side="top"
-                />
-              </OIcon>
-              <span v-else>-</span>
-            </q-td>
-          </template>
-
-          <template #body-cell-delay_in_secs="props">
-            <q-td :props="props">
-              {{
-                props.row.delay_in_secs !== null &&
-                props.row.delay_in_secs !== undefined
-                  ? props.row.delay_in_secs + "s"
-                  : "-"
-              }}
-            </q-td>
-          </template>
-
-          <template #body-cell-evaluation_took_in_secs="props">
-            <q-td :props="props">
-              {{
-                props.row.evaluation_took_in_secs !== null &&
-                props.row.evaluation_took_in_secs !== undefined
-                  ? props.row.evaluation_took_in_secs.toFixed(2) + "s"
-                  : "-"
-              }}
-            </q-td>
-          </template>
-
-          <template #body-cell-query_took="props">
-            <q-td :props="props">
-              {{
-                props.row.query_took !== null &&
-                props.row.query_took !== undefined
-                  ? (props.row.query_took / 1000).toFixed(2) + "ms"
-                  : "-"
-              }}
-            </q-td>
-          </template>
-
-          <template #bottom="scope">
-            <div
-              class="bottom-btn tw:h-[48px] tw:w-full tw:flex tw:items-center"
+          <template #cell-status="{ row }">
+            <OBadge
+              :variant="getStatusVariant(row.status)"
+              size="sm"
             >
-              <div
-                class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md"
-              >
-                {{ pagination.rowsNumber }} {{ t("pipeline.header") }}
-              </div>
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="pagination.rowsNumber"
-                :perPageOptions="rowsPerPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
+              {{ row.status }}
+            </OBadge>
+          </template>
+
+          <template #cell-is_realtime="{ row }">
+            <OIcon
+              :name="row.is_realtime ? 'check-circle' : 'schedule'"
+              :color="row.is_realtime ? 'positive' : 'grey'"
+              size="xs"
+            >
+              <q-tooltip>
+                {{ row.is_realtime ? "Real-time" : "Scheduled" }}
+              </q-tooltip>
+            </OIcon>
+          </template>
+
+          <template #cell-is_silenced="{ row }">
+            <OIcon
+              :name="row.is_silenced ? 'volume-off' : 'volume-up'"
+              :color="row.is_silenced ? 'grey' : 'positive'"
+              size="20px"
+            >
+              <q-tooltip>
+                {{ row.is_silenced ? "Silenced" : "Not Silenced" }}
+              </q-tooltip>
+            </OIcon>
+          </template>
+
+          <template #cell-duration="{ row }">
+            {{ formatDuration(row.end_time - row.start_time) }}
+          </template>
+
+          <template #cell-is_partial="{ row }">
+            <OIcon
+              v-if="
+                row.is_partial !== null &&
+                row.is_partial !== undefined
+              "
+              :name="row.is_partial ? 'warning' : 'check-circle'"
+              :color="row.is_partial ? 'warning' : 'positive'"
+              size="xs"
+            >
+              <q-tooltip>
+                {{
+                  row.is_partial
+                    ? "Partial Results"
+                    : "Complete Results"
+                }}
+              </q-tooltip>
+            </OIcon>
+            <span v-else>-</span>
+          </template>
+
+          <template #cell-delay_in_secs="{ row }">
+            {{
+              row.delay_in_secs !== null &&
+              row.delay_in_secs !== undefined
+                ? row.delay_in_secs + "s"
+                : "-"
+            }}
+          </template>
+
+          <template #cell-evaluation_took_in_secs="{ row }">
+            {{
+              row.evaluation_took_in_secs !== null &&
+              row.evaluation_took_in_secs !== undefined
+                ? row.evaluation_took_in_secs.toFixed(2) + "s"
+                : "-"
+            }}
+          </template>
+
+          <template #cell-query_took="{ row }">
+            {{
+              row.query_took !== null &&
+              row.query_took !== undefined
+                ? (row.query_took / 1000).toFixed(2) + "ms"
+                : "-"
+            }}
+          </template>
+
+          <template #empty>
+            <no-data />
+          </template>
+
+          <template #bottom="{ totalRows }">
+            <div
+              class="o2-table-footer-title tw:flex tw:items-center tw:w-[120px] tw:mr-md"
+            >
+              {{ totalRows }} {{ t("pipeline.header") }}
             </div>
           </template>
-        </q-table>
+        </OTable>
       </div>
     </div>
 
@@ -681,7 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -693,7 +662,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -718,12 +687,7 @@ const pagination = ref({
   descending: true,
 });
 
-const rowsPerPageOptions = [
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
+const pageSizeOptions = [10, 20, 50, 100];
 
 // Date time - default to last 15 minutes (relative)
 const dateTimeRef = ref<any>(null);
@@ -752,117 +716,117 @@ const errorMessage = ref<any>(null);
 
 // Table columns
 const columns = ref([
-  { name: "#", label: "#", field: "#", align: "left", style: "width: 37px;" },
   {
-    name: "pipeline_name",
-    label: "Pipeline Name",
-    field: "pipeline_name",
-    align: "left",
-    sortable: true,
+    id: "row_number",
+    header: "#",
+    accessorKey: "#",
+    size: 37,
+    meta: { align: "left" as const },
   },
   {
-    name: "is_realtime",
-    label: "Type",
-    field: "is_realtime",
-    align: "center",
+    id: "pipeline_name",
+    header: "Pipeline Name",
+    accessorKey: "pipeline_name",
     sortable: true,
-    style: "width: 37px;",
+    meta: { align: "left" as const },
   },
   {
-    name: "is_silenced",
-    label: "Is Silenced",
-    field: "is_silenced",
-    align: "center",
+    id: "is_realtime",
+    header: "Type",
+    accessorKey: "is_realtime",
     sortable: true,
-    style: "width: 37px;",
+    size: 37,
+    meta: { align: "center" as const },
   },
   {
-    name: "timestamp",
-    label: "Timestamp",
-    field: "timestamp",
-    align: "left",
+    id: "is_silenced",
+    header: "Is Silenced",
+    accessorKey: "is_silenced",
     sortable: true,
-    style: "width: 160px;",
+    size: 37,
+    meta: { align: "center" as const },
   },
   {
-    name: "start_time",
-    label: "Start Time",
-    field: "start_time",
-    align: "left",
+    id: "timestamp",
+    header: "Timestamp",
+    accessorKey: "timestamp",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    meta: { align: "left" as const },
   },
   {
-    name: "end_time",
-    label: "End Time",
-    field: "end_time",
-    align: "left",
+    id: "start_time",
+    header: "Start Time",
+    accessorKey: "start_time",
     sortable: true,
-    style: "width: 160px;",
+    size: 160,
+    meta: { align: "left" as const },
   },
   {
-    name: "duration",
-    label: "Duration",
-    field: (row: any) => row.end_time - row.start_time,
-    align: "right",
+    id: "end_time",
+    header: "End Time",
+    accessorKey: "end_time",
     sortable: true,
-    style: "width: 50px;",
+    size: 160,
+    meta: { align: "left" as const },
   },
   {
-    name: "status",
-    label: "Status",
-    field: "status",
-    align: "center",
+    id: "duration",
+    header: "Duration",
+    accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    style: "width: 150px;",
+    size: 50,
+    meta: { align: "right" as const },
   },
   {
-    name: "retries",
-    label: "Retries",
-    field: "retries",
-    align: "center",
+    id: "status",
+    header: "Status",
+    accessorKey: "status",
     sortable: true,
-    style: "width: 50px;",
+    size: 150,
+    meta: { align: "center" as const },
   },
   {
-    name: "is_partial",
-    label: "Partial",
-    field: "is_partial",
-    align: "center",
+    id: "retries",
+    header: "Retries",
+    accessorKey: "retries",
+    sortable: true,
+    size: 50,
+    meta: { align: "center" as const },
+  },
+  {
+    id: "is_partial",
+    header: "Partial",
+    accessorKey: "is_partial",
     sortable: false,
-    style: "width: 60px;",
+    size: 60,
+    meta: { align: "center" as const },
   },
   {
-    name: "delay_in_secs",
-    label: "Delay (s)",
-    field: "delay_in_secs",
-    align: "right",
+    id: "delay_in_secs",
+    header: "Delay (s)",
+    accessorKey: "delay_in_secs",
     sortable: true,
-    style: "width: 80px;",
+    size: 80,
+    meta: { align: "right" as const },
   },
   {
-    name: "evaluation_took_in_secs",
-    label: "Eval Time (s)",
-    field: "evaluation_took_in_secs",
-    align: "right",
+    id: "evaluation_took_in_secs",
+    header: "Eval Time (s)",
+    accessorKey: "evaluation_took_in_secs",
     sortable: true,
-    style: "width: 100px;",
+    size: 100,
+    meta: { align: "right" as const },
   },
   {
-    name: "query_took",
-    label: "Query Time (ms)",
-    field: "query_took",
-    align: "right",
+    id: "query_took",
+    header: "Query Time (ms)",
+    accessorKey: "query_took",
     sortable: true,
-    style: "width: 110px;",
+    size: 110,
+    meta: { align: "right" as const },
   },
 ]);
-
-// Computed
-const filteredRows = computed(() => {
-  // Removed client-side filtering as we're using server-side pagination
-  return rows.value;
-});
 
 // Methods
 const fetchPipelinesList = async () => {
@@ -1022,13 +986,16 @@ const updateDateTime = (value: any) => {
   fetchPipelineHistory();
 };
 
-const onRequest = (props: any) => {
-  // The pagination component passes the updated pagination object
-  pagination.value = {
-    ...pagination.value,
-    ...props.pagination,
-  };
+const onPaginationChange = (params: { page: number; size: number }) => {
+  pagination.value.page = params.page;
+  pagination.value.rowsPerPage = params.size;
+  fetchPipelineHistory();
+};
 
+const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
+  pagination.value.sortBy = params.column;
+  pagination.value.descending = params.order === "desc";
+  pagination.value.page = 1;
   fetchPipelineHistory();
 };
 
@@ -1122,37 +1089,9 @@ watch(
     fetchPipelineHistory();
   },
 );
-const changePagination = (val: { label: string; value: any }) => {
-  pagination.value.rowsPerPage = val.value;
-  pagination.value.page = 1; // Reset to first page when changing page size
-  fetchPipelineHistory();
-};
 </script>
 
 <style scoped lang="scss">
-.pipeline-history-table {
-  :deep(.q-table) {
-    width: 100%;
-
-    td {
-      vertical-align: middle;
-    }
-
-    // Align all sorting chevrons to the right
-    th.sortable {
-      .q-table__sort-icon {
-        margin-left: auto;
-        margin-right: 0;
-      }
-    }
-
-    // Ensure header content and icon are in a flex container
-    .q-table th .q-table__sort-icon {
-      order: 2;
-    }
-  }
-}
-
 .pipeline-details-dialog {
   :deep(.q-dialog__inner) {
     padding: 24px;

@@ -145,246 +145,184 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-127px)]">
-          <q-table
+          <OTable
             data-test="pipeline-list-table"
-            ref="qTableRef"
-            :rows="visibleRows"
-            :columns="columns"
-            row-key="name"
-            :pagination="pagination"
-            :filter="filterQuery"
-            style="width: 100%"
+            :data="filteredPipelines"
+            :columns="otableColumns"
+            row-key="pipeline_id"
+            :global-filter="filterQuery"
+            :page-size="20"
+            :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
-            v-model:selected="selectedPipelines"
-            :style="
-              hasVisibleRows
-                ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
-                : 'width: 100%'
-            "
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+            v-model:selected-ids="selectedPipelineIds"
+            :expansion="activeTab === 'realtime' ? 'none' : 'single'"
+            v-model:expanded-ids="expandedId"
+            style="width: 100%; height: calc(100vh - var(--navbar-height) - 77px)"
+            @row-click="handleRowClick"
           >
-            <template v-slot:body="props">
-              <q-tr
-                :data-test="`pipeline-list-table-${props.row.pipeline_id}-row`"
-                :props="props"
-                style="cursor: pointer"
-                @click="triggerExpand(props)"
-              >
-                <q-td auto-width>
-                  <OCheckbox
-                    v-model="props.selected"
-                    class="o2-table-checkbox"
-                    @click.stop
-                  />
-                </q-td>
-                <q-td v-if="activeTab == 'scheduled'" auto-width>
-                  <OButton variant="ghost" size="icon-xs-sq"
-                    :icon-left="expandedRow != props.row.pipeline_id ? 'expand-more' : 'expand-less'"
-                  />
-                </q-td>
-                <q-td
-                  v-for="col in filterColumns()"
-                  :key="col.name"
-                  :props="props"
+            <template #cell-actions="{ row }">
+              <div class="tw:flex tw:items-center actions-container">
+                <OButton
+                  :data-test="`pipeline-list-${row.name}-pause-start-alert`"
+                  :variant="
+                    row.enabled ? 'ghost-destructive' : 'ghost'
+                  "
+                  size="icon-xs-sq"
+                  :title="
+                    row.enabled
+                      ? t('alerts.pause')
+                      : t('alerts.start')
+                  "
+                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  @click.stop="togglePipeline(row)"
+                />
+                <OButton
+                  :data-test="`pipeline-list-${row.name}-update-pipeline`"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  @click.stop="editPipeline(row)"
+                  icon-left="edit"
+                />
+                <OButton
+                  :data-test="`pipeline-list-${row.name}-view-pipeline`"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :title="t('pipeline.view')"
+                  icon-left="visibility"
                 >
-                  <template v-if="col.name !== 'actions'">
-                    {{ props.row[col.field] }}
+                  <template #icon-left>
+                    <OIcon name="visibility" size="sm" />
                   </template>
-                  <template v-else>
-                    <!-- Actions Buttons -->
-                    <div class="tw:flex tw:items-center actions-container">
-                      <OButton
-                        :data-test="`pipeline-list-${props.row.name}-pause-start-alert`"
-                        :variant="
-                          props.row.enabled ? 'ghost-destructive' : 'ghost'
+                  <OTooltip>
+                    <template #content><PipelineView :pipeline="row" /></template>
+                  </OTooltip>
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  @click.stop
+                  :data-test="`pipeline-list-${row.name}-more-options`"
+                  icon-left="more-vert"
+                >
+                  <q-menu>
+                    <q-list style="min-width: 100px">
+                      <q-item
+                        class="flex items-center"
+                        clickable
+                        v-close-popup
+                        @click="exportPipeline(row)"
+                      >
+                        <q-item-section dense avatar>
+                          <OIcon size="sm" name="download" />
+                        </q-item-section>
+                        <q-item-section>{{
+                          t("pipeline.export")
+                        }}</q-item-section>
+                      </q-item>
+                      <q-separator
+                        v-if="
+                          row.source.source_type === 'scheduled' &&
+                          config.isEnterprise == 'true'
                         "
-                        size="icon-xs-sq"
-                        :title="
-                          props.row.enabled
-                            ? t('alerts.pause')
-                            : t('alerts.start')
+                      />
+                      <q-item
+                        v-if="
+                          row.source.source_type === 'scheduled' &&
+                          config.isEnterprise == 'true'
                         "
-                        :icon-left="props.row.enabled ? 'pause' : 'play-arrow'"
-                        @click.stop="togglePipeline(props.row)"
-                      />
-                      <OButton
-                        :data-test="`pipeline-list-${props.row.name}-update-pipeline`"
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        @click.stop="editPipeline(props.row)"
-                        icon-left="edit"
-                      />
-                      <OButton
-                        :data-test="`pipeline-list-${props.row.name}-view-pipeline`"
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        :title="t('pipeline.view')"
-                        icon-left="visibility"
+                        class="flex items-center"
+                        clickable
+                        v-close-popup
+                        @click="openBackfillDialog(row)"
                       >
-                        <template #icon-left>
-                          <OIcon name="visibility" size="sm" />
-                        </template>
-                        <OTooltip>
-                          <template #content><PipelineView :pipeline="props.row" /></template>
-                        </OTooltip>
-                      </OButton>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        @click.stop
-                        :data-test="`pipeline-list-${props.row.name}-more-options`"
-                        icon-left="more-vert"
+                        <q-item-section dense avatar>
+                          <OIcon size="sm" name="refresh" />
+                        </q-item-section>
+                        <q-item-section>Create Backfill</q-item-section>
+                      </q-item>
+                      <q-separator />
+                      <q-item
+                        class="flex items-center"
+                        clickable
+                        v-close-popup
+                        @click="openDeleteDialog(row)"
                       >
-                        <q-menu>
-                          <q-list style="min-width: 100px">
-                            <q-item
-                              class="flex items-center"
-                              clickable
-                              v-close-popup
-                              @click="exportPipeline(props.row)"
-                            >
-                              <q-item-section dense avatar>
-                                <OIcon size="sm" name="download" />
-                              </q-item-section>
-                              <q-item-section>{{
-                                t("pipeline.export")
-                              }}</q-item-section>
-                            </q-item>
-                            <q-separator
-                              v-if="
-                                props.row.source.source_type === 'scheduled' &&
-                                config.isEnterprise == 'true'
-                              "
-                            />
-                            <q-item
-                              v-if="
-                                props.row.source.source_type === 'scheduled' &&
-                                config.isEnterprise == 'true'
-                              "
-                              class="flex items-center"
-                              clickable
-                              v-close-popup
-                              @click="openBackfillDialog(props.row)"
-                            >
-                              <q-item-section dense avatar>
-                                <OIcon size="sm" name="refresh" />
-                              </q-item-section>
-                              <q-item-section>Create Backfill</q-item-section>
-                            </q-item>
-                            <q-separator />
-                            <q-item
-                              class="flex items-center"
-                              clickable
-                              v-close-popup
-                              @click="openDeleteDialog(props.row)"
-                            >
-                              <q-item-section dense avatar>
-                                <OIcon name="delete" size="sm" />
-                              </q-item-section>
-                              <q-item-section>{{
-                                t("pipeline.delete")
-                              }}</q-item-section>
-                            </q-item>
-                            <q-separator v-if="props.row.last_error" />
-                            <q-item
-                              v-if="props.row.last_error"
-                              class="flex items-center"
-                              clickable
-                              v-close-popup
-                              @click="showErrorDialog(props.row)"
-                            >
-                              <q-item-section dense avatar>
-                                <OIcon
-                                  size="sm"
-                                  name="error"
-                                />
-                              </q-item-section>
-                              <q-item-section>
-                                <div>View Error</div>
-                                <div class="text-caption text-grey">
-                                  {{
-                                    new Date(
-                                      props.row.last_error
-                                        .last_error_timestamp / 1000,
-                                    ).toLocaleString()
-                                  }}
-                                </div>
-                              </q-item-section>
-                            </q-item>
-                          </q-list>
-                        </q-menu>
-                      </OButton>
-                    </div>
-                  </template>
-                </q-td>
-              </q-tr>
-              <q-tr
-                data-test="scheduled-pipeline-row-expand"
-                v-show="expandedRow === props.row.pipeline_id"
-                :props="props"
-              >
-                <q-td v-if="props.row?.sql_query" colspan="100%">
-                  <div
-                    data-test="scheduled-pipeline-expanded-content"
-                    class="text-left tw:px-2 q-mb-sm expanded-content"
-                  >
-                    <div class="tw:flex tw:items-center q-py-sm">
-                      <strong
-                        >{{ t("pipeline_list.sql_query") }} : <span></span
-                      ></strong>
-                    </div>
-                    <div class="tw:flex tw:items-start tw:justify-center">
-                      <div
-                        data-test="scheduled-pipeline-expanded-sql"
-                        class="scrollable-content expanded-sql"
+                        <q-item-section dense avatar>
+                          <OIcon name="delete" size="sm" />
+                        </q-item-section>
+                        <q-item-section>{{
+                          t("pipeline.delete")
+                        }}</q-item-section>
+                      </q-item>
+                      <q-separator v-if="row.last_error" />
+                      <q-item
+                        v-if="row.last_error"
+                        class="flex items-center"
+                        clickable
+                        v-close-popup
+                        @click="showErrorDialog(row)"
                       >
-                        <pre style="text-wrap: wrap"
-                          >{{ props.row?.sql_query }} </pre
-                        >
-                      </div>
-                    </div>
-                  </div>
-                </q-td>
-              </q-tr>
+                        <q-item-section dense avatar>
+                          <OIcon
+                            size="sm"
+                            name="error"
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <div>View Error</div>
+                          <div class="text-caption text-grey">
+                            {{
+                              new Date(
+                                row.last_error
+                                  .last_error_timestamp / 1000,
+                              ).toLocaleString()
+                            }}
+                          </div>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </q-menu>
+                </OButton>
+              </div>
             </template>
-            <template #no-data>
+
+            <template #expansion="{ row }">
+              <div
+                v-if="row?.sql_query"
+                data-test="scheduled-pipeline-expanded-content"
+                class="text-left tw:px-2 q-mb-sm expanded-content"
+              >
+                <div class="tw:flex tw:items-center q-py-sm">
+                  <strong
+                    >{{ t("pipeline_list.sql_query") }} : <span></span
+                  ></strong>
+                </div>
+                <div class="tw:flex tw:items-start tw:justify-center">
+                  <div
+                    data-test="scheduled-pipeline-expanded-sql"
+                    class="scrollable-content expanded-sql"
+                  >
+                    <pre style="text-wrap: wrap"
+                      >{{ row?.sql_query }} </pre
+                    >
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <template #empty>
               <no-data />
             </template>
-            <template v-slot:body-selection="scope">
-              <OCheckbox
-                v-model="scope.selected"
-                class="o2-table-checkbox"
-              />
-            </template>
 
-            <template v-slot:body-cell-function="props">
-              <q-td :props="props">
-                <OTooltip>
-                  <template #content><pre data-test="scheduled-pipeline-expanded-tooltip-sql">{{ props.row.sql }}</pre></template>
-                </OTooltip>
-                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-              </q-td>
-            </template>
-            <!-- <template #top="scope">
-              <q-table-pagination
-                :scope="scope"
-                :pageTitle="t('pipeline.header')"
-                :position="'top'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-            </template> -->
-
-            <template #bottom="scope">
+            <template #bottom="bottomProps">
               <div class="bottom-btn tw:py-2">
                 <div
                   class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
                 >
-                  {{ resultTotal }} {{ t("pipeline.header") }}
+                  {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
                 </div>
                 <div
-                  v-if="selectedPipelines.length > 0"
+                  v-if="selectedPipelineIds.length > 0"
                   class="tw:flex tw:items-center tw:gap-2"
                 >
                   <OButton
@@ -424,45 +362,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Delete
                   </OButton>
                 </div>
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
               </div>
             </template>
-
-            <template v-slot:header="props">
-              <q-tr :props="props">
-                <!-- Adding this block to render the select-all checkbox -->
-                <q-th v-if="columns.length > 0">
-                  <OCheckbox
-                    v-model="props.selected"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-table-checkbox-dark'
-                        : 'o2-table-checkbox-light'
-                    "
-                    class="o2-table-checkbox"
-                    @update:model-value="props.select"
-                  />
-                </q-th>
-
-                <!-- Rendering the rest of the columns -->
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                  :class="col.classes"
-                  :style="col.style"
-                >
-                  {{ col.label }}
-                </q-th>
-              </q-tr>
-            </template>
-          </q-table>
+          </OTable>
         </div>
       </div>
     </div>
@@ -586,12 +488,11 @@ import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
-import { useQuasar, type QTableProps } from "quasar";
-import type { QTableColumn } from "quasar";
+import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -608,18 +509,8 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 import { filter, update } from "lodash-es";
 
-interface Column {
-  name: string;
-  field: string;
-  label: string;
-  align: string;
-  sortable?: boolean;
-}
-
 const { t } = useI18n();
 const router = useRouter();
-
-const qTableRef: any = ref({});
 
 const q = useQuasar();
 
@@ -641,7 +532,6 @@ onUnmounted(() => {
 
 const showCreatePipeline = ref(false);
 
-const expandedRow: any = ref([]); // Array to track expanded rows
 
 const pipelines = ref([]);
 
@@ -695,26 +585,12 @@ const tabs = reactive([
     icon: "bolt",
   },
 ]);
-const perPageOptions: any = [
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "250", value: 250 },
-  { label: "500", value: 500 },
-];
-const resultTotal = ref<number>(0);
-const maxRecordToReturn = ref<number>(100);
-const selectedPerPage = ref<number>(20);
-const pagination: any = ref({
-  rowsPerPage: 20,
-});
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
 
-const selectedPipelines = ref<any[]>([]);
+const selectedPipelineIds = ref<string[]>([]);
+const selectedPipelines = computed(() =>
+  filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id))
+);
+const expandedId = ref<string[]>([]);
 
 const errorDialog = ref({
   show: false,
@@ -732,13 +608,12 @@ const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
 
-const filterColumns = (): Column[] => {
-  if (activeTab.value === "realtime" || activeTab.value === "all") {
-    return columns.value;
+const otableColumns = computed(() => {
+  if (activeTab.value === "scheduled") {
+    return columns.value.filter((c: any) => c.id !== "#");
   }
-
-  return columns.value.slice(1);
-};
+  return columns.value;
+});
 
 const updateActiveTab = () => {
   if (activeTab.value === "all") {
@@ -750,7 +625,6 @@ const updateActiveTab = () => {
     );
     columns.value = getColumnsForActiveTab(activeTab.value);
     filteredPipelines.value = pipelines.value;
-    resultTotal.value = pipelines.value.length;
     return;
   }
 
@@ -761,7 +635,6 @@ const updateActiveTab = () => {
       "#": index + 1,
     }));
 
-  resultTotal.value = filteredPipelines.value.length;
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
 //this is the function to check whether the pipeline is enabled or not
@@ -815,116 +688,108 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     });
 };
 
-const triggerExpand = (props: any) => {
-  if (
-    expandedRow.value === props.row.pipeline_id ||
-    props.row.source.source_type === "realtime"
-  ) {
-    expandedRow.value = null;
+const handleRowClick = (row: any) => {
+  if (row.source?.source_type === "realtime") {
+    expandedId.value = [];
+    return;
+  }
+  if (expandedId.value.includes(row.pipeline_id)) {
+    expandedId.value = [];
   } else {
-    // Otherwise, expand the clicked row and collapse any other row
-    expandedRow.value = props.row.pipeline_id;
+    expandedId.value = [row.pipeline_id];
   }
 };
 
 const getColumnsForActiveTab = (tab: any) => {
-  let realTimeColumns = [
-    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px;" },
-
-    {
-      name: "name",
-      field: "name",
-      label: t("common.name"),
-      align: "left",
-      sortable: true,
-    },
-    {
-      name: "stream_name",
-      field: "stream_name",
-      label: t("alerts.stream_name"),
-      align: "left",
-      sortable: true,
-    },
-    {
-      name: "stream_type",
-      field: "stream_type",
-      label: t("alerts.streamType"),
-      align: "left",
-      sortable: true,
-    },
-  ];
-
-  let scheduledColumns = [
-    { name: "#", label: "#", field: "#", align: "left", style: "width: 67px;" },
-
-    {
-      name: "name",
-      field: "name",
-      label: t("common.name"),
-      align: "left",
-      sortable: true,
-    },
-    {
-      name: "stream_type",
-      field: "stream_type",
-      label: t("pipeline_list.stream_type"),
-      align: "left",
-      sortable: true,
-    },
-    {
-      name: "frequency",
-      field: "frequency",
-      label: t("pipeline_list.frequency"),
-      align: "left",
-      sortable: true,
-    },
-    {
-      name: "period",
-      field: "period",
-      label: t("pipeline_list.period"),
-      align: "left",
-      sortable: true,
-    },
-    {
-      name: "cron",
-      field: "cron",
-      label: t("pipeline_list.cron"),
-      align: "left",
-      sortable: false,
-    },
-  ];
-
-  const actionsColumn = {
-    name: "actions",
-    field: "actions",
-    label: t("alerts.actions"),
-    align: "center",
+  const hashColumn = {
+    id: "#",
+    header: "#",
+    accessorKey: "#",
     sortable: false,
-    classes: "actions-column",
+    size: 67,
+    meta: { align: "left" },
   };
+  const nameColumn = {
+    id: "name",
+    header: t("common.name"),
+    accessorKey: "name",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const streamNameColumn = {
+    id: "stream_name",
+    header: t("alerts.stream_name"),
+    accessorKey: "stream_name",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const streamTypeColumn = {
+    id: "stream_type",
+    header: t("alerts.streamType"),
+    accessorKey: "stream_type",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const frequencyColumn = {
+    id: "frequency",
+    header: t("pipeline_list.frequency"),
+    accessorKey: "frequency",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const periodColumn = {
+    id: "period",
+    header: t("pipeline_list.period"),
+    accessorKey: "period",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const cronColumn = {
+    id: "cron",
+    header: t("pipeline_list.cron"),
+    accessorKey: "cron",
+    sortable: false,
+    meta: { align: "left" },
+  };
+  const typeColumn = {
+    id: "type",
+    header: t("pipeline_list.type"),
+    accessorKey: "type",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const scheduledStreamTypeColumn = {
+    id: "stream_type",
+    header: t("pipeline_list.stream_type"),
+    accessorKey: "stream_type",
+    sortable: true,
+    meta: { align: "left" },
+  };
+  const actionsColumn = {
+    id: "actions",
+    header: t("alerts.actions"),
+    sortable: false,
+    isAction: true,
+    meta: { align: "center", cellClass: "actions-column" },
+  };
+
   if (tab === "all") {
-    const allColumns = [...scheduledColumns, actionsColumn];
-    allColumns.splice(2, 0, {
-      name: "type",
-      field: "type",
-      label: t("pipeline_list.type"),
-      align: "left",
-      sortable: true,
-    });
-
-    allColumns.splice(3, 0, {
-      name: "stream_name",
-      field: "stream_name",
-      label: t("alerts.stream_name"),
-      align: "left",
-      sortable: true,
-    });
-
-    return allColumns;
+    return [
+      hashColumn,
+      nameColumn,
+      typeColumn,
+      streamNameColumn,
+      scheduledStreamTypeColumn,
+      frequencyColumn,
+      periodColumn,
+      cronColumn,
+      actionsColumn,
+    ];
   }
-  return tab === "realtime"
-    ? [...realTimeColumns, actionsColumn]
-    : [...scheduledColumns, actionsColumn];
+  if (tab === "realtime") {
+    return [hashColumn, nameColumn, streamNameColumn, streamTypeColumn, actionsColumn];
+  }
+  return [hashColumn, nameColumn, scheduledStreamTypeColumn, frequencyColumn, periodColumn, cronColumn, actionsColumn];
 };
 
 onMounted(async () => {
@@ -1104,16 +969,6 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
-const filterData = (rows: any, terms: any) => {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i]["name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-    }
-  }
-  return filtered;
-};
 const routeToAddPipeline = () => {
   router.push({
     name: "createPipeline",
@@ -1195,21 +1050,7 @@ const handleCancelResumePipeline = () => {
   return;
 };
 
-const visibleRows = computed(() => {
-  if (!filterQuery.value) return filteredPipelines.value || [];
-  return filterData(filteredPipelines.value || [], filterQuery.value);
-});
 
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-// Watch visibleRows to sync resultTotal with search filter
-watch(
-  visibleRows,
-  (newVisibleRows) => {
-    resultTotal.value = newVisibleRows.length;
-  },
-  { immediate: true },
-);
 
 const showErrorDialog = (pipeline: any) => {
   errorDialog.value.show = true;

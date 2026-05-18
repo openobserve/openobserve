@@ -28,115 +28,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <q-table
+    <OTable
       data-test="anomaly-detection-list-table"
-      :rows="configs"
+      :data="displayConfigs"
       :columns="columns"
       row-key="anomaly_id"
       :loading="loading"
-      :pagination="{ rowsPerPage: 20 }"
-      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-      style="width: 100%; height: calc(100vh - 160px)"
+      pagination="client"
+      :page-size="20"
+      sorting="client"
+      filter-mode="client"
+      :show-global-filter="false"
+      class="tw:h-full"
     >
-      <!-- # column -->
-      <template #body-cell-rownum="props">
-        <q-td :props="props">{{ props.rowIndex + 1 }}</q-td>
-      </template>
-
       <!-- Status column -->
-      <template #body-cell-status="props">
-        <q-td :props="props">
-          <OBadge :variant="statusColor(props.row)" data-test="anomaly-detection-status-badge">
-            {{ statusLabel(props.row) }}
+      <template #cell-status="{ row }">
+        <div class="tw:flex tw:items-center tw:gap-2">
+          <OBadge :variant="statusColor(row)" data-test="anomaly-detection-status-badge">
+            {{ statusLabel(row) }}
             <OSpinner
-              v-if="props.row.status === 'training'"
+              v-if="row.status === 'training'"
               size="xs"
               class="q-ml-xs"
             />
-            {{ props.row.last_error || t("alerts.anomalyStatus.failed") }}
-          <OTooltip v-if="props.row.status === 'failed'" :content="props.row.last_error || t('alerts.anomalyStatus.failed')" />
           </OBadge>
-        </q-td>
+          <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
+        </div>
       </template>
 
       <!-- Look back window column -->
-      <template #body-cell-detection_window="props">
-        <q-td :props="props">
-          <span v-if="props.row.detection_window_seconds">
-            {{ formatSeconds(props.row.detection_window_seconds) }}
-          </span>
-          <span v-else class="text-grey-5">—</span>
-        </q-td>
+      <template #cell-detection_window="{ row }">
+        <span v-if="row.detection_window_seconds">
+          {{ formatSeconds(row.detection_window_seconds) }}
+        </span>
+        <span v-else class="text-grey-5">—</span>
       </template>
 
       <!-- Last Triggered At column -->
-      <template #body-cell-last_triggered_at="props">
-        <q-td :props="props">
-          <span v-if="props.row.last_detection_run && props.row.last_detection_run > 0">
-            {{ formatTimestamp(props.row.last_detection_run) }}
-          </span>
-          <span v-else class="text-grey-5">—</span>
-        </q-td>
+      <template #cell-last_triggered_at="{ row }">
+        <span v-if="row.last_detection_run && row.last_detection_run > 0">
+          {{ formatTimestamp(row.last_detection_run) }}
+        </span>
+        <span v-else class="text-grey-5">—</span>
       </template>
 
       <!-- Last Anomaly Detected At column -->
-      <template #body-cell-last_anomaly_detected_at="props">
-        <q-td :props="props">
-          <span v-if="props.row.last_anomaly_detected_at">
-            {{ formatTimestamp(props.row.last_anomaly_detected_at) }}
-          </span>
-          <span v-else class="text-grey-5">—</span>
-        </q-td>
+      <template #cell-last_anomaly_detected_at="{ row }">
+        <span v-if="row.last_anomaly_detected_at">
+          {{ formatTimestamp(row.last_anomaly_detected_at) }}
+        </span>
+        <span v-else class="text-grey-5">—</span>
       </template>
 
       <!-- Last Trained At column -->
-      <template #body-cell-last_trained_at="props">
-        <q-td :props="props">
-          <span v-if="props.row.training_completed_at">
-            {{ formatTimestamp(props.row.training_completed_at) }}
-          </span>
-          <span v-else class="text-grey-5">—</span>
-        </q-td>
+      <template #cell-last_trained_at="{ row }">
+        <span v-if="row.training_completed_at">
+          {{ formatTimestamp(row.training_completed_at) }}
+        </span>
+        <span v-else class="text-grey-5">—</span>
       </template>
 
       <!-- Actions column -->
-      <template #body-cell-actions="props">
-        <q-td :props="props" class="tw:text-center">
+      <template #cell-actions="{ row }">
+        <div class="tw:flex tw:items-center tw:justify-center tw:gap-1">
           <!-- Edit -->
           <OButton
           icon-left="edit"
           variant="ghost"
           size="icon-sm"
           :title="t('alerts.edit')"
-          @click="editConfig(props.row)"
+          @click="editConfig(row)"
           />
           <!-- Pause / Resume — hidden while training or failed -->
           <OButton
-            v-if="props.row.status !== 'training' && props.row.status !== 'failed'"
-          :icon-left="props.row.enabled ? 'pause' : 'play-arrow'"
+            v-if="row.status !== 'training' && row.status !== 'failed'"
+          :icon-left="row.enabled ? 'pause' : 'play-arrow'"
           variant="ghost"
           size="icon-sm"
-          :title="props.row.enabled ? 'Pause' : 'Resume'"
-          @click="toggleEnabled(props.row)"
+          :title="row.enabled ? 'Pause' : 'Resume'"
+          @click="toggleEnabled(row)"
           />
           <!-- Stop Training — only shown while training -->
           <OButton
-            v-if="props.row.status === 'training'"
+            v-if="row.status === 'training'"
           icon-left="stop-circle"
           variant="ghost-warning"
           size="icon-sm"
           title="Stop Training"
-          :loading="cancellingId === props.row.anomaly_id"
-          @click="confirmCancelTraining(props.row)"
+          :loading="cancellingId === row.anomaly_id"
+          @click="confirmCancelTraining(row)"
           />
           <!-- Retrain / Retry -->
           <OButton
-            v-if="props.row.is_trained || props.row.status === 'failed'"
-            :variant="props.row.status === 'failed' ? 'ghost-destructive' : 'ghost'"
+            v-if="row.is_trained || row.status === 'failed'"
+            :variant="row.status === 'failed' ? 'ghost-destructive' : 'ghost'"
             size="icon-sm"
-            :title="props.row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
-            :loading="retrainingId === props.row.anomaly_id"
-            @click="confirmRetrain(props.row)"
+            :title="row.status === 'failed' ? 'Retry Training' : t('alerts.triggerTraining')"
+            :loading="retrainingId === row.anomaly_id"
+            @click="confirmRetrain(row)"
           >
             <OIcon name="brain-circuit" size="sm" />
           </OButton>
@@ -146,18 +135,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-destructive"
           size="icon-sm"
           :title="t('alerts.delete')"
-          @click="confirmDelete(props.row)"
+          @click="confirmDelete(row)"
           />
-        </q-td>
+        </div>
       </template>
 
       <!-- Empty state -->
-      <template #no-data>
+      <template #empty>
         <div class="tw:w-full tw:text-center tw:py-12 text-grey-6">
           {{ t("alerts.noDestinations") }}
         </div>
       </template>
-    </q-table>
+    </OTable>
 
     <!-- Confirm delete dialog -->
     <ODialog data-test="anomaly-detection-list-delete-dialog"
@@ -240,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import { defineComponent, ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
@@ -256,7 +245,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTooltip },
+  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
 
   props: {
     org_identifier: {
@@ -285,18 +274,22 @@ export default defineComponent({
     const pendingCancelRow = ref<any>(null);
     const cancellingId = ref<string | null>(null);
 
-    const columns: any[] = [
-      { name: "rownum",         label: "#",                        field: "rownum",              align: "left",   style: "width: 50px" },
-      { name: "name",           label: t("alerts.name"),           field: "name",               sortable: true, align: "left" },
-      { name: "stream",         label: "Stream",                   field: "stream_name",         sortable: true, align: "left" },
-      { name: "status",         label: "Status",                   field: "status",              sortable: true, align: "left" },
-      { name: "detection_window",         label: "Look back window",         field: "detection_window_seconds", sortable: true, align: "left" },
-      { name: "check_every",              label: t("alerts.frequency"),      field: "schedule_interval",       sortable: true, align: "left" },
-      { name: "last_triggered_at",        label: t("alerts.lastTriggered"),  field: "last_detection_run",      sortable: true, align: "left" },
-      { name: "last_anomaly_detected_at", label: t("alerts.lastSatisfied"),  field: "last_anomaly_detected_at", sortable: true, align: "left" },
-      { name: "last_trained_at",          label: "Last Trained At",          field: "training_completed_at",   sortable: true, align: "left" },
-      { name: "actions",        label: t("alerts.actions"),        field: "actions",             align: "center", style: "width: 140px" },
+    const columns: OTableColumnDef[] = [
+      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
+      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
+      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, meta: { align: "left" } },
+      { id: "status", header: "Status", accessorKey: "status", sortable: true, meta: { align: "left" } },
+      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, meta: { align: "left" } },
+      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, meta: { align: "left" } },
+      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, meta: { align: "left" } },
+      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, meta: { align: "left" } },
+      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, meta: { align: "left" } },
+      { id: "actions", header: t("alerts.actions"), accessorKey: "actions", size: 140, meta: { align: "center" } },
     ];
+
+    const displayConfigs = computed(() =>
+      configs.value.map((c, i) => ({ ...c, "#": i + 1 }))
+    );
 
     const statusColor = (row: any): BadgeVariant => {
       if (!row.enabled) return "default";
@@ -450,6 +443,7 @@ export default defineComponent({
       t,
       loading,
       configs,
+      displayConfigs,
       columns,
       showDeleteDialog,
       pendingDeleteRow,
