@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OSelect>
             </div>
-            <q-space />
+            <div class="tw:flex-1" />
             <TablePaginationControls
               :show-pagination="config.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"

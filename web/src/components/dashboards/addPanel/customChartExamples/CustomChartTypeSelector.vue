@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="bar-chart" size="sm" class="q-mr-sm" />
           <span class="text-h6">Example of custom charts</span>
         </div>
-        <q-space />
+        <div class="tw:flex-1" />
         <OInput
           v-model="searchQuery"
           placeholder="Search charts..."

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
         {{ t("queries.runningQueries") }}
       </div>
-      <q-space />
+      <div class="tw:flex-1" />
       <div class="flex items-start">
         <div
           data-test="running-queries-filter-container"

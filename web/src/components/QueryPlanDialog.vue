@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.explainResults")
                   }}
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OButton
                   v-if="!isAnalyzing && !showAnalyzeResults"
                   variant="primary"

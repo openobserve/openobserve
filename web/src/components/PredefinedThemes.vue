@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ theme.light.themeColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isThemeApplied(theme, 'light')"
                   variant="success"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ customLightColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isCustomThemeApplied('light')"
                   variant="success"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ theme.dark.themeColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isThemeApplied(theme, 'dark')"
                   variant="success"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ customDarkColor }}
                   </div>
                 </div>
-                <q-space />
+                <div class="tw:flex-1" />
                 <OBadge
                   v-if="isCustomThemeApplied('dark')"
                   variant="success"
