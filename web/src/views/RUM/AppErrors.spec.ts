@@ -251,10 +251,6 @@ describe("AppErrors.vue", () => {
             template: '<div class="q-spinner">Loading...</div>',
             props: ["color", "size"],
           },
-          "q-avatar": {
-            template: '<div class="q-avatar"><slot /></div>',
-            props: ["color", "textColor", "size", "icon"],
-          },
         },
       },
     });

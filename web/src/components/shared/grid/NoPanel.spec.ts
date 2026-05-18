@@ -41,11 +41,6 @@ const i18n = createI18n({
 });
 
 // Stubs for Quasar components not under test
-const qImgStub = {
-  template: '<img :src="src" />',
-  props: ["src", "style"],
-};
-
 const qBtnStub = {
   template:
     "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",
@@ -65,7 +60,6 @@ function mountNoPanel(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       stubs: {
-        "q-img": qImgStub,
         "q-btn": qBtnStub,
         OButton: oBtnStub,
       },
@@ -97,7 +91,7 @@ describe("NoPanel", () => {
       );
     });
 
-    it("should render a q-img element", () => {
+    it("should render an img element", () => {
       expect(wrapper.find("img").exists()).toBe(true);
     });
 

@@ -17,12 +17,6 @@ describe("NoOrganizationSelected", () => {
     wrapper = mount(NoOrganizationSelected, {
       global: {
         plugins: [i18n],
-        stubs: {
-          'q-img': {
-            template: '<div class="q-img" :src="src"><slot /></div>',
-            props: ['src']
-          }
-        }
       },
     });
   });
@@ -38,7 +32,7 @@ describe("NoOrganizationSelected", () => {
   });
 
   it("should display the organization selection image", () => {
-    const image = wrapper.find('.q-img');
+    const image = wrapper.find('img');
     expect(image.exists()).toBe(true);
     expect(image.attributes('src')).toBe('/mocked/images/common/selectOrganization.svg');
   });
