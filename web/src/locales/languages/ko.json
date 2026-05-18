@@ -790,7 +790,8 @@
     "no_keep_current": "아니요, 최신 상태로 유지",
     "feature_correlation_management": "상관관계 관리",
     "feature_log_patterns": "로그 패턴",
-    "environment_type": "환경 유형"
+    "environment_type": "환경 유형",
+    "license_allows_unlimited_ingestion": "현재 라이선스는 무제한 데이터 수집을 허용합니다."
   },
   "login": {
     "userid": "사용자 ID",
