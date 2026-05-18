@@ -54,22 +54,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Patterns List with Virtual Scroll -->
-      <q-virtual-scroll
+      <OVirtualScroll
         :items="patterns"
-        virtual-scroll-slice-size="5"
-        v-slot="{ item: pattern, index }"
-        :scroll-target="scrollTarget ?? undefined"
+        :overscan="5"
+        :scroll-target="scrollTarget ?? null"
       >
-        <PatternCard
-          :pattern="pattern"
-          :index="index"
-          :wrap="wrap"
-          @click="$emit('open-details', pattern, index)"
-          @include="$emit('add-to-search', pattern, 'include')"
-          @exclude="$emit('add-to-search', pattern, 'exclude')"
-          @create-alert="$emit('create-alert', pattern)"
-        />
-      </q-virtual-scroll>
+        <template #default="{ item: pattern, index }">
+          <PatternCard
+            :pattern="pattern"
+            :index="index"
+            :wrap="wrap"
+            @click="$emit('open-details', pattern, index)"
+            @include="$emit('add-to-search', pattern, 'include')"
+            @exclude="$emit('add-to-search', pattern, 'exclude')"
+            @create-alert="$emit('create-alert', pattern)"
+          />
+        </template>
+      </OVirtualScroll>
     </div>
 
     <!-- Loading State -->
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="loading"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[3rem]"
     >
-      <OSpinner size="lg" />
+      <OSpinner size="lg" data-test="pattern-list-loading-indicator" />
       <div
         class="q-mt-md text-body2"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
@@ -133,6 +134,7 @@ import PatternCard from "./PatternCard.vue";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 
 defineProps<{
   patterns: any[];

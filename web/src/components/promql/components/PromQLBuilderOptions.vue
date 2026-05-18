@@ -1,6 +1,6 @@
 <template>
   <div>
-    <q-separator />
+    <OSeparator />
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div class="tw:py-[0.25rem]">
@@ -34,17 +34,14 @@
                 size="sm"
                 class="cursor-pointer field-info-icon"
               >
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="top middle"
-                  self="bottom middle"
-                  max-width="250px"
-                >
-                  ({{ t("dashboard.optional") }}) <b>Legend - </b>
-                  {{ t("dashboard.overrideMessage") }}
-                  <br />
-                  {{ t("dashboard.overrideMessageExample") }}
-                </q-tooltip>
+                <OTooltip side="top" max-width="250px">
+                  <template #content>
+                    ({{ t("dashboard.optional") }}) <b>Legend - </b>
+                    {{ t("dashboard.overrideMessage") }}
+                    <br />
+                    {{ t("dashboard.overrideMessageExample") }}
+                  </template>
+                </OTooltip>
               </OIcon>
             </div>
           </div>
@@ -52,22 +49,15 @@
           <!-- Step Value -->
           <div class="option-field-wrapper">
             <span class="field-label">{{ t("dashboard.stepValue") }}</span>
-            <q-input
+            <OInput
               v-model="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].config.step_value
               "
               type="text"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
               placeholder="e.g., 30s, 1m"
               data-test="dashboard-promql-builder-step-value"
-              hide-bottom-space
               style="width: 140px"
             >
               <template v-slot:append>
@@ -76,61 +66,48 @@
                   size="sm"
                   class="cursor-pointer"
                 >
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    max-width="250px"
-                  >
-                    ({{ t("dashboard.optional") }}) <b>Step - </b>
-                    {{ t("dashboard.stepValueTooltip") }}
-                    <br />
-                    {{ t("dashboard.stepValueTooltipInfo") }}
-                    <br />
-                    {{ t("dashboard.stepValueExample") }}
-                  </q-tooltip>
+                  <OTooltip side="top" max-width="250px">
+                    <template #content>
+                      ({{ t("dashboard.optional") }}) <b>Step - </b>
+                      {{ t("dashboard.stepValueTooltip") }}
+                      <br />
+                      {{ t("dashboard.stepValueTooltipInfo") }}
+                      <br />
+                      {{ t("dashboard.stepValueExample") }}
+                    </template>
+                  </OTooltip>
                 </OIcon>
               </template>
-            </q-input>
+            </OInput>
           </div>
 
                     <!-- Query Type Select (Range/Instant) -->
           <div class="option-field-wrapper">
             <span class="field-label">{{ t("common.type") }}</span>
-            <q-select
+            <OSelect
               v-model="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].config.query_type
               "
               :options="queryTypeOptions"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              borderless
-              dense
-              emit-value
-              map-options
+              labelKey="label"
+              valueKey="value"
               data-test="dashboard-promql-builder-query-type"
-              hide-bottom-space
               style="width: 120px"
             >
               <template v-slot:append>
                 <OIcon name="info" size="sm" class="cursor-pointer">
-                  <q-tooltip
-                    class="bg-grey-8"
-                    anchor="top middle"
-                    self="bottom middle"
-                    max-width="250px"
-                  >
-                    <b>Query Type - </b><br />
-                    Range: Returns time series data over a time range.<br />
-                    Instant: Returns single value at a specific point in time.
-                  </q-tooltip>
+                  <OTooltip side="top" max-width="250px">
+                    <template #content>
+                      <b>Query Type - </b><br />
+                      Range: Returns time series data over a time range.<br />
+                      Instant: Returns single value at a specific point in time.
+                    </template>
+                  </OTooltip>
                 </OIcon>
               </template>
-            </q-select>
+            </OSelect>
           </div>
         </div>
       </div>
@@ -143,13 +120,21 @@ import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "PromQLBuilderOptions",
   components: {
     CommonAutoComplete,
     OIcon,
-},
+    OInput,
+    OSelect,
+    OTooltip,
+    OSeparator,
+  },
   props: {
     dashboardPanelData: {
       type: Object,

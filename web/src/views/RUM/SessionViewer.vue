@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div class="col-3 row">
-        <q-separator vertical class="full-height" />
+        <OSeparator vertical class="tw:h-full" />
         <PlayerEventsSidebar
           :events="segmentEvents"
           :sessionDetails="sessionDetails"
@@ -114,6 +114,7 @@ import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 import { date } from "quasar";
 import { getUUID } from "@/utils/zincutils";

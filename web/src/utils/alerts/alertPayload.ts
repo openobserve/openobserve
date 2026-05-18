@@ -7,6 +7,7 @@ import { cloneDeep } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export interface PayloadFormData {
   name: string;
@@ -190,8 +191,8 @@ export const prepareAndSaveAlert = async (
   }
 
   try {
-    const dismiss = q.notify({
-      spinner: true,
+    const dismiss = toast({
+      variant: "loading",
       message: "Please wait...",
       timeout: 2000,
     });
@@ -203,8 +204,8 @@ export const prepareAndSaveAlert = async (
         activeFolderId.value,
       );
       emit("update:list", activeFolderId.value);
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Alert updated successfully.",
       });
     } else {
@@ -214,8 +215,8 @@ export const prepareAndSaveAlert = async (
         activeFolderId.value,
       );
       emit("update:list", activeFolderId.value);
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Alert saved successfully.",
       });
     }

@@ -56,6 +56,13 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
 
+// Only forward cell-slot templates for columns whose cell slot the parent actually provides.
+// If we forward an empty slot for every column, OTableBodyCell sees $slots.default as truthy
+// and renders the (empty) slot instead of falling through to the plain-text {{ displayValue }}.
+const cellSlotColumns = computed(() =>
+  props.columns.filter((col) => slots[`cell-${col.id}`]),
+);
+
 // ── Refs for virtual scroll & keyboard ──────────────────────────
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const columnIds = computed(() => props.columns.map((c) => c.id));
@@ -115,16 +122,16 @@ const pagination = useTablePagination(table, {
   pageSize: props.pageSize,
   pageSizeOptions: props.pageSizeOptions,
   currentPage: props.currentPage,
-  totalCount: props.totalCount,
+  get totalCount() { return props.totalCount; },
   get data() { return props.data; },
 }, emit);
 
 // ── Sorting ─────────────────────────────────────────────────────
 const sorting = useTableSorting(table, {
   sorting: props.sorting,
-  sortBy: props.sortBy,
-  sortOrder: props.sortOrder,
-  sortFieldMap: props.sortFieldMap,
+  get sortBy() { return props.sortBy; },
+  get sortOrder() { return props.sortOrder; },
+  get sortFieldMap() { return props.sortFieldMap; },
 }, emit);
 
 // ── Selection ───────────────────────────────────────────────────
@@ -302,7 +309,7 @@ defineExpose({
       <div class="tw:relative tw:max-w-xs">
         <OIcon
           name="search"
-          size="0.9rem"
+          size="sm"
           class="tw:absolute tw:left-2 tw:top-1/2 tw:-translate-y-1/2 tw:text-text-secondary"
         />
         <input
@@ -329,26 +336,6 @@ defineExpose({
       data-test="o2-table-loading-banner"
     />
 
-    <!-- ── Top pagination ───────────────────────────────────── -->
-    <OTablePagination
-      v-if="pagination.isEnabled.value && pagination.isServerMode.value"
-      position="top"
-      :current-page="pagination.currentPage.value"
-      :total-pages="pagination.totalPages.value"
-      :total-count="pagination.totalCount.value"
-      :page-size="pagination.pageSize.value"
-      :page-size-options="pagination.pageSizeOptions.value"
-      :showing-from="pagination.showingFrom.value"
-      :showing-to="pagination.showingTo.value"
-      :is-first-page="pagination.isFirstPage.value"
-      :is-last-page="pagination.isLastPage.value"
-      @update:page-size="pagination.setPageSize"
-      @first-page="pagination.firstPage"
-      @prev-page="pagination.prevPage"
-      @next-page="pagination.nextPage"
-      @last-page="pagination.lastPage"
-    />
-
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
@@ -371,6 +358,7 @@ defineExpose({
         ]"
         :style="{
           ...columnSizeVars,
+          '--o2-table-row-height': props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)',
         }"
         data-test="o2-table"
       >
@@ -415,6 +403,7 @@ defineExpose({
           :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
           :expansion-enabled="expansion.isEnabled.value"
           :is-expanded-fn="(row: TData) => expansion.isExpanded(row)"
+          :get-row-expansion-enabled="props.getRowExpansionEnabled"
           :highlight-text="props.highlightText"
           :should-highlight-column="highlighting.shouldHighlightColumn"
           :get-highlighted-html="highlighting.getHighlightedHtml"
@@ -434,13 +423,19 @@ defineExpose({
           :measure-element="isVirtual ? measureElement : undefined"
           @toggle-selection="selection.toggleRow"
           @toggle-expansion="expansion.toggleRow"
-          @row-click="(row: TData, evt: MouseEvent) => emit('row-click', row, evt)"
+          @row-click="(row: TData, evt: MouseEvent) => {
+            const canExpand = typeof props.expandOnRowClick === 'function'
+              ? props.expandOnRowClick(row)
+              : props.expandOnRowClick;
+            if (canExpand) expansion.toggleRow(row);
+            emit('row-click', row, evt);
+          }"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
           @cell-click="(params: any) => emit('cell-click', params)"
         >
-          <!-- Pass through named cell slots from parent -->
+          <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->
           <template
-            v-for="col in props.columns.filter(c => c.isAction || c.cell)"
+            v-for="col in cellSlotColumns"
             :key="`cell-${col.id}`"
             #[`cell-${col.id}`]="slotProps"
           >
@@ -460,7 +455,7 @@ defineExpose({
 
         <!-- ── Footer (sticky totals row) ─────────────────────── -->
         <tfoot
-          v-if="table.getFooterGroups().length"
+          v-if="table.getFooterGroups().some(fg => fg.headers.some(h => h.column.columnDef.footer))"
           data-test="o2-table-footer"
           class="tw:sticky tw:bottom-0 tw:z-10"
         >

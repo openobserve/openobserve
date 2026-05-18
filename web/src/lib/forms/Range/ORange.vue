@@ -7,7 +7,7 @@ import type {
   RangeSlots,
   RangeValue,
 } from "./ORange.types";
-import { computed, useAttrs, useId } from "vue";
+import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -21,6 +21,10 @@ const props = withDefaults(defineProps<RangeProps>(), {
   size: "md",
   disabled: false,
   showValue: false,
+  vertical: false,
+  reverse: false,
+  labelAlways: false,
+  markers: false,
 });
 
 const emit = defineEmits<RangeEmits>();
@@ -143,10 +147,248 @@ const displayValue = computed(() => {
   const fmt = props.formatValue ?? ((n: number) => String(n));
   return `${fmt(current.value.min)} – ${fmt(current.value.max)}`;
 });
+
+// ── Vertical mode ──────────────────────────────────────────────────────────
+
+const trackWidthV: Record<NonNullable<RangeProps["size"]>, string> = {
+  sm: "tw:w-1",
+  md: "tw:w-1.5",
+  lg: "tw:w-2",
+};
+
+const thumbSizePx: Record<NonNullable<RangeProps["size"]>, string> = {
+  sm: "0.75rem",
+  md: "1rem",
+  lg: "1.25rem",
+};
+
+function valueToTop(value: number): number {
+  if (range.value <= 0) return 0;
+  const pct = (value - props.min) / range.value;
+  return (props.reverse ? 1 - pct : pct) * 100;
+}
+
+const vertMinTop = computed(() => valueToTop(current.value.min));
+const vertMaxTop = computed(() => valueToTop(current.value.max));
+const vertFilledTop = computed(() =>
+  Math.min(vertMinTop.value, vertMaxTop.value),
+);
+const vertFilledHeight = computed(() =>
+  Math.abs(vertMaxTop.value - vertMinTop.value),
+);
+
+const displayMin = computed(() => {
+  const fmt = props.formatValue ?? ((n: number) => String(n));
+  return fmt(current.value.min);
+});
+const displayMax = computed(() => {
+  const fmt = props.formatValue ?? ((n: number) => String(n));
+  return fmt(current.value.max);
+});
+
+const vertMinOnTop = computed(() => vertMinTop.value < 50);
+const vertMinZClass = computed(() =>
+  vertMinOnTop.value ? "tw:z-20" : "tw:z-10",
+);
+const vertMaxZClass = computed(() =>
+  vertMinOnTop.value ? "tw:z-10" : "tw:z-20",
+);
+
+const vertTrackRef = ref<HTMLElement | null>(null);
+let dragging: "min" | "max" | null = null;
+
+function vToValue(clientY: number): number {
+  const el = vertTrackRef.value;
+  if (!el) return props.min;
+  const rect = el.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+  const raw = props.reverse
+    ? props.max - pct * range.value
+    : props.min + pct * range.value;
+  const stepped =
+    Math.round((raw - props.min) / props.step) * props.step + props.min;
+  return clamp(stepped);
+}
+
+function onVertDown(e: PointerEvent) {
+  if (props.disabled) return;
+  const target = e.target as HTMLElement;
+  e.preventDefault();
+  if (target.dataset.thumb === "min") {
+    dragging = "min";
+  } else if (target.dataset.thumb === "max") {
+    dragging = "max";
+  } else {
+    const v = vToValue(e.clientY);
+    const distToMin = Math.abs(v - current.value.min);
+    const distToMax = Math.abs(v - current.value.max);
+    if (distToMin <= distToMax) {
+      dragging = "min";
+      emit("update:modelValue", {
+        min: clamp(Math.min(v, current.value.max)),
+        max: current.value.max,
+      });
+    } else {
+      dragging = "max";
+      emit("update:modelValue", {
+        min: current.value.min,
+        max: clamp(Math.max(v, current.value.min)),
+      });
+    }
+  }
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+}
+
+function onVertMove(e: PointerEvent) {
+  if (!dragging || props.disabled) return;
+  const v = vToValue(e.clientY);
+  if (dragging === "min") {
+    emit("update:modelValue", {
+      min: clamp(Math.min(v, current.value.max)),
+      max: current.value.max,
+    });
+  } else {
+    emit("update:modelValue", {
+      min: current.value.min,
+      max: clamp(Math.max(v, current.value.min)),
+    });
+  }
+}
+
+function onVertUp(e: PointerEvent) {
+  if (!dragging || props.disabled) {
+    dragging = null;
+    return;
+  }
+  const v = vToValue(e.clientY);
+  const next: RangeValue =
+    dragging === "min"
+      ? { min: clamp(Math.min(v, current.value.max)), max: current.value.max }
+      : { min: current.value.min, max: clamp(Math.max(v, current.value.min)) };
+  emit("update:modelValue", next);
+  emit("change", next);
+  dragging = null;
+}
 </script>
 
 <template>
-  <div v-bind="$attrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div
+    v-bind="$attrs"
+    :class="
+      vertical
+        ? 'tw:flex tw:flex-row tw:h-full'
+        : 'tw:flex tw:flex-col tw:gap-1 tw:w-full'
+    "
+  >
+    <!-- ── Vertical mode ──────────────────────────────────────────────────── -->
+    <template v-if="vertical">
+      <!-- Value labels on left (labelAlways) -->
+      <div
+        v-if="labelAlways"
+        class="tw:relative tw:h-full tw:shrink-0"
+        style="width: 1.5rem"
+        aria-hidden="true"
+      >
+        <span
+          class="tw:absolute tw:right-0.5 tw:text-xs tw:tabular-nums tw:leading-none tw:-translate-y-1/2 tw:whitespace-nowrap tw:text-slider-value"
+          :style="{ top: vertMinTop + '%' }"
+        >{{ displayMin }}</span>
+        <span
+          class="tw:absolute tw:right-0.5 tw:text-xs tw:tabular-nums tw:leading-none tw:-translate-y-1/2 tw:whitespace-nowrap tw:text-slider-value"
+          :style="{ top: vertMaxTop + '%' }"
+        >{{ displayMax }}</span>
+      </div>
+
+      <!-- Track column -->
+      <div
+        ref="vertTrackRef"
+        class="tw:relative tw:h-full tw:flex tw:justify-center tw:shrink-0"
+        :class="disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer'"
+        :style="{ width: thumbSizePx[resolvedSize] }"
+        @pointerdown="onVertDown"
+        @pointermove="onVertMove"
+        @pointerup="onVertUp"
+      >
+        <!-- Background track strip -->
+        <div
+          class="tw:absolute tw:top-0 tw:bottom-0 tw:rounded-full"
+          :class="[trackWidthV[resolvedSize], disabled ? 'tw:bg-slider-disabled-track' : 'tw:bg-slider-track']"
+          aria-hidden="true"
+        />
+        <!-- Filled segment -->
+        <div
+          class="tw:absolute tw:rounded-full"
+          :class="[trackWidthV[resolvedSize], disabled ? 'tw:bg-slider-disabled-track-fill' : 'tw:bg-slider-track-fill']"
+          :style="{ top: vertFilledTop + '%', height: vertFilledHeight + '%' }"
+          aria-hidden="true"
+        />
+        <!-- Marker ticks -->
+        <template v-if="markers && markerLabels?.length">
+          <div
+            v-for="ml in markerLabels"
+            :key="ml.value"
+            class="tw:absolute tw:left-0 tw:right-0 tw:h-px tw:opacity-50"
+            :class="disabled ? 'tw:bg-slider-disabled-track' : 'tw:bg-slider-track'"
+            :style="{ top: valueToTop(ml.value) + '%' }"
+            aria-hidden="true"
+          />
+        </template>
+        <!-- Min thumb -->
+        <span
+          data-thumb="min"
+          :class="[
+            'tw:absolute tw:rounded-full tw:shadow-sm tw:border-2 tw:border-slider-thumb-border',
+            'tw:left-1/2 tw:-translate-x-1/2 tw:touch-none tw:select-none',
+            thumbSize[resolvedSize],
+            vertMinZClass,
+            disabled ? 'tw:bg-slider-disabled-thumb tw:cursor-not-allowed' : 'tw:bg-slider-thumb tw:cursor-grab',
+          ]"
+          :style="{ top: `calc(${vertMinTop}% - ${thumbHalf[resolvedSize]})` }"
+          role="slider"
+          :aria-valuenow="current.min"
+          :aria-valuemin="min"
+          :aria-valuemax="max"
+          :aria-label="`${label ?? 'Range'} minimum`"
+          tabindex="0"
+        />
+        <!-- Max thumb -->
+        <span
+          data-thumb="max"
+          :class="[
+            'tw:absolute tw:rounded-full tw:shadow-sm tw:border-2 tw:border-slider-thumb-border',
+            'tw:left-1/2 tw:-translate-x-1/2 tw:touch-none tw:select-none',
+            thumbSize[resolvedSize],
+            vertMaxZClass,
+            disabled ? 'tw:bg-slider-disabled-thumb tw:cursor-not-allowed' : 'tw:bg-slider-thumb tw:cursor-grab',
+          ]"
+          :style="{ top: `calc(${vertMaxTop}% - ${thumbHalf[resolvedSize]})` }"
+          role="slider"
+          :aria-valuenow="current.max"
+          :aria-valuemin="min"
+          :aria-valuemax="max"
+          :aria-label="`${label ?? 'Range'} maximum`"
+          tabindex="0"
+        />
+      </div>
+
+      <!-- Marker labels on right -->
+      <div
+        v-if="markerLabels?.length"
+        class="tw:relative tw:h-full tw:pl-1 tw:shrink-0"
+        style="width: 1.5rem"
+        aria-hidden="true"
+      >
+        <span
+          v-for="ml in markerLabels"
+          :key="ml.value"
+          class="tw:absolute tw:left-1 tw:text-xs tw:leading-none tw:-translate-y-1/2 tw:whitespace-nowrap tw:text-slider-value"
+          :style="{ top: valueToTop(ml.value) + '%' }"
+        >{{ ml.label }}</span>
+      </div>
+    </template>
+
+    <!-- ── Horizontal mode (default) ───────────────────────────────────── -->
+    <template v-else>
     <div
       v-if="$slots.label || label || showValue || $slots.tooltip"
       class="tw:flex tw:items-center tw:justify-between tw:gap-2"
@@ -303,6 +545,7 @@ const displayValue = computed(() => {
         {{ helpText }}
       </span>
     </div>
+    </template>
   </div>
 </template>
 

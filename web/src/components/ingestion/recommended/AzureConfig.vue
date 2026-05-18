@@ -155,14 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: 100%;
                 "
               >
-                <q-checkbox
+                <OCheckbox
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
                   v-model="enabledCategories"
                   :val="cat.value"
                   :label="cat.label"
-                  dense
-                  color="primary"
                 />
               </div>
             </div>
@@ -179,11 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:text-xs tw:mb-1 section-label">
                   Resource Group
                 </div>
-                <q-input
+                <OInput
                   v-model="resourceGroup"
-                  outlined
-                  dense
-                  hide-bottom-space
                   placeholder="rg-openobserve-activity-logs"
                   autocomplete="off"
                   data-test="azure-resource-group-input"
@@ -193,11 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:text-xs tw:mb-1 section-label">
                   Deployment Name
                 </div>
-                <q-input
+                <OInput
                   v-model="deploymentName"
-                  outlined
-                  dense
-                  hide-bottom-space
                   placeholder="o2-activity-20260420"
                   autocomplete="off"
                   data-test="azure-deployment-name-input"
@@ -238,9 +230,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -250,6 +243,7 @@ import {
 } from "@/utils/azureIntegrations";
 import CopyContent from "@/components/CopyContent.vue";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const SCRIPT_URL =
   "https://raw.githubusercontent.com/openobserve/o2-datasource/main/azure/azure_activity_logs/configure-diagnostic-settings.sh";
@@ -271,12 +265,11 @@ const activityLogsIntegration = azureIntegrations.find(
 
 export default defineComponent({
   name: "AzureConfig",
-  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton,
+  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
     OIcon,
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     let endpoint: any = null;
     try {
@@ -308,8 +301,8 @@ export default defineComponent({
 
     const handleDeploy = () => {
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -321,8 +314,8 @@ export default defineComponent({
       const passcode = store.state?.organizationData?.organizationPasscode;
 
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -343,8 +336,8 @@ export default defineComponent({
         integration_id: "activity-logs",
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: "Opening Azure portal to deploy Activity Logs infrastructure",
         timeout: 3000,
       });

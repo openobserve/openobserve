@@ -21,7 +21,7 @@ import PatternStatistics from "./PatternStatistics.vue";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [quasar.Notify],
+  plugins: [quasar.],
 });
 
 describe("PatternStatistics", () => {

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('modelPricing.errorValidations') }}
         </div>
         <div v-else class="text-center text-h6 tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Model Pricing Errors Section -->
           <div
@@ -70,24 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
                         :label="t('modelPricing.modelNameLabel')"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        @update:model-value="
-                          updateModelPricingName(
-                            userSelectedModelPricingName[index],
-                            index,
-                          )
-                        "
+                        @update:model-value="updateModelPricingName(userSelectedModelPricingName[index], index)"
                       />
                     </div>
                   </span>
@@ -101,24 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"
                         :label="t('modelPricing.matchPatternLabel')"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        tabindex="0"
-                        @update:model-value="
-                          updateModelPricingPattern(
-                            userSelectedModelPricingPattern[index],
-                            index,
-                          )
-                        "
+                        @update:model-value="updateModelPricingPattern(userSelectedModelPricingPattern[index], index)"
                       />
                     </div>
                   </span>
@@ -164,11 +138,13 @@ import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 
 import BaseImport from "../common/BaseImport.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 import modelPricingService from "@/services/model_pricing";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
   existingModels?: string[];
@@ -182,7 +158,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
 const baseImportRef = ref<any>(null);
 const modelPricingErrorsToDisplay = ref<any[]>([]);
 const userSelectedModelPricingName = ref<string[]>([]);
@@ -253,10 +228,9 @@ async function importJson({ jsonStr: jsonString }: any) {
       ? parsedJson
       : [parsedJson];
   } catch (e: any) {
-    q.notify({
+    toast({
       message: e.message || "Invalid JSON format",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 2000,
     });
     return;
@@ -286,10 +260,9 @@ async function importJson({ jsonStr: jsonString }: any) {
   }
 
   if (successCount === totalCount) {
-    q.notify({
+    toast({
       message: `Successfully imported ${successCount} model pricing definition${successCount !== 1 ? "s" : ""}`,
-      color: "positive",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 2000,
     });
 
@@ -322,10 +295,9 @@ async function processJsonObject(jsonObj: any, index: number) {
     const created = await createModelPricing(jsonObj, index);
     return created;
   } catch (e: any) {
-    q.notify({
+    toast({
       message: "Error importing model pricing. Please check the JSON format.",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 2000,
     });
     return false;
@@ -422,10 +394,9 @@ async function createModelPricing(jsonObj: any, index: number) {
 
     // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
     if (error?.response?.status !== 403) {
-      q.notify({
+      toast({
         message: `Failed to import "${jsonObj.name}": ${errorMessage}`,
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 4000,
       });
     }

@@ -36,6 +36,16 @@ export interface RangeProps {
   id?: string;
   /** HTML name used as a prefix for both inputs */
   name?: string;
+  /** Vertical orientation — renders the track top-to-bottom */
+  vertical?: boolean;
+  /** Reverse value direction. For vertical: max at top, min at bottom */
+  reverse?: boolean;
+  /** Always show the current value label next to each thumb */
+  labelAlways?: boolean;
+  /** Show tick marks at marker label positions */
+  markers?: boolean;
+  /** Custom labels at specific value positions along the track */
+  markerLabels?: { value: number; label: string }[];
 }
 
 export interface RangeEmits {

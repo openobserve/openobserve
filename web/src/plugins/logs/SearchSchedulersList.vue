@@ -40,242 +40,178 @@
 
    <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
       <div class=" tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container">
-          <q-table
+          <OTable
             data-test="search-scheduler-table"
-            ref="qTableSchedule"
-            dense
-            :rows="dataToBeLoaded"
+            :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
-            :pagination="pagination"
             row-key="trace_id"
-            :rows-per-page-options="[]"
+            pagination="client"
+            expansion="single"
+            v-model:expanded-ids="expandedIds"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             :style="dataToBeLoaded.length > 0 ? 'height: calc(100vh  - var(--navbar-height) - 95px); overflow-y: auto;' : 'height: 0px'"
-            :sort-method="sortMethod"
+            @row-click="onExpandRow"
           >
-            <template v-slot:body="props">
-              <q-tr
-                :data-test="`search-scheduler-table-${props.row.trace_id}-row`"
-                :props="props"
-                style="cursor: pointer"
-                @click="triggerExpand(props)"
-              >
-                <q-td>
-                  <OButton
-                    data-test="search-scheduler-expand-btn"
-                    variant="ghost"
-                    size="icon"
-                  >
-                    <OIcon
-                      :name="
-                        expandedRow != props.row.trace_id
-                          ? 'expand-more'
-                          : 'expand-less'
-                      " size="sm"
-                    />
-                  </OButton>
-                </q-td>
-
-                <q-td
-                  v-for="(col, index) in columnsToBeRendered.slice(1)"
-                  :key="col.name"
-                  :props="props"
-                >
-                  <!-- Render the content for all but the last item -->
-                  <template
-                    v-if="
-                      index < columnsToBeRendered.slice(1).length - 1 &&
-                      col.field != 'status'
-                    "
-                  >
-                    {{ props.row[col.field] }}
-                  </template>
-                  <template v-else-if="col.field === 'status'">
-                    <div class="status-cell">
-                      <OIcon
-                        :name="getStatusIcon(props.row[col.field])"
-                        size="xs"
-                        class="q-mr-xs"
-                        :color="getStatusColor(props.row[col.field])"
-                      />
-                      {{ getStatusText(props.row[col.field]) }}
-                    </div>
-                  </template>
-                  <template v-else>
-                    <OButton
-                      data-test="search-scheduler-cancel-btn"
-                      variant="ghost"
-                      size="icon"
-                      :title="t('search_scheduler_job.cancel')"
-                      :disabled="
-                        props.row.status_code !== 0 &&
-                        props.row.status_code !== 1
-                      "
-                      @click="confirmCancelJob(props.row)"
-                    >
-                      <OIcon name="cancel" size="xs" />
-                    </OButton>
-
-                    <OButton
-                      data-test="search-scheduler-delete-btn"
-                      variant="ghost-destructive"
-                      size="icon"
-                      :title="t('search_scheduler_job.delete')"
-                      @click="confirmDeleteJob(props.row)"
-                    >
-                      <OIcon name="delete" size="xs" />
-                    </OButton>
-                    <OButton
-                      data-test="search-scheduler-restart-btn"
-                      variant="ghost"
-                      size="icon"
-                      :title="t('search_scheduler_job.restart')"
-                      :disabled="
-                        props.row.status_code !== 2 &&
-                        props.row.status_code !== 3
-                      "
-                      @click="retrySearchJob(props.row)"
-                    >
-                      <OIcon name="refresh" size="xs" />
-                    </OButton>
-                    <OButton
-                      data-test="search-scheduler-explore-btn"
-                      variant="ghost"
-                      size="icon"
-                      :title="t('search_scheduler_job.explore')"
-                      :disabled="
-                        props.row.status_code == 0 || props.row.status_code == 3
-                      "
-                      @click="fetchSearchResults(props.row)"
-                    >
-                      <OIcon name="search" size="xs" />
-                    </OButton>
-                  </template>
-                </q-td>
-              </q-tr>
-
-              <q-tr v-show="expandedRow === props.row.trace_id" :props="props">
-                <q-td colspan="100%">
-                  <div class="app-tabs-schedule-list report-list-tabs">
-                    <app-tabs
-                      data-test="expanded-list-tabs"
-                      class="q-mr-md"
-                      :tabs="tabs"
-                      v-model:active-tab="activeTab"
-                    />
-                  </div>
-                  <div v-if="activeTab == 'query'">
-                    <div class="text-left tw:px-2 q-mb-sm expanded-content">
-                      <div class="tw:flex tw:items-center q-py-sm">
-                        <strong
-                          >{{ t('search_scheduler_job.sql_query') }} :
-                          <span>
-                            <OButton
-                              variant="ghost"
-                              size="icon"
-                              class="copy-btn-sql tw:ml-2"
-                              data-test="search-scheduler-copy-sql-btn"
-                              @click.stop="copyToClipboard(props.row.sql, 'SQL Query')"
-                            >
-                              <OIcon name="content-copy" size="sm" />
-                            </OButton></span
-                        ></strong>
-                        <OButton
-                          variant="ghost-destructive"
-                          size="sm"
-                          class="copy-btn tw:mx-2"
-                          data-test="search-scheduler-go-to-logs-btn"
-                          :disabled="
-                            props.row.status_code == 0 ||
-                            props.row.status_code == 3
-                          "
-                          @click.stop="fetchSearchResults(props.row)"
-                          icon-left="search"
-                        >
-                          {{ t('search_scheduler_job.logs') }}
-                        </OButton>
-                      </div>
-                      <div class="tw:flex tw:items-start tw:justify-center">
-                        <div class="scrollable-content expanded-sql">
-                          <pre style="text-wrap: wrap">{{
-                            props.row?.sql
-                          }}</pre>
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      v-if="props.row?.function"
-                      class="text-left q-mb-sm tw:px-2 expanded-content"
-                    >
-                      <div class="tw:flex tw:items-center q-py-sm">
-                        <strong
-                          >{{ t('search_scheduler_job.function_definition') }} :
-                          <span>
-                            <OButton
-                              variant="ghost"
-                              size="icon"
-                              class="copy-btn-function tw:ml-2"
-                              @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
-                            >
-                              <OIcon name="content-copy" size="sm" />
-                            </OButton></span
-                        ></strong>
-                      </div>
-
-                      <div class="tw:flex tw:items-start tw:justify-center">
-                        <div class="scrollable-content expanded-function">
-                          <pre style="text-wrap: wrap">{{
-                            props.row?.function
-                          }}</pre>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="q-py-md" v-else>
-                    <div
-                      class="text-left tw:px-2 q-mb-sm expanded-content flex tw:flex-col"
-                    >
-                      <query-editor
-                        style="height: 130px"
-                        :key="props.row.trace_id"
-                        :ref="`QueryEditorRef${props.row.trace_id}`"
-                        :editor-id="`alerts-query-editor${props.row.trace_id}`"
-                        class="monaco-editor"
-                        :debounceTime="300"
-                        v-model:query="query"
-                        language="json"
-                        read-only
-                      />
-                    </div>
-                  </div>
-                </q-td>
-              </q-tr>
+            <template #cell-status="{ row }">
+              <div class="status-cell">
+                <OIcon
+                  :name="getStatusIcon(row.status)"
+                  size="xs"
+                  class="q-mr-xs"
+                  :color="getStatusColor(row.status)"
+                />
+                {{ getStatusText(row.status) }}
+              </div>
             </template>
-            <template #bottom="scope">
-            <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t('search_scheduler_job.results') }}
-            </div>
-            <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
-            <q-separator
-              style="height: 1.5rem; margin: auto 0"
-              vertical
-              inset
-              class="q-mr-md"
-            />
+            <template #cell-actions="{ row }">
+              <OButton
+                data-test="search-scheduler-cancel-btn"
+                variant="ghost"
+                size="icon"
+                :title="t('search_scheduler_job.cancel')"
+                :disabled="
+                  row.status_code !== 0 &&
+                  row.status_code !== 1
+                "
+                @click="confirmCancelJob(row)"
+              >
+                <OIcon name="cancel" size="xs" />
+              </OButton>
 
-            <div class="q-pl-md">
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-            </div>
-          </div>
-          </template>
-            <template #no-data>
+              <OButton
+                data-test="search-scheduler-delete-btn"
+                variant="ghost-destructive"
+                size="icon"
+                :title="t('search_scheduler_job.delete')"
+                @click="confirmDeleteJob(row)"
+              >
+                <OIcon name="delete" size="xs" />
+              </OButton>
+              <OButton
+                data-test="search-scheduler-restart-btn"
+                variant="ghost"
+                size="icon"
+                :title="t('search_scheduler_job.restart')"
+                :disabled="
+                  row.status_code !== 2 &&
+                  row.status_code !== 3
+                "
+                @click="retrySearchJob(row)"
+              >
+                <OIcon name="refresh" size="xs" />
+              </OButton>
+              <OButton
+                data-test="search-scheduler-explore-btn"
+                variant="ghost"
+                size="icon"
+                :title="t('search_scheduler_job.explore')"
+                :disabled="
+                  row.status_code == 0 || row.status_code == 3
+                "
+                @click="fetchSearchResults(row)"
+              >
+                <OIcon name="search" size="xs" />
+              </OButton>
+            </template>
+            <template #expansion="{ row }">
+              <div class="app-tabs-schedule-list report-list-tabs">
+                <app-tabs
+                  data-test="expanded-list-tabs"
+                  class="q-mr-md"
+                  :tabs="tabs"
+                  v-model:active-tab="activeTab"
+                />
+              </div>
+              <div v-if="activeTab == 'query'">
+                <div class="text-left tw:px-2 q-mb-sm expanded-content">
+                  <div class="tw:flex tw:items-center q-py-sm">
+                    <strong
+                      >{{ t('search_scheduler_job.sql_query') }} :
+                      <span>
+                        <OButton
+                          variant="ghost"
+                          size="icon"
+                          class="copy-btn-sql tw:ml-2"
+                          data-test="search-scheduler-copy-sql-btn"
+                          @click.stop="copyToClipboard(row.sql, 'SQL Query')"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                        </OButton></span
+                    ></strong>
+                    <OButton
+                      variant="ghost-destructive"
+                      size="sm"
+                      class="copy-btn tw:mx-2"
+                      data-test="search-scheduler-go-to-logs-btn"
+                      :disabled="
+                        row.status_code == 0 ||
+                        row.status_code == 3
+                      "
+                      @click.stop="fetchSearchResults(row)"
+                      icon-left="search"
+                    >
+                      {{ t('search_scheduler_job.logs') }}
+                    </OButton>
+                  </div>
+                  <div class="tw:flex tw:items-start tw:justify-center">
+                    <div class="scrollable-content expanded-sql">
+                      <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  v-if="row?.function"
+                  class="text-left q-mb-sm tw:px-2 expanded-content"
+                >
+                  <div class="tw:flex tw:items-center q-py-sm">
+                    <strong
+                      >{{ t('search_scheduler_job.function_definition') }} :
+                      <span>
+                        <OButton
+                          variant="ghost"
+                          size="icon"
+                          class="copy-btn-function tw:ml-2"
+                          @click.stop="copyToClipboard(row.function, 'Function Defination')"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                        </OButton></span
+                    ></strong>
+                  </div>
+
+                  <div class="tw:flex tw:items-start tw:justify-center">
+                    <div class="scrollable-content expanded-function">
+                      <pre style="text-wrap: wrap">{{ row?.function }}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="q-py-md" v-else>
+                <div
+                  class="text-left tw:px-2 q-mb-sm expanded-content flex tw:flex-col"
+                >
+                  <query-editor
+                    style="height: 130px"
+                    :key="row.trace_id"
+                    :ref="`QueryEditorRef${row.trace_id}`"
+                    :editor-id="`alerts-query-editor${row.trace_id}`"
+                    class="monaco-editor"
+                    :debounceTime="300"
+                    v-model:query="query"
+                    language="json"
+                    read-only
+                  />
+                </div>
+              </div>
+            </template>
+            <template #bottom>
+              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
+                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
+                  {{ resultTotal }} {{ t('search_scheduler_job.results') }}
+                </div>
+                <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
+              </div>
+            </template>
+            <template #empty>
               <div v-if="!isLoading" class="tw:flex tw:mx-auto">
                 <NoData />
               </div>
@@ -286,22 +222,7 @@
                 <OSpinner size="md" />
               </div>
             </template>
-            <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Rendering the of the columns -->
-               <!-- here we can add the classes class so that the head will be sticky -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-          </q-table>
+          </OTable>
         <ConfirmDialog
           :title="t('search_scheduler_job.delete_job_title')"
           :message="t('search_scheduler_job.delete_job_message')"
@@ -350,9 +271,10 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date, qTable, useQuasar } from "quasar";
+import { date } from "quasar";
 import type { Ref } from "vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -361,13 +283,14 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "SearchSchedulersList",
   components: {
     DateTime,
     NoData,
-    QTablePagination,
+    OTable,
     TenstackTable,
     ConfirmDialog,
     AppTabs,
@@ -393,16 +316,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const $q = useQuasar();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18n();
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
-    const qTableSchedule: Ref<InstanceType<typeof qTable> | null> = ref(null);
-    const qTableRef: Ref<InstanceType<typeof qTableSchedule> | null> =
-      ref(null);
     const searchDateTimeRef = ref(null);
     const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
@@ -412,9 +331,8 @@ export default defineComponent({
       startTime: 0,
       endTime: 0,
     });
-    const columnsToBeRendered = ref([]);
-    const expandedColumns = ref([]);
-    const expandedRow = ref([]); // Array to track expanded rows
+    const columnsToBeRendered = ref<OTableColumnDef[]>([]);
+    const expandedRow = ref(""); // trace_id of expanded row
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
     const showSearchResults = ref(false);
@@ -423,14 +341,8 @@ export default defineComponent({
     const activeTab = ref("query");
     const query = ref("");
 
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
-    ];
+    const pageSize = ref(100);
+    const pageSizeOptions = [5, 10, 20, 50, 100];
     const tabs = reactive([
       {
         label: t('search_scheduler_job.query_function'),
@@ -450,89 +362,17 @@ export default defineComponent({
 
     const resultTotal = ref<number>(0);
 
-    const pagination = ref({
-      page: 1,
-      rowsPerPage: 100,
-    });
-    const selectedPerPage = ref(pagination.value.rowsPerPage);
-
-    const generateColumns = (data: any) => {
+    const generateColumns = (data: any): OTableColumnDef[] => {
       if (data && data.length === 0) return [];
 
-      // Define the desired column order and names
-      const desiredColumns = [
-        { key: "#", label: "#", align: "center", sortable: false },
-        { key: "user_id", label: t('search_scheduler_job.user_id') },
-        { key: "created_at", label: t('search_scheduler_job.created_at') },
-        { key: "start_time", label: t('search_scheduler_job.start_time') },
-        { key: "duration", label: t('search_scheduler_job.duration') },
-        { key: "status", label: t('search_scheduler_job.status') },
-        { key: "Actions", label: t('search_scheduler_job.actions') },
+      return [
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: 200, meta: { align: "center" } },
+        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: 200, meta: { align: "center" } },
+        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: 200, meta: { align: "center" } },
+        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: 100, meta: { align: "left" } },
+        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: 200, meta: { align: "left" } },
+        { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 150, meta: { align: "left", cellClass: "actions-column" } },
       ];
-
-      return desiredColumns.map(({ key, label }) => {
-        let columnWidth = 150;
-        let classes = '';
-
-        let align = "center";
-        let sortable = true;
-        if (key === "user_id") {
-          columnWidth = 200;
-          align = "center";
-          sortable = true;
-        }
-        if (key === "Actions") {
-          columnWidth = 150;
-          align = "left";
-          sortable = false;
-          classes = 'actions-column';
-        }
-        if (key == "trace_id") {
-          columnWidth = 250;
-          sortable = false;
-        }
-        if (key == "duration") {
-          align = "left";
-          columnWidth = 100;
-          sortable = true;
-        }
-        if (
-          key == "start_time" ||
-          key == "end_time" ||
-          key == "created_at" ||
-          key == "started_at" ||
-          key == "ended_at"
-        ) {
-          columnWidth = 200;
-          sortable = true;
-        }
-        if (key == "sql") {
-          columnWidth = 300;
-          sortable = false;
-        }
-        if (key == "status") {
-          align = "left";
-          columnWidth = 200;
-          sortable = false;
-        }
-        if (key == "#") {
-          columnWidth = 67;
-          sortable = false;
-          align = "left";
-        }
-
-
-        // Custom width for each column
-        return {
-          name: key, // Field name
-          label: label, // Column label
-          field: key, // Field accessor
-          align: align,
-          sortable: sortable,
-          classes: classes,
-          style: `max-width: ${columnWidth}px; width: ${columnWidth}px;`,
-        };
-      });
     };
 
     function filterRow(row) {
@@ -561,7 +401,7 @@ export default defineComponent({
         const { org_identifier } = router.currentRoute.value.query;
         // columnsToBeRendered.value = [];
         // dataToBeLoaded.value = [];
-        expandedRow.value = [];
+        expandedRow.value = "";
         isLoading.value = true;
         let responseToBeFetched = [];
         searchService
@@ -612,8 +452,8 @@ export default defineComponent({
           })
           .catch((e) => {
             if (e.response.status != 403) {
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: t('search_scheduler_job.fetch_failed'),
                 timeout: 5000,
               });
@@ -624,8 +464,8 @@ export default defineComponent({
           });
       } catch (error) {
         if (error.response.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t('search_scheduler_job.fetch_failed'),
             timeout: 5000,
           });
@@ -641,16 +481,16 @@ export default defineComponent({
           jobId: toBeCancelled.value.id,
         })
         .then((res) => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t('search_scheduler_job.job_cancelled_success'),
             timeout: 2000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_cancel_failed'),
               timeout: 2000,
@@ -668,16 +508,16 @@ export default defineComponent({
           jobId: row.id,
         })
         .then((res) => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t('search_scheduler_job.job_restarted_success'),
             timeout: 2000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_restart_failed'),
               timeout: 2000,
@@ -704,16 +544,16 @@ export default defineComponent({
         })
         .then((res) => {
           fetchSearchHistory();
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t('search_scheduler_job.job_deleted_success'),
             timeout: 2000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_delete_failed'),
               timeout: 2000,
@@ -724,58 +564,19 @@ export default defineComponent({
           fetchSearchHistory();
         });
     };
-    const sortMethod = (rows, sortBy, descending) => {
-      const data = [...rows];
-      if (sortBy === "user_id") {
-        if (descending) {
-          return data.sort((a, b) => b.user_id.localeCompare(a.user_id));
-        }
-        return data.sort((a, b) => a.user_id.localeCompare(b.user_id));
-      }
-      if (sortBy === "duration") {
-        if (descending) {
-          return data.sort((a, b) => b.rawDuration - a.rawDuration);
-        }
-        return data.sort((a, b) => a.rawDuration - b.rawDuration);
-      }
-      if (sortBy == "start_time") {
-        if (descending) {
-          return data.sort(
-            (a, b) => b.toBeStoredStartTime - a.toBeStoredStartTime,
-          );
-        }
-        return data.sort(
-          (a, b) => a.toBeStoredStartTime - b.toBeStoredStartTime,
-        );
-      }
-      if (sortBy == "created_at") {
-        if (descending) {
-          return data.sort((a, b) => b.toBeCreatedAt - a.toBeCreatedAt);
-        }
-        return data.sort((a, b) => a.toBeCreatedAt - b.toBeCreatedAt);
-      }
-      // if(sortBy == "status"){
-      //   if (descending) {
-      //     return data.sort((a, b) => b.status - a.status);
-      //   }
-      //   return data.sort((a, b) => a.status - b.status);
-      // }
-
-      // return a.rawDuration - b.rawDuration;
-    };
     const copyToClipboard = (text, type) => {
       navigator.clipboard
         .writeText(text)
         .then(() => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${type} ${t('search_scheduler_job.copy_success')}`,
             timeout: 5000,
           });
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t('search_scheduler_job.copy_error'),
             timeout: 5000,
           });
@@ -850,13 +651,14 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
-    const triggerExpand = (props) => {
-      query.value = JSON.stringify(filterRow(props.row), null, 2);
-      if (expandedRow.value === props.row.trace_id) {
-        expandedRow.value = null;
+    const expandedIds = computed(() => expandedRow.value ? [expandedRow.value] : []);
+
+    const onExpandRow = (row: any) => {
+      query.value = JSON.stringify(filterRow(row), null, 2);
+      if (expandedRow.value === row.trace_id) {
+        expandedRow.value = "";
       } else {
-        // Otherwise, expand the clicked row and collapse any other row
-        expandedRow.value = props.row.trace_id;
+        expandedRow.value = row.trace_id;
       }
     };
     const goToLogs = (row) => {
@@ -896,8 +698,8 @@ export default defineComponent({
         queryObject["fn_editor"] = "false";
       }
 
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t('search_scheduler_job.job_applied_success'),
         timeout: 2000,
       });
@@ -907,18 +709,6 @@ export default defineComponent({
         query: queryObject,
       });
     };
-    const changePagination = (val: { label: string; value: any }) => {
-      if (val.label == "All") {
-        val.value = dataToBeLoaded.value.length;
-        val.label = "All";
-      }
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTableSchedule.value.setPagination(pagination.value);
-
-      // pagination.value.page = 1;
-    };
-
     watch(
       () => props.isClicked,
       (value) => {
@@ -989,32 +779,27 @@ export default defineComponent({
       fetchSearchHistory,
       dataToBeLoaded,
       columnsToBeRendered,
-      expandedColumns,
       config,
       t,
       route,
       isLoading,
-      qTableSchedule,
       updateDateTime,
-      pagination,
+      pageSize,
+      pageSizeOptions,
       searchDateTimeRef,
       expandedRow,
+      expandedIds,
       goToLogs,
-      triggerExpand,
+      onExpandRow,
       copyToClipboard,
       formatTime,
       delayMessage,
-      sortMethod,
       resultTotal,
-      perPageOptions,
-      changePagination,
-      selectedPerPage,
       getStatusText,
       getStatusIcon,
       getStatusColor,
       showSearchResults,
       fetchSearchResults,
-      qTableRef,
       cancelSearchJob,
       retrySearchJob,
       deleteSearchJob,

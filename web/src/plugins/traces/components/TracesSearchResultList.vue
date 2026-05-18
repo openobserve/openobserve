@@ -88,7 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-table-loading-banner-row"
               class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <OSpinner size="xs" class="tw:mx-[0.25rem]" />
+              <OSpinner
+                size="xs"
+                class="tw:mx-[0.25rem]"
+                data-test="traces-search-result-loading-indicator"
+              />
               <span
                 class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
                 >{{ t("traces.fetchingTraces") }}</span
@@ -102,7 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-table-loading-row"
               class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
             >
-              <OSpinner size="xs" class="tw:mr-[0.25rem]" />
+              <OSpinner
+                size="xs"
+                class="tw:mr-[0.25rem]"
+                data-test="traces-search-result-loading-indicator"
+              />
               <span
                 class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
                 >{{ t("traces.fetchingTraces") }}</span

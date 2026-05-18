@@ -16,12 +16,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import CompareWithPast from "./CompareWithPast.vue";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock getUUID
@@ -384,9 +384,9 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should render Cycle text", () => {
-      const html = wrapper.html();
-      // Check for info icon which accompanies the cycle text
-      expect(html).toContain("info");
+      // Check for info icon (OIcon component) which accompanies the cycle text
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
     });
 
     it("should render running text with period and frequency", () => {
@@ -485,8 +485,8 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should have info icons with tooltips", () => {
-      const html = wrapper.html();
-      expect(html).toContain("info");
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
     });
   });
 

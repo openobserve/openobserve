@@ -30,7 +30,7 @@ use super::{datafusion::exec::TableBuilder, index::IndexCondition};
 
 pub mod flight;
 pub mod storage;
-pub(crate) mod tantivy_result;
+pub(crate) mod tantivy;
 pub(crate) mod tantivy_result_cache;
 pub mod wal;
 

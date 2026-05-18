@@ -29,9 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="isAnimating ? 'rotating-icon' : ''"
         size="sm"
       />
-      <q-tooltip class="tw:text-[12px]" :offset="[0, 2]">
-        {{ t("search.autoRefresh") }}: {{ selectedLabel }}
-      </q-tooltip>
+      <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
 
       <!-- Dropdown menu for interval selection -->
       <q-menu content-style="z-index: 10001">
@@ -52,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <q-separator />
+        <OSeparator />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="row">
           <div
             v-for="(item, j) in items"
@@ -68,15 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-close-popup="true"
               :disabled="item.disabled"
             >
-              <q-tooltip
+              <OTooltip
                 v-if="item.disabled"
-                style="z-index: 10001; font-size: 14px"
-                anchor="center right"
-                self="center left"
+                side="right"
+                align="center"
                 max-width="300px"
-              >
-                {{ minRangeRestrictionMessageVal }}
-              </q-tooltip>
+                :content="minRangeRestrictionMessageVal"
+              />
               {{ item.label }}
             </OButton>
           </div>
@@ -100,33 +96,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="row items-center no-wrap">
             <OIcon
               left
-              name="update" size="sm"
+              name="update"
+              size="sm"
               :class="[
                 isAnimating ? 'rotating-icon' : '',
                 isAnimating ? 'text-primary' : '',
               ]"
             />
             <div class="text-center">{{ selectedLabel }}</div>
-            <OIcon
-              name="arrow-drop-down"
-              size="sm"
-              class="tw:ml-0.5"
-            />
+            <OIcon name="arrow-drop-down" size="sm" class="tw:ml-0.5" />
           </div>
         </OButton>
       </template>
       <div class="tw:w-[300px] tw:p-2">
         <div class="row">
-          <div
-            class="col col-12 q-pa-sm"
-            style="text-align: center"
-          >
+          <div class="col col-12 q-pa-sm" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
               size="sm"
               :block="true"
-              @click="() => { onItemClick({ label: t('common.off'), value: 0 }); btnRefreshInterval = false; }"
+              @click="
+                () => {
+                  onItemClick({ label: t('common.off'), value: 0 });
+                  btnRefreshInterval = false;
+                }
+              "
             >
               {{ t("common.off") }}
             </OButton>
@@ -144,18 +139,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
               :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
               size="sm"
-              @click="() => { onItemClick(item); btnRefreshInterval = false; }"
+              @click="
+                () => {
+                  onItemClick(item);
+                  btnRefreshInterval = false;
+                }
+              "
               :disabled="item.disabled"
             >
-              <q-tooltip
+              <OTooltip
                 v-if="item.disabled"
-                style="z-index: 10001; font-size: 14px"
-                anchor="center right"
-                self="center left"
+                side="right"
+                align="center"
                 max-width="300px"
-              >
-                {{ minRangeRestrictionMessageVal }}
-              </q-tooltip>
+                :content="minRangeRestrictionMessageVal"
+              />
               {{ item.label }}
             </OButton>
           </div>
@@ -177,18 +175,17 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OButton, ODropdown, ODropdownSeparator,
-    OIcon,
-},
+  components: { OSeparator, OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
   props: {
     modelValue: {
       type: Number,
@@ -215,7 +212,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;

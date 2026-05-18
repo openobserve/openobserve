@@ -18,12 +18,12 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MetricList from "./MetricList.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock useQuasar
@@ -182,14 +182,15 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["modelValue", "options", "label", "filled", "dense", "hideSelected"],
           emits: ["update:modelValue", "filter"],
         },
-        QTable: {
-          template: `<div data-test-stub='q-table' :data-test='$attrs["data-test"]'>
-            <div data-test="table-top-right"><slot name="top-right"></slot></div>
+        OTable: {
+          template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
+            <div data-test="table-top"><slot name="top"></slot></div>
             <div data-test="table-body">
-              <slot name="body-cell-name" v-for="row in rows || [{name: 'test_field'}, {name: 'other_field'}]" :key="row.name" v-bind="{row: row, col: {name: 'name'}}"></slot>
+              <slot name="cell-name" v-for="row in data || [{name: 'test_field'}, {name: 'other_field'}]" :key="row.name" v-bind="{row: row}"></slot>
             </div>
           </div>`,
-          props: ["rows", "columns", "visibleColumns", "filter", "filterMethod", "pagination", "hideHeader", "hideBottom"],
+          props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter", "rowClass"],
+          emits: ["row-click"],
         },
         QInput: {
           template: `<input 
@@ -253,10 +254,6 @@ const createWrapper = (props = {}, options = {}) => {
           </button>`,
           props: ["icon", "size", "round", "title"],
           emits: ["click"],
-        },
-        QInnerLoading: {
-          template: "<div data-test-stub='q-inner-loading' v-if='showing'></div>",
-          props: ["showing", "size", "label", "labelStyle"],
         },
         EqualIcon: {
           template: "<div data-test-stub='equal-icon'></div>",

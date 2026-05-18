@@ -327,11 +327,11 @@ describe("TenstackTable", () => {
   describe("loading state", () => {
     it("should show the default loading indicator when loading=true and no rows", () => {
       wrapper = mountTable({ rows: [], loading: true });
-      // Quasar renders q-spinner-hourglass as an SVG with class q-spinner
-      const tableHtml = wrapper.html();
-      expect(tableHtml).toContain("q-spinner");
+      expect(
+        wrapper.find('[data-test="tenstack-table-loading-indicator"]').exists(),
+      ).toBe(true);
       // i18n key is rendered as-is by the mock
-      expect(tableHtml).toContain("confirmDialog.loading");
+      expect(wrapper.html()).toContain("confirmDialog.loading");
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {

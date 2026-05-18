@@ -16,11 +16,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Notify } from "quasar";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Notify],
+  plugins: [],
 });
 
 // vi.mock calls are hoisted — must appear before imports of mocked modules
@@ -393,7 +392,7 @@ describe("ServiceGraphSidePanel.vue", () => {
       expect(health.status).toBe("healthy");
       expect(health.text).toBe("Healthy");
       expect(health.color).toBe("positive");
-      expect(health.icon).toBe("check_circle");
+      expect(health.icon).toBe("check-circle");
     });
 
     it("should return degraded status when error_rate > 5% and <= 10%", () => {

@@ -49,21 +49,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
           </div>
       </div>
-      <q-table
+      <OTable
         data-test="alert-destinations-list-table"
-        ref="qTable"
-        :rows="visibleRows"
+        :data="visibleRows"
         :columns="columns"
         row-key="name"
-        :pagination="pagination"
+        :selected-ids="selectedDestinationIds"
         selection="multiple"
-        v-model:selected="selectedDestinations"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
-            : 'width: 100%'"
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[5, 10, 20, 50, 100]"
+        sorting="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        @update:selected-ids="handleSelectedIdsUpdate"
       >
-        <template #no-data>
+        <template #empty>
           <div
             v-if="!templates.length"
             class="full-width flex column justify-center items-center text-center"
@@ -88,77 +89,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <NoData />
           </template>
         </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-              <OButton
-                data-test="destination-export"
-                variant="ghost"
-                size="icon-circle-sm"
-                title="Export Destination"
-                @click.stop="exportDestination(props.row)"
-              >
-                <OIcon name="download" size="sm" />
-              </OButton>
-              <OButton
-                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-                variant="ghost"
-                size="icon-circle-sm"
-                :title="t('alert_destinations.edit')"
-                @click="editDestination(props.row)"
-              >
-                <OIcon name="edit" size="sm" />
-              </OButton>
-              <OButton
-                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-                variant="ghost"
-                size="icon-circle-sm"
-                :title="t('alert_destinations.delete')"
-                @click="conformDeleteDestination(props.row)"
-              >
-                <OIcon name="delete" size="sm" />
-              </OButton>
-            </div>
-          </q-td>
+
+        <template #cell-type="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <template v-if="getPrebuiltTypeName(row)">
+              <OBadge
+                :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
+                variant="primary"
+                class="tw:text-xs"
+              >{{ getPrebuiltTypeName(row) }}</OBadge>
+              <OIcon
+                name="auto-awesome"
+                size="sm"
+                :title="'Prebuilt ' + getPrebuiltTypeName(row) + ' destination'"
+              />
+            </template>
+            <template v-else>
+              <OBadge
+                data-test="destination-type-badge-custom"
+                variant="default"
+                class="tw:text-xs"
+              >{{ getCustomDestinationLabel(row) }}</OBadge>
+              <OIcon
+                name="settings"
+                size="sm"
+                :title="getCustomDestinationLabel(row)"
+              />
+            </template>
+          </div>
         </template>
 
-        <template v-slot:body-cell-type="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <!-- Prebuilt Destination Badge -->
-              <template v-if="getPrebuiltTypeName(props.row)">
-                <q-badge
-                  :data-test="`destination-type-badge-${getPrebuiltTypeName(props.row)?.toLowerCase()}`"
-                  :color="'primary'"
-                  class="tw:text-xs"
-                  :label="getPrebuiltTypeName(props.row)"
-                />
-                <OIcon
-                  name="auto-awesome"
-                  size="sm"
-                  :title="'Prebuilt ' + getPrebuiltTypeName(props.row) + ' destination'"
-                />
-              </template>
-              <!-- Custom Destination -->
-              <template v-else>
-                <q-badge
-                  data-test="destination-type-badge-custom"
-                  color="grey-6"
-                  class="tw:text-xs"
-                  :label="getCustomDestinationLabel(props.row)"
-                />
-                <OIcon
-                  name="settings"
-                  size="sm"
-                  :title="getCustomDestinationLabel(props.row)"
-                />
-              </template>
-            </div>
-          </q-td>
-        </template>
-
-        <template v-slot:body-selection="scope">
-          <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+            <OButton
+              data-test="destination-export"
+              variant="ghost"
+              size="icon-circle-sm"
+              title="Export Destination"
+              @click.stop="exportDestination(row)"
+            >
+              <OIcon name="download" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-destination-list-${row.name}-update-destination`"
+              variant="ghost"
+              size="icon-circle-sm"
+              :title="t('alert_destinations.edit')"
+              @click="editDestination(row)"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-destination-list-${row.name}-delete-destination`"
+              variant="ghost"
+              size="icon-circle-sm"
+              :title="t('alert_destinations.delete')"
+              @click="conformDeleteDestination(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+          </div>
         </template>
 
         <template #bottom="scope">
@@ -186,30 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           </div>
         </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <OCheckbox
-                  v-model="props.selected"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-
-              <!-- Render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
+      </OTable>
     </div>
     <div v-else-if="showDestinationEditor && !showImportDestination">
       <AddDestination
@@ -258,7 +225,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
@@ -267,7 +233,6 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -279,6 +244,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OBadge from '@/lib/core/Badge/OBadge.vue';
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ConformDelete {
   visible: boolean;
@@ -291,71 +260,67 @@ export default defineComponent({
     AddDestination,
     NoData,
     ConfirmDialog,
-    QTablePagination,
     ImportDestination,
     OButton,
     OInput,
     OCheckbox,
+    OBadge,
+    OTable,
   },
   setup() {
-    const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18n();
-    const q = useQuasar();
     const { getAllActions } = useActions();
     const { track } = useReo();
 
-    // Prebuilt destinations composable
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 67,
+        meta: { align: "left" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("alert_destinations.name"),
-        align: "left",
+        id: "name",
+        header: t("alert_destinations.name"),
+        accessorKey: "name",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "type",
-        field: "type",
-        label: "Type",
-        align: "left",
+        id: "type",
+        header: "Type",
+        accessorKey: "type",
         sortable: true,
-        style: "width: 120px",
+        size: 120,
+        meta: { align: "left" },
       },
       {
-        name: "url",
-        field: "url",
-        label: t("alert_destinations.url"),
-        align: "left",
-        sortable: false,
+        id: "url",
+        header: t("alert_destinations.url"),
+        accessorKey: "url",
+        meta: { align: "left" },
       },
       {
-        name: "method",
-        field: "method",
-        label: t("alert_destinations.method"),
-        align: "left",
+        id: "method",
+        header: t("alert_destinations.method"),
+        accessorKey: "method",
         sortable: true,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("alert_destinations.actions"),
-        align: "center",
-        sortable: false,
-        classes:'actions-column'
+        id: "actions",
+        header: t("alert_destinations.actions"),
+        isAction: true,
+        pinned: "right",
+        meta: { align: "center" },
       },
-    ]);
+    ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
     const templates: Ref<Template[]> = ref([
       { name: "test", body: "", type: "http" },
@@ -370,19 +335,19 @@ export default defineComponent({
     const showImportDestination = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
-    ];
     const resultTotal = ref(0);
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+
+    const selectedDestinationIds = computed(() =>
+      selectedDestinations.value.map((d: any) => d.name),
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const map = new Map(destinations.value.map((r: any) => [r.name, r]));
+      selectedDestinations.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
+    };
+
     onActivated(() => {
       getTemplates();
       if (!destinations.value.length) getDestinations();
@@ -408,15 +373,15 @@ export default defineComponent({
     });
 
     const getActions = async () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading alert destination...",
       });
       if (store.state.organizationData.actions.length == 0) {
         await getAllActions()
           .catch(() => {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while loading actions.",
             });
           })
@@ -425,8 +390,8 @@ export default defineComponent({
     };
 
     const getDestinations = () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading destinations...",
       });
       destinationService
@@ -454,8 +419,8 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err.response.status != 403) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while pulling destinations.",
               timeout: 2000,
             });
@@ -526,8 +491,8 @@ export default defineComponent({
             destination_name: confirmDelete.value.data.name,
           })
           .then(() => {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
               timeout: 2000,
             });
@@ -539,8 +504,8 @@ export default defineComponent({
                 err.response.data?.message ||
                 err.response.data?.error ||
                 "Error while deleting destination";
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message,
                 timeout: 2000,
               });
@@ -565,11 +530,6 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-    };
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -599,17 +559,10 @@ export default defineComponent({
       const destinationJson = JSON.stringify(destinationByName, null, 2);
       const blob = new Blob([destinationJson], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      // Create an anchor element to trigger the download
       const link = document.createElement("a");
       link.href = url;
-
-      // Set the filename of the download
       link.download = `${destinationByName.name}.json`;
-
-      // Trigger the download by simulating a click
       link.click();
-
-      // Clean up the URL object after download
       URL.revokeObjectURL(url);
     };
     const importDestination = () => {
@@ -623,7 +576,6 @@ export default defineComponent({
       });
     };
 
-    // Get display name for prebuilt destination type
     const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
       const prebuiltType = detectPrebuiltType(destination);
       if (!prebuiltType) return null;
@@ -632,7 +584,6 @@ export default defineComponent({
       return typeConfig ? typeConfig.name : prebuiltType;
     };
 
-    // Get display label for custom destination sub-type
     const getCustomDestinationLabel = (destination: DestinationPayload): string => {
       if (destination.type === "http") {
         return t("alert_destinations.customWebhook");
@@ -648,23 +599,22 @@ export default defineComponent({
       if (!filterQuery.value) return destinations.value || [];
       return filterData(destinations.value || [], filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteDestinations = async () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting destinations...",
         timeout: 0,
       });
 
       try {
         if (selectedDestinations.value.length === 0) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No destinations selected for deletion",
             timeout: 2000,
           });
@@ -672,7 +622,6 @@ export default defineComponent({
           return;
         }
 
-        // Extract destination names for the API call (BE supports names)
         const payload = {
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
@@ -684,53 +633,46 @@ export default defineComponent({
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
         if (response.data) {
           const { successful = [], unsuccessful = [] } = response.data;
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
           if (failCount > 0 && successCount > 0) {
-            // Partial success
-            q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
-            // All failed
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} destination(s)`,
               timeout: 3000,
             });
           } else {
-            // All successful
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} destination(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
-          // Fallback success message
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
             timeout: 2000,
           });
         }
 
         selectedDestinations.value = [];
-        // Refresh destinations list
         getDestinations();
       } catch (error: any) {
         dismiss();
-        // Show error message from response if available
         const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });
@@ -740,15 +682,12 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-
-    // Watch visibleRows to sync resultTotal with search filter
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
     return {
       t,
-      qTable,
       showDestinationEditor,
       destinations,
       columns,
@@ -764,24 +703,20 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      changePagination,
-      perPageOptions,
       resultTotal,
-      pagination,
       routeTo,
       exportDestination,
       showImportDestination,
       importDestination,
       store,
-      // Expose additional methods for testing
       getActions,
       getTemplates,
       updateRoute,
       getDestinationByName,
       resetEditingDestination,
-      selectedPerPage,
       visibleRows,
-      hasVisibleRows,
+      selectedDestinationIds,
+      handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,

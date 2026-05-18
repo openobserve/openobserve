@@ -6,6 +6,7 @@
 import searchService from "@/services/search";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 interface QueryCondition {
@@ -377,8 +378,8 @@ export const validateInputs = (
 
   if (isNaN(Number(input.trigger_condition.silence))) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Silence Notification should not be empty",
         timeout: 1500,
       });
@@ -392,8 +393,8 @@ export const validateInputs = (
     isNaN(Number(input.trigger_condition.period))
   ) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Period should be greater than 0",
         timeout: 1500,
       });
@@ -409,8 +410,8 @@ export const validateInputs = (
       !input.query_condition.aggregation.having.operator
     ) {
       notify &&
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Threshold should not be empty",
           timeout: 1500,
         });
@@ -426,8 +427,8 @@ export const validateInputs = (
     !input.trigger_condition.operator
   ) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Threshold should not be empty",
         timeout: 1500,
       });
@@ -444,8 +445,8 @@ export const validateInputs = (
     } catch (err) {
       console.log(err);
       notify &&
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid cron expression!",
           timeout: 1500,
         });
@@ -455,8 +456,8 @@ export const validateInputs = (
     // Validate timezone is set for cron
     if (!input.trigger_condition.timezone || input.trigger_condition.timezone.trim() === '') {
       notify &&
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Timezone is required for cron schedule",
           timeout: 1500,
         });
@@ -467,8 +468,8 @@ export const validateInputs = (
     const frequency = Number(input.trigger_condition.frequency);
     if (isNaN(frequency) || frequency < 1) {
       notify &&
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Frequency should be greater than 0",
           timeout: 1500,
         });
@@ -534,8 +535,8 @@ export const validateSqlQuery = async (
 
         if (res.data?.function_error) {
           vrlFunctionError.value = res.data.function_error;
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Invalid VRL Function",
             timeout: 3000,
           });
@@ -588,8 +589,8 @@ export const saveAlertJson = async (
       streams.value[jsonPayload.stream_type] = response.list;
     } catch (err: any) {
       if (err.response.status !== 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.message || "Error fetching streams",
           timeout: 3000,
         });

@@ -21,9 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="layout-name">
         {{ t("panel.mapname") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -76,7 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-name-item-${nameLabel}`"
           >
             {{ nameLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
@@ -137,15 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <!-- value for maps container -->
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.mapvalue") }}
         <OIcon name="info-outline" size="sm" class="q-ml-xs">
-          <q-tooltip>
-            {{ Hint }}
-          </q-tooltip>
+          <OTooltip :content="Hint" />
         </OIcon>
       </div>
       <span class="layout-separator">:</span>
@@ -199,7 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
           >
             {{ valueLabel }}
-            <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+            <template #icon-right
+              ><OIcon name="arrow-drop-down" size="sm"
+            /></template>
             <q-menu
               class="field-function-menu-popup"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
@@ -260,9 +260,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
     <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <q-separator />
+    <OSeparator />
     <!-- filters container -->
     <DashboardFiltersOption
       :dashboardData="dashboardData"
@@ -284,7 +284,6 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import { useQuasar } from "quasar";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
@@ -296,10 +295,13 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
     SortByBtnGrp,
@@ -309,13 +311,13 @@ export default defineComponent({
     DynamicFunctionPopUp,
     DashboardJoinsOption,
     OIcon,
-},
+    OTooltip,
+  },
   props: ["dashboardData"],
   setup(props) {
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
 
-    const $q = useQuasar();
     const expansionItems = reactive({
       name: true,
       value_for_maps: true,

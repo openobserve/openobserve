@@ -72,6 +72,13 @@ function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
 }
 
+function headerAlignClass(header: any): string {
+  const align = (header.column.columnDef.meta as any)?.align;
+  if (align === 'center') return 'tw:text-center tw:justify-center';
+  if (align === 'right') return 'tw:text-right tw:justify-end';
+  return '';
+}
+
 function headerPaddingClass(header: any): string {
   return (header.column.columnDef.meta as any)?.compactPadding ? 'tw:px-1' : 'tw:px-2';
 }
@@ -147,19 +154,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           <span v-else>{{ col.label ?? col.id }}</span>
           <OIcon
             v-if="getSortIcon?.(col.id) === 'asc'"
-            name="arrow_upward"
+            name="arrow-upward"
             size="0.85rem"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else-if="getSortIcon?.(col.id) === 'desc'"
-            name="arrow_downward"
+            name="arrow-downward"
             size="0.85rem"
             class="tw:text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else
-            name="unfold_more"
+            name="unfold-more"
             size="0.85rem"
             class="tw:opacity-40"
           />
@@ -196,19 +203,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         {{ cell.label }}
         <OIcon
           v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
-          name="arrow_upward"
+          name="arrow-upward"
           size="0.85rem"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
-          name="arrow_downward"
+          name="arrow-downward"
           size="0.85rem"
           class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn"
-          name="unfold_more"
+          name="unfold-more"
           size="0.85rem"
           class="tw:opacity-40 tw:ml-1"
         />
@@ -250,7 +257,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="tw:w-0 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-8 tw:min-w-8 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
 
@@ -276,7 +283,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-secondary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs tw:select-none tw:relative`,
           'table-head',
           dense ? 'tw:h-6' : 'tw:h-7',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
@@ -304,7 +311,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             : {}),
         }"
       >
-        <div class="tw:flex tw:items-center tw:gap-1 tw:h-full">
+        <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full', headerAlignClass(header)]">
           <!-- Sortable header -->
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
@@ -321,21 +328,21 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
-                name="arrow_upward"
+                name="arrow-upward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
-                name="arrow_downward"
+                name="arrow-downward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
-                name="unfold_more"
+                name="unfold-more"
                 size="0.85rem"
                 class="tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
@@ -344,7 +351,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           </div>
 
           <!-- Non-sortable header -->
-          <div v-else class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
+          <div v-else :class="['tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
@@ -383,7 +390,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     <tr v-if="!enableColumnReorder">
       <th
         v-if="expansionEnabled"
-        class="tw:w-0 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-8 tw:min-w-8 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
       <th
@@ -403,7 +410,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-secondary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-text-primary tw:text-xs tw:select-none tw:relative`,
           dense ? 'tw:h-7 tw:group' : 'tw:h-8 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
@@ -429,7 +436,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             : {}),
         }"
       >
-        <div class="tw:flex tw:items-center tw:gap-1 tw:h-full">
+        <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full', headerAlignClass(header)]">
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
             class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden"
@@ -444,28 +451,28 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
-                name="arrow_upward"
+                name="arrow-upward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
-                name="arrow_downward"
+                name="arrow-downward"
                 size="0.85rem"
                 class="tw:text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
               />
               <OIcon
                 v-else
-                name="unfold_more"
+                name="unfold-more"
                 size="0.85rem"
                 class="tw:opacity-40"
                 data-test="o2-table-sort-icon-inactive"
               />
             </template>
           </div>
-          <div v-else class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
+          <div v-else :class="['tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"

@@ -45,10 +45,6 @@ describe('ScriptEditor.vue', () => {
             template: '<div data-test="vrl-function-test-events-editor"></div>',
             props: ['editorId', 'language', 'query']
           },
-          'q-spinner-hourglass': {
-            template: '<div class="spinner"></div>',
-            props: ['size']
-          },
           'OIcon': {
             template: '<div class="icon"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
             props: ['name', 'size']
@@ -149,7 +145,7 @@ describe('ScriptEditor.vue', () => {
     it('shows loading spinner when loading is true', () => {
       wrapper = createWrapper({ loading: true });
       
-      const spinner = wrapper.find('.spinner');
+      const spinner = wrapper.find('[data-test="script-editor-loading-indicator"]');
       expect(spinner.exists()).toBe(true);
     });
 
@@ -162,7 +158,7 @@ describe('ScriptEditor.vue', () => {
     it('does not show loading elements when loading is false', () => {
       wrapper = createWrapper({ loading: false });
       
-      const spinner = wrapper.find('.spinner');
+      const spinner = wrapper.find('[data-test="script-editor-loading-indicator"]');
       expect(spinner.exists()).toBe(false);
     });
 
@@ -367,7 +363,7 @@ describe('ScriptEditor.vue', () => {
     it('handles both loading and error states simultaneously', () => {
       wrapper = createWrapper({ loading: true, error: 'Test error' });
       
-      const spinner = wrapper.find('.spinner');
+      const spinner = wrapper.find('[data-test="script-editor-loading-indicator"]');
       const errorIcon = wrapper.find('.icon');
       
       expect(spinner.exists()).toBe(true);

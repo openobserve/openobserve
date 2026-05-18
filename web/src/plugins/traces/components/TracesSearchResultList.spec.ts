@@ -217,7 +217,7 @@ describe("TracesSearchResultList", () => {
     it("shows a spinner while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
       ).toBe(true);
     });
 
@@ -247,7 +247,7 @@ describe("TracesSearchResultList", () => {
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
       ).toBe(false);
     });
 
@@ -278,7 +278,7 @@ describe("TracesSearchResultList", () => {
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
       expect(
-        wrapper.findComponent({ name: "QSpinnerHourglass" }).exists(),
+        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
       ).toBe(false);
     });
 

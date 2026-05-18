@@ -31,22 +31,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-section-header"
         class="row items-center tw:px-[0.5rem]! q-py-xs tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
-        <q-badge
+        <OBadge
           data-test="traces-count-badge"
-          rounded
-          :label="`${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
+          variant="default"
           class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
-        />
-        <q-badge
+        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OBadge>
+        <OBadge
           v-if="
             searchObj.data.queryResults.errorCount != null &&
             searchObj.data.queryResults.errorCount > 0
           "
           data-test="traces-error-count-badge"
-          rounded
-          :label="`${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
+          variant="error"
           class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
-        />
+        >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
         <!-- Insights Button -->
         <OButton
           variant="outline"
@@ -68,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:ml-2"
         />
 
-        <q-space />
+        <div class="tw:flex-1" />
         <!-- Pagination -->
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
@@ -161,7 +159,6 @@ import {
   ref,
   watch,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -175,6 +172,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -184,6 +182,7 @@ export default defineComponent({
     OTooltip,
     OSelect,
     OPagination,
+    OBadge,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
@@ -223,7 +222,6 @@ export default defineComponent({
   setup(_props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    useQuasar();
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();

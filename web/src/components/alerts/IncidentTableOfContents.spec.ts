@@ -202,8 +202,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent();
       const icon = findByTestId(wrapper, "toc-header-icon");
       expect(icon.exists()).toBe(true);
-      const qIcon = icon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("format_list_bulleted");
+      const qIcon = icon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("format-list-bulleted");
     });
 
     it("should display header title", () => {
@@ -286,7 +286,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const icon = findByTestId(wrapper, "toc-level1-icon-parent1");
-      const qIcon = icon.findComponent({ name: "QIcon" });
+      const qIcon = icon.findComponent({ name: "OIcon" });
       expect(qIcon.props("name")).toBe("folder");
     });
 
@@ -295,7 +295,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const icon = findByTestId(wrapper, "toc-level1-icon-parent2");
-      const qIcon = icon.findComponent({ name: "QIcon" });
+      const qIcon = icon.findComponent({ name: "OIcon" });
       expect(qIcon.props("name")).toBe("article");
     });
 
@@ -368,7 +368,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const icon = findByTestId(wrapper, "toc-level2-icon-child1-1");
-      const qIcon = icon.findComponent({ name: "QIcon" });
+      const qIcon = icon.findComponent({ name: "OIcon" });
       expect(qIcon.props("name")).toBe("label");
     });
 
@@ -433,8 +433,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]));
 
       const icon = findByTestId(wrapper, "toc-level3-icon-l3-1");
-      const qIcon = icon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("fiber_manual_record");
+      const qIcon = icon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("fiber-manual-record");
     });
 
     it("should emit scroll-to-section when clicking level 3 item", async () => {
@@ -469,24 +469,25 @@ describe("IncidentTableOfContents", () => {
   });
 
   describe("Expand/Collapse Functionality", () => {
-    it("should show chevron_right icon when collapsed", () => {
+    it("should show chevron-right icon when collapsed", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      // OButton renders OIcon as a Quasar icon span inside the button
-      // When collapsed, expandedSections[item.id] is falsy → chevron_right
-      expect(button.html()).toContain("chevron_right");
+      // OBadge/OIcon renders SVG components — check via component lookup
+      const icon = button.findComponent({ name: "OIcon" });
+      expect(icon.exists()).toBe(true);
+      expect(icon.props("name")).toBe("chevron-right");
     });
 
-    it("should show expand_more icon when expanded", () => {
+    it("should show expand-more icon when expanded", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      // OButton renders OIcon as a Quasar icon span inside the button
-      // When expanded, expandedSections[item.id] is truthy → expand_more
-      expect(button.html()).toContain("expand_more");
+      const icon = button.findComponent({ name: "OIcon" });
+      expect(icon.exists()).toBe(true);
+      expect(icon.props("name")).toBe("expand-more");
     });
 
     it("should emit toggle-section when clicking expand button", async () => {

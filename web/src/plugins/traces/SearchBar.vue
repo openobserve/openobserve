@@ -103,13 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
+            class="toolbar-toggle-container element-box-shadow"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="sm"
+              size="lg"
             />
             <img
               :src="metricsIcon"
@@ -129,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <!-- Error Only Toggle -->
           <div
-            class="q-pr-xs tw:flex tw:items-center tw:justify-center tw:border-solid tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-[0.375rem]"
+            class="toolbar-toggle-container element-box-shadow"
           >
             <OSwitch
               data-test="traces-search-bar-error-only-toggle-btn"
               v-model="searchObj.meta.showErrorOnly"
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center"
-              size="sm"
+              size="lg"
               @update:model-value="onErrorOnlyToggle"
             />
             <OIcon
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.runQuery") }}
             </OButton>
             <!-- Dropdown: shown when live mode feature is enabled -->
-            <q-separator
+            <OSeparator
               v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
               class="tw:h-[1.875rem]! tw:w-[1px]"
             />
@@ -437,7 +437,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
@@ -451,6 +450,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import useTraces from "@/composables/useTraces";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
@@ -466,10 +466,12 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OSeparator,
     DateTime,
     ShareButton,
     OToggleGroup,
@@ -537,7 +539,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
@@ -659,10 +660,9 @@ export default defineComponent({
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
+              toast({
                 message: "Stream not found",
-                color: "negative",
-                position: "top",
+                position: "top-center",
                 timeout: 2000,
               });
             }
@@ -1225,5 +1225,24 @@ export default defineComponent({
 .o2-color-cancel {
   background-color: #f67a7a;
   color: var(--o2-primary-btn-text);
+}
+
+.toolbar-toggle-container {
+  padding: 0.25rem 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.0625rem solid var(--color-button-outline-border);
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--o2-hover-accent);
+  }
+}
+
+:global(.dark-theme) .toolbar-toggle-container {
+  border: 0.0625rem solid var(--color-button-outline-border);
 }
 </style>

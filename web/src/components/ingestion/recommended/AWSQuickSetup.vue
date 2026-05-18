@@ -72,10 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
             />
             <div class="step-label">Select services to monitor</div>
-            <q-chip dense color="primary" text-color="white" size="sm">
+            <OBadge variant="primary" size="sm">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
-            </q-chip>
+            </OBadge>
           </div>
           <div class="tw:flex tw:gap-2" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll"
@@ -159,13 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >(where stacks will be deployed)</span
                 >
               </div>
-              <q-chip
+              <OBadge
                 v-if="targetRegions.length > 0"
-                dense
-                color="primary"
-                text-color="white"
+                variant="primary"
                 size="sm"
-                >{{ targetRegions.length }} selected</q-chip
+                >{{ targetRegions.length }} selected</OBadge
               >
             </div>
             <div class="tw:flex tw:gap-2" @click.stop>
@@ -293,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="tw:overflow-hidden tw:min-h-0">
         <div>
-          <q-separator class="tw:mb-4" />
+          <OSeparator class="tw:mb-4" />
           <div class="param-helper">
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
               <div class="tw:font-semibold step-label">
@@ -336,14 +334,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Target regions to enter in "Deployment targets":
               </div>
               <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
-                <q-chip
+                <OBadge
                   v-for="r in targetRegions"
                   :key="r"
-                  dense
-                  color="primary"
-                  text-color="white"
+                  variant="primary"
                   size="sm"
-                  >{{ r }}</q-chip
+                  >{{ r }}</OBadge
                 >
               </div>
             </div>
@@ -358,7 +354,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -369,22 +364,25 @@ import {
 } from "@/utils/awsIntegrations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const COMPLETE_TEMPLATE_URL =
   "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+  components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
     OIcon,
+    OBadge,
 },
   setup() {
     const store = useStore();
-    const q = useQuasar();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");
@@ -454,8 +452,8 @@ export default defineComponent({
 
     const copyParam = (value: string) => {
       navigator.clipboard.writeText(value);
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Copied to clipboard",
         timeout: 1500,
       });
@@ -463,8 +461,8 @@ export default defineComponent({
 
     const handleLaunch = () => {
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -473,8 +471,8 @@ export default defineComponent({
 
       const { organizationId, email, passcode } = getCredentials();
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -485,8 +483,8 @@ export default defineComponent({
         launchSingleRegion(organizationId, email, passcode);
       } else {
         if (targetRegions.value.length === 0) {
-          q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "Select at least one target region.",
             timeout: 3000,
           });
@@ -523,8 +521,8 @@ export default defineComponent({
       );
 
       if (!url) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "CloudFormation template not available yet",
           timeout: 3000,
         });
@@ -537,8 +535,8 @@ export default defineComponent({
         region: selectedRegion.value,
         services: enabledServices.value,
       });
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: "Opening AWS Console to deploy complete integration stack",
         timeout: 3000,
       });
@@ -558,8 +556,8 @@ export default defineComponent({
         services: enabledServices.value,
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message:
           "AWS StackSets console opened. Use the parameter values below to complete setup.",
         timeout: 5000,

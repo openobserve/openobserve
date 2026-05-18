@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md domain_management">
+  <div class="domain_management tw:flex tw:flex-col tw:h-full">
+  <div class="q-px-md q-py-md tw:flex-1 tw:overflow-y-auto tw:pb-4">
     <!-- Claim Parser Function Selection -->
     <div class="q-mb-xl">
       <div class="text-h6 text-bold q-mb-xs">
@@ -27,35 +28,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="row q-gutter-md items-end">
         <div class="col-auto claim-parser-select">
-          <q-select
+          <OSelect
             v-model="claimParserFunction"
             :options="functionOptions"
             :label="t('settings.claimParserFunctionLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            dense
-            :loading="loadingFunctions"
-            @filter="filterFunctions"
-            use-input
-            fill-input
-            hide-selected
-            input-debounce="300"
+            searchable
             clearable
+            :loading="loadingFunctions"
           >
-            <template v-slot:hint>
-              {{ t("settings.claimParserFunctionHint") }}
+            <template #empty>
+              <span>{{ t('settings.noVrlFunctionsFound') }}</span>
             </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("settings.noVrlFunctionsFound") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          </OSelect>
         </div>
         <div class="col-auto">
           <OButton
@@ -73,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="showVrlInfo = true"
             icon-left="help-outline"
           >
-            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+            <OTooltip :content="t('settings.claimParserFunctionInfoTitle')" side="top" />
           </OButton>
         </div>
       </div>
@@ -128,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="loadRecentErrors"
                         :loading="loadingErrors"
                       >
-                            <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
+                            <OTooltip :content="t('common.refresh')" side="top" />
                       </OButton>
                     </div>
                   </div>
@@ -178,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Divider -->
-    <q-separator class="q-mb-xl" />
+    <OSeparator class="tw:mb-8" />
 
     <div class="text-h6 text-bold q-mb-xs">
       {{ t("settings.domainRestrictionsSubsection") }}
@@ -195,18 +179,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       
       <div class="row q-gutter-md items-center q-mb-md">
         <div class="col-auto">
-          <q-input
+          <OInput
             v-model="newDomain"
-            :hint="t('settings.domainHint', { 'at_sign': '@' })"
             class="domain-input"
-            borderless
-            hide-bottom-space
-            dense
             @keydown.enter="addDomain"
             :placeholder="t('settings.domainPlaceholder')"
-            :rules="[
-              (val) => isValidDomain(val) || t('settings.invalidDomain')
-            ]"
+            :error="!!domainError"
+            :error-message="domainError"
+            @update:model-value="domainError = ''"
           />
         </div>
         <div class="col-auto q-my-none">
@@ -244,23 +224,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-pa-md">
           <!-- Radio Button Options -->
-          <div class="q-mb-xs">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-          
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
+          <ORadioGroup v-model="domain.allowAllUsers" orientation="vertical">
+            <div class="q-mb-xs">
+              <ORadio
+                :val="true"
+                :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
+              />
+            </div>
+            <div class="q-mb-md">
+              <ORadio
+                :val="false"
+                :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
+              />
+            </div>
+          </ORadioGroup>
 
           <!-- Info message for all users -->
           <div 
@@ -274,18 +251,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="!domain.allowAllUsers" class="specific-users-section">
             <div class="row q-gutter-md items-center q-mb-md">
               <div class="col">
-                <q-input
+                <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="email-input"
-                  outlined
-                  dense
                   @keydown.enter="addEmail(domain)"
-                  :rules="[
-                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
-                  ]"
                 />
               </div>
               <div class="col-auto q-my-none">
@@ -324,8 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("settings.noDomainMessage") }}
     </div>
 
+  </div>
     <!-- Action Buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-2 q-pl-lg q-pr-xl q-py-lg full-width tw:absolute tw:bottom-0">
+    <div class="tw:flex tw:justify-end tw:gap-2 tw:px-6 tw:py-4 tw:border-t tw:border-(--o2-border-color) tw:shrink-0 tw:bg-(--o2-bg-default)">
       <OButton
         variant="outline"
         size="sm-action"
@@ -339,15 +310,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ t('settings.saveChanges') }}</OButton>
     </div>
   </div>
+
+  <!-- Confirm remove domain dialog -->
+  <ODialog
+    v-model:open="confirmRemoveDomainOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveDomainOpen = false"
+    @click:primary="doRemoveDomain"
+  >
+    <p v-if="pendingRemoveDomainIndex !== null">{{ t('settings.confirmRemoveDomain', { domain: domains[pendingRemoveDomainIndex]?.name }) }}</p>
+  </ODialog>
+
+  <!-- Confirm remove email dialog -->
+  <ODialog
+    v-model:open="confirmRemoveEmailOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveEmailOpen = false"
+    @click:primary="doRemoveEmail"
+  >
+    <p v-if="pendingRemoveEmail !== null">{{ t('settings.confirmRemoveEmail', { email: pendingRemoveEmail.email }) }}</p>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
@@ -356,6 +356,10 @@ import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Domain {
   name: string;
@@ -365,11 +369,17 @@ interface Domain {
 }
 
 const { t } = useI18n();
-const q = useQuasar();
+
+// Dialog state for domain/email removal confirmations
+const confirmRemoveDomainOpen = ref(false);
+const pendingRemoveDomainIndex = ref<number | null>(null);
+const confirmRemoveEmailOpen = ref(false);
+const pendingRemoveEmail = ref<{ domain: any; emailIndex: number; email: string } | null>(null);
 const store = useStore();
 const router = useRouter();
 
 const newDomain = ref("");
+const domainError = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
 
@@ -522,12 +532,19 @@ const isValidEmail = (email: any, domain: any): boolean => {
 };
 
 const addDomain = () => {
-  if (!newDomain.value || !isValidDomain(newDomain.value)) return;
+  if (!newDomain.value) {
+    domainError.value = t("settings.domainRequired") || "Domain is required";
+    return;
+  }
+  if (!isValidDomain(newDomain.value)) {
+    domainError.value = t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)";
+    return;
+  }
   
   // Check if domain already exists
   if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.domainAlreadyExists"),
       timeout: 3000,
     });
@@ -543,26 +560,28 @@ const addDomain = () => {
 
   newDomain.value = "";
 
-  // q.notify({
-  //   type: "positive",
+  // toast({
+  //   variant: "success",
   //   message: t("settings.domainAdded"),
   //   timeout: 3000,
   // });
 };
 
 const removeDomain = (index: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveDomain", { domain: domains[index].name }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domains.splice(index, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.domainRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveDomainIndex.value = index;
+  confirmRemoveDomainOpen.value = true;
+};
+
+const doRemoveDomain = () => {
+  const index = pendingRemoveDomainIndex.value;
+  if (index === null) return;
+  domains.splice(index, 1);
+  pendingRemoveDomainIndex.value = null;
+  confirmRemoveDomainOpen.value = false;
+  toast({
+    variant: "success",
+    message: t("settings.domainRemoved"),
+    timeout: 3000,
   });
 };
 
@@ -571,8 +590,8 @@ const addEmail = (domain: Domain) => {
 
   // Check if email already exists
   if (domain.allowedEmails.includes(domain.newEmail.toLowerCase())) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.emailAlreadyExists"),
       timeout: 3000,
     });
@@ -582,26 +601,28 @@ const addEmail = (domain: Domain) => {
   domain.allowedEmails.push(domain.newEmail.toLowerCase());
   domain.newEmail = "";
 
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("settings.emailAdded"),
     timeout: 3000,
   });
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveEmail.value = { domain, emailIndex, email: domain.allowedEmails[emailIndex] };
+  confirmRemoveEmailOpen.value = true;
+};
+
+const doRemoveEmail = () => {
+  const pending = pendingRemoveEmail.value;
+  if (!pending) return;
+  pending.domain.allowedEmails.splice(pending.emailIndex, 1);
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
+  toast({
+    variant: "success",
+    message: t("settings.emailRemoved"),
+    timeout: 3000,
   });
 };
 
@@ -663,14 +684,14 @@ const saveClaimParserFunction = async () => {
     // Update original value after successful save
     originalClaimParserFunction.value = claimParserFunction.value || "";
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.claimParserFunctionSaved"),
       timeout: 3000,
     });
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingClaimParserFunction"),
       timeout: 3000,
     });
@@ -784,8 +805,8 @@ const saveChanges = async () => {
     // Validate all domains have proper configuration
     for (const domain of domains) {
       if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
           timeout: 3000,
         });
@@ -806,16 +827,16 @@ const saveChanges = async () => {
     // Save to backend API
     await domainManagement.updateDomainRestrictions(store.state.zoConfig.meta_org, domainData);
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.domainSettingsSaved"),
       timeout: 3000,
     });
 
     emit("saved", domains);
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingDomainSettings"),
       timeout: 3000,
     });

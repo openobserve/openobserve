@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import AlertHistory from "@/components/alerts/AlertHistory.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -32,7 +31,7 @@ vi.mock("@/services/alerts", () => ({
 
 import alertsService from "@/services/alerts";
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -188,12 +187,12 @@ describe("AlertHistory.vue", () => {
       expect(tableText).toContain("Test Alert 2");
     });
 
-    it("should display status chips with correct colors", async () => {
+    it("should display status badges with correct variants", async () => {
       await mountComponent();
       await flushPromises();
 
-      const statusChips = wrapper.findAllComponents({ name: "QChip" });
-      expect(statusChips.length).toBeGreaterThan(0);
+      const statusBadges = wrapper.findAllComponents({ name: "OBadge" });
+      expect(statusBadges.length).toBeGreaterThan(0);
     });
 
     it("should show realtime vs scheduled icon", async () => {
@@ -496,33 +495,33 @@ describe("AlertHistory.vue", () => {
     });
   });
 
-  describe("Status Color Mapping", () => {
-    it("should return correct color for success status", async () => {
+  describe("Status Variant Mapping", () => {
+    it("should return correct variant for success status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusColor("success")).toBe("positive");
-      expect(vm.getStatusColor("ok")).toBe("positive");
-      expect(vm.getStatusColor("completed")).toBe("positive");
+      expect(vm.getStatusVariant("success")).toBe("success-outline");
+      expect(vm.getStatusVariant("ok")).toBe("success-outline");
+      expect(vm.getStatusVariant("completed")).toBe("success-outline");
     });
 
-    it("should return correct color for error status", async () => {
+    it("should return correct variant for error status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusColor("error")).toBe("negative");
-      expect(vm.getStatusColor("failed")).toBe("negative");
+      expect(vm.getStatusVariant("error")).toBe("error-outline");
+      expect(vm.getStatusVariant("failed")).toBe("error-outline");
     });
 
-    it("should return correct color for warning status", async () => {
+    it("should return correct variant for warning status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusColor("warning")).toBe("warning");
+      expect(vm.getStatusVariant("warning")).toBe("warning-outline");
     });
 
-    it("should return correct color for pending/running status", async () => {
+    it("should return correct variant for pending/running status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusColor("pending")).toBe("info");
-      expect(vm.getStatusColor("running")).toBe("info");
+      expect(vm.getStatusVariant("pending")).toBe("primary-outline");
+      expect(vm.getStatusVariant("running")).toBe("primary-outline");
     });
   });
 

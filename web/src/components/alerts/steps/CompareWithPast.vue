@@ -44,9 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  {{ t('alerts.compareWithPast.cycleTooltip') }}
-                </q-tooltip>
+                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
               </OIcon>
             </span>
           </div>
@@ -64,13 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OIcon name="delete-outline" size="sm" />
                 </OButton>
-                <q-tooltip
-                  anchor="top middle"
-                  self="bottom middle"
-                  :offset="[0, 8]"
-                >
-                  {{ t('alerts.compareWithPast.currentWindowCannotBeDeleted') }}
-                </q-tooltip>
+                <OTooltip :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')" side="top" align="center" :sideOffset="8" />
               </span>
             </div>
           </div>
@@ -105,9 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  {{ t('alerts.compareWithPast.timeFrameTooltip') }}
-                </q-tooltip>
+                <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
               </OIcon>
             </span>
           </div>
@@ -133,9 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-xs cursor-pointer"
                 :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
               >
-                <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-                  {{ t('alerts.compareWithPast.cycleTooltip') }}
-                </q-tooltip>
+                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
               </OIcon>
             </span>
           </div>
@@ -163,18 +151,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="multi-time-range-alerts-add-btn"
           variant="outline"
           size="sm"
-          :disable="isComparisonDisabled"
+          :disabled="isComparisonDisabled"
           @click="addTimeShift"
         >
           {{ t('alerts.compareWithPast.addComparisonWindow') }}
-          <q-tooltip
+          <OTooltip
             v-if="isComparisonDisabled"
-            anchor="top middle"
-            self="bottom middle"
-            :offset="[0, 8]"
-          >
-            {{ comparisonDisabledTooltip }}
-          </q-tooltip>
+            :content="comparisonDisabledTooltip"
+            side="top"
+            align="center"
+            :sideOffset="8"
+          />
         </OButton>
 
       </div>
@@ -191,6 +178,7 @@ import { getUUID } from "@/utils/zincutils";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface TimeShiftPicker {
   offSet: string;
@@ -203,6 +191,7 @@ export default defineComponent({
     CustomDateTimePicker,
     OButton,
     OIcon,
+    OTooltip,
 },
   props: {
     multiTimeRange: {

@@ -49,11 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`ingestion.resetTokenBtnLabel`) }}
             </OButton>
           </span>
-          <q-input
+          <OInput
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
-            dense
-            borderless
             clearable
             class="tw:max-w-sm q-ml-md q-mb-xs right float-right indexlist-search-input"
             data-test="recommended-list-search-input"
@@ -61,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #prepend>
               <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
-          </q-input>
+          </OInput>
           <span
             class="text-subtitle bg-warning float-right q-pa-sm text-bold"
             v-if="
@@ -226,6 +224,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -239,7 +238,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
@@ -247,16 +246,16 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, OTabs, ORouteTab, OButton,
+  components: { ConfirmDialog, OTabs, ORouteTab, OButton, OInput,
     OIcon,
 },
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const route = useRoute();
     const rowData: any = ref({});
@@ -354,8 +353,8 @@ export default defineComponent({
         .get_organization_passcode(store.state.selectedOrganization.identifier)
         .then((res) => {
           if (res.data.data.token == "") {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "API Key not found.",
               timeout: 5000,
             });
@@ -382,14 +381,14 @@ export default defineComponent({
         )
         .then((res) => {
           if (res.data.data.token == "") {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "API Key not found.",
               timeout: 5000,
             });
           } else {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Token reset successfully.",
               timeout: 5000,
             });
@@ -400,8 +399,8 @@ export default defineComponent({
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while updating Token." + e.error,
               timeout: 5000,
             });
@@ -427,15 +426,15 @@ export default defineComponent({
     const copyToClipboardFn = (content: any) => {
       copyToClipboard(content.innerText)
         .then(() => {
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Content Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });
@@ -458,16 +457,16 @@ export default defineComponent({
             rum_token: res.data.data.new_key,
           });
           getRUMToken();
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "RUM Token generated successfully.",
             timeout: 5000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message ||
                 "Error while generating RUM Token.",
@@ -492,16 +491,16 @@ export default defineComponent({
         )
         .then((res) => {
           getRUMToken();
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "RUM Token updated successfully.",
             timeout: 5000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message ||
                 "Error while refreshing RUM Token.",

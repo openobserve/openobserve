@@ -46,7 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
             {{ t("search.visualize") }}
-            <OTooltip v-if="isVisualizeDisabled" :content="t('search.enableSqlModeOrSelectSingleStream')" />
+            <OTooltip
+              v-if="isVisualizeDisabled"
+              :content="t('search.enableSqlModeOrSelectSingleStream')"
+            />
           </OToggleGroupItem>
 
           <OToggleGroupItem
@@ -79,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             data-test="logs-search-bar-show-histogram-toggle-btn"
             v-model="searchObj.meta.showHistogram"
-            size="sm"
+            size="lg"
           >
             <template #label>
               <OIcon name="bar-chart" size="xs" />
@@ -95,11 +98,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-sql-mode-toggle-btn"
             v-model="searchObj.meta.sqlMode"
             :disabled="isSqlModeDisabled"
-            size="sm"
+            size="lg"
           >
             <template #label>
               <img :src="sqlIcon" alt="SQL Mode" class="toolbar-icon" />
-              <OTooltip :content="isSqlModeDisabled ? t('search.sqlModeDisabledForVisualization') : t('search.sqlModeLabel')" />
+              <OTooltip
+                :content="
+                  isSqlModeDisabled
+                    ? t('search.sqlModeDisabledForVisualization')
+                    : t('search.sqlModeLabel')
+                "
+              />
             </template>
           </OSwitch>
         </div>
@@ -154,26 +163,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     no-hover
                     style="width: 60%; border-right: 1px solid lightgray"
                   >
-                    <q-table
+                    <OTable
                       data-test="log-search-saved-view-list-fields-table"
-                      :visible-columns="['view_name']"
-                      :rows="searchObj.data.savedViews"
-                      :row-key="(row) => 'saved_view_' + row.view_id"
-                      :filter="searchObj.data.savedViewFilterFields"
-                      :filter-method="filterSavedViewFn"
-                      :pagination="{ rowsPerPage }"
-                      hide-header
-                      :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                      class="saved-view-table full-height"
-                      no-hover
-                      id="savedViewList"
-                      :rows-per-page-options="[]"
-                      :hide-bottom="
-                        searchObj.data.savedViews.length <= rowsPerPage ||
-                        searchObj.data.savedViews.length == 0
-                      "
+                      :data="searchObj.data.savedViews"
+                      :columns="savedViewColumns"
+                      row-key="view_id"
+                      :global-filter="searchObj.data.savedViewFilterFields"
+                      :page-size="rowsPerPage"
+                      :page-size-options="[10, 20, 50]"
+                      class="saved-view-table full-height o2-table-hide-header"
                     >
-                      <template #top-right>
+                      <template #top>
                         <div class="full-width">
                           <OInput
                             data-test="log-search-saved-view-field-search-input"
@@ -199,44 +199,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("confirmDialog.loading") }}
                           </div>
                         </div>
-                        <q-tr>
-                          <q-td
-                            v-if="
-                              searchObj.data.savedViews.length == 0 &&
-                              searchObj.loadingSavedView == false
-                            "
-                          >
-                            <q-item-label class="q-pl-sm q-pt-sm">{{
-                              t("search.savedViewsNotFound")
-                            }}</q-item-label>
-                          </q-td>
-                        </q-tr>
                       </template>
-                      <template v-slot:body-cell-view_name="props">
-                        <q-td :props="props" class="field_list" no-hover>
+                      <template #cell-view_name="{ row, value }">
+                        <div class="field_list">
                           <q-item
                             class="q-pa-xs saved-view-item"
                             clickable
                             v-close-popup
                           >
                             <q-item-section
-                              @click.stop="applySavedView(props.row)"
+                              @click.stop="applySavedView(row)"
                               v-close-popup
-                              :title="props.row.view_name"
+                              :title="value"
                             >
                               <q-item-label
                                 class="ellipsis"
                                 style="max-width: 140px"
-                                >{{ props.row.view_name }}</q-item-label
+                                >{{ value }}</q-item-label
                               >
                             </q-item-section>
                             <q-item-section
-                              :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                              :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
                               side
                               @click.stop="
                                 handleFavoriteSavedView(
-                                  props.row,
-                                  favoriteViews.includes(props.row.view_id),
+                                  row,
+                                  favoriteViews.includes(row.view_id),
                                 )
                               "
                             >
@@ -248,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >
                                 <OIcon
                                   :name="
-                                    favoriteViews.includes(props.row.view_id)
+                                    favoriteViews.includes(row.view_id)
                                       ? 'favorite'
                                       : 'favorite-border'
                                   "
@@ -257,9 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OButton>
                             </q-item-section>
                             <q-item-section
-                              :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
+                              :data-test="`logs-search-bar-update-${value}-saved-view-btn`"
                               side
-                              @click.stop="handleUpdateSavedView(props.row)"
+                              @click.stop="handleUpdateSavedView(row)"
                             >
                               <OButton
                                 :title="t('common.edit')"
@@ -271,9 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OButton>
                             </q-item-section>
                             <q-item-section
-                              :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
+                              :data-test="`logs-search-bar-delete-${value}-saved-view-btn`"
                               side
-                              @click.stop="handleDeleteSavedView(props.row)"
+                              @click.stop="handleDeleteSavedView(row)"
                             >
                               <OButton
                                 :title="t('common.delete')"
@@ -285,9 +273,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OButton>
                             </q-item-section>
                           </q-item>
-                        </q-td>
+                        </div>
                       </template>
-                    </q-table>
+                      <template #empty>
+                        <div
+                          v-if="searchObj.loadingSavedView == false"
+                          class="q-pl-sm q-pt-sm"
+                        >
+                          <q-item-label>{{
+                            t("search.savedViewsNotFound")
+                          }}</q-item-label>
+                        </div>
+                      </template>
+                    </OTable>
                   </q-item-section>
 
                   <q-item-section
@@ -295,19 +293,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="width: 40%; margin-left: 0px"
                     v-if="localSavedViews.length > 0"
                   >
-                    <q-table
+                    <OTable
                       data-test="log-search-saved-view-favorite-list-fields-table"
-                      :visible-columns="['view_name']"
-                      :rows="localSavedViews"
-                      :row-key="(row) => 'favorite_saved_view_' + row.view_name"
-                      hide-header
-                      hide-bottom
-                      :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                      class="saved-view-table full-height"
-                      id="savedViewFavoriteList"
-                      :rows-per-page-options="[0]"
+                      :data="localSavedViews"
+                      :columns="savedViewColumns"
+                      row-key="view_id"
+                      pagination="none"
+                      class="saved-view-table full-height o2-table-hide-header"
                     >
-                      <template #top-right>
+                      <template #top>
                         <q-item style="padding: 0px">
                           <q-item-label
                             header
@@ -315,38 +309,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >{{ t("search.favoriteViews") }}</q-item-label
                           >
                         </q-item>
-                        <q-separator horizontal inset></q-separator>
+                        <OSeparator class="tw:mx-4" />
                       </template>
-                      <template v-slot:body-cell-view_name="props">
-                        <q-td :props="props" class="field_list q-pa-xs">
+                      <template #cell-view_name="{ row, value }">
+                        <div class="field_list q-pa-xs">
                           <q-item
                             class="q-pa-xs saved-view-item"
                             clickable
                             v-close-popup
                           >
                             <q-item-section
-                              @click.stop="applySavedView(props.row)"
+                              @click.stop="applySavedView(row)"
                               v-close-popup
                             >
                               <q-item-label
                                 class="ellipsis"
                                 style="max-width: 90px"
-                                >{{ props.row.view_name }}</q-item-label
+                                >{{ value }}</q-item-label
                               >
                             </q-item-section>
                             <q-item-section
-                              :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
+                              :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
                               side
                               @click.stop="
                                 handleFavoriteSavedView(
-                                  props.row,
-                                  favoriteViews.includes(props.row.view_id),
+                                  row,
+                                  favoriteViews.includes(row.view_id),
                                 )
                               "
                             >
                               <OIcon
                                 :name="
-                                  favoriteViews.includes(props.row.view_id)
+                                  favoriteViews.includes(row.view_id)
                                     ? 'favorite'
                                     : 'favorite-border'
                                 "
@@ -355,9 +349,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </q-item-section>
                             <q-item-section
-                              :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
+                              :data-test="`logs-search-bar-update-${value}-favorite-saved-view-btn`"
                               side
-                              @click.stop="handleUpdateSavedView(props.row)"
+                              @click.stop="handleUpdateSavedView(row)"
                             >
                               <OButton
                                 :title="t('common.edit')"
@@ -369,9 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OButton>
                             </q-item-section>
                             <q-item-section
-                              :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
+                              :data-test="`logs-search-bar-delete-${value}-favorite-saved-view-btn`"
                               side
-                              @click.stop="handleDeleteSavedView(props.row)"
+                              @click.stop="handleDeleteSavedView(row)"
                             >
                               <OButton
                                 :title="t('common.delete')"
@@ -383,9 +377,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OButton>
                             </q-item-section>
                           </q-item>
-                        </q-td>
+                        </div>
                       </template>
-                    </q-table>
+                    </OTable>
                   </q-item-section>
                 </q-item>
               </q-list>
@@ -508,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator />
+              <OSeparator />
 
               <!-- === SAVED VIEWS GROUP (moved from toolbar at <= 1500px) === -->
 
@@ -546,7 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveSavedViewToMenu" />
+              <OSeparator v-if="shouldMoveSavedViewToMenu" />
 
               <!-- === ACTIONS GROUP === -->
 
@@ -567,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveSavedViewToMenu" />
+              <OSeparator v-if="shouldMoveSavedViewToMenu" />
 
               <!-- Syntax Guide -->
               <q-item class="q-pa-sm saved-view-item syntax-guide-menu-item">
@@ -629,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-item-section>
               </q-item>
 
-              <q-separator v-if="shouldMoveShareToMenu" />
+              <OSeparator v-if="shouldMoveShareToMenu" />
 
               <q-item
                 data-test="search-history-item-btn"
@@ -648,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator />
+              <OSeparator />
               <q-item
                 style="min-width: 150px"
                 class="q-pa-sm saved-view-item download-menu-parent"
@@ -687,11 +681,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         downloadLogs(searchObj.data.queryResults.hits, 'csv')
                       "
                     >
-                      <OIcon
-                        name="grid-on"
-                        size="xs"
-                        class="q-pr-sm q-pt-xs"
-                      />
+                      <OIcon name="grid-on" size="xs" class="q-pr-sm q-pt-xs" />
                       <q-item-section>
                         <q-item-label
                           class="tw:flex tw:items-center tw:gap-2 q-mr-md"
@@ -746,7 +736,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator />
+              <OSeparator />
               <q-item
                 v-if="searchObj.meta.sqlMode"
                 data-test="logs-search-bar-explain-query-menu-btn"
@@ -765,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator v-if="searchObj.meta.sqlMode" />
+              <OSeparator v-if="searchObj.meta.sqlMode" />
               <q-item
                 v-if="config.isEnterprise == 'true'"
                 data-test="search-scheduler-create-new-btn"
@@ -810,7 +800,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </q-item-section>
               </q-item>
-              <q-separator v-if="config.isEnterprise == 'true'" />
+              <OSeparator v-if="config.isEnterprise == 'true'" />
               <q-item
                 v-if="
                   config.isEnterprise == 'true' &&
@@ -891,11 +881,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <OIcon
-                      name="arrow-drop-down"
-                      size="sm"
-                      class="tw:ml-1"
-                    />
+                    <OIcon name="arrow-drop-down" size="sm" class="tw:ml-1" />
                   </OButton>
                 </template>
                 <div class="tw:p-2 tw:min-w-[240px]">
@@ -973,7 +959,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -1074,7 +1060,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -1210,12 +1196,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </OButton>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
-              <q-separator
+              <OSeparator
                 v-if="
                   config.isEnterprise == 'true' ||
                   store.state.zoConfig.auto_query_enabled
                 "
                 class="tw:h-[1.875rem]! tw:w-[1px]"
+                vertical
               />
               <ODropdown
                 v-if="
@@ -1464,11 +1451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       data-test="vrl-editor-disabled-warning"
                     >
-                      <OIcon
-                        name="warning"
-                        size="md"
-                        class="q-mx-sm"
-                      />
+                      <OIcon name="warning" size="md" class="q-mx-sm" />
                       <span
                         class="text-negative q-pa-sm"
                         style="font-weight: 600; font-size: 14px"
@@ -1521,7 +1504,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <ODialog data-test="search-bar-confirm-dialog"
+    <ODialog
+      data-test="search-bar-confirm-dialog"
       ref="confirmDialog"
       v-model:open="confirmDialogVisible"
       size="xs"
@@ -1533,7 +1517,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p>{{ confirmMessage }}</p>
     </ODialog>
 
-    <ODialog data-test="search-bar-confirm-saved-view-dialog"
+    <ODialog
+      data-test="search-bar-confirm-saved-view-dialog"
       ref="confirmSavedViewDialog"
       v-model:open="confirmSavedViewDialogVisible"
       size="xs"
@@ -1544,7 +1529,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ confirmMessageSavedView }}</p>
     </ODialog>
-    <ODialog data-test="search-bar-custom-download-dialog"
+    <ODialog
+      data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
       title="Custom Download"
@@ -1553,7 +1539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
-      <p>{{ t('search.customDownloadMessage') }}</p>
+      <p>{{ t("search.customDownloadMessage") }}</p>
       <OInput
         type="number"
         data-test="custom-download-initial-number-input"
@@ -1569,7 +1555,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-py-sm"
       />
       <div class="q-py-sm file-type">
-        <label class="q-pr-sm">{{ t('search.fileType') }}</label><br />
+        <label class="q-pr-sm">{{ t("search.fileType") }}</label
+        ><br />
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
           class="file-type-button-group q-mt-xs"
@@ -1582,11 +1569,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="downloadCustomFileType = option.value"
-          >{{ option.label }}</OButton>
+            >{{ option.label }}</OButton
+          >
         </OButtonGroup>
       </div>
     </ODialog>
-    <ODialog data-test="search-bar-store-state-saved-view-dialog"
+    <ODialog
+      data-test="search-bar-store-state-saved-view-dialog"
       v-model:open="store.state.savedViewDialog"
       size="md"
       :title="t('search.savedViewsLabel')"
@@ -1621,7 +1610,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <ODialog data-test="search-bar-store-state-saved-function-dialog"
+    <ODialog
+      data-test="search-bar-store-state-saved-function-dialog"
       v-model:open="store.state.savedFunctionDialog"
       size="md"
       :title="t('search.functionPlaceholder')"
@@ -1670,26 +1660,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </ODialog>
-    <ODialog data-test="search-bar-search-scheduler-job-dialog"
+    <ODialog
+      data-test="search-bar-search-scheduler-job-dialog"
       v-model:open="searchSchedulerJob"
       size="md"
       :title="t('search.scheduleSearchJob')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="searchSchedulerJob = false; searchObj.meta.showSearchScheduler = false;"
+      @click:secondary="
+        searchSchedulerJob = false;
+        searchObj.meta.showSearchScheduler = false;
+      "
       @click:primary="addJobScheduler"
     >
       <div>
         <div class="text-left q-mb-xs">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="17px" class="q-ml-xs cursor-pointer">
-            <OTooltip
-              side="right"
-              align="center"
-              max-width="300px"
-            >
+            <OTooltip side="right" align="center" max-width="300px">
               <template #content>
-                <span style="font-size: 14px">{{ t("search.noOfRecordsTooltip") }}</span>
+                <span style="font-size: 14px">{{
+                  t("search.noOfRecordsTooltip")
+                }}</span>
               </template>
             </OTooltip>
           </OIcon>
@@ -1704,17 +1696,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-left">
         {{ t("search.maxEventsScheduleJob") }}
       </div>
-      <div
-        style="opacity: 0.8"
-        class="text-left mapping-warning-msg q-mt-md"
-      >
+      <div style="opacity: 0.8" class="text-left mapping-warning-msg q-mt-md">
         <OIcon name="warning" size="sm" class="q-mr-sm" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
 
     <!-- Search Inspect Dialog -->
-    <ODialog data-test="search-bar-search-inspect-dialog"
+    <ODialog
+      data-test="search-bar-search-inspect-dialog"
       v-model:open="searchInspectDialog"
       size="sm"
       title="Search Inspect"
@@ -1765,240 +1755,232 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="saved-views-list-dialog"
     >
       <div>
-          <q-list data-test="logs-search-saved-view-list">
-            <q-item style="padding: 0px 0px 0px 0px">
-              <q-item-section
-                class="column"
-                no-hover
-                :style="
-                  localSavedViews.length > 0
-                    ? 'width: 60%; border-right: 1px solid lightgray'
-                    : 'width: 100%'
-                "
+        <q-list data-test="logs-search-saved-view-list">
+          <q-item style="padding: 0px 0px 0px 0px">
+            <q-item-section
+              class="column"
+              no-hover
+              :style="
+                localSavedViews.length > 0
+                  ? 'width: 60%; border-right: 1px solid lightgray'
+                  : 'width: 100%'
+              "
+            >
+              <OTable
+                data-test="log-search-saved-view-list-fields-table"
+                :data="searchObj.data.savedViews"
+                :columns="savedViewColumns"
+                row-key="view_id"
+                :global-filter="searchObj.data.savedViewFilterFields"
+                :page-size="rowsPerPage"
+                :page-size-options="[10, 20, 50]"
+                :style="{ minHeight: '420px', height: '420px' }"
+                class="saved-view-table full-height o2-table-hide-header"
               >
-                <q-table
-                  data-test="log-search-saved-view-list-fields-table"
-                  :visible-columns="['view_name']"
-                  :rows="searchObj.data.savedViews"
-                  :row-key="(row) => 'saved_view_' + row.view_id"
-                  :filter="searchObj.data.savedViewFilterFields"
-                  :filter-method="filterSavedViewFn"
-                  :pagination="{ rowsPerPage }"
-                  hide-header
-                  :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                  class="saved-view-table full-height"
-                  no-hover
-                  :rows-per-page-options="[]"
-                  style="min-height: 420px; height: 420px"
-                  :hide-bottom="searchObj.data.savedViews.length == 0"
-                >
-                  <template #top>
-                    <div class="full-width">
-                      <OInput
-                        data-test="log-search-saved-view-field-search-input"
-                        v-model="searchObj.data.savedViewFilterFields"
-                        clearable
-                        :debounce="300"
-                        class="tw:mx-2 tw:my-2"
-                        :placeholder="t('search.searchSavedView')"
+                <template #top>
+                  <div class="full-width">
+                    <OInput
+                      data-test="log-search-saved-view-field-search-input"
+                      v-model="searchObj.data.savedViewFilterFields"
+                      clearable
+                      :debounce="300"
+                      class="tw:mx-2 tw:my-2"
+                      :placeholder="t('search.searchSavedView')"
+                    >
+                      <template #prepend>
+                        <OIcon name="search" size="sm" />
+                      </template>
+                    </OInput>
+                  </div>
+                  <div
+                    v-if="searchObj.loadingSavedView == true"
+                    class="full-width q-pa-sm"
+                  >
+                    <div class="text-subtitle2 text-weight-bold">
+                      <OSpinner size="xs" />
+                      {{ t("confirmDialog.loading") }}
+                    </div>
+                  </div>
+                </template>
+                <template #cell-view_name="{ row, value }">
+                  <div class="field_list">
+                    <q-item class="q-pa-xs saved-view-item" clickable>
+                      <q-item-section
+                        @click.stop="
+                          applySavedView(row);
+                          savedViewsListDialog = false;
+                        "
+                        :title="value"
                       >
-                        <template #prepend>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                      </OInput>
-                    </div>
-                    <div
-                      v-if="searchObj.loadingSavedView == true"
-                      class="full-width q-pa-sm"
-                    >
-                      <div class="text-subtitle2 text-weight-bold">
-                        <OSpinner size="xs" />
-                        {{ t("confirmDialog.loading") }}
-                      </div>
-                    </div>
-                  </template>
-                  <template v-slot:no-data>
-                    <div
-                      v-if="searchObj.loadingSavedView == false"
-                      class="text-center q-pa-sm tw:w-full"
-                    >
-                      <q-item-label>{{
-                        t("search.savedViewsNotFound")
-                      }}</q-item-label>
-                    </div>
-                  </template>
-                  <template v-slot:body-cell-view_name="props">
-                    <q-td :props="props" class="field_list" no-hover>
-                      <q-item class="q-pa-xs saved-view-item" clickable>
-                        <q-item-section
-                          @click.stop="
-                            applySavedView(props.row);
-                            savedViewsListDialog = false;
-                          "
-                          :title="props.row.view_name"
+                        <q-item-label
+                          class="ellipsis"
+                          style="max-width: 140px"
+                          >{{ value }}</q-item-label
                         >
-                          <q-item-label
-                            class="ellipsis"
-                            style="max-width: 140px"
-                            >{{ props.row.view_name }}</q-item-label
-                          >
-                        </q-item-section>
-                        <q-item-section
-                          :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                          side
-                          @click.stop="
-                            handleFavoriteSavedView(
-                              props.row,
-                              favoriteViews.includes(props.row.view_id),
-                            )
-                          "
-                        >
-                          <OButton
-                            :title="t('common.favourite')"
-                            class="logs-saved-view-icon"
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <OIcon
-                              :name="
-                                favoriteViews.includes(props.row.view_id)
-                                  ? 'favorite'
-                                  : 'favorite-border'
-                              "
-                              size="xs"
-                            />
-                          </OButton>
-                        </q-item-section>
-                        <q-item-section
-                          :data-test="`logs-search-bar-update-${props.row.view_name}-saved-view-btn`"
-                          side
-                          @click.stop="handleUpdateSavedView(props.row)"
-                        >
-                          <OButton
-                            :title="t('common.edit')"
-                            class="logs-saved-view-icon"
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <OIcon name="edit" size="xs" />
-                          </OButton>
-                        </q-item-section>
-                        <q-item-section
-                          :data-test="`logs-search-bar-delete-${props.row.view_name}-saved-view-btn`"
-                          side
-                          @click.stop="handleDeleteSavedView(props.row)"
-                        >
-                          <OButton
-                            :title="t('common.delete')"
-                            class="logs-saved-view-icon"
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <OIcon name="delete" size="xs" />
-                          </OButton>
-                        </q-item-section>
-                      </q-item>
-                    </q-td>
-                  </template>
-                </q-table>
-              </q-item-section>
-
-              <q-item-section
-                class="column"
-                style="width: 40%; margin-left: 0px"
-                v-if="localSavedViews.length > 0"
-              >
-                <q-table
-                  data-test="log-search-saved-view-favorite-list-fields-table"
-                  :visible-columns="['view_name']"
-                  :rows="localSavedViews"
-                  :row-key="(row) => 'favorite_saved_view_' + row.view_name"
-                  hide-header
-                  :wrap-cells="searchObj.meta.resultGrid.wrapCells"
-                  class="saved-view-table full-height"
-                  :rows-per-page-options="[]"
-                  :hide-bottom="true"
-                >
-                  <template #top-right>
-                    <q-item style="padding: 0px"
-                      ><q-item-label
-                        header
-                        class="q-pa-sm text-bold favorite-label"
-                        >{{ t("search.favoriteViews") }}</q-item-label
-                      ></q-item
-                    >
-                    <q-separator horizontal inset></q-separator>
-                  </template>
-                  <template v-slot:body-cell-view_name="props">
-                    <q-td :props="props" class="field_list q-pa-xs">
-                      <q-item class="q-pa-xs saved-view-item" clickable>
-                        <q-item-section
-                          @click.stop="
-                            applySavedView(props.row);
-                            savedViewsListDialog = false;
-                          "
-                        >
-                          <q-item-label
-                            class="ellipsis"
-                            style="max-width: 90px"
-                            >{{ props.row.view_name }}</q-item-label
-                          >
-                        </q-item-section>
-                        <q-item-section
-                          :data-test="`logs-search-bar-favorite-${props.row.view_name}-saved-view-btn`"
-                          side
-                          @click.stop="
-                            handleFavoriteSavedView(
-                              props.row,
-                              favoriteViews.includes(props.row.view_id),
-                            )
-                          "
+                      </q-item-section>
+                      <q-item-section
+                        :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
+                        side
+                        @click.stop="
+                          handleFavoriteSavedView(
+                            row,
+                            favoriteViews.includes(row.view_id),
+                          )
+                        "
+                      >
+                        <OButton
+                          :title="t('common.favourite')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
                         >
                           <OIcon
                             :name="
-                              favoriteViews.includes(props.row.view_id)
+                              favoriteViews.includes(row.view_id)
                                 ? 'favorite'
                                 : 'favorite-border'
                             "
-                            color="grey"
                             size="xs"
                           />
-                        </q-item-section>
-                        <q-item-section
-                          :data-test="`logs-search-bar-update-${props.row.view_name}-favorite-saved-view-btn`"
-                          side
-                          @click.stop="handleUpdateSavedView(props.row)"
+                        </OButton>
+                      </q-item-section>
+                      <q-item-section
+                        :data-test="`logs-search-bar-update-${value}-saved-view-btn`"
+                        side
+                        @click.stop="handleUpdateSavedView(row)"
+                      >
+                        <OButton
+                          :title="t('common.edit')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
                         >
-                          <OButton
-                            :title="t('common.edit')"
-                            class="logs-saved-view-icon"
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <OIcon name="edit" size="xs" />
-                          </OButton>
-                        </q-item-section>
-                        <q-item-section
-                          :data-test="`logs-search-bar-delete-${props.row.view_name}-favorite-saved-view-btn`"
-                          side
-                          @click.stop="handleDeleteSavedView(props.row)"
+                          <OIcon name="edit" size="xs" />
+                        </OButton>
+                      </q-item-section>
+                      <q-item-section
+                        :data-test="`logs-search-bar-delete-${value}-saved-view-btn`"
+                        side
+                        @click.stop="handleDeleteSavedView(row)"
+                      >
+                        <OButton
+                          :title="t('common.delete')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
                         >
-                          <OButton
-                            :title="t('common.delete')"
-                            class="logs-saved-view-icon"
-                            variant="ghost"
-                            size="icon"
-                          >
-                            <OIcon name="delete" size="xs" />
-                          </OButton>
-                        </q-item-section>
-                      </q-item>
-                    </q-td>
-                  </template>
-                </q-table>
-              </q-item-section>
-            </q-item>
-          </q-list>
+                          <OIcon name="delete" size="xs" />
+                        </OButton>
+                      </q-item-section>
+                    </q-item>
+                  </div>
+                </template>
+                <template #empty>
+                  <div
+                    v-if="searchObj.loadingSavedView == false"
+                    class="text-center q-pa-sm tw:w-full"
+                  >
+                    <q-item-label>{{
+                      t("search.savedViewsNotFound")
+                    }}</q-item-label>
+                  </div>
+                </template>
+              </OTable>
+            </q-item-section>
+
+            <q-item-section
+              class="column"
+              style="width: 40%; margin-left: 0px"
+              v-if="localSavedViews.length > 0"
+            >
+              <OTable
+                data-test="log-search-saved-view-favorite-list-fields-table"
+                :data="localSavedViews"
+                :columns="savedViewColumns"
+                row-key="view_id"
+                pagination="none"
+                class="saved-view-table full-height o2-table-hide-header"
+              >
+                <template #top>
+                  <q-item style="padding: 0px"
+                    ><q-item-label
+                      header
+                      class="q-pa-sm text-bold favorite-label"
+                      >{{ t("search.favoriteViews") }}</q-item-label
+                    ></q-item
+                  >
+                  <OSeparator class="tw:mx-4" />
+                </template>
+                <template #cell-view_name="{ row, value }">
+                  <div class="field_list q-pa-xs">
+                    <q-item class="q-pa-xs saved-view-item" clickable>
+                      <q-item-section
+                        @click.stop="
+                          applySavedView(row);
+                          savedViewsListDialog = false;
+                        "
+                      >
+                        <q-item-label
+                          class="ellipsis"
+                          style="max-width: 90px"
+                          >{{ value }}</q-item-label
+                        >
+                      </q-item-section>
+                      <q-item-section
+                        :data-test="`logs-search-bar-favorite-${value}-saved-view-btn`"
+                        side
+                        @click.stop="
+                          handleFavoriteSavedView(
+                            row,
+                            favoriteViews.includes(row.view_id),
+                          )
+                        "
+                      >
+                        <OIcon
+                          :name="
+                            favoriteViews.includes(row.view_id)
+                              ? 'favorite'
+                              : 'favorite-border'
+                          "
+                          color="grey"
+                          size="xs"
+                        />
+                      </q-item-section>
+                      <q-item-section
+                        :data-test="`logs-search-bar-update-${value}-favorite-saved-view-btn`"
+                        side
+                        @click.stop="handleUpdateSavedView(row)"
+                      >
+                        <OButton
+                          :title="t('common.edit')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <OIcon name="edit" size="xs" />
+                        </OButton>
+                      </q-item-section>
+                      <q-item-section
+                        :data-test="`logs-search-bar-delete-${value}-favorite-saved-view-btn`"
+                        side
+                        @click.stop="handleDeleteSavedView(row)"
+                      >
+                        <OButton
+                          :title="t('common.delete')"
+                          class="logs-saved-view-icon"
+                          variant="ghost"
+                          size="icon"
+                        >
+                          <OIcon name="delete" size="xs" />
+                        </OButton>
+                      </q-item-section>
+                    </q-item>
+                  </div>
+                </template>
+              </OTable>
+            </q-item-section>
+          </q-item>
+        </q-list>
       </div>
     </ODialog>
   </div>
@@ -2023,11 +2005,12 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard, is, QTooltip } from "quasar";
+import { copyToClipboard, is, QTooltip } from "quasar";
 
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import useLogs from "@/composables/useLogs";
 import useStreams from "@/composables/useStreams";
@@ -2111,6 +2094,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const defaultValue: any = () => {
   return {
@@ -2171,6 +2156,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OSeparator,
     OButtonGroup,
     ODialog,
     ODropdown,
@@ -2238,8 +2224,8 @@ export default defineComponent({
     },
     handleUpdateSavedView(item: any) {
       if (this.searchObj.data.stream.selectedStream.length == 0) {
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "No stream available to update save view.",
         });
         return;
@@ -2264,19 +2250,17 @@ export default defineComponent({
     downloadRangeData() {
       let initNumber = parseInt(this.downloadCustomInitialNumber);
       if (initNumber < 0) {
-        this.$q.notify({
+        toast({
           message: "Initial number must be positive number.",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
-        this.$q.notify({
+        toast({
           message: "Please run a query first before downloading.",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
@@ -2300,19 +2284,17 @@ export default defineComponent({
           if (res.data.hits.length > 0) {
             this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
-            this.$q.notify({
+            toast({
               message: "No data found to download.",
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
           }
         })
         .catch((err) => {
-          this.$q.notify({
+          toast({
             message: err.message,
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
         });
@@ -2332,10 +2314,18 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
+    const savedViewColumns = [
+      {
+        id: "view_name",
+        header: "",
+        accessorKey: "view_name",
+        sortable: false,
+        meta: { align: "left" },
+      },
+    ];
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
@@ -2577,10 +2567,9 @@ export default defineComponent({
             searchObj.data.tempFunctionContent != "")
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
-            $q.notify({
+            toast({
               message: "Job Context have been removed",
-              color: "warning",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
             searchObj.meta.jobId = "";
@@ -2595,10 +2584,9 @@ export default defineComponent({
       () => searchObj.meta.showHistogram,
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
-          $q.notify({
+          toast({
             message: "Histogram is not available for scheduled search",
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
           searchObj.meta.showHistogram = false;
@@ -2876,10 +2864,10 @@ export default defineComponent({
                 // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // $q.notify({
+                // toast({
                 //   message: "Stream not found",
                 //   color: "info",
-                //   position: "bottom",
+                //   position: "bottom-center",
                 //   timeout: 2000,
                 // });
               }
@@ -2892,10 +2880,9 @@ export default defineComponent({
           searchObj.meta.queryEditorPlaceholderFlag == true
         ) {
           if (!checkQuery(value)) {
-            $q.notify({
+            toast({
               message: "Job Context have been removed",
-              color: "warning",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
             searchObj.meta.jobId = "";
@@ -3040,10 +3027,9 @@ export default defineComponent({
       //to solve this issue we are using json2csv package
 
       if (!data || data.length === 0) {
-        $q.notify({
+        toast({
           message: "No data found to download.",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
@@ -3082,8 +3068,8 @@ export default defineComponent({
         showDownloadMenu.value = false;
       } catch (error) {
         showDownloadMenu.value = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error downloading logs",
           timeout: 2000,
         });
@@ -3176,8 +3162,8 @@ export default defineComponent({
       }
 
       if (content.trim() == "") {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message:
             "The function field must contain a value and cannot be left empty.",
         });
@@ -3200,8 +3186,8 @@ export default defineComponent({
 
         callTransform
           .then((res: { data: any }) => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
             });
 
@@ -3223,8 +3209,8 @@ export default defineComponent({
           })
           .catch((err) => {
             saveFunctionLoader.value = false;
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response.data["message"]) ||
                 "Function creation failed",
@@ -3242,8 +3228,8 @@ export default defineComponent({
 
           callTransform
             .then((res: { data: any }) => {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: "Function updated successfully.",
               });
 
@@ -3266,8 +3252,8 @@ export default defineComponent({
             })
             .catch((err) => {
               saveFunctionLoader.value = false;
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message:
                   JSON.stringify(err.response.data["message"]) ||
                   "Function updation failed",
@@ -3304,8 +3290,8 @@ export default defineComponent({
       openEditor = true,
     ) => {
       if (flag) {
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `${fnValue.name} function applied successfully.`,
           timeout: 3000,
         });
@@ -3327,8 +3313,8 @@ export default defineComponent({
     const fnSavedFunctionDialog = () => {
       const content = searchObj.data.tempFunctionContent;
       if (content == "") {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "No function definition found.",
         });
         return;
@@ -3383,8 +3369,8 @@ export default defineComponent({
 
     const fnSavedView = () => {
       if (searchObj.data.stream.selectedStream.length == 0) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "No stream available to save view.",
         });
         return;
@@ -3830,10 +3816,9 @@ export default defineComponent({
 
             updateEditorWidth();
 
-            $q.notify({
+            toast({
               message: `${item.view_name} view applied successfully.`,
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             setTimeout(async () => {
@@ -3889,10 +3874,9 @@ export default defineComponent({
           } else {
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
-            $q.notify({
+            toast({
               message: err.message || `Error while applying saved view.`,
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 3000,
             });
           }
@@ -3900,10 +3884,9 @@ export default defineComponent({
         .catch((err) => {
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
-          $q.notify({
+          toast({
             message: `Error while applying saved view.`,
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1000,
           });
           console.log("Error while applying saved view", err);
@@ -3939,10 +3922,10 @@ export default defineComponent({
       //       );
       //     });
       //   } else {
-      //     $q.notify({
+      //     toast({
       //       message: `Please select saved view to update.`,
       //       color: "negative",
-      //       position: "bottom",
+      //       position: "bottom-center",
       //       timeout: 1000,
       //     });
       //   }
@@ -3981,27 +3964,24 @@ export default defineComponent({
             );
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
-              $q.notify({
+              toast({
                 message: t("search.viewDeletedSuccessfully"),
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
               getSavedViews();
             } else {
-              $q.notify({
+              toast({
                 message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
             }
           })
           .catch((err) => {
-            $q.notify({
+            toast({
               message: t("search.errorDeletingSavedView"),
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             console.log("Error while deleting saved view", err);
@@ -4061,10 +4041,9 @@ export default defineComponent({
     const createSavedViews = (viewName: string) => {
       try {
         if (viewName.trim() == "") {
-          $q.notify({
+          toast({
             message: `Please provide valid view name.`,
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1000,
           });
           saveViewLoader.value = false;
@@ -4090,10 +4069,9 @@ export default defineComponent({
                 view_id: res.data.view_id,
                 view_name: viewName,
               });
-              $q.notify({
+              toast({
                 message: t("search.viewCreatedSuccessfully"),
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
               getSavedViews();
@@ -4102,20 +4080,18 @@ export default defineComponent({
               saveViewLoader.value = false;
             } else {
               saveViewLoader.value = false;
-              $q.notify({
+              toast({
                 message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
             }
           })
           .catch((err) => {
             saveViewLoader.value = false;
-            $q.notify({
+            toast({
               message: t("search.errorCreatingSavedView"),
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             console.log("Error while creating saved view", err);
@@ -4124,10 +4100,9 @@ export default defineComponent({
         isSavedViewAction.value = "create";
         savedViewName.value = "";
         saveViewLoader.value = false;
-        $q.notify({
+        toast({
           message: `Error while saving view: ${e}`,
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 1000,
         });
         console.log("Error while saving view", e);
@@ -4141,9 +4116,9 @@ export default defineComponent({
           view_name: viewName,
         };
 
-        const dismiss = $q.notify({
+        const dismiss = toast({
           message: "Updating saved view...",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 0,
         });
 
@@ -4163,10 +4138,9 @@ export default defineComponent({
                 },
               );
 
-              $q.notify({
+              toast({
                 message: t("search.viewUpdatedSuccessfully"),
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
               isSavedViewAction.value = "create";
@@ -4175,10 +4149,9 @@ export default defineComponent({
               confirmSavedViewDialogVisible.value = false;
             } else {
               saveViewLoader.value = false;
-              $q.notify({
+              toast({
                 message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 1000,
               });
             }
@@ -4186,10 +4159,9 @@ export default defineComponent({
           .catch((err) => {
             dismiss();
             saveViewLoader.value = false;
-            $q.notify({
+            toast({
               message: t("search.errorUpdatingSavedView"),
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1000,
             });
             console.log("Error while updating saved view", err);
@@ -4198,10 +4170,9 @@ export default defineComponent({
         isSavedViewAction.value = "create";
         savedViewSelectedName.value = "";
         saveViewLoader.value = false;
-        $q.notify({
+        toast({
           message: `Error while saving view: ${e}`,
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 1000,
         });
         console.log("Error while saving view", e);
@@ -4392,10 +4363,9 @@ export default defineComponent({
 
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
-          $q.notify({
+          toast({
             message: "You can only save 10 views.",
-            color: "info",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
           return;
@@ -4407,19 +4377,17 @@ export default defineComponent({
         // moveItemsToTop(localSavedView, favoriteViews.value);
 
         useLocalSavedView(localSavedView);
-        $q.notify({
+        toast({
           message: "View added to favorites.",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
-        $q.notify({
+        toast({
           message: "View removed from favorites.",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       }
@@ -4516,9 +4484,7 @@ export default defineComponent({
         !searchObj.meta.sqlMode &&
         searchObj.data.stream.selectedStream.length > 1
       ) {
-        showErrorNotification(
-          t("search.enableSqlOrSelectStream"),
-        );
+        showErrorNotification(t("search.enableSqlOrSelectStream"));
         return;
       }
 
@@ -4582,9 +4548,7 @@ export default defineComponent({
           searchObj.data.query === "" &&
           searchObj?.data?.stream?.selectedStream?.length === 0
         ) {
-          showErrorNotification(
-            t("search.queryEmptyToVisualize"),
-          );
+          showErrorNotification(t("search.queryEmptyToVisualize"));
           return;
         }
 
@@ -4602,9 +4566,7 @@ export default defineComponent({
           Array.isArray(logsPageQuery) &&
           logsPageQuery.length > 1
         ) {
-          showErrorNotification(
-            t("search.multipleSqlNotAllowed"),
-          );
+          showErrorNotification(t("search.multipleSqlNotAllowed"));
           return;
         }
 
@@ -4618,9 +4580,7 @@ export default defineComponent({
 
         // validate sql query that all fields have alias
         if (!allSelectionFieldsHaveAlias(logsPageQuery)) {
-          showErrorNotification(
-            t("search.aggregationFieldsNeedAlias"),
-          );
+          showErrorNotification(t("search.aggregationFieldsNeedAlias"));
           return;
         }
 
@@ -4798,16 +4758,16 @@ export default defineComponent({
           !searchObj.data.stream.selectedStream ||
           searchObj.data.stream.selectedStream.length === 0
         ) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Please select a stream before scheduling a job",
             timeout: 3000,
           });
           return;
         }
         if (searchObj.meta.jobId != "") {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.jobAlreadyScheduled"),
             timeout: 3000,
           });
@@ -4818,8 +4778,8 @@ export default defineComponent({
           searchObj.meta.jobRecords == 0 ||
           searchObj.meta.jobRecords < 0
         ) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.jobSchedulerRange"),
             timeout: 3000,
           });
@@ -4831,8 +4791,8 @@ export default defineComponent({
         await getJobData();
       } catch (e) {
         if (e.response.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.errorAddingJob"),
             timeout: 3000,
           });
@@ -4900,10 +4860,9 @@ export default defineComponent({
     };
 
     const updateActionSelection = (item: any) => {
-      $q.notify({
+      toast({
         message: `${item?.name} action applied successfully`,
         timeout: 3000,
-        color: "secondary",
       });
     };
 
@@ -4981,7 +4940,6 @@ export default defineComponent({
     // [END] explain query functionality
 
     return {
-      $q,
       t,
       store,
       router,
@@ -5057,6 +5015,7 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       filterSavedViewFn,
+      savedViewColumns,
       config,
       handleRegionsSelection,
       handleQuickMode,
@@ -5453,7 +5412,7 @@ export default defineComponent({
 
 // Toolbar Icon and Toggle Styles
 .toolbar-toggle-container {
-  padding: 0 0.175rem; // 0 ~2.8px
+  padding: 0.25rem 0.375rem; // 4px 6px
   margin-left: 0.25rem; // 8px
   display: flex;
   align-items: center;
@@ -5649,5 +5608,9 @@ export default defineComponent({
   .mode-label {
     color: rgba(255, 255, 255, 0.7);
   }
+}
+
+.o2-table-hide-header :deep(thead) {
+  display: none;
 }
 </style>

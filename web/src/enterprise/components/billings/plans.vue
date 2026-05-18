@@ -35,12 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <img :src="aiIcon" />
               </div>
             </div>
-            <q-badge
-              :color="aiModeBadgeColor"
-              :label="aiModeLabel"
+            <OBadge
+              :variant="aiModeBadgeVariant"
               class="q-mt-sm"
               style="width: fit-content;"
-            />
+            >{{ aiModeLabel }}</OBadge>
           </div>
           <div class="q-mt-md q-mb-sm">
             <OProgressBar
@@ -99,7 +98,7 @@ import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -107,6 +106,8 @@ import { siteURL } from "@/constants/config";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "plans",
@@ -117,6 +118,7 @@ export default defineComponent({
     OSpinner,
     OProgressBar,
     OIcon,
+    OBadge,
 },
   emits: ["update:proSubscription"],
   async mounted() {
@@ -193,8 +195,8 @@ export default defineComponent({
           })
           .catch((e) => {
             this.proLoading = false;
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });
@@ -208,8 +210,8 @@ export default defineComponent({
             window.location.href = res.data.url;
           })
           .catch((e) => {
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });
@@ -232,8 +234,8 @@ export default defineComponent({
           }
         })
         .catch((e) => {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: e.message,
             timeout: 5000,
           });
@@ -267,8 +269,8 @@ export default defineComponent({
           this.billingProvider === "stripe"
         ) {
           // Only show subscribe prompt for Stripe orgs without subscription
-          this.$q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "Please subscribe to one of the plan.",
             timeout: 5000,
           });
@@ -288,8 +290,8 @@ export default defineComponent({
         this.loading = false;
         this.proLoading = false;
 
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: e.message,
           timeout: 5000,
         });
@@ -299,7 +301,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const frmPayment = ref();
     const planType = ref("");
     const isActiveSubscription = ref(false);
@@ -322,12 +323,12 @@ export default defineComponent({
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
       return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
     });
-    const aiModeBadgeColor = computed(() => {
-      if (!aiUsage.value) return 'grey';
+    const aiModeBadgeVariant = computed(() => {
+      if (!aiUsage.value) return 'default';
       switch (aiUsage.value.mode) {
-        case 'pay_as_you_go': return 'blue';
-        case 'exhausted': return 'red';
-        default: return 'green';
+        case 'pay_as_you_go': return 'primary';
+        case 'exhausted': return 'error';
+        default: return 'success';
       }
     });
     const aiModeLabel = computed(() => {
@@ -374,7 +375,7 @@ export default defineComponent({
       aiUsage,
       aiIcon,
       aiUsageRatio,
-      aiModeBadgeColor,
+      aiModeBadgeVariant,
       aiModeLabel,
       proPlanFeatures,
       enterprisePlanFeatures,

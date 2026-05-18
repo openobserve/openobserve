@@ -9,7 +9,7 @@
       @click="copyToClipboard"
     >
       <OIcon name="content-copy" size="sm" />
-      <q-tooltip>{{ t("common.copyToClipboard") }}</q-tooltip>
+      <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
     <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
@@ -75,13 +75,15 @@
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { copyToClipboard as quasarCopyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard as quasarCopyToClipboard } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default {
   name: "JsonPreview",
@@ -90,6 +92,7 @@ export default {
     ChunkedContent,
     OButton,
     ODropdown,
+    OTooltip,
   },
   props: {
     value: {
@@ -114,7 +117,6 @@ export default {
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const slots = useSlots();
 
     const hasFieldDropdownSlot = computed(() => !!slots["field-dropdown"]);
@@ -122,8 +124,8 @@ export default {
 
     const copyToClipboard = () => {
       quasarCopyToClipboard(JSON.stringify(props.value, null, 2));
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("common.copyToClipboard") + "!",
         timeout: 1500,
       });

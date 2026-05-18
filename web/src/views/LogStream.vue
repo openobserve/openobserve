@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><OIcon name="description" size="xs" class="tw:shrink-0"
+                    ><OIcon name="search" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
@@ -98,61 +98,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-[calc(100vh-126px)]">
-          <q-table
+          <OTable
             data-test="log-stream-table"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            ref="qTable"
-            v-model:selected="selected"
-            :rows="logStream"
+            :data="logStream"
             :columns="columns"
-            :row-key="getRowKey"
-            :selected-rows-label="getSelectedString"
+            row-key="_rowKey"
             selection="multiple"
-            v-model:pagination="pagination"
-            :filter="filterQuery"
-            :filter-method="filterData"
+            v-model:selected-ids="selectedIds"
+            pagination="server"
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-size-options="pageSizeOptions"
+            :total-count="totalCount"
+            sorting="server"
+            v-model:sort-by="sortBy"
+            v-model:sort-order="sortOrder"
+            :show-global-filter="false"
+            :default-columns="false"
+            :loading="loadingState"
+            width="100%"
             :style="
               logStream?.length
                 ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
                 : 'width: 100%'
             "
-            :rows-per-page-options="perPageOptions"
-            @request="onRequest"
           >
-            <template #no-data>
-              <div
-                v-if="!loadingState"
-                class="text-center full-width full-height"
-              >
-                <NoData />
-              </div>
-              <div
-                v-else
-                class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
-              >
-                <OSpinner size="md" />
-              </div>
-            </template>
-            <template #body-selection="scope">
-              <OCheckbox
-                v-model="scope.selected"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-table-checkbox-dark'
-                    : 'o2-table-checkbox-light'
-                "
-                class="o2-table-checkbox"
-              />
-            </template>
-            <template #body-cell-actions="props">
-              <q-td :props="props">
+            <template #cell-actions="{ row }">
+               <div class="tw:flex tw:items-center actions-container">
                 <OButton
                   icon-left="search"
                   :title="t('logStream.explore')"
                   data-test="log-stream-explore-btn"
                   variant="ghost"
                   size="icon-sm"
-                  @click="exploreStream(props)"
+                  @click="exploreStream({ row })"
                 />
                 <OButton
                   icon-left="description"
@@ -160,78 +139,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="log-stream-schema-btn"
                   variant="ghost"
                   size="icon-sm"
-                  @click="listSchema(props)"
+                  @click="listSchema({ row })"
                 />
                 <OButton
                   icon-left="delete"
                   :title="t('logStream.delete')"
                   variant="ghost-destructive"
                   size="icon-sm"
-                  @click="confirmDeleteAction(props)"
+                  @click="confirmDeleteAction({ row })"
                 />
-              </q-td>
-            </template>
-            <template v-slot:pagination="scope">
-              <div
-                class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4"
-              >
-                <div class="tw:flex tw:items-center q-ml-md">
-                  <OButton
-                    icon-left="chevron-left"
-                    variant="ghost"
-                    size="icon-sm"
-                    :disabled="scope.isFirstPage"
-                    @click="scope.prevPage"
-                  />
-                  <OButton
-                    icon-left="chevron-right"
-                    variant="ghost"
-                    size="icon-sm"
-                    :disabled="scope.isLastPage"
-                    @click="scope.nextPage"
-                  />
-                </div>
               </div>
             </template>
-            <template v-slot:header="props">
-              <q-tr :props="props">
-                <!-- Adding this block to render the select-all checkbox -->
-                <q-th auto-width>
-                  <OCheckbox
-                    v-model="props.selected"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-table-checkbox-dark'
-                        : 'o2-table-checkbox-light'
-                    "
-                    class="o2-table-checkbox"
-                    @update:model-value="props.select"
-                  />
-                </q-th>
 
-                <!-- Rendering the rest of the columns -->
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                  :class="col.classes"
-                  :style="col.style"
-                >
-                  {{ col.label }}
-                </q-th>
-              </q-tr>
+            <template #empty>
+              <div v-if="!loadingState">
+                <NoData />
+              </div>
             </template>
 
-            <template v-slot:bottom="scope">
+            <template #bottom="scope">
               <div
                 class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
               >
                 <div
-                  class="q-table__separator tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]"
+                  class="tw:flex tw:items-center tw:w-full text-bold tw:text-[14px]"
                 >
-                  {{ scope.pagination.rowsNumber }} Stream(s)
+                  {{ scope.totalRows }} Stream(s)
                   <OButton
-                    v-if="selected.length > 0"
+                    v-if="selectedIds.length > 0"
                     icon-left="delete"
                     variant="outline-destructive"
                     size="sm-action"
@@ -242,16 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ isDeleting ? "Deleting..." : "Delete" }}
                   </OButton>
                 </div>
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="pagination.rowsNumber"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
               </div>
             </template>
-          </q-table>
+          </OTable>
         </div>
       </div>
     </div>
@@ -326,10 +254,10 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import QTablePagination from "../components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import NoData from "../components/shared/grid/NoData.vue";
@@ -353,10 +281,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "PageLogStream",
   components: {
-    QTablePagination,
     SchemaIndex,
     NoData,
     AddStream,
@@ -368,12 +296,12 @@ export default defineComponent({
     OSpinner,
     OInput,
     OCheckbox,
+    OTable,
   },
-  emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
+  emits: [],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -382,9 +310,8 @@ export default defineComponent({
     const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const resultTotal = ref<number>(0);
-    const selected = ref<any>([]);
+    const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
-    const qTable: any = ref(null);
     const previousOrgIdentifier = ref("");
     const filterQuery = ref("");
     const duplicateStreamList: Ref<any[]> = ref([]);
@@ -395,27 +322,16 @@ export default defineComponent({
     const streamActiveTab = ref("logs");
     const { track } = useReo();
 
-    const perPageOptions: any = [20, 50, 100, 250, 500];
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination = ref({
-      sortBy: "name",
-      descending: false,
-      page: 1,
-      rowsPerPage: 20,
-      rowsNumber: 0,
-    });
-    const sortField = ref("name");
-    const sortAsc = ref(true);
+    const pageSize = ref(20);
+    const pageSizeOptions = [20, 50, 100, 250, 500];
+    const currentPage = ref(1);
+    const sortBy = ref("name");
+    const sortOrder = ref<"asc" | "desc">("asc");
+    const totalCount = ref(0);
 
-    const offset =
-      (pagination.value.page - 1) * pagination.value.rowsPerPage < 0
-        ? 0
-        : (pagination.value.page - 1) * pagination.value.rowsPerPage;
-
-    const pageOffset = ref(offset);
-
-    const pageRecordsPerPage = ref(pagination.value.rowsPerPage);
+    const selectedItems = computed(() =>
+      logStream.value.filter((s: any) => selectedIds.value.includes(s._rowKey))
+    );
 
     const streamTabs: never[] = [];
     const {
@@ -426,76 +342,67 @@ export default defineComponent({
       getPaginatedStreams,
       addNewStreams,
     } = useStreams();
-    const columns = ref<QTableProps["columns"]>([
+    const columns = ref<OTableColumnDef[]>([
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 67,
+        meta: { align: "left" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("logStream.name"),
-        align: "left",
+        id: "name",
+        accessorKey: "name",
+        header: t("logStream.name"),
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "stream_type",
-        field: "stream_type",
-        label: t("logStream.type"),
-        align: "left",
-        sortable: false,
+        id: "stream_type",
+        accessorKey: "stream_type",
+        header: t("logStream.type"),
+        meta: { align: "left" },
       },
       {
-        name: "doc_num",
-        field: (row: any) => row.doc_num.toLocaleString(),
-        label: t("logStream.docNum"),
-        align: "left",
+        id: "doc_num",
+        accessorFn: (row: any) =>
+          row.doc_num?.toLocaleString?.() ?? row.doc_num,
+        header: t("logStream.docNum"),
         sortable: true,
-        sort: (a, b, rowA, rowB) => {
-          return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
-        },
+        meta: { align: "left" },
       },
       {
-        name: "storage_size",
-        label: t("logStream.storageSize"),
-        field: (row: any) => formatSizeFromMB(row.storage_size),
-        align: "left",
+        id: "storage_size",
+        accessorFn: (row: any) => formatSizeFromMB(row.storage_size),
+        header: t("logStream.storageSize"),
         sortable: true,
-        sort: (a, b, rowA, rowB) => {
-          return parseInt(rowA.storage_size) - parseInt(rowB.storage_size);
-        },
+        meta: { align: "left" },
       },
       {
-        name: "compressed_size",
-        field: (row: any) => formatSizeFromMB(row.compressed_size),
-        label: t("logStream.compressedSize"),
-        align: "left",
+        id: "compressed_size",
+        accessorFn: (row: any) => formatSizeFromMB(row.compressed_size),
+        header: t("logStream.compressedSize"),
         sortable: true,
-        sort: (a, b, rowA, rowB) =>
-          parseInt(rowA.compressed_size) - parseInt(rowB.compressed_size),
+        meta: { align: "left" },
       },
       {
-        name: "index_size",
-        field: (row: any) => formatSizeFromMB(row.index_size),
-        label: t("logStream.indexSize"),
-        align: "left",
+        id: "index_size",
+        accessorFn: (row: any) => formatSizeFromMB(row.index_size),
+        header: t("logStream.indexSize"),
         sortable: true,
-        sort: (a, b, rowA, rowB) =>
-          parseInt(rowA.index_size) - parseInt(rowB.index_size),
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        classes: "actions-column",
+        id: "actions",
+        header: t("user.actions"),
+        isAction: true,
+        size: 120,
+        meta: { align: "center", cellClass: "actions-column" },
       },
     ]);
 
     if (config.isCloud == "true") {
-      columns.value?.splice(5, 1);
+      columns.value = columns.value.filter((c: any) => c.id !== "compressed_size");
     }
 
     const addStreamDialog = ref({
@@ -513,9 +420,7 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
-        columns.value = columns.value.filter(
-          (column) => column.name !== "doc_num",
-        );
+        columns.value = columns.value.filter((col) => col.id !== "doc_num");
       }
 
       if (router.currentRoute.value.name === "streamExplorer") {
@@ -549,13 +454,14 @@ export default defineComponent({
         loadingState.value = true;
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while loading streams...",
         });
         logStream.value = [];
 
-        let counter = 1 + pageOffset.value;
+        const offset = (currentPage.value - 1) * pageSize.value;
+        let counter = 1 + (offset < 0 ? 0 : offset);
         let streamResponse;
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
@@ -564,11 +470,11 @@ export default defineComponent({
           selectedStreamType.value || "",
           false,
           false,
-          pageOffset.value,
-          pageRecordsPerPage.value,
+          offset < 0 ? 0 : offset,
+          pageSize.value,
           filterQuery.value,
-          sortField.value,
-          sortAsc.value,
+          sortBy.value,
+          sortOrder.value === "asc",
         );
         // }
 
@@ -580,7 +486,7 @@ export default defineComponent({
             let compressed_size = "";
             let index_size = "";
             resultTotal.value = res.list.length;
-            pagination.value.rowsNumber = res.total;
+            totalCount.value = res.total;
 
             logStream.value.push(
               ...res.list.map((data: any) => {
@@ -594,6 +500,7 @@ export default defineComponent({
                 }
                 return {
                   "#": counter <= 9 ? `0${counter++}` : counter++,
+                  _rowKey: `${data.name}-${data.stream_type}`,
                   name: data.name,
                   doc_num: doc_num,
                   storage_size: storage_size,
@@ -621,8 +528,8 @@ export default defineComponent({
           })
           .catch((err) => {
             if (err.response?.status != 403) {
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message:
                   err.response?.data?.message ||
                   "Error while fetching streams.",
@@ -663,10 +570,6 @@ export default defineComponent({
       });
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
-
     const confirmDeleteAction = (props: any) => {
       confirmDelete.value = true;
       deleteStreamName = props.row.name;
@@ -686,19 +589,17 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Stream deleted successfully.",
             });
             removeStream(deleteStreamName, deleteStreamType);
-            selected.value = [];
+            selectedIds.value = [];
             getLogStream();
           }
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: "Error while deleting stream.",
             });
           }
@@ -709,10 +610,10 @@ export default defineComponent({
     };
     const deleteBatchStream = () => {
       isDeleting.value = true;
-      const selectedItems = selected.value;
+      const items = selectedItems.value;
       const promises: Promise<any>[] = [];
 
-      selectedItems.forEach((stream: any) => {
+      items.forEach((stream: any) => {
         promises.push(
           streamService.delete(
             store.state.selectedOrganization.identifier,
@@ -733,35 +634,28 @@ export default defineComponent({
           );
 
           if (successfulDeletions.length > 0) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `Deleted ${successfulDeletions.length} streams successfully.`,
             });
           }
 
           if (failedDeletions.length > 0) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: `Failed to delete ${failedDeletions.length} streams.`,
             });
           }
 
           // Remove deleted streams from the list
-          selectedItems.forEach((stream: any) => {
+          items.forEach((stream: any) => {
             removeStream(stream.name, stream.stream_type);
-            selected.value = selected.value.filter(
-              (item: any) =>
-                item.name !== stream.name &&
-                item.stream_type !== stream.stream_type,
-            );
           });
 
+          selectedIds.value = [];
           getLogStream();
         })
         .catch((error) => {
           if (error.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message:
                 error.response?.data?.message ||
                 "Error while deleting streams.",
@@ -773,6 +667,15 @@ export default defineComponent({
           isDeleting.value = false;
         });
     };
+
+    watch([currentPage, pageSize, sortBy, sortOrder], () => {
+      getLogStream();
+    });
+
+    watch(filterQuery, () => {
+      currentPage.value = 1;
+      getLogStream();
+    });
 
     onActivated(() => {
       if (logStream.value.length > 0) {
@@ -790,14 +693,6 @@ export default defineComponent({
         getLogStream();
       }
     });
-    const getSelectedString = () => {
-      return selected.value.length === 0
-        ? ""
-        : `${selected.value.length} record${
-            selected.value.length > 1 ? "s" : ""
-          } selected`;
-    };
-
     /**
      * Get time range for stream explorer, for enrichment tables it will get the time range from the stream data min and max time
      * @param stream: Stream object
@@ -806,10 +701,9 @@ export default defineComponent({
       const dateTime: { period?: string; from?: number; to?: number } = {};
 
       if (stream.stream_type === "enrichment_tables") {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Redirecting to explorer...",
-          color: "secondary",
         });
 
         await getStream(stream.name, stream.stream_type, true)
@@ -865,26 +759,6 @@ export default defineComponent({
       });
     };
 
-    const filterData = (rows: any, terms: any) => {
-      var filtered = [];
-      terms = terms.toLowerCase();
-
-      for (var i = 0; i < duplicateStreamList.value.length; i++) {
-        if (
-          (selectedStreamType.value ===
-            duplicateStreamList.value[i]["stream_type"] ||
-            selectedStreamType.value === "all") &&
-          (duplicateStreamList.value[i]["name"].toLowerCase().includes(terms) ||
-            duplicateStreamList.value[i]["stream_type"]
-              .toLowerCase()
-              .includes(terms))
-        ) {
-          filtered.push(duplicateStreamList.value[i]);
-        }
-      }
-      return filtered;
-    };
-
     const onChangeStreamFilter = (value: string) => {
       selectedStreamType.value = value;
       getLogStream(true);
@@ -912,66 +786,33 @@ export default defineComponent({
       // });
     };
 
-    const getRowKey = (row: any) => {
-      return `${row.name}-${row.stream_type}`; // Unique key by combining `name` and `stream_type`
+    const onPaginationChange = async (params: { page: number; size: number }) => {
+      currentPage.value = params.page;
+      pageSize.value = params.size;
+      await getLogStream();
     };
 
-    const onRequest = async (props: any) => {
-      const { page, rowsPerPage, sortBy, descending } = props.pagination;
-      const filter = props.filter;
-
-      if (sortBy != null) {
-        sortField.value = sortBy;
-        sortAsc.value = !descending;
-      } else {
-        sortField.value = "name";
-        sortAsc.value = true;
-      }
-
-      pageOffset.value =
-        (page - 1) * rowsPerPage < 0 ? 0 : (page - 1) * rowsPerPage;
-      pageRecordsPerPage.value = rowsPerPage;
-
-      loadingState.value = true;
-
+    const onSortChange = async (params: { column: string; order: "asc" | "desc" }) => {
+      sortBy.value = params.column;
+      sortOrder.value = params.order;
+      currentPage.value = 1;
       await getLogStream();
-
-      // don't forget to update local pagination object
-      pagination.value.page = page;
-      pagination.value.rowsPerPage = rowsPerPage;
-      pagination.value.sortBy = sortBy;
-      pagination.value.descending = descending;
-
-      // ...and turn of loading indicator
-      loadingState.value = false;
     };
 
     const filterLogStreamByTab = (tab: string) => {
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.hasOwnProperty("value") ? val.value : val;
-      pagination.value.rowsPerPage = val.hasOwnProperty("value")
-        ? val.value
-        : val;
-      pagination.value.page = 1; // Reset to first page when changing records per page
-      qTable.value?.requestServerInteraction({
-        pagination: pagination.value,
-      });
-    };
-
     return {
       t,
-      qTable,
       router,
       store,
       logStream: logStream,
       columns,
-      selected,
+      selectedIds,
+      selectedItems,
       orgData,
       getLogStream: getLogStream,
-      pagination,
       resultTotal,
       listSchema,
       deleteStream,
@@ -981,14 +822,17 @@ export default defineComponent({
       confirmDelete,
       confirmBatchDelete,
       schemaData,
-      perPageOptions,
-      selectedPerPage,
-      maxRecordToReturn,
+      pageSize,
+      pageSizeOptions,
+      currentPage,
+      sortBy,
+      sortOrder,
+      totalCount,
+      onPaginationChange,
+      onSortChange,
       showIndexSchemaDialog,
-      changeMaxRecordToReturn,
       isSchemaUDSEnabled,
       filterQuery,
-      filterData,
       getImageURL,
       verifyOrganizationStatus,
       exploreStream,
@@ -998,15 +842,11 @@ export default defineComponent({
       addStreamDialog,
       addStream,
       loadingState,
-      getSelectedString,
       isDeleting,
-      getRowKey,
       searchKeyword,
-      onRequest,
       deleteAssociatedAlertsPipelines,
       filterLogStreamByTab,
       streamActiveTab,
-      changePagination,
     };
   },
 });

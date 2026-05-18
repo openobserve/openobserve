@@ -89,7 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-pb-lg flex items-center justify-center text-center tw:h-full"
                 >
                   <div>
-                    <OSpinner size="md" class="tw:mx-auto tw:block" />
+                    <OSpinner
+                      size="md"
+                      class="tw:mx-auto tw:block"
+                      data-test="app-sessions-loading-indicator"
+                    />
                     <div class="text-center full-width">
                       {{ t("rum.loadingSessions") }}
                     </div>
@@ -97,23 +101,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template v-else>
-                <AppTable
-                  :columns="columns"
-                  :rows="rows"
-                  class="app-table-container tw:h-full"
-                  :bordered="false"
-                  @event-emitted="handleTableEvents"
+                <OTable
+                  :data="tableRows"
+                  :columns="tableColumns"
+                  row-key="session_id"
+                  pagination="none"
+                  virtual-scroll
+                  dense
+                  class="tw:h-full"
                   data-test="rum-sessions-table"
+                  @row-click="handleRowClick"
+                  @scroll-end="handleScrollEnd"
                 >
-                  <template v-slot:frustration_count_column="slotProps">
-                    <FrustrationBadge
-                      :count="slotProps.column.row.frustration_count || 0"
+                  <template #cell-action_play="{ row }">
+                    <OIcon
+                      name="play-circle-filled"
+                      size="1.5rem"
+                      class="cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
-                  <template v-slot:session_location_column="slotProps">
-                    <SessionLocationColumn :column="slotProps.column.row" />
+                  <template #cell-frustration_count="{ row }">
+                    <FrustrationBadge
+                      :count="row.frustration_count || 0"
+                    />
                   </template>
-                </AppTable>
+                  <template #cell-location="{ row }">
+                    <SessionLocationColumn :column="row" />
+                  </template>
+                </OTable>
               </template>
             </div>
           </div>
@@ -160,7 +175,8 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import AppTable from "@/components/rum/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   formatDuration,
   b64DecodeUnicode,
@@ -171,7 +187,7 @@ import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
@@ -185,6 +201,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Session {
   timestamp: string;
@@ -210,7 +227,6 @@ const props = defineProps({
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
-const q = useQuasar();
 
 const { sessionState } = useSession();
 const store = useStore();
@@ -271,77 +287,58 @@ const userDataSet = new Set([
   "resource_url",
 ]);
 
-const columns = ref([
+const tableColumns = [
   {
-    name: "action_play",
-    field: "",
-    label: "",
-    type: "action",
-    icon: "play-circle-filled",
-    class: "session-play-icon",
-    style: { width: "3.5rem" },
+    id: "action_play",
+    header: "",
+    accessorKey: "action_play",
+    sortable: false,
+    size: 56,
+    meta: { align: "center" },
   },
   {
-    name: "timestamp",
-    field: (row: any) => getFormattedDate(row["timestamp"] / 1000),
-    label: t("rum.timestamp"),
-    align: "left",
+    id: "timestamp",
+    header: t("rum.timestamp"),
+    accessorFn: (row: any) => getFormattedDate(row["timestamp"] / 1000),
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "user_email",
-    field: (row: any) => row["user_email"] || "Unknown",
-    label: t("login.userEmail"),
-    align: "left",
+    id: "user_email",
+    header: t("login.userEmail"),
+    accessorFn: (row: any) => row["user_email"] || "Unknown",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "time_spent",
-    field: (row: any) => formatDuration(row["time_spent"]),
-    label: t("rum.timeSpent"),
-    align: "left",
+    id: "time_spent",
+    header: t("rum.timeSpent"),
+    accessorFn: (row: any) => formatDuration(row["time_spent"]),
     sortable: true,
-    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return (
-        parseInt(rowA.time_spent.toString()) -
-        parseInt(rowB.time_spent.toString())
-      );
-    },
+    meta: { align: "left" },
   },
   {
-    name: "error_count",
-    field: (row: any) => row["error_count"],
-    prop: (row: any) => row["error_count"],
-    label: t("rum.errorCount"),
-    align: "left",
+    id: "error_count",
+    header: t("rum.errorCount"),
+    accessorKey: "error_count",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "frustration_count",
-    field: (row: any) => row["frustration_count"] || 0,
-    prop: (row: any) => row["frustration_count"] || 0,
-    label: t("rum.frustrationCount"),
-    align: "left",
+    id: "frustration_count",
+    header: t("rum.frustrationCount"),
+    accessorFn: (row: any) => row["frustration_count"] || 0,
     sortable: true,
-    slot: true,
-    slotName: "frustration_count_column",
+    meta: { align: "left" },
   },
   {
-    name: "location",
-    field: (row: any) => formatDuration(row["time_spent"]),
-    label: t("rum.location"),
-    align: "left",
-    slot: true,
-    slotName: "session_location_column",
+    id: "location",
+    header: t("rum.location"),
+    accessorFn: (row: any) => formatDuration(row["time_spent"]),
     sortable: true,
-    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return (
-        parseInt(rowA.time_spent.toString()) -
-        parseInt(rowB.time_spent.toString())
-      );
-    },
+    meta: { align: "left" },
   },
-]);
+];
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -535,10 +532,9 @@ const getSessions = () => {
     })
     .catch((err) => {
       rows.value = [];
-      q.notify({
+      toast({
         message: err.response?.data?.message || "Error while fetching sessions",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     })
     .finally(() => {
@@ -610,12 +606,11 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message ||
           "Error while fetching session replay data",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })
@@ -639,20 +634,20 @@ const updateDateChange = (date: any) => {
 const splitterModel = ref(250);
 
 const rows = ref<Session[]>([]);
+
+const tableRows = computed(() => rows.value);
+
 const router = useRouter();
 
-const handleTableEvents = (event: string, payload: any) => {
-  const eventMapping: { [key: string]: (payload: any) => void } = {
-    "cell-click": handleCellClick,
-    scroll: handleScroll,
-  };
-  eventMapping[event](payload);
+const handleRowClick = (row: any) => {
+  if (!row.session_id) return;
+  handleCellClick({ columnName: "action_play", row });
 };
 
-const handleScroll = (scrollData: any) => {
+const handleScrollEnd = () => {
   if (!isLoading.value.length) {
     const totalFetchedSessions = Object.keys(sessionState.data.sessions).length;
-    if (totalFetchedSessions / scrollData.to < 1.3) {
+    if (totalFetchedSessions > 0 && totalFetchedSessions % sessionState.data.resultGrid.size === 0) {
       sessionState.data.resultGrid.currentPage++;
       // getSessions();
     }

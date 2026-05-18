@@ -54,6 +54,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: 'TracesMetricsContextMenu',
+  components: {
+    OIcon,
+  },
   props: {
     visible: {
       type: Boolean,

@@ -68,7 +68,7 @@
           data-test="dashboard-viewpanel-cancel-btn"
           icon-left="cancel"
         >
-          <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+          <OTooltip :content="t('panel.cancel')" />
         </OButton>
         <OButton
           v-else
@@ -79,11 +79,7 @@
           data-test="dashboard-viewpanel-refresh-data-btn"
           icon-left="refresh"
         >
-          <q-tooltip>{{
-            isVariablesChanged
-              ? "Refresh"
-              : "Refresh to apply latest variable changes"
-          }}</q-tooltip>
+          <OTooltip :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'" />
         </OButton>
         <OButton
           variant="outline"
@@ -95,7 +91,7 @@
         </OButton>
       </div>
     </div>
-    <q-separator></q-separator>
+    <OSeparator />
     <div class="row" style="height: calc(100vh - 130px); overflow: hidden">
       <div class="col" style="width: 100%; height: 100%">
         <div class="row" style="height: 100%">
@@ -230,6 +226,8 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -241,6 +239,7 @@ const PanelErrorButtons = defineAsyncComponent(() => {
 export default defineComponent({
   name: "ViewPanel",
   components: {
+    OSeparator,
     DateTimePickerDashboard,
     DashboardErrorsComponent,
     VariablesValueSelector,
@@ -252,6 +251,7 @@ export default defineComponent({
     PanelErrorButtons,
     OButton,
     OIcon,
+    OTooltip,
 },
   props: {
     panelId: {

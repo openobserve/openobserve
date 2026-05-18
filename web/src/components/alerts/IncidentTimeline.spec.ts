@@ -27,13 +27,13 @@ vi.mock("@/services/incidents", () => ({
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import IncidentTimeline from "@/components/alerts/IncidentTimeline.vue";
 import incidentsService from "@/services/incidents";
 
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 const makeEvent = (overrides: Record<string, any> = {}) => ({
   type: "Alert",
@@ -237,10 +237,10 @@ describe("IncidentTimeline - getEventIcon", () => {
     (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
   });
 
-  it("returns add_circle for Created", async () => {
+  it("returns add-circle for Created", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventIcon({ type: "Created" })).toBe("add_circle");
+    expect((w.vm as any).getEventIcon({ type: "Created" })).toBe("add-circle");
   });
 
   it("returns notifications for Alert", async () => {

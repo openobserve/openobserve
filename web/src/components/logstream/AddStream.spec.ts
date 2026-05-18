@@ -17,11 +17,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddStream from "./AddStream.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 const { mockGetStream, mockAddStream, mockCreateStream, mockSchemaStream } = vi.hoisted(() => ({
   mockGetStream: vi.fn(),

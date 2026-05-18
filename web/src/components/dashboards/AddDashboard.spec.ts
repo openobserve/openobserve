@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 
 // Mock dashboard service
 vi.mock("@/services/dashboards", () => ({
@@ -60,7 +60,7 @@ import store from "@/test/unit/helpers/store";
 import dashboardService from "@/services/dashboards";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 describe("AddDashboard", () => {

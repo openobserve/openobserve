@@ -137,10 +137,6 @@ const createWrapper = (props: Record<string, any> = {}) =>
           template: '<i data-test-stub="OIcon" :data-name="name"></i>',
           props: ["name", "size"],
         },
-        "q-skeleton": {
-          template: '<div data-test-stub="q-skeleton" :data-type="type"></div>',
-          props: ["type", "size", "width", "height", "animation"],
-        },
         "q-tooltip": {
           template: '<div data-test-stub="q-tooltip"><slot /></div>',
         },
@@ -661,8 +657,21 @@ describe("EnterpriseUpgradeDialog", () => {
       await wrapper.setProps({ modelValue: true });
       await nextTick();
       expect((wrapper.vm as any).isLoadingLicense).toBe(true);
-      const skeletons = wrapper.findAll('[data-test-stub="q-skeleton"]');
-      expect(skeletons.length).toBeGreaterThan(0);
+      const usageSkeleton = wrapper.find(
+        '[data-test="enterprise-upgrade-usage-indicator-skeleton"]',
+      );
+      const offerBadgeSkeleton = wrapper.find(
+        '[data-test="enterprise-upgrade-offer-badge-skeleton"]',
+      );
+      const chartSkeleton = wrapper.find(
+        '[data-test="enterprise-upgrade-chart-skeleton"]',
+      );
+      // At least one skeleton variant should be present while loading.
+      expect(
+        usageSkeleton.exists() ||
+          offerBadgeSkeleton.exists() ||
+          chartSkeleton.exists(),
+      ).toBe(true);
     });
 
     it("does not render skeletons after data has loaded", async () => {

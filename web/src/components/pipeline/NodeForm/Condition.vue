@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <div class="stream-routing-container q-px-md q-pt-md">
-      <q-form ref="routeFormRef" @submit.prevent="saveCondition">
+      <div>
         <div
           class="q-pt-sm showLabelOnTop text-bold text-h7"
           data-test="add-condition-query-input-title"
@@ -124,10 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-condition-save-btn"
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="saveCondition"
           >{{ t('alerts.save') }}</OButton>
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
   </ODrawer>
@@ -163,11 +163,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -210,7 +210,6 @@ interface StreamRoute {
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -252,8 +251,6 @@ const originalStreamFields: Ref<any[]> = ref([]);
 const isValidName: Ref<boolean> = ref(true);
 
 const isAggregationEnabled = ref(false);
-
-const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 
@@ -654,8 +651,8 @@ const saveCondition = async () => {
     });
 
     if (!hasValidConditions) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Please add at least one condition",
         timeout: 3000,
       });
@@ -695,8 +692,8 @@ const saveCondition = async () => {
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Error saving condition: " + (error as Error).message,
       timeout: 5000,
     });
@@ -757,8 +754,8 @@ const validateSqlQuery = () => {
       .catch((err: any) => {
         if (err.response.data.code === 500) {
           isValidSqlQuery.value = false;
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Invalid SQL Query : " + err.response.data.message,
             timeout: 3000,
           });

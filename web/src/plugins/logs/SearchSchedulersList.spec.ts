@@ -122,7 +122,6 @@ describe("SearchSchedulersList Component", () => {
           'q-btn': true,
           'OIcon': true,
           'q-toggle': true,
-          'q-spinner-hourglass': true,
           'q-tabs': true,
           'q-tab': true,
           'q-tab-panels': true,

@@ -31,7 +31,7 @@
       </ul>
     </div>
 
-    <q-space></q-space>
+    <div class="tw:flex-1" />
 
     <div class="tw:flex tw:justify-end tw:gap-2 q-pa-md">
       <OButton

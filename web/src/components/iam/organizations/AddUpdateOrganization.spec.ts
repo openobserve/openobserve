@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 vi.mock("@/services/organizations", () => ({
   default: {

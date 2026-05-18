@@ -240,12 +240,10 @@ describe("JsonPreview Component", () => {
           'q-item-label': true,
           'q-select': true,
           'OIcon': true,
-          'q-img': true,
           'q-input': true,
           'q-card': true,
           'q-card-section': true,
           'q-card-actions': true,
-          'q-spinner-hourglass': true,
           'EqualIcon': true,
           'NotEqualIcon': true
         }
@@ -295,13 +293,11 @@ describe("JsonPreview Component", () => {
             'q-item-label': true,
             'q-select': true,
             'OIcon': true,
-            'q-img': true,
             'q-input': true,
             'q-card': true,
             'q-card-section': true,
             'q-card-actions': true,
-            'q-spinner-hourglass': true,
-            'EqualIcon': true,
+              'EqualIcon': true,
             'NotEqualIcon': true
           }
         },
@@ -776,13 +772,11 @@ describe("JsonPreview Component", () => {
             'q-item-label': true,
             'q-select': true,
             'OIcon': true,
-            'q-img': true,
             'q-input': true,
             'q-card': true,
             'q-card-section': true,
             'q-card-actions': true,
-            'q-spinner-hourglass': true,
-            'EqualIcon': true,
+              'EqualIcon': true,
             'NotEqualIcon': true
           }
         },

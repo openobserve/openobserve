@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t('common.refresh') }}</OButton>
       </div>
 
-      <q-separator class="tw:mb-6" />
+      <OSeparator class="tw:mb-6" />
 
       <!-- Enable Deduplication -->
       <div class="tw:mb-6">
@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
 import GroupHeader from "@/components/common/GroupHeader.vue";
@@ -159,9 +158,10 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 interface FieldAlias {
@@ -229,8 +229,8 @@ const saveSettings = async () => {
   if (localConfig.value.alert_dedup_enabled) {
     if (!localConfig.value.alert_fingerprint_groups ||
         localConfig.value.alert_fingerprint_groups.length === 0) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Please select at least one semantic group for cross-alert deduplication",
         timeout: 3000,
       });
@@ -254,8 +254,8 @@ const saveSettings = async () => {
       configToSave,
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message:
         "Organization deduplication settings saved successfully",
       timeout: 2000,
@@ -264,8 +264,8 @@ const saveSettings = async () => {
     emit("saved");
   } catch (error: any) {
     console.error("Error saving deduplication settings:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || "Failed to save settings",
       timeout: 3000,
     });

@@ -44,8 +44,9 @@ export function useTableExpansion<TData>(
     const newSet = new Set(localExpandedIds.value);
 
     if (isSingle.value && !isTree.value) {
+      const wasExpanded = newSet.has(id);
       newSet.clear();
-      if (!newSet.has(id)) newSet.add(id);
+      if (!wasExpanded) newSet.add(id);
     } else {
       if (newSet.has(id)) newSet.delete(id);
       else newSet.add(id);

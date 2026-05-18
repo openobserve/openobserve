@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
         </q-card-section>
-        <q-separator />
+        <OSeparator />
         <q-card-section class="q-pt-none answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-card-section class="syntax-guide-title">
           <div class="label">Syntax Guide: SQL Mode</div>
         </q-card-section>
-        <q-separator />
+        <OSeparator />
         <q-card-section class="q-pt-none answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
@@ -131,21 +131,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For phrase prefix search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error
+                    code*')</span
                   >
                   to find phrases starting with 'error code'.
                 </li>
                 <li>
                   For case sensitive search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all('traceHits')</span
                   >
                   with exact case matching.
                 </li>
                 <li>
                   For postfix search use
                   <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
+                    >SELECT * FROM <b>stream</b> WHERE
+                    match_all('*failed')</span
                   >
                   to find all terms ending with 'failed'.
                 </li>
@@ -216,6 +219,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
   props: {
@@ -229,12 +233,10 @@ export default defineComponent({
     },
     label: {
       type: String,
-      default: '',
+      default: "",
     },
   },
-  components: { OButton, OTooltip,
-    OIcon,
-},
+  components: { OSeparator, OButton, OTooltip, OIcon },
   setup() {
     const { t } = useI18n();
     const store = useStore();

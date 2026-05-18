@@ -29,11 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="job" class="tw:space-y-2 tw:mx-6 tw:my-4">
           <!-- Status and Actions -->
           <div class="flex items-center justify-between">
-            <q-badge
-              :color="getStatusColor(job.status, job.deletion_status)"
-              :label="getStatusLabel(job.status, job.deletion_status)"
+            <OBadge
+              :variant="getStatusColor(job.status, job.deletion_status)"
               class="text-lg q-pa-sm"
-            />
+            >
+              {{ getStatusLabel(job.status, job.deletion_status) }}
+            </OBadge>
             <OButton
               v-if="canCancelJob"
               variant="outline-destructive"
@@ -109,10 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
                   <div>
-                    <q-badge
-                      :color="getDeletionStatusColor(job.deletion_status)"
-                      :label="getDeletionStatusLabel(job.deletion_status)"
-                    />
+                    <OBadge
+                      :variant="getDeletionStatusColor(job.deletion_status)"
+                    >
+                      {{ getDeletionStatusLabel(job.deletion_status) }}
+                    </OBadge>
                   </div>
                 </div>
                 <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
@@ -208,7 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -221,6 +222,9 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   modelValue: boolean;
@@ -236,7 +240,6 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
 
 const show = computed({
@@ -301,8 +304,8 @@ const confirmCancelJob = () => {
 
 const cancelJob = async () => {
   if (!job.value || !job.value.pipeline_id) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Job information not available. Please try again.",
       timeout: 3000,
     });
@@ -316,8 +319,8 @@ const cancelJob = async () => {
       job_id: job.value.job_id,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job canceled successfully",
       timeout: 3000,
     });
@@ -326,8 +329,8 @@ const cancelJob = async () => {
     loadJobDetails();
   } catch (error: any) {
     console.error("Error canceling backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to cancel backfill job",
       timeout: 5000,
     });
@@ -421,24 +424,24 @@ const getBackfillStartTime = computed(() => {
 });
 
 // Helper functions
-const getStatusColor = (status: string, deletionStatus?: any) => {
+const getStatusColor = (status: string, deletionStatus?: any): BadgeVariant => {
   if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "negative";
+    return "error";
   }
 
   switch (status) {
     case "running":
-      return "positive";
+      return "success";
     case "completed":
-      return "positive";
+      return "success";
     case "failed":
-      return "negative";
+      return "error";
     case "pending":
       return "warning";
     case "canceled":
-      return "grey";
+      return "default";
     default:
-      return "grey";
+      return "default";
   }
 };
 
@@ -457,13 +460,13 @@ const getProgressColor = (deletionStatus?: any) => {
   return "positive";
 };
 
-const getDeletionStatusColor = (status?: any) => {
-  if (!status) return "grey";
-  if (typeof status === "object" && "failed" in status) return "negative";
-  if (status === "completed") return "positive";
-  if (status === "in_progress") return "blue";
+const getDeletionStatusColor = (status?: any): BadgeVariant => {
+  if (!status) return "default";
+  if (typeof status === "object" && "failed" in status) return "error";
+  if (status === "completed") return "success";
+  if (status === "in_progress") return "primary";
   if (status === "pending") return "warning";
-  return "grey";
+  return "default";
 };
 
 const getDeletionStatusLabel = (status?: any) => {

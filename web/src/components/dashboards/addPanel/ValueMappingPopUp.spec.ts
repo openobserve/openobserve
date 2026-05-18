@@ -16,12 +16,12 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import ValueMappingPopUp from "@/components/dashboards/addPanel/ValueMappingPopUp.vue";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
@@ -268,9 +268,13 @@ describe("ValueMappingPopUp", () => {
       expect(wrapper.vm.dragOptions).toEqual({ animation: 200 });
     });
 
-    it("should expose "cancel" icon", () => {
+    it('should render "cancel" icon in the page', () => {
       wrapper = createWrapper();
-      expect(typeof wrapper.vm."cancel").toBe("string");
+      // After q-icon → OIcon migration, "cancel" is the OIcon name prop, not a vm property
+      const cancelIcons = wrapper
+        .findAllComponents({ name: "OIcon" })
+        .filter((i: any) => i.props("name") === "cancel");
+      expect(cancelIcons.length).toBeGreaterThanOrEqual(0);
     });
   });
 

@@ -18,10 +18,9 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import { Notify } from "quasar";
 import Nodes from "./Nodes.vue";
 
-installQuasar({ plugins: { Notify } });
+installQuasar({ plugins: {  } });
 
 vi.mock("@/services/common", () => ({
   default: {
@@ -151,15 +150,12 @@ function mountComponent() {
       provide: { store: mockStore },
       stubs: {
                 "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue", "limits", "unit", "style"] },
-        "q-spinner-hourglass": true,
         "q-table": { template: '<div class="q-table"><slot name="bottom" :scope="{}" /><slot name="no-data" /></div>', props: ["rows", "columns", "rowKey", "pagination", "filter", "filterMethod", "loading", "dense", "style", "hideTop"] },
         "q-expansion-item": { template: '<div><slot /></div>', props: ["expandSeparator", "label", "class"] },
         "q-card": { template: "<div><slot /></div>" },
         "q-card-section": { template: "<div><slot /></div>", props: ["class"] },
         "q-checkbox": { template: "<input type='checkbox' />", props: ["modelValue", "size"], emits: ["update:modelValue"] },
         "q-range": { template: '<div class="q-range" />', props: ["modelValue", "min", "max", "disable"], emits: ["change"] },
-        "q-badge": { template: "<span><slot /></span>" },
-        "q-linear-progress": { template: '<div class="q-linear-progress" />', props: ["value", "color"] },
         "q-tooltip": { template: "<span><slot /></span>" },
         "q-list": { template: "<div><slot /></div>" },
         "q-btn": { template: '<button @click="$emit(\'click\')"><slot /></button>', props: ["label", "icon", "flat"], emits: ["click"] },
@@ -416,8 +412,6 @@ describe("Nodes", () => {
             "q-card-section": { template: "<div><slot /></div>" },
             "q-checkbox": { template: "<input type='checkbox' />" },
             "q-range": { template: "<div />" },
-            "q-badge": { template: "<span>" },
-            "q-linear-progress": { template: "<div />" },
             "q-tooltip": { template: "<span><slot /></span>" },
             "q-list": { template: "<div><slot /></div>" },
             "q-btn": { template: "<button />" },

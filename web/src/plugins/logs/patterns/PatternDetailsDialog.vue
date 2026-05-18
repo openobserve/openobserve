@@ -146,12 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                 @mouseleave="onMouseLeave"
               >
-                <q-chip
+                <OBadge
+                  size="sm"
                   class="wildcard-chip-detail q-my-none q-mx-none"
                   :class="wildcardChipColor(tok.value, tok.sampleValues)"
                 >
                   {{ wildcardLabel(tok.value, tok.sampleValues) }}
-                </q-chip>
+                </OBadge>
               </span>
             </template>
           </div>
@@ -168,35 +169,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-subtitle2 text-weight-medium tw-mb-[0.375rem]">
             {{ t("search.patternVariablesWithCount", { count: selectedPattern.pattern.variables.length }) }}
           </div>
-          <q-table
-            :rows="selectedPattern.pattern.variables"
+          <OTable
+            :data="selectedPattern.pattern.variables"
             :columns="variableColumns"
-            :row-key="(row: any) => 'var_' + row.index"
-            :rows-per-page-options="[0]"
-            class="q-table o2-quasar-table o2-row-md tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-            dense
+            row-key="index"
+            pagination="none"
+            :show-global-filter="false"
+            class="tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
           >
-            <template v-slot:body-cell-name="props">
-              <q-td
-                class="text-left text-weight-bold text-primary"
-              >
-                {{ props.row.name || "var_" + props.row.index }}
-              </q-td>
+            <template #cell-name="{ row }">
+              <div class="text-left text-weight-bold text-primary">
+                {{ row.name || "var_" + row.index }}
+              </div>
             </template>
 
-            <template v-slot:body-cell-type="props">
-              <q-td class="text-left">
-                <q-chip
+            <template #cell-type="{ row }">
+              <div class="text-left">
+                <OBadge
                   size="sm"
                   :class="
                     store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-3'
                   "
                 >
-                  {{ props.row.var_type || "unknown" }}
-                </q-chip>
-              </q-td>
+                  {{ row.var_type || "unknown" }}
+                </OBadge>
+              </div>
             </template>
-          </q-table>
+          </OTable>
         </div>
 
         <!-- Example Logs -->
@@ -285,8 +284,11 @@ import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   tokenizeTemplate,
   wildcardChipColor,
@@ -330,19 +332,9 @@ const anomalyExplanationForSelected = computed(() =>
   anomalyExplanation(props.selectedPattern?.pattern ?? {}, t),
 );
 
-const variableColumns = computed(() => [
-  {
-    name: "name",
-    label: t("search.patternVariableNameColumn"),
-    field: "name",
-    align: "left",
-  },
-  {
-    name: "type",
-    label: t("search.patternVariableTypeColumn"),
-    field: "var_type",
-    align: "left",
-  },
+const variableColumns = computed<OTableColumnDef[]>(() => [
+  { id: "name", header: t("search.patternVariableNameColumn"), accessorKey: "name", meta: { align: "left" } },
+  { id: "type", header: t("search.patternVariableTypeColumn"), accessorKey: "var_type", meta: { align: "left" } },
 ]);
 </script>
 

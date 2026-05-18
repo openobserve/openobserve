@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
-          <q-tooltip>View Documentation</q-tooltip>
+          <OTooltip content="View Documentation" />
         </OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
@@ -148,8 +148,8 @@ import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type {
   AWSIntegration,
@@ -165,12 +165,12 @@ import segment from "@/services/segment_analytics";
 import dashboardsService from "@/services/dashboards";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton, ODialog,
-    OIcon,
-},
+  components: { OButton, ODialog, OIcon, OTooltip },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,
@@ -283,8 +283,8 @@ export default defineComponent({
         // Validate endpoint
         if (!endpoint?.url) {
           console.error("Invalid endpoint:", endpoint);
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Invalid ingestion endpoint. Please check configuration.",
             timeout: 3000,
           });
@@ -303,8 +303,8 @@ export default defineComponent({
             email,
             hasPasscode: !!passcode,
           });
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               "Missing organization credentials. Please refresh the page.",
             timeout: 3000,
@@ -330,8 +330,8 @@ export default defineComponent({
         );
 
         if (!cloudFormationURL) {
-          q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "CloudFormation template not available yet",
             timeout: 3000,
           });
@@ -348,15 +348,15 @@ export default defineComponent({
           integration_id: props.integration.id,
         });
 
-        q.notify({
-          type: "info",
+        toast({
+          variant: "info",
           message: `Opening AWS Console to set up ${props.integration.displayName}`,
           timeout: 3000,
         });
       } catch (error) {
         console.error("Error generating CloudFormation URL:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error opening AWS Console: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });
@@ -487,21 +487,19 @@ export default defineComponent({
             cancel: {
               label: "Cancel",
               flat: true,
-              color: "primary",
             },
             ok: {
               label: "Replace",
               flat: true,
-              color: "negative",
             },
             persistent: true,
           }).onOk(async () => {
             // User chose to replace
-            const loadingNotif = q.notify({
+            const loadingNotif = toast({
               type: "ongoing",
               message: "Replacing dashboard...",
               timeout: 0,
-              spinner: true,
+              variant: "loading",
             });
 
             try {
@@ -513,14 +511,13 @@ export default defineComponent({
               );
 
               loadingNotif();
-              q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: `Dashboard for ${props.integration.displayName} replaced successfully!`,
                 timeout: 5000,
                 actions: [
                   {
                     label: "View Dashboard",
-                    color: "white",
                     handler: () =>
                       router.push(`/dashboards?org_identifier=${orgId}`),
                   },
@@ -535,8 +532,8 @@ export default defineComponent({
             } catch (error) {
               loadingNotif();
               console.error("Error replacing dashboard:", error);
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: `Failed to replace dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
                 timeout: 5000,
               });
@@ -546,24 +543,23 @@ export default defineComponent({
         }
 
         // No existing dashboard, proceed with import
-        const loadingNotif = q.notify({
+        const loadingNotif = toast({
           type: "ongoing",
           message: "Importing dashboard...",
           timeout: 0,
-          spinner: true,
+          variant: "loading",
         });
 
         await importDashboard(dashboardJson, folderId, orgId);
 
         loadingNotif();
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Dashboard for ${props.integration.displayName} imported successfully!`,
           timeout: 5000,
           actions: [
             {
               label: "View Dashboard",
-              color: "white",
               handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
             },
           ],
@@ -576,8 +572,8 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Error importing dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to import dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });

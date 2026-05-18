@@ -330,7 +330,6 @@ const globalStubs: Record<string, any> = {
     template: `<input :value="modelValue" :placeholder="placeholder" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
   "q-separator": true,
-  "q-spinner-hourglass": true,
   ODrawer: ODrawerStub,
   OButton: OButtonStub,
   ConfirmDialog: ConfirmDialogStub,

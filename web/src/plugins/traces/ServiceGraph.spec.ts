@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Notify } from "quasar";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
 
@@ -61,7 +60,7 @@ const ODialogStub = defineComponent({
 });
 
 installQuasar({
-  plugins: [Notify],
+  plugins: [],
 });
 
 // Create a persistent mock for router push
@@ -201,7 +200,6 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
           QBtn: false,
           QIcon: false,
           QTooltip: false,
-          QSpinner: false,
           ODialog: ODialogStub,
         },
       },

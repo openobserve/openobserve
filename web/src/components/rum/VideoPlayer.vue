@@ -21,7 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="q-pb-lg flex items-center justify-center text-center full-width tw:h-[calc(100vh-12.5rem)]"
     >
       <div>
-        <OSpinner size="md" class="tw:mx-auto tw:block" />
+        <OSpinner
+          size="md"
+          class="tw:mx-auto tw:block"
+          data-test="video-player-loading-indicator"
+        />
         <div class="text-center full-width">
           {{ t("rum.loadingSessions") }}
         </div>
@@ -120,24 +124,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex items-center">
-          <q-toggle
-            class="o2-toggle-button-xs q-mr-md"
+          <OSwitch
+            class="q-mr-md"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
-            size="xs"
             @update:model-value="toggleSkipInactive"
           />
-          <q-select
+          <OSelect
             class="speed-selector"
             v-model="playerState.speed"
             :options="speedOptions"
-            color="input-border"
-            bg-color="input-bg"
-            stack-label
-            outlined
-            filled
-            dense
-            size="xs"
             @update:model-value="setSpeed"
           />
         </div>
@@ -160,8 +156,9 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 const props = defineProps({
   events: {
     type: Array,

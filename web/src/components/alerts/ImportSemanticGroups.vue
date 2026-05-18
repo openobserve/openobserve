@@ -37,10 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="card-container q-pa-sm q-mb-sm">
           <div class="row items-center">
             <div class="col-12 col-md-8">
-              <q-file
+              <OFile
                 v-model="jsonFile"
-                dense
-                filled
                 label="Select JSON file"
                 accept=".json"
                 @update:model-value="loadFile"
@@ -59,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="cursor-pointer"
                   />
                 </template>
-              </q-file>
+              </OFile>
             </div>
             <div class="col-12 col-md-4 text-right q-pl-sm">
               <OButton
@@ -69,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="applyChanges"
                 :disable="!hasSelectedChanges"
                 :loading="isApplying"
-              >Apply Changes</OButton>
+                >Apply Changes</OButton
+              >
             </div>
           </div>
         </div>
@@ -80,19 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container q-pa-sm q-mb-sm">
             <div class="row items-center q-col-gutter-sm">
               <div class="col-auto">
-                <q-chip dense color="positive" text-color="white" class="summary-chip">
-                  <strong>{{ diffData.additions.length }}</strong>&nbsp;New
-                </q-chip>
+                <OBadge variant="success" class="summary-chip">
+                  <strong>{{ diffData.additions.length }}</strong
+                  >&nbsp;New
+                </OBadge>
               </div>
               <div class="col-auto">
-                <q-chip dense color="warning" text-color="white" class="summary-chip">
-                  <strong>{{ diffData.modifications.length }}</strong>&nbsp;Modified
-                </q-chip>
+                <OBadge variant="warning" class="summary-chip">
+                  <strong>{{ diffData.modifications.length }}</strong
+                  >&nbsp;Modified
+                </OBadge>
               </div>
               <div class="col-auto">
-                <q-chip dense color="grey-6" text-color="white" class="summary-chip">
+                <OBadge variant="default" class="summary-chip">
                   {{ diffData.unchanged.length }} Unchanged
-                </q-chip>
+                </OBadge>
               </div>
               <div class="col">
                 <OButtonGroup class="float-right">
@@ -100,17 +101,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost-primary"
                     size="xs"
                     @click="selectAllAdditions"
-                  >Select All New</OButton>
+                    >Select All New</OButton
+                  >
                   <OButton
                     variant="ghost-warning"
                     size="xs"
                     @click="selectAllModifications"
-                  >Select All Modified</OButton>
-                  <OButton
-                    variant="ghost-muted"
-                    size="xs"
-                    @click="deselectAll"
-                  >Clear All</OButton>
+                    >Select All Modified</OButton
+                  >
+                  <OButton variant="ghost-muted" size="xs" @click="deselectAll"
+                    >Clear All</OButton
+                  >
                 </OButtonGroup>
               </div>
             </div>
@@ -122,13 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="diffData.additions.length > 0" class="q-mb-sm">
               <div class="section-header text-positive q-pa-xs">
                 <OIcon name="add-circle" size="sm" />
-                New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
+                New ({{ selectedAdditions.length }}/{{
+                  diffData.additions.length
+                }})
               </div>
               <q-list dense bordered separator class="compact-list">
                 <q-item
                   v-for="group in diffData.additions"
                   :key="group.id"
-                  dense
                   clickable
                   @click="toggleAddition(group.id)"
                   class="compact-item"
@@ -140,10 +142,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
+                    <q-item-label class="text-weight-medium">{{
+                      group.display
+                    }}</q-item-label>
                     <q-item-label caption lines="1">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <q-badge v-if="group.normalize" color="blue" label="norm" class="q-ml-xs" />
+                      <OBadge
+                        v-if="group.normalize"
+                        variant="primary"
+                        class="q-ml-xs"
+                        >norm</OBadge
+                      >
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -163,27 +172,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="diffData.modifications.length > 0" class="q-mb-sm">
               <div class="section-header text-warning q-pa-xs">
                 <OIcon name="edit" size="sm" />
-                Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
+                Modified ({{ selectedModifications.length }}/{{
+                  diffData.modifications.length
+                }})
               </div>
               <q-list dense bordered separator class="compact-list">
                 <q-item
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
-                  dense
                   clickable
                   @click="toggleModification(mod.proposed.id)"
                   class="compact-item"
                 >
                   <q-item-section side top>
                     <OCheckbox
-                      :model-value="selectedModifications.includes(mod.proposed.id)"
+                      :model-value="
+                        selectedModifications.includes(mod.proposed.id)
+                      "
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ mod.proposed.display }}</q-item-label>
+                    <q-item-label class="text-weight-medium">{{
+                      mod.proposed.display
+                    }}</q-item-label>
                     <q-item-label caption lines="1">
-                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
+                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
+                      {{ mod.proposed.fields.length }} fields
                     </q-item-label>
                   </q-item-section>
                   <q-item-section side>
@@ -202,7 +217,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unchanged (Collapsed) -->
             <div v-if="diffData.unchanged.length > 0">
               <q-expansion-item
-                dense
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check_circle"
                 header-class="text-grey-7 q-pa-xs"
@@ -211,12 +225,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-item
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    dense
                     class="compact-item"
                   >
                     <q-item-section>
                       <q-item-label>{{ group.display }}</q-item-label>
-                      <q-item-label caption>{{ group.id }} • {{ group.fields.length }} fields</q-item-label>
+                      <q-item-label caption
+                        >{{ group.id }} •
+                        {{ group.fields.length }} fields</q-item-label
+                      >
                     </q-item-section>
                   </q-item>
                 </q-list>
@@ -226,9 +242,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- No Diff State -->
-        <div v-else-if="!isImporting && !diffData" class="card-container q-pa-lg text-center">
+        <div
+          v-else-if="!isImporting && !diffData"
+          class="card-container q-pa-lg text-center"
+        >
           <OIcon name="cloud-upload" size="64px" class="q-mb-md" />
-          <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file to get started</div>
+          <div class="text-h6 text-grey-7 q-mb-sm">
+            Upload a JSON file to get started
+          </div>
           <div class="text-body2 text-grey-6">
             The system will analyze the file and show you what will change
           </div>
@@ -238,7 +259,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </base-import>
 
   <!-- Group Details Dialog -->
-  <ODialog data-test="import-semantic-groups-group-dialog"
+  <ODialog
+    data-test="import-semantic-groups-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
     :title="selectedGroup?.display"
@@ -247,26 +269,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-subtitle2 q-mb-sm">Fields ({{ selectedGroup?.fields.length }})</div>
-      <q-chip
+      <div class="text-subtitle2 q-mb-sm">
+        Fields ({{ selectedGroup?.fields.length }})
+      </div>
+      <OBadge
         v-for="field in selectedGroup?.fields"
         :key="field"
-        dense
         color="primary"
         text-color="white"
         class="q-ma-xs"
       >
         {{ field }}
-      </q-chip>
+      </OBadge>
       <div class="q-mt-md">
-        <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
-        <q-badge v-else color="grey" label="Not Normalized" />
+        <OBadge v-if="selectedGroup?.normalize" variant="primary"
+          >Normalized</OBadge
+        >
+        <OBadge v-else variant="default">Not Normalized</OBadge>
       </div>
     </div>
   </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <ODialog data-test="import-semantic-groups-modification-dialog"
+  <ODialog
+    data-test="import-semantic-groups-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
     :title="selectedModification?.proposed.display"
@@ -277,36 +303,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="row q-col-gutter-md">
       <div class="col-6">
         <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-        <div class="text-caption q-mb-xs">{{ selectedModification?.current.fields.length }} fields</div>
+        <div class="text-caption q-mb-xs">
+          {{ selectedModification?.current.fields.length }} fields
+        </div>
         <div class="field-chips-container">
-          <q-chip
+          <OBadge
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
-            dense
             color="grey-4"
             size="sm"
             class="q-ma-xs"
           >
             {{ field }}
-          </q-chip>
+          </OBadge>
         </div>
       </div>
       <div class="col-6">
         <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-        <div class="text-caption q-mb-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
+        <div class="text-caption q-mb-xs">
+          {{ selectedModification?.proposed.fields.length }} fields
+        </div>
         <div class="field-chips-container">
-          <q-chip
+          <OBadge
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
-            dense
             :color="isNewField(field) ? 'positive' : 'grey-4'"
             :text-color="isNewField(field) ? 'white' : 'black'"
             size="sm"
             class="q-ma-xs"
           >
             {{ field }}
-            <OIcon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
-          </q-chip>
+            <OIcon
+              v-if="isNewField(field)"
+              name="add"
+              size="xs"
+              class="q-ml-xs"
+            />
+          </OBadge>
         </div>
       </div>
     </div>
@@ -317,14 +350,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface SemanticGroup {
   id: string;
@@ -345,7 +380,6 @@ interface SemanticGroupDiff {
 }
 
 const router = useRouter();
-const q = useQuasar();
 const store = useStore();
 
 const jsonFile = ref<File | null>(null);
@@ -361,7 +395,9 @@ const selectedGroup = ref<SemanticGroup | null>(null);
 const selectedModification = ref<SemanticGroupModification | null>(null);
 
 const hasSelectedChanges = computed(() => {
-  return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
+  return (
+    selectedAdditions.value.length > 0 || selectedModifications.value.length > 0
+  );
 });
 
 const loadFile = async (file: File | null) => {
@@ -383,10 +419,9 @@ const loadFile = async (file: File | null) => {
     importedGroups.value = groups;
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     clearFile();
@@ -410,13 +445,16 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     diffData.value = response.data;
 
     // Auto-select all additions and modifications
-    selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
-    selectedModifications.value = response.data.modifications.map((m: SemanticGroupModification) => m.proposed.id);
+    selectedAdditions.value = response.data.additions.map(
+      (g: SemanticGroup) => g.id,
+    );
+    selectedModifications.value = response.data.modifications.map(
+      (m: SemanticGroupModification) => m.proposed.id,
+    );
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   }
@@ -424,12 +462,14 @@ const previewDiff = async (groups: SemanticGroup[]) => {
 
 const selectAllAdditions = () => {
   if (!diffData.value) return;
-  selectedAdditions.value = diffData.value.additions.map(g => g.id);
+  selectedAdditions.value = diffData.value.additions.map((g) => g.id);
 };
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(m => m.proposed.id);
+  selectedModifications.value = diffData.value.modifications.map(
+    (m) => m.proposed.id,
+  );
 };
 
 const deselectAll = () => {
@@ -479,15 +519,15 @@ const applyChanges = async () => {
     const finalGroups: SemanticGroup[] = [];
 
     // Add selected additions
-    const selectedAdditionGroups = diffData.value.additions.filter(g =>
-      selectedAdditions.value.includes(g.id)
+    const selectedAdditionGroups = diffData.value.additions.filter((g) =>
+      selectedAdditions.value.includes(g.id),
     );
     finalGroups.push(...selectedAdditionGroups);
 
     // Add selected modifications
     const selectedModificationGroups = diffData.value.modifications
-      .filter(m => selectedModifications.value.includes(m.proposed.id))
-      .map(m => m.proposed);
+      .filter((m) => selectedModifications.value.includes(m.proposed.id))
+      .map((m) => m.proposed);
     finalGroups.push(...selectedModificationGroups);
 
     // Add unchanged groups
@@ -495,28 +535,26 @@ const applyChanges = async () => {
 
     // Add unselected current groups (keep them as-is)
     const unselectedModifications = diffData.value.modifications
-      .filter(m => !selectedModifications.value.includes(m.proposed.id))
-      .map(m => m.current);
+      .filter((m) => !selectedModifications.value.includes(m.proposed.id))
+      .map((m) => m.current);
     finalGroups.push(...unselectedModifications);
 
     // Save to backend
     const org = store.state.selectedOrganization.identifier;
     await alertsService.saveSemanticGroups(org, finalGroups);
 
-    q.notify({
+    toast({
       message: `Successfully applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
-      color: "positive",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
 
     // Go back
     handleBack();
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to save changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   } finally {
@@ -547,10 +585,9 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
     importedGroups.value = jsonArray;
     await previewDiff(jsonArray);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Invalid JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   } finally {
@@ -610,7 +647,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 .section-header {
   font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   margin-bottom: 4px;
 }
 
@@ -658,11 +695,6 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 
 .summary-chip {
   font-size: 14px !important;
-
-  :deep(.q-chip__content) {
-    padding: 6px 12px;
-    font-weight: 500;
-  }
 
   :deep(strong) {
     font-size: 15px;

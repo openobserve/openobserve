@@ -84,7 +84,7 @@ import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
 import { correlate as correlateStreams } from "@/services/service_streams";
 
-installQuasar({ plugins: [quasar.Notify, quasar.Dialog] });
+installQuasar({ plugins: [quasar.quasar.Dialog] });
 
 // ---------------------------------------------------------------------------
 // Shared fixtures

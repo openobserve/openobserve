@@ -17,11 +17,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import ModelPricingEditor from "./ModelPricingEditor.vue";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 // Service mocks
 vi.mock("@/services/model_pricing", () => ({

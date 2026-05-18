@@ -46,7 +46,7 @@ document.body.appendChild(node);
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
+  plugins: [quasar.Dialog, quasar.quasar.Loading],
 });
 
 // Mock zincutils
@@ -131,17 +131,13 @@ describe("SessionsList Component", () => {
                 <div data-test="before-section"><slot name="before" /></div>
                 <div data-test="separator-section">
                   <slot name="separator">
-                    <q-avatar data-test="avatar" />
+                    <div data-test="avatar" />
                   </slot>
                 </div>
                 <div data-test="after-section"><slot name="after" /></div>
               </div>
             `,
             props: ["v-model", "unit", "vertical"],
-          },
-          "q-avatar": {
-            template: '<div data-test="avatar" />',
-            props: ["color", "text-color", "size", "icon", "style"],
           },
         },
       },

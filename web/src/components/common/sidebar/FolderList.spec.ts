@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { Dialog, Notify } from 'quasar'
+import { Dialog } from 'quasar'
 import { installQuasar } from '@/test/unit/helpers'
 import FolderList from './FolderList.vue'
 import { useRouter } from 'vue-router'
@@ -9,7 +9,7 @@ import store from '@/test/unit/helpers/store'
 import i18n from '@/locales'
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 })
 
 // AddFolder stub — after the q-dialog -> ODrawer migration, AddFolder owns

@@ -33,27 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex items-center justify-between full-width q-mb-sm">
             <div class="flex items-center">
-              <q-select
+              <OSelect
                 :loading="isOrgLoading"
                 v-model="selectedOrganization"
                 :options="organizationToDisplay"
-                @filter="filterOrganizations"
+                searchable
                 placeholder="Select Organization"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                color="input-border"
-                bg-color="input-bg"
                 class="q-py-sm no-case q-mr-md input-width org-select"
-                stack-label
-                outlined
-                filled
-                dense
-                use-input
-                hide-selected
-                fill-input
+                labelKey="label"
+                valueKey="value"
                 @update:model-value="updateOrganization()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-              >
-              </q-select>
+              />
               <div class="app-tabs-container tw:h-[36px] tw:w-fit">
                 <app-tabs
                   data-test="quota-tabs"
@@ -85,11 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedOrganization && activeType == 'table'"
               class="flex items-center"
             >
-              <q-input
+              <OInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
-                borderless
-                flat
                 class="no-border input-width o2-search-input"
                 :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                 :placeholder="
@@ -98,34 +86,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     'role-limits': t('quota.role-search'),
                   }[activeTab]
                 "
-
               >
                 <template #prepend>
                   <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                 </template>
-              </q-input>
-              <q-select
+              </OInput>
+              <OSelect
                 v-if="activeTab == 'role-limits'"
                 :loading="isApiCategoryLoading"
                 v-model="selectedApiCategory"
-                :options="filteredApiCategoryToDisplayOptions"
-                placeholder="Select API Category"
-                color="input-border"
-                style="padding: 0px"
-                bg-color="input-bg"
-                class="no-case q-mr-md input-width q-ml-md category-select"
-                stack-label
-                outlined
-                filled
-                dense
-                use-input
-                hide-selected
-                fill-input
+                :options="apiCategories"
+                searchable
                 clearable
-                @filter="filterApiCategoriesToDisplayOptions"
+                placeholder="Select API Category"
+                style="padding: 0px"
+                class="no-case q-mr-md input-width q-ml-md category-select"
+                labelKey="label"
+                valueKey="value"
                 @update:model-value="filterModulesBasedOnCategory()"
-              >
-              </q-select>
+              />
             </div>
             <div
               v-if="selectedOrganization"
@@ -415,6 +394,8 @@ import {
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -423,7 +404,6 @@ import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -431,11 +411,14 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useRateLimiter from "@/composables/useRateLimiter";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "Quota",
   components: {
     NoOrganizationSelected,
     OButton,
+    OSelect,
+    OInput,
     AppTabs,
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(
@@ -450,7 +433,6 @@ export default defineComponent({
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
-    const $q = useQuasar();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
@@ -470,12 +452,10 @@ export default defineComponent({
       {
         label: "API Limits",
         value: "api-limits",
-        icon: "speed",
       },
       {
         label: "Role Limits",
         value: "role-limits",
-        icon: "shield",
       },
     ]);
 
@@ -483,17 +463,14 @@ export default defineComponent({
       {
         label: "Per Second",
         value: "second",
-        icon: "timer",
       },
       {
         label: "Per Minute",
         value: "minute",
-        icon: "access-time",
       },
       {
         label: "Per Hour",
         value: "hour",
-        icon: "hourglass-empty",
       },
     ]);
 
@@ -501,12 +478,10 @@ export default defineComponent({
       {
         label: "Table",
         value: "table",
-        icon: "table-chart",
       },
       {
         label: "JSON",
         value: "json",
-        icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
@@ -744,14 +719,14 @@ export default defineComponent({
 
     const organizationToDisplay = computed(() => {
       if (activeTab.value === "api-limits") {
-        const newArray = [...filteredOrganizations.value];
+        const newArray = [...organizations.value];
         newArray.unshift({
           label: "global rules",
           value: "global_rules",
         });
         return newArray;
       } else {
-        return filteredOrganizations.value;
+        return organizations.value;
       }
     });
     const updateOrganization = async () => {
@@ -990,8 +965,8 @@ export default defineComponent({
           uploadError.value = "";
           uploadedRules.value = [];
           isBulkUpdate.value = false;
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
             timeout: 3000,
           });
@@ -1015,8 +990,8 @@ export default defineComponent({
         }
         changedValues.value = {};
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error.response.data.message ||
             "Error while updating rate limits rule",
@@ -1064,8 +1039,8 @@ export default defineComponent({
         }
         // Here you would call your API to save the changes
         if (response.status === 200) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
             timeout: 3000,
           });
@@ -1090,8 +1065,8 @@ export default defineComponent({
         isSavingJson.value = false;
       } catch (error: any) {
         isSavingJson.value = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error.response.data.message ||
             "Error while updating rate limits rule",
@@ -1142,8 +1117,8 @@ export default defineComponent({
     const uploadTemplate = async () => {
       const combinedJson = await convertUploadRulesToJson(uploadedRules.value);
       try {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while uploading rules...",
           timeout: 1000,
         });
@@ -1153,8 +1128,8 @@ export default defineComponent({
           combinedJson,
         );
         if (response.status === 200) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
             timeout: 3000,
           });
@@ -1188,10 +1163,9 @@ export default defineComponent({
                   : [parsedJson];
                 resolve(jsonArray);
               } catch (error) {
-                $q.notify({
+                toast({
                   message: `Error parsing JSON from file ${file.name}`,
-                  color: "negative",
-                  position: "bottom",
+                  position: "bottom-center",
                   timeout: 2000,
                 });
                 resolve([]);
@@ -1287,8 +1261,8 @@ export default defineComponent({
       Object.keys(changedValues).forEach((moduleName: any) => {
         Object.keys(changedValues[moduleName]).forEach((operation: any) => {
           if (changedValues[moduleName][operation] === "") {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "some values are empty please check",
               timeout: 3000,
             });
@@ -1467,8 +1441,8 @@ export default defineComponent({
       let isChanged = Object.keys(changedValues.value).length > 0;
 
       if (isChanged) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "Please save or cancel your changes before switching time units",
           timeout: 3000,
         });

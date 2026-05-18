@@ -16,13 +16,13 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 const node = document.createElement("div");
@@ -229,7 +229,7 @@ describe("SyntaxGuide", () => {
     it("should have tooltip component for accessibility", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       // Check that QTooltip component is present as a child
-      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
   });
@@ -238,7 +238,7 @@ describe("SyntaxGuide", () => {
     it("should work with i18n translations", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       // Check that QTooltip component is present
-      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
 

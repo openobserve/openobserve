@@ -50,7 +50,7 @@ vi.mock("@/composables/useNotifications", () => ({
 // Mock search service
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // Mock clipboard API
@@ -285,19 +285,6 @@ describe("TraceDetails", () => {
     expect(wrapper.find(".trace-details").exists()).toBe(true);
   });
 
-  // describe("Loading state", () => {
-  //   it("should show loading spinner when isLoadingTraceDetails is true", async () => {
-  //     const spinner = wrapper.find(".q-spinner");
-  //     const loadingText = wrapper.find(
-  //       '[data-test="trace-details-loading-text"]',
-  //     );
-
-  //     expect(spinner.exists()).toBe(true);
-  //     expect(loadingText.exists()).toBe(true);
-  //     expect(loadingText.text()).toContain("Fetching your trace");
-  //   });
-  // });
-
   describe("Toolbar functionality", () => {
     beforeEach(() => {
       vi.waitFor(() => {}, {
@@ -359,12 +346,16 @@ describe("TraceDetails", () => {
 
   describe("Search functionality", () => {
     it("should handle search query changes", async () => {
-      const searchInput = wrapper.find(
+      // OInput wraps the native input in a div; find the inner element
+      const searchInputWrapper = wrapper.find(
         '[data-test="trace-details-search-input"]',
       );
-      if (searchInput.exists()) {
-        await searchInput.setValue("test-search");
-        expect(wrapper.vm.searchQuery).toBe("test-search");
+      if (searchInputWrapper.exists()) {
+        const nativeInput = searchInputWrapper.find("input");
+        if (nativeInput.exists()) {
+          await nativeInput.setValue("test-search");
+          expect(wrapper.vm.searchQuery).toBe("test-search");
+        }
       }
     });
 

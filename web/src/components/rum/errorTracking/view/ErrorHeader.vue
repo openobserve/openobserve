@@ -69,13 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { defineProps } from "vue";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const router = useRouter();
-const q = useQuasar();
 const props = defineProps({
   error: {
     type: Object,
@@ -84,8 +84,8 @@ const props = defineProps({
 });
 
 const copyErrorId = (id: string) => {
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: "Copied to clipboard",
     timeout: 1500,
   });

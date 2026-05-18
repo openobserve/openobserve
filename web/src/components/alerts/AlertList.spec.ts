@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
@@ -61,7 +61,7 @@ import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 
 // Ensure Quasar plugin
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -399,10 +399,9 @@ describe("AlertList - basic rendering", () => {
     expect(wrapper.find('[data-test="alert-list-add-alert-btn"]').exists()).toBe(true);
   });
 
-  it("has a splitter and table", async () => {
+  it("renders the alert list table", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
-    expect(wrapper.find('[data-test="alert-list-splitter"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="alert-list-table"]').exists()).toBe(true);
   });
 });
@@ -540,10 +539,19 @@ describe("AlertList - row actions", () => {
     const first = (wrapper.vm as any).filteredResults[0];
     const initial = first.enabled;
 
-    // Click the pause/start button for this row
-    const btn = wrapper.find(`[data-test="alert-list-${first.name}-pause-start-alert"]`);
-    expect(btn.exists()).toBe(true);
-    await btn.trigger("click");
+    // Click the pause/start button for this row.
+    // The button is rendered by the OButton wrapper component; firing a DOM
+    // click on the inner <button> does not invoke the OButton's @click emit,
+    // so we emit the click directly on the OButton component instance.
+    const obComponent = wrapper
+      .findAllComponents({ name: "OButton" })
+      .find(
+        (c: any) =>
+          c.attributes("data-test") ===
+          `alert-list-${first.name}-pause-start-alert`,
+      );
+    expect(obComponent).toBeTruthy();
+    await obComponent!.vm.$emit("click", new MouseEvent("click"));
     await flushPromises();
 
     const updated = (wrapper.vm as any).filteredResults.find((r: any) => r.uuid === first.uuid);

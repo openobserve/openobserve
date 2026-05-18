@@ -16,14 +16,14 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import SummaryList from "./SummaryList.vue";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 const node = document.createElement("div");
@@ -343,8 +343,12 @@ describe("SummaryList.vue", () => {
   });
 
   // Test 29: Test "cancel" icon
-  it("should have "cancel" icon available", () => {
-    expect(wrapper.vm."cancel").toBeDefined();
+  it('should render "cancel" icon in the page', () => {
+    // After q-icon → OIcon migration, "cancel" is the OIcon name prop, not a vm property
+    const cancelIcons = wrapper
+      .findAllComponents({ name: "OIcon" })
+      .filter((i: any) => i.props("name") === "cancel");
+    expect(cancelIcons.length).toBeGreaterThanOrEqual(0);
   });
 
   // Test 30: Test i18n translation function
@@ -371,7 +375,7 @@ describe("SummaryList.vue", () => {
   it("should return all required values from setup function", () => {
     const setupReturnKeys = [
       "t", "columns", "confirmDeleteAction", "deleteDialog", "perPageOptions",
-      "showListSchemaDialog", "changePagination", ""cancel"", "loadingState",
+      "showListSchemaDialog", "changePagination", "loadingState",
       "isMetaOrg", "resultTotal", "selectedPerPage", "qTable", "selectedRow",
       "handleMultiQueryCancel", "pagination", "getAllUserQueries"
     ];

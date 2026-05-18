@@ -252,7 +252,7 @@ import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
-import { date, copyToClipboard, useQuasar } from "quasar";
+import { date, copyToClipboard } from "quasar";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
@@ -260,6 +260,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -278,7 +279,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 const { searchObj } = searchState();
 const { loadKeyFields } = useServiceCorrelation();
 
@@ -812,8 +812,8 @@ const handleRowClick = (row: any) => {
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData).then(() =>
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Content Copied Successfully!",
       timeout: 1000,
     })
@@ -846,15 +846,15 @@ const handleAddFieldToTable = (field: string) => {
     visibleColumns.value = new Set(visibleColumns.value);
 
     // Show success notification
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: `Column "${field}" added to table`,
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
-    $q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `Column "${field}" is already visible`,
       timeout: 1500,
     });

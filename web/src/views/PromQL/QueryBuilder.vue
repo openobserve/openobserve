@@ -8,7 +8,7 @@
         </div>
       </q-card-section>
 
-      <q-separator />
+      <OSeparator />
 
       <q-card-section>
         <!-- Query Builder Section -->
@@ -32,7 +32,7 @@
         </div>
       </q-card-section>
 
-      <q-separator />
+      <OSeparator />
 
       <!-- Generated Query Display -->
       <q-card-section>
@@ -88,7 +88,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useQuasar } from "quasar";
 import { PromVisualQuery } from "@/components/promql/types";
 import { promQueryModeller } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
@@ -96,8 +95,9 @@ import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
-const $q = useQuasar();
 
 // State
 const visualQuery = ref<PromVisualQuery>({
@@ -127,10 +127,10 @@ const generatedQuery = computed(() => {
 const copyQuery = () => {
   if (generatedQuery.value) {
     navigator.clipboard.writeText(generatedQuery.value);
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Query copied to clipboard!",
-      position: "top",
+      position: "top-center",
     });
   }
 };
@@ -142,19 +142,19 @@ const clearQuery = () => {
     operations: [],
   };
   queryResult.value = null;
-  $q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Query cleared",
-    position: "top",
+    position: "top-center",
   });
 };
 
 const testQuery = () => {
   // TODO: Implement actual query execution
-  $q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Query testing will be implemented soon",
-    position: "top",
+    position: "top-center",
   });
 
   // Mock result for now

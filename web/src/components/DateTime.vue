@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         anchor="bottom left"
         self="top left"
         no-route-dismiss
+        :persistent="isTimezoneSelectOpen"
         @before-show="onBeforeShow"
         @before-hide="onBeforeHide"
         @hide="onHide"
@@ -55,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("common.relative") }}
           </OButton>
-          <q-separator vertical inset />
+          <OSeparator vertical class="tw:my-2" />
           <OButton
             data-test="date-time-absolute-tab"
             class="tab-button"
@@ -66,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("common.absolute") }}
           </OButton>
         </div>
-        <q-separator />
+        <OSeparator />
         <OTabPanels v-model="selectedType" animated>
           <OTabPanel v-if="!disableRelative" name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
@@ -102,67 +103,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="'period_' + item_index"
                   >
                     {{ item }}
-                    <q-tooltip
-                      style="z-index: 10001; font-size: 14px"
-                      anchor="center right"
-                      self="center left"
-                      max-width="300px"
+                    <OTooltip
                       v-if="
                         relativeDatesInHour[period.value][item_index] >
                           queryRangeRestrictionInHour &&
                         queryRangeRestrictionInHour > 0
                       "
-                    >
-                      {{ queryRangeRestrictionMsg }}
-                    </q-tooltip>
+                      side="right"
+                      align="center"
+                      max-width="300px"
+                      :content="queryRangeRestrictionMsg"
+                    />
                   </OButton>
                 </div>
               </div>
 
               <div class="relative-row q-px-md q-py-sm">
                 <div class="relative-period-name">{{ t("common.custom") }}</div>
-                <q-tooltip
-                  style="z-index: 10001; font-size: 14px"
-                  anchor="center right"
-                  self="center left"
+                <OTooltip
+                  side="right"
+                  align="center"
                   max-width="300px"
                   v-if="queryRangeRestrictionInHour > 0"
-                >
-                  {{ queryRangeRestrictionMsg }}
-                </q-tooltip>
+                  :content="queryRangeRestrictionMsg"
+                />
 
                 <div class="row q-gutter-sm">
                   <div class="col">
-                    <q-input
+                    <OInput
                       v-model.number="relativeValue"
                       type="number"
-                      dense
-                      filled
-                      min="1"
+                      :min="1"
                       :step="1"
                       :max="
                         relativePeriodsMaxValue[relativePeriod] > 0
                           ? relativePeriodsMaxValue[relativePeriod]
-                          : ''
+                          : undefined
                       "
                       @update:model-value="onCustomPeriodSelect"
                     />
                   </div>
                   <div class="col">
-                    <q-select
+                    <OSelect
                       v-model="relativePeriod"
                       :options="relativePeriodsSelect"
-                      dense
-                      filled
                       emit-value
-                      @update:modelValue="onCustomPeriodSelect"
-                      popup-content-style="z-index: 10002"
-                      style="width: 100px"
+                      @update:model-value="onCustomPeriodSelect"
                     >
                       <template v-slot:selected-item>
                         <div>{{ getPeriodLabel }}</div>
                       </template>
-                    </q-select>
+                    </OSelect>
                   </div>
                 </div>
               </div>
@@ -170,29 +161,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanel>
           <OTabPanel name="absolute">
             <div class="date-time-table">
-              <q-tooltip
-                anchor="center right"
-                self="center left"
+              <OTooltip
+                side="right"
+                align="center"
                 max-width="300px"
                 v-if="queryRangeRestrictionInHour > 0"
-              >
-                <span style="font-size: 14px">
-                  {{ queryRangeRestrictionMsg }}</span
-                ></q-tooltip
-              >
-              <div class="flex justify-center q-pa-none">
-                <!-- here add -->
-                <q-date
-                  size="sm"
-                  v-model="selectedDate"
-                  class="absolute-calendar"
-                  range
-                  :locale="dateLocale"
-                  :options="optionsFn"
+                :content="queryRangeRestrictionMsg"
+              />
+              <div class="tw:flex tw:justify-center tw:px-3 tw:py-2">
+                <ODateRangeCalendar
+                  :start-date="selectedDate.from"
+                  :end-date="selectedDate.to"
+                  :min-date="calendarMinDate"
+                  :max-date="calendarMaxDate"
+                  @update:start-date="selectedDate.from = $event"
+                  @update:end-date="selectedDate.to = $event"
                 />
               </div>
               <div class="notePara">* You can choose multiple date</div>
-              <q-separator v-if="!disableRelative" class="q-my-sm" />
+              <OSeparator v-if="!disableRelative" class="tw:my-2" />
 
               <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tbody>
@@ -202,84 +189,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </tr>
                   <tr>
                     <td>
-                      <q-input
+                      <OTime
+                        class="tw:w-full"
                         v-model="selectedTime.startTime"
-                        dense
-                        borderless
-                        mask="fulltime"
-                        hide-bottom-space
-                        :rules="['fulltime']"
+                        with-seconds
                         @blur="
                           resetTime(
                             selectedTime.startTime,
                             selectedTime.endTime,
                           )
                         "
-                      >
-                        <template #append>
-                          <OIcon name="access-time" size="sm" class="cursor-pointer">
-                            <q-popup-proxy
-                              transition-show="scale"
-                              transition-hide="scale"
-                              style="z-index: 10002"
-                            >
-                              <q-time
-                                v-model="selectedTime.startTime"
-                                with-seconds
-                              >
-                                <div class="row items-center justify-end">
-                                  <OButton
-                                    v-close-popup
-                                    variant="ghost-primary"
-                                    size="xs"
-                                    >Close</OButton
-                                  >
-                                </div>
-                              </q-time>
-                            </q-popup-proxy>
-                          </OIcon>
-                        </template>
-                      </q-input>
+                      />
                     </td>
                     <td>
-                      <q-input
+                      <OTime
+                        class="tw:w-full"
                         v-model="selectedTime.endTime"
-                        dense
-                        borderless
-                        mask="fulltime"
-                        :rules="['fulltime']"
-                        hide-bottom-space
+                        :with-seconds="true"
                         @blur="
                           resetTime(
                             selectedTime.startTime,
                             selectedTime.endTime,
                           )
                         "
-                      >
-                        <template #append>
-                          <OIcon name="access-time" size="sm" class="cursor-pointer">
-                            <q-popup-proxy
-                              transition-show="scale"
-                              transition-hide="scale"
-                              style="z-index: 10002"
-                            >
-                              <q-time
-                                v-model="selectedTime.endTime"
-                                :with-seconds="true"
-                              >
-                                <div class="row items-center justify-end">
-                                  <OButton
-                                    v-close-popup
-                                    variant="ghost-primary"
-                                    size="xs"
-                                    >Close</OButton
-                                  >
-                                </div>
-                              </q-time>
-                            </q-popup-proxy>
-                          </OIcon>
-                        </template>
-                      </q-input>
+                      />
                     </td>
                   </tr>
                 </tbody>
@@ -287,34 +220,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
         </OTabPanels>
-        <q-select
+        <OSelect
           v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
           v-model="timezone"
-          :options="filteredTimezone"
-          @blur="
-            timezone =
-              timezone == ''
-                ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                : timezone
-          "
-          use-input
-          @filter="timezoneFilterFn"
-          input-debounce="0"
-          dense
-          borderless
-          emit-value
-          fill-input
-          hide-selected
+          :options="timezoneSelectOptions"
+          searchable
           :label="t('logStream.timezone')"
-          @update:modelValue="onTimezoneChange"
-          :display-value="`Timezone: ${timezone}`"
-          class="timezone-select o2-custom-select-dashboard"
-          popup-content-style="z-index: 10002"
-        >
-        </q-select>
+          @update:model-value="onTimezoneChange"
+          @open="isTimezoneSelectOpen = true"
+          @close="isTimezoneSelectOpen = false"
+          class="timezone-select"
+        />
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
-          <q-separator class="q-my-sm" />
+          <OSeparator class="tw:my-2" />
           <OButton
             data-test="date-time-apply-btn"
             variant="primary"
@@ -336,6 +255,12 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTime from "@/lib/forms/Time/OTime.vue";
+import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 // @ts-nocheck
 import {
   ref,
@@ -354,16 +279,25 @@ import {
   convertToUtcTimestamp,
   timestampToTimezoneDate,
 } from "../utils/zincutils";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
 
 export default defineComponent({
-  components: { OTabPanels, OTabPanel, OButton,
+  components: {
+    OSeparator,
+    OTabPanels,
+    OTabPanel,
+    OButton,
     OIcon,
-},
+    OTooltip,
+    OInput,
+    OSelect,
+    OTime,
+    ODateRangeCalendar,
+  },
   props: {
     defaultType: {
       type: String,
@@ -424,7 +358,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
@@ -480,7 +413,12 @@ export default defineComponent({
       onTimezoneChange();
     }
 
-    const filteredTimezone: any = ref([]);
+    const filteredTimezone: any = ref(timezoneOptions);
+    const isTimezoneSelectOpen = ref(false);
+
+    const timezoneSelectOptions = computed(() =>
+      timezoneOptions.map((tz: string) => ({ label: tz, value: tz })),
+    );
 
     let relativePeriods = [
       { label: t("common.seconds"), value: "s" },
@@ -538,6 +476,19 @@ export default defineComponent({
     const dateLocale = {
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
+
+    const calendarMinDate = computed(() => {
+      if (props.disableRelative && props.minDate) return props.minDate;
+      return "1999/01/01";
+    });
+
+    const calendarMaxDate = computed(() => {
+      return timestampToTimezoneDate(
+        new Date().getTime(),
+        store.state.timezone,
+        "yyyy/MM/dd",
+      );
+    });
 
     onMounted(() => {
       // updateDisplayValue();
@@ -1130,6 +1081,10 @@ export default defineComponent({
       showOnlyAbsolute,
       onShow,
       onHide,
+      calendarMinDate,
+      calendarMaxDate,
+      timezoneSelectOptions,
+      isTimezoneSelectOpen,
     };
   },
   computed: {
@@ -1214,6 +1169,7 @@ export default defineComponent({
 
 .date-time-table.relative {
   display: flex;
+  flex-direction: column;
 
   .relative-row {
     display: flex;
@@ -1265,6 +1221,11 @@ export default defineComponent({
   // border: $secondary;
   background: rgba(0, 0, 0, 0.07);
   font-weight: 700;
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
 }
 
 .rp-selector-selected {
@@ -1328,7 +1289,11 @@ export default defineComponent({
   }
 }
 .startEndTime {
+  width: calc(100% - 0.8rem);
   margin: 0.5rem 0.4rem 0.3rem 0.4rem;
+  td {
+    width: 50%;
+  }
   .q-field__control-container {
     min-height: 32px;
     height: 32px;

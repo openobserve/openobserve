@@ -18,12 +18,12 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import General from "./General.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock useQuasar
@@ -204,11 +204,6 @@ const createWrapper = (props = {}, options = {}) => {
         QSeparator: {
           template: "<div data-test-stub='q-separator'></div>",
         },
-        QImg: {
-          template:
-            "<img data-test-stub='q-img' :src='src' :alt='alt' data-test='setting_ent_custom_logo_img' />",
-          props: ["src", "alt", "style", "class"],
-        },
         QFile: {
           template: `<input 
             type='file' 
@@ -243,10 +238,6 @@ const createWrapper = (props = {}, options = {}) => {
         QIcon: {
           template: "<span data-test-stub='OIcon'></span>",
           props: ["name"],
-        },
-        QSpinnerHourglass: {
-          template: "<div data-test-stub='q-spinner-hourglass'></div>",
-          props: ["class", "size", "color"],
         },
         QDialog: {
           template:
@@ -869,7 +860,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: true });
 
-      const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
+      const spinner = wrapper.find('[data-test="general-settings-loading-indicator"]');
       if (spinner.exists()) {
         expect(spinner.exists()).toBe(true);
       } else {
@@ -882,7 +873,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: false });
 
-      const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
+      const spinner = wrapper.find('[data-test="general-settings-loading-indicator"]');
       expect(spinner.exists()).toBe(false);
     });
   });

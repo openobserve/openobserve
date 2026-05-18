@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
-              <q-badge v-if="anomalyConfig.status" :color="anomalyStatusColor" :label="anomalyConfig.status" class="text-caption" />
+              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="text-caption">{{ anomalyConfig.status }}</OBadge>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="tw:text-[11px] tw:whitespace-nowrap"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
 
         <!-- Tab Content -->
-        <q-form ref="addAlertForm" class="tw:flex-1 tw:overflow-auto" @submit="onSubmit">
+        <div class="tw:flex-1 tw:overflow-auto">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
           <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
             <div>
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
-        </q-form>
+        </div>
       </div><!-- end TIER 3 card -->
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
@@ -454,6 +454,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -500,6 +501,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
+    OBadge,
     OTooltip,
     OInput,
     OSelect,
@@ -943,85 +945,6 @@ body.body--dark .query-mode-tabs {
 
 .o2-alert-tab-border {
   border-top: 0.0625rem solid var(--o2-border-color);
-}
-
-// Wizard Stepper Styles
-.alert-wizard-stepper {
-  box-shadow: none;
-  .q-stepper__step-inner {
-    padding: 0.375rem !important;
-  }
-  .q-stepper__tab {
-    padding-left: 0.375rem !important;
-    min-height: 30px !important;
-  }
-
-  :deep(.q-stepper__header) {
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  :deep(.q-stepper__tab) {
-    padding: 12px 16px;
-    min-height: 60px;
-  }
-
-  // Hide captions for inactive steps
-  :deep(.q-stepper__tab) {
-    .q-stepper__caption {
-      display: none !important;
-    }
-  }
-
-  // Show caption only on active step
-  :deep(.q-stepper__tab--active) {
-    .q-stepper__caption {
-      display: block !important;
-      opacity: 0.7;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-  }
-
-  :deep(.q-stepper__tab--active) {
-    color: #1976d2;
-    font-weight: 600;
-  }
-
-  :deep(.q-stepper__tab--done) {
-    color: #4caf50;
-    cursor: pointer;
-  }
-
-  :deep(.q-stepper__dot) {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-  }
-
-  .q-stepper--horizontal .q-stepper__step-inner {
-    padding: 8px !important;
-  }
-
-  // Make step titles more compact
-  :deep(.q-stepper__title) {
-    font-size: 14px;
-    line-height: 1.2;
-  }
-}
-
-.wizard-view-container {
-  .q-stepper {
-    background: transparent !important;
-  }
-}
-
-// Dark mode adjustments
-.dark-mode1 {
-  .alert-wizard-stepper {
-    :deep(.q-stepper__header) {
-      border-bottom-color: #424242;
-    }
-  }
 }
 
 // Persistent step caption styles (helper text style)

@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div data-test="add-action-script-type" class="report-name-input">
+            <div data-test="add-action-script-type" class="report-name-input q-mb-md">
               <OSelect
                 data-test="add-action-script-type-select"
                 v-model="formData.type"
@@ -110,57 +110,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <q-stepper
+            <OStepper
               v-model="step"
-              vertical
-              color="primary"
+              orientation="vertical"
               animated
+              navigable
               class="q-mb-md"
-              header-nav
             >
-              <q-step
+              <OStep
                 data-test="add-action-script-step-1"
                 :name="1"
                 :title="t('actions.uploadCodeZip')"
-                icon="dashboard"
+                icon="edit"
                 :done="step > 1"
               >
                 <div
                   data-test="add-action-script-file-input"
                   class="flex items-center"
                 >
-                  <q-file
+                  <OFile
                     v-if="
                       !isEditingActionScript || formData.fileNameToShow == ''
                     "
                     ref="fileInput"
-                    color="primary"
-                    filled
                     v-model="formData.codeZip"
                     :label="t('actions.zipFile') + ' *'"
-                    bg-color="input-bg"
-                    class="tw:w-[300px] q-pt-md q-pb-sm showLabelOnTop lookup-table-file-uploader"
-                    stack-label
-                    outlined
-                    dense
                     accept=".zip"
-                    :rules="[
-                      (val: any) => {
-                        if (!isEditingActionScript) {
-                          return !!val || 'ZIP File is required!';
-                        }
-                        return true;
-                      },
-                    ]"
+                    data-test="add-action-script-file-input"
+                    :error-message="!isEditingActionScript && !formData.codeZip ? 'ZIP File is required!' : undefined"
+                    :error="!isEditingActionScript && !formData.codeZip && step > 1"
                   >
-                    <template v-slot:prepend>
-                      <OIcon name="attachment" size="sm" />
-                    </template>
-                    <template v-slot:hint>
+                    <template #hint>
                       Note: Only .zip files are accepted and it may contain
                       various resources such as .py, .txt and main.py file etc.
                     </template>
-                  </q-file>
+                  </OFile>
 
                   <div
                     v-else-if="
@@ -191,21 +175,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                   </div>
                 </div>
+                <div class="tw:flex tw:gap-2 tw:mt-8">
+                  <OButton
+                    data-test="add-action-script-step1-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
 
-                <q-stepper-navigation>
-                  <div class="q-mt-sm">
-                    <OButton
-                      data-test="add-action-script-step1-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 2"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-
-              <q-step
+              <OStep
                 v-if="formData.type === 'scheduled'"
                 data-test="add-action-script-step-2"
                 :name="2"
@@ -324,28 +305,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </div>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <OButton
+                    data-test="add-action-script-step2-back-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="step--"
+                    >Back</OButton
+                  >
+                  <OButton
+                    data-test="add-action-script-step2-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
 
-                <q-stepper-navigation>
-                  <div class="tw:flex tw:gap-2">
-                    <OButton
-                      data-test="add-action-script-step2-back-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="step = 1"
-                      >Back</OButton
-                    >
-                    <OButton
-                      data-test="add-action-script-step2-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 3"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-
-              <q-step
+              <OStep
                 data-test="add-action-script-step-3"
                 :name="3"
                 title="Select Service Account"
@@ -400,27 +378,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-
-                <q-stepper-navigation>
-                  <div class="tw:flex tw:gap-2">
-                    <OButton
-                      data-test="add-action-script-step3-back-btn"
-                      variant="outline"
-                      size="sm"
-                      @click="step = formData.type === 'scheduled' ? 2 : 1"
-                      >Back</OButton
-                    >
-                    <OButton
-                      data-test="add-action-script-step3-continue-btn"
-                      variant="primary"
-                      size="sm"
-                      @click="step = 4"
-                      >Continue</OButton
-                    >
-                  </div>
-                </q-stepper-navigation>
-              </q-step>
-              <q-step
+                <div class="tw:flex tw:gap-2 tw:mt-4">
+                  <OButton
+                    data-test="add-action-script-step3-back-btn"
+                    variant="outline"
+                    size="sm"
+                    @click="step === 3 ? (step = formData.type === 'scheduled' ? 2 : 1) : step--"
+                    >Back</OButton
+                  >
+                  <OButton
+                    data-test="add-action-script-step3-continue-btn"
+                    variant="primary"
+                    size="sm"
+                    @click="step++"
+                    >Continue</OButton
+                  >
+                </div>
+              </OStep>
+              <OStep
                 data-test="add-action-script-step-4"
                 :name="4"
                 title="Environmental Variables"
@@ -470,17 +445,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     /></OButton>
                   </div>
                 </div>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-action-script-step4-back-btn"
                     variant="outline"
                     size="sm"
-                    @click="step = 3"
+                    @click="step--"
                     >Back</OButton
                   >
-                </q-stepper-navigation>
-              </q-step>
-            </q-stepper>
+                </div>
+              </OStep>
+            </OStepper>
+
           </div>
         </div>
       </div>
@@ -537,7 +513,6 @@ import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -547,6 +522,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineProps({
   report: {
@@ -594,7 +573,6 @@ const step = ref(1);
 
 const formData = ref(defaultActionScript);
 
-const q = useQuasar();
 
 const actionTypes = [
   {
@@ -866,8 +844,8 @@ const saveActionScript = async () => {
       ? actions.update
       : actions.create;
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -876,8 +854,8 @@ const saveActionScript = async () => {
 
   updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Action ${
           isEditingActionScript.value ? "updated" : "saved"
         } successfully.`,
@@ -889,8 +867,8 @@ const saveActionScript = async () => {
     .catch((error) => {
       step.value = 3;
       if (error.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message ||
             `Error while ${
@@ -1101,8 +1079,8 @@ const handleActionScript = async () => {
       })
       .catch((err) => {
         if (err.response.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.data?.message || "Error while fetching Action!",
             timeout: 4000,
           });
@@ -1143,8 +1121,8 @@ const getServiceAccounts = async () => {
     filteredServiceAccounts.value = [...serviceAccountsOptions];
   } catch (err: any) {
     if (err.response?.status != 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err.response?.data?.message ||
           "Error while fetching service accounts.",

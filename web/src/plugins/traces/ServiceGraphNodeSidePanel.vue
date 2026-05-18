@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="tw:my-[1rem]!" />
+        <OSeparator class="tw:my-[1rem]!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
           <div
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <OSpinner size="xs" />
+                <OSpinner size="xs" data-test="service-graph-operations-loading-indicator" />
                 <span>Loading operations...</span>
               </div>
 
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <OSpinner size="xs" />
+                <OSpinner size="xs" data-test="service-graph-resource-loading-indicator" />
                 <span>Loading {{ cfg.label.toLowerCase() }}...</span>
               </div>
               <template v-else>
@@ -593,7 +593,6 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import streamService from "@/services/stream";
@@ -622,6 +621,8 @@ import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -714,6 +715,7 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,
@@ -759,7 +761,6 @@ export default defineComponent({
   emits: ["close", "view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const { t } = useI18n();
     const router = useRouter();
 
@@ -1333,8 +1334,6 @@ export default defineComponent({
         return {
           status: "unknown",
           text: "Unknown",
-          color: "grey",
-          icon: "help",
         };
       }
 
@@ -1345,22 +1344,16 @@ export default defineComponent({
         return {
           status: "critical",
           text: "Critical",
-          color: "negative",
-          icon: "error",
         };
       } else if (errorRate > 5) {
         return {
           status: "degraded",
           text: "Degraded",
-          color: "warning",
-          icon: "warning",
         };
       } else {
         return {
           status: "healthy",
           text: "Healthy",
-          color: "positive",
-          icon: "check-circle",
         };
       }
     });
@@ -1964,20 +1957,20 @@ export default defineComponent({
             filterQuery = filterParts;
           }
         } else {
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: t("traces.noLogsAvailableForService"),
             timeout: 3000,
-            position: "bottom",
+            position: "bottom-center",
           });
           return;
         }
       } catch {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: t("traces.noLogsAvailableForService"),
           timeout: 3000,
-          position: "bottom",
+          position: "bottom-center",
         });
         return;
       }
@@ -2006,11 +1999,11 @@ export default defineComponent({
       if (correlationData.value) {
         showTelemetryDialog.value = true;
       } else if (correlationError.value) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: correlationError.value,
           timeout: 3000,
-          position: "bottom",
+          position: "bottom-center",
         });
       }
     };

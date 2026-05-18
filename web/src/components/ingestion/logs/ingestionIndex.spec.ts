@@ -16,7 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
-import { copyToClipboard, Notify } from "quasar";
+import { copyToClipboard } from "quasar";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
@@ -56,7 +56,7 @@ vi.mock("quasar", async () => {
 });
 
 installQuasar({
-  plugins: [Notify]
+  plugins: []
 });
 
 describe("IngestLogs Index Component", () => {

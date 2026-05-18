@@ -13,6 +13,7 @@ const props = defineProps<{
   isRowSelectedFn?: (row: any) => boolean;
   expansionEnabled?: boolean;
   isExpandedFn?: (row: any) => boolean;
+  getRowExpansionEnabled?: (row: any) => boolean;
   highlightText?: string;
   shouldHighlightColumn?: (columnId: string) => boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
@@ -77,6 +78,7 @@ function getRowForIndex(index: number) {
       :selection-multiple="selectionMultiple"
       :is-row-selected="isRowSelectedFn?.(row.original)"
       :expansion-enabled="expansionEnabled"
+      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(row.original) : true"
       :is-expanded="isExpandedFn?.(row.original)"
       :highlight-text="highlightText"
       :should-highlight-column="shouldHighlightColumn"
@@ -131,6 +133,7 @@ function getRowForIndex(index: number) {
       :selection-multiple="selectionMultiple"
       :is-row-selected="isRowSelectedFn?.(getRowForIndex(virtualRow.index)?.original)"
       :expansion-enabled="expansionEnabled"
+      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(getRowForIndex(virtualRow.index)?.original) : true"
       :is-expanded="isExpandedFn?.(getRowForIndex(virtualRow.index)?.original)"
       :highlight-text="highlightText"
       :should-highlight-column="shouldHighlightColumn"

@@ -13,7 +13,7 @@
         <q-card-section class="metric-legends-title">
           <div class="label">{{ t("search.legendLabel") }}</div>
         </q-card-section>
-        <q-separator />
+        <OSeparator />
         <q-card-section class="q-pt-none legends">
           <div class="legend-grid">
             <div
@@ -37,10 +37,11 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "MetricLegends",
-  components: { OButton,
+  components: { OSeparator, OButton,
     OIcon,
 },
   setup() {

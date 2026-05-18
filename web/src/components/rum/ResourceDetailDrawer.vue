@@ -48,15 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formatTimestamp(resource[store.state.zoConfig.timestamp_column])
               }}</span>
             </div>
-            <q-separator vertical />
+            <OSeparator vertical />
             <div class="row items-center">
               <OIcon name="access-time" size="sm" class="q-mr-xs" />
               <span>{{ formatDuration(resource.resource_duration) }}</span>
             </div>
-            <q-separator vertical />
+            <OSeparator vertical />
             <div class="row items-center">
               <OIcon
-                :name="getStatusIcon(resource.resource-status-code)"
+                :name="getStatusIcon(resource.resource - status - code)"
                 :color="getStatusColor(resource.resource_status_code)"
                 size="sm"
                 class="q-mr-xs"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="tw:my-4" />
 
         <!-- Resource Details -->
         <div class="q-mb-md">
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="tw:my-4" />
 
         <!-- Trace Correlation -->
         <TraceCorrelationCard
@@ -138,11 +138,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Session Context -->
         <div v-if="resource.session?.id" class="q-mt-md">
-          <q-separator class="q-my-md" />
+          <OSeparator class="tw:my-4" />
           <div class="tags-title text-bold q-ml-xs q-mb-sm">
             Session Context
           </div>
-        <div class="row q-gutter-sm">
+          <div class="row q-gutter-sm">
             <OButton
               icon-left="play-circle"
               variant="outline"
@@ -170,12 +170,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 
 const props = defineProps({
@@ -191,7 +193,6 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 
-const q = useQuasar();
 const router = useRouter();
 const store = useStore();
 
@@ -280,8 +281,8 @@ const viewSessionEvents = () => {
   if (!props.resource?.session?.id) return;
 
   // TODO: Navigate to filtered session events view
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Session events view coming soon",
     timeout: 2000,
   });

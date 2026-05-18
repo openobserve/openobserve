@@ -68,45 +68,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Compact Status, Severity, Alerts badges at extreme right -->
       <div v-if="incidentDetails && !isEditingTitle" class="tw:flex tw:items-center tw:gap-2 tw:ml-auto">
         <!-- Status Badge -->
-        <q-badge
-          :color="getStatusColor(incidentDetails.status)"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          style="height: 33px;"
-          outline
+        <OBadge
+          :variant="getStatusVariant(incidentDetails.status)"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <OIcon name="info" size="xs" />
             <span>{{ getStatusLabel(incidentDetails.status) }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)" />
-        </q-badge>
+        </OBadge>
 
         <!-- Severity Badge -->
-        <q-badge
-          :style="{ color: getSeverityColorHex(incidentDetails.severity), height: '33px' }"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          outline
+        <OBadge
+          :variant="getSeverityVariant(incidentDetails.severity)"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <OIcon name="warning" size="xs" />
             <span>{{ incidentDetails.severity }}</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
-        </q-badge>
+        </OBadge>
 
         <!-- Alert Count Badge -->
-        <q-badge
-          color="primary"
-          class="tw:px-2.5 tw:py-1.5 tw:cursor-default"
-          style="height: 33px;"
-          outline
+        <OBadge
+          variant="primary-soft"
+          class="tw:h-9 tw:px-2.5 tw:cursor-default tw:rounded-md! tw:ring-1 tw:ring-inset tw:ring-current"
         >
           <div class="tw:flex tw:items-center tw:gap-1.5">
             <OIcon name="notifications-active" size="xs" />
             <span>{{ triggers.length }} Alerts</span>
           </div>
           <OTooltip :delay="200" :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
-        </q-badge>
+        </OBadge>
       </div>
 
       <!-- Save/Cancel buttons when editing -->
@@ -916,9 +911,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
                             Stream Type
                           </span>
-                          <q-badge :color="alerts[selectedAlertIndex]?.stream_type === 'logs' ? 'blue' : alerts[selectedAlertIndex]?.stream_type === 'metrics' ? 'purple' : 'teal'" outline class="tw:w-fit">
+                          <OBadge variant="primary" class="tw:w-fit">
                             <span class="tw:text-[10px]">{{ alerts[selectedAlertIndex]?.stream_type || 'N/A' }}</span>
-                          </q-badge>
+                          </OBadge>
                         </div>
                         <div class="tw:flex tw:flex-col tw:gap-0.5">
                           <span :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-500'" class="tw:text-[10px] tw:uppercase tw:tracking-wide">
@@ -1010,7 +1005,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
           </div>
 
           <!-- Error/No Data State -->
@@ -1060,7 +1055,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
@@ -1118,7 +1113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 
@@ -1179,7 +1174,6 @@ import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { date } from "quasar";
 import incidentsService, {
@@ -1207,6 +1201,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1225,12 +1222,12 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OIcon,
+    OBadge,
 },
   emits: ['close', 'status-updated', 'sendToAiChat'],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
 
     // Copy to clipboard state
@@ -1244,8 +1241,8 @@ export default defineComponent({
         .writeText(text)
         .then(() => {
           copiedField.value = fieldName;
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Copied to clipboard",
             timeout: 2000,
           });
@@ -1255,8 +1252,8 @@ export default defineComponent({
           }, 2000);
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Failed to copy to clipboard",
             timeout: 2000,
           });
@@ -1983,8 +1980,8 @@ export default defineComponent({
         await checkAnalysisInFlight(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to load incident details",
         });
       } finally {
@@ -2098,8 +2095,8 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
         // Mark data as stale so incident list will refresh when navigating back
@@ -2117,8 +2114,8 @@ export default defineComponent({
         }
       } catch (error) {
         console.error("[UPDATE STATUS] Failed to update status:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("alerts.incidents.statusUpdateFailed"),
         });
       } finally {
@@ -2171,8 +2168,8 @@ export default defineComponent({
         incidentDetails.value.title = response.data.title;
         isEditingTitle.value = false;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.incidentTitleUpdatedSuccess"),
           timeout: 2000,
         });
@@ -2185,8 +2182,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update title:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident title",
           timeout: 3000,
         });
@@ -2194,16 +2191,16 @@ export default defineComponent({
       }
     };
 
-    const getStatusColor = (status: string) => {
+    const getStatusVariant = (status: string): BadgeVariant => {
       switch (status) {
         case "open":
-          return "negative";
+          return "error-soft";
         case "acknowledged":
-          return "orange";
+          return "warning-soft";
         case "resolved":
-          return "positive";
+          return "success-soft";
         default:
-          return "grey";
+          return "default-soft";
       }
     };
 
@@ -2232,6 +2229,21 @@ export default defineComponent({
           return "#6b7280"; // gray-500
         default:
           return "#6b7280"; // gray-500
+      }
+    };
+
+    const getSeverityVariant = (severity: string): BadgeVariant => {
+      switch (severity) {
+        case "P1":
+          return "error-soft";
+        case "P2":
+          return "warning-soft";
+        case "P3":
+          return "warning-soft";
+        case "P4":
+          return "default-soft";
+        default:
+          return "default-soft";
       }
     };
 
@@ -2336,8 +2348,8 @@ export default defineComponent({
         incidentDetails.value.status = response.data.status;
         editableStatus.value = response.data.status;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Incident status updated to ${response.data.status}`,
           timeout: 2000,
         });
@@ -2350,8 +2362,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update status:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident status",
           timeout: 3000,
         });
@@ -2390,8 +2402,8 @@ export default defineComponent({
         incidentDetails.value.severity = data.severity;
         editableSeverity.value = data.severity;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Incident severity updated to ${data.severity}`,
           timeout: 2000,
         });
@@ -2402,8 +2414,8 @@ export default defineComponent({
         if ('analysis_in_flight' in data) {
           analysisInFlight.value = !!data.analysis_in_flight;
           if (data.analysis_in_flight) {
-            $q.notify({
-              type: "info",
+            toast({
+              variant: "info",
               message: "AI analysis is already running for this incident",
               timeout: 3000,
             });
@@ -2412,20 +2424,20 @@ export default defineComponent({
               title: "Re-run AI Analysis?",
               message: "Severity has changed. Would you like AI to re-analyze this incident?",
               cancel: { label: "No thanks", flat: true },
-              ok: { label: "Re-run AI analysis", color: "primary" },
+              ok: { label: "Re-run AI analysis" },
               persistent: false,
             }).onOk(async () => {
               try {
                 await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
-                $q.notify({
-                  type: "positive",
+                toast({
+                  variant: "success",
                   message: "AI reanalysis started",
                   timeout: 2000,
                 });
                 await loadDetails(incidentId);
               } catch (e: any) {
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message: e?.response?.data?.message || "Failed to start reanalysis",
                   timeout: 3000,
                 });
@@ -2435,8 +2447,8 @@ export default defineComponent({
         }
       } catch (error: any) {
         console.error("Failed to update severity:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || "Failed to update incident severity",
           timeout: 3000,
         });
@@ -2815,8 +2827,8 @@ export default defineComponent({
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;
 
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("alerts.incidents.rcaCompleted"),
         });
 
@@ -2825,8 +2837,8 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to trigger RCA:", error);
         rcaStreamContent.value = "";
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error?.response?.data?.message || error?.message || "Failed to perform RCA analysis",
         });
       } finally {
@@ -2911,9 +2923,10 @@ export default defineComponent({
       handleStatusChange,
       handleSeverityChange,
       handleTriggerRowClick,
-      getStatusColor,
+      getStatusVariant,
       getStatusLabel,
       getSeverityColorHex,
+      getSeverityVariant,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

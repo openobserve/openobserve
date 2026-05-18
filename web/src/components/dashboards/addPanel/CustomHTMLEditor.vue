@@ -37,14 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #separator>
           <div class="splitter-vertical splitter-enabled"></div>
-          <q-avatar
-            color="primary"
-            text-color="white"
-            size="20px"
-            icon="drag_indicator"
+          <div
+            class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
             style="top: 10px; left: 3.5px"
             data-test="dashboard-html-editor-drag-indicator"
-          />
+          >
+            <OIcon name="drag-indicator" size="xs" />
+          </div>
         </template>
         <template #after>
           <HTMLRenderer
@@ -62,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineAsyncComponent, defineComponent, ref } from "vue";
 import HTMLRenderer from "../panels/HTMLRenderer.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   components: {
@@ -69,6 +69,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     HTMLRenderer,
+    OIcon,
   },
   name: "CustomHTMLEditor",
   props: {

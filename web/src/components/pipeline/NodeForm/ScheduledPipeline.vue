@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="full-width scheduled-pipeline-container">
-    <!-- <q-separator /> -->
+    <!-- <OSeparator /> -->
 
     <div class="q-mb-sm stepper-header tw:w-full tw:flex tw:h-full">
       <div
@@ -68,48 +68,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <div style="flex-shrink: 0">
-                      <q-select
+                      <OSelect
                         v-model="selectedStreamType"
                         :options="streamTypes"
-                        option-label="label"
-                        option-value="value"
                         :label="t('alerts.streamType') + ' *'"
-                        :popup-content-style="{ textTransform: 'lowercase' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="no-case full-width q-mb-xs o2-custom-select-dashboard"
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        borderless
-                        input-debounce="300"
+                        class="no-case full-width q-mb-xs"
                         @update:model-value="getStreamList"
                       />
 
-                      <q-select
+                      <OSelect
                         v-model="selectedStreamName"
                         :options="filteredStreams"
-                        option-label="label"
-                        option-value="value"
+                        labelKey="label"
+                        valueKey="value"
                         :label="t('alerts.stream_name')"
-                        :popup-content-style="{ textTransform: 'lowercase' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-my-xs no-case full-width o2-custom-select-dashboard"
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        borderless
-                        input-debounce="300"
+                        class="q-my-xs no-case full-width"
                         @update:model-value="getStreamFields"
-                        @filter="filterStreams"
-                        @popup-show="getStreamList"
-                        map-options
-                        emit-value
+                        @open="getStreamList"
                       />
                     </div>
 
@@ -120,17 +95,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <FieldList
                         :fields="streamFields"
-                        :stream-name="selectedStreamName"
-                        :stream-type="selectedStreamType"
-                        @event-emitted="handleSidebarEvent"
-                        :time-stamp="{
-                          startTime: dateTime.startTime,
-                          endTime: dateTime.endTime,
-                        }"
-                        :hideIncludeExlcude="false"
-                        :hideCopyValue="false"
-                        :hideAddSearchTerm="true"
-                      />
+                        :theme="store.state.theme"
+                        :show-pagination="false"
+                        :page-size="50"
+                      >
+                        <template #field-row="{ row }">
+                          <FieldRow
+                            :field="row"
+                            :selected-fields="[]"
+                            :timestamp-column="store.state.zoConfig.timestamp_column"
+                            :theme="store.state.theme"
+                            :show-quick-mode="false"
+                            :show-visibility-toggle="false"
+                            :show-fts-field-values="showFtsFieldValues"
+                            @add-to-filter="addFieldSearchTerm(`${row.name}=''`)"
+                          >
+                            <template
+                              v-if="isFieldExpandable(row)"
+                              #expansion="{ field }"
+                            >
+                              <FieldExpansion
+                                :field="field"
+                                :field-values="fieldValues[field.name]"
+                                :expanded="expandedRows?.[field.name] ?? false"
+                                :theme="store.state.theme"
+                                :show-visibility-toggle="false"
+                                :show-filter-icon="false"
+                                :show-quick-mode="false"
+                                :default-values-count="defaultValuesCount"
+                                @add-to-filter="(val: string) => addFieldSearchTerm(val)"
+                                @add-search-term="handleAddSearchTerm"
+                                @add-multiple-search-terms="handleAddMultipleSearchTerms"
+                                @remove-field-filter="(fn: string) => handleSidebarEvent('remove-field', fn)"
+                                @search-field-values="handleSearchFieldValues"
+                                @load-more-values="handleLoadMoreValues"
+                                @before-show="(event: any, f: any) => openFilterCreator(f)"
+                                @before-hide="(f: any) => closeField(f.name)"
+                              >
+                                <!-- Duration percentiles for traces -->
+                                <template
+                                  v-if="field.name === 'duration' && selectedStreamType === 'traces'"
+                                  #body
+                                >
+                                  <div
+                                    v-if="durationPercentilesLoading"
+                                    class="tw:flex tw:justify-center tw:py-[0.5rem]"
+                                  >
+                                    <OSpinner size="xs" />
+                                  </div>
+                                  <template v-else-if="hasDurationPercentiles">
+                                    <div
+                                      v-for="p in PERCENTILE_LABELS"
+                                      :key="p.key"
+                                      class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem] tw:pl-[0.5rem]"
+                                    >
+                                      <span class="tw:text-[0.7rem] tw:w-[2rem] tw:shrink-0">{{ p.label }}</span>
+                                      <span class="tw:text-[0.7rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]">
+                                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                                      </span>
+                                      <div class="tw:flex tw:w-[2.7rem]">
+                                        <OButton
+                                          v-if="p.key !== 'max'"
+                                          variant="ghost"
+                                          size="icon-xs-circle"
+                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          class="tw:ml-[0.125rem]! tw:border! tw:border-[var(--o2-border-color)]!"
+                                        >
+                                          <OIcon name="arrow-forward-ios" size="sm" class="tw:h-[0.4rem]! tw:w-[0.4rem]!" />
+                                        </OButton>
+                                        <OButton
+                                          variant="ghost"
+                                          size="icon-xs-circle"
+                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          class="tw:ml-auto! tw:mr-[0.5rem]! tw:border! tw:border-[var(--o2-border-color)]!"
+                                        >
+                                          <OIcon name="arrow-back-ios" size="sm" class="tw:h-[0.4rem]! tw:w-[0.4rem]!" />
+                                        </OButton>
+                                      </div>
+                                    </div>
+                                  </template>
+                                  <div v-else class="tw:pl-2 tw:py-1 tw:text-[0.7rem] tw:text-o2-text-secondary">
+                                    {{ durationPercentileErrMsg || "No values found" }}
+                                  </div>
+                                </template>
+                              </FieldExpansion>
+                            </template>
+                          </FieldRow>
+                        </template>
+                      </FieldList>
                     </div>
                   </div>
                 </div>
@@ -175,37 +229,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Based upon the condition of trigger the pipeline
-                              will get trigger <br />
-                              e.g. if the trigger value is >100 and the query
-                              returns a value of 101 then the pipeline will
-                              trigger.</span
-                            >
-                          </q-tooltip>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Based upon the condition of trigger the
+                                pipeline will get trigger <br />
+                                e.g. if the trigger value is >100 and the query
+                                returns a value of 101 then the pipeline will
+                                trigger.</span
+                              >
+                            </template>
+                          </OTooltip>
                         </OIcon>
                       </div>
                       <div class="flex justify-start items-center">
                         <div
                           data-test="scheduled-pipeline-promlq-condition-operator-select"
                         >
-                          <q-select
+                          <OSelect
                             v-model="promqlCondition.operator"
                             :options="triggerOperators"
-                            color="input-border"
-                            bg-color="input-bg"
                             class="no-case q-py-none q-mr-xs"
-                            filled
-                            borderless
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
                             style="width: 88px; border-right: none"
                             @update:model-value="updatePromqlCondition"
                           />
@@ -215,13 +259,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 160px; margin-left: 0 !important"
                           class="silence-notification-input o2-input"
                         >
-                          <q-input
+                          <OInput
                             v-model="promqlCondition.value"
                             type="number"
-                            dense
-                            filled
-                            min="0"
-                            style="background: none"
+                            :min="0"
                             :placeholder="t('pipeline.value')"
                             @update:model-value="updatePromqlCondition"
                           />
@@ -238,13 +279,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("pipeline.aggregation") }}
                       </div>
-                      <q-toggle
+                      <OSwitch
                         data-test="scheduled-pipeline-aggregation-toggle"
                         v-model="_isAggregationEnabled"
-                        size="md"
-                        color="primary"
-                        class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
-                        :disable="tab === 'sql' || tab === 'promql'"
+                        :disabled="tab === 'sql' || tab === 'promql'"
                         @update:model-value="updateAggregation"
                       />
                     </div>
@@ -274,28 +312,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               data-test="scheduled-pipeline-group-by-column-select"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.group_by[index]"
                                 :options="filteredFields"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none q-mb-sm"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                emit-value
-                                hide-selected
+                                labelKey="label"
+                                valueKey="value"
                                 :placeholder="t('pipeline.selectColumn')"
-                                fill-input
-                                :input-debounce="400"
-                                @filter="filterFields"
-                                :rules="[
-                                  (val: any) =>
-                                    !!val || t('pipeline.fieldRequired'),
-                                ]"
+                                :error="!!groupByErrors[index]"
+                                :error-message="groupByErrors[index]"
                                 style="width: 200px"
-                                @update:model-value="updateTrigger"
+                                @update:model-value="
+                                  (val: any) => {
+                                    groupByErrors[index] = '';
+                                    updateTrigger();
+                                  }
+                                "
                               />
                             </div>
                             <OButton
@@ -341,19 +372,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >The threshold above/below which the alert will
-                              trigger. <br />
-                              e.g. if the threshold is >100 and the query
-                              returns a value of 101 then the alert will
-                              trigger.</span
-                            >
-                          </q-tooltip>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >The threshold above/below which the alert will
+                                trigger. <br />
+                                e.g. if the threshold is >100 and the query
+                                returns a value of 101 then the alert will
+                                trigger.</span
+                              >
+                            </template>
+                          </OTooltip>
                         </OIcon>
                       </div>
                       <div
@@ -368,18 +397,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-threshold-function-select"
                               class="threshould-input q-mr-xs o2-input"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.function"
                                 :options="aggFunctions"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
                                 style="width: 120px"
                                 @update:model-value="updateAggregation"
                               />
@@ -388,20 +408,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="threshould-input q-mr-xs o2-input"
                               data-test="scheduled-pipeline-threshold-column-select"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.having.column"
                                 :options="filteredNumericColumns"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                emit-value
-                                hide-selected
-                                fill-input
-                                @filter="filterNumericColumns"
+                                labelKey="label"
+                                valueKey="value"
                                 style="width: 250px"
                                 @update:model-value="updateAggregation"
                               />
@@ -410,18 +421,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-threshold-operator-select"
                               class="threshould-input q-mr-xs o2-input q-mt-sm"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.having.operator"
                                 :options="triggerOperators"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
                                 style="width: 120px"
                                 @update:model-value="updateAggregation"
                               />
@@ -432,13 +434,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 style="width: 250px; margin-left: 0 !important"
                                 class="silence-notification-input o2-input"
                               >
-                                <q-input
+                                <OInput
                                   v-model="aggregationData.having.value"
                                   type="number"
-                                  dense
-                                  filled
-                                  min="0"
-                                  style="background: none"
+                                  :min="0"
                                   :placeholder="t('pipeline.value')"
                                   @update:model-value="updateAggregation"
                                 />
@@ -466,22 +465,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="threshould-input"
                               data-test="scheduled-pipeline-threshold-operator-select"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="triggerData.operator"
                                 :options="triggerOperators"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="showLabelOnTop no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
-                                :rules="[
-                                  (val: any) =>
-                                    !!val || t('pipeline.fieldRequired'),
-                                ]"
                                 style="
                                   width: 88px;
                                   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -501,13 +487,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="silence-notification-input"
                                 data-test="scheduled-pipeline-threshold-value-input"
                               >
-                                <q-input
+                                <OInput
                                   v-model="triggerData.threshold"
                                   type="number"
-                                  dense
-                                  filled
-                                  min="1"
-                                  style="background: none"
+                                  :min="1"
                                   @update:model-value="updateTrigger"
                                 />
                               </div>
@@ -561,16 +544,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Configure the option to enable a cron
-                              expression.</span
-                            >
-                          </q-tooltip>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Configure the option to enable a cron
+                                expression.</span
+                              >
+                            </template>
+                          </OTooltip>
                         </OIcon>
                       </div>
                       <div style="min-height: 58px">
@@ -582,14 +563,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="scheduled-pipeline-cron-input"
                             class="silence-notification-input"
                           >
-                            <q-toggle
+                            <OSwitch
                               data-test="scheduled-pipeline-cron-toggle-btn"
-                              size="md"
-                              color="primary"
-                              class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
-                              v-model="triggerData.frequency_type"
-                              :true-value="'cron'"
-                              :false-value="'minutes'"
+                              v-model="isCronMode"
                             />
                           </div>
                         </div>
@@ -617,34 +593,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="auto"
-                          >
-                            <span
-                              style="font-size: 14px"
-                              v-if="triggerData.frequency_type == 'minutes'"
-                              >How often the task should be executed.<br />
-                              e.g., 2 minutes means that the task will run every
-                              2 minutes and will be processed based on the other
-                              parameters provided.</span
-                            >
-                            <span style="font-size: 14px" v-else>
-                              Pattern: * * * * * * means every second.
-                              <br />
-                              Format: [Second (optional) 0-59] [Minute 0-59]
-                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                              [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
-                              <br />
-                              Use '*' to represent any value, 'L' for the last
-                              day/weekday.
-                              <br />
-                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies second, minute, hour, day of
-                              month, month, and day of week, respectively.</span
-                            >
-                          </q-tooltip>
+                          <OTooltip side="right">
+                            <template #content>
+                              <span
+                                style="font-size: 14px"
+                                v-if="triggerData.frequency_type == 'minutes'"
+                                >How often the task should be executed.<br />
+                                e.g., 2 minutes means that the task will run
+                                every 2 minutes and will be processed based on
+                                the other parameters provided.</span
+                              >
+                              <span style="font-size: 14px" v-else>
+                                Pattern: * * * * * * means every second.
+                                <br />
+                                Format: [Second (optional) 0-59] [Minute 0-59]
+                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
+                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
+                                Sunday].
+                                <br />
+                                Use '*' to represent any value, 'L' for the last
+                                day/weekday.
+                                <br />
+                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
+                                daily. It specifies second, minute, hour, day of
+                                month, month, and day of week,
+                                respectively.</span
+                              >
+                            </template>
+                          </OTooltip>
                         </OIcon>
                         <template
                           v-if="
@@ -662,15 +638,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'tw:text-orange-500'
                             "
                           >
-                            <q-tooltip
-                              anchor="center right"
-                              self="center left"
-                              max-width="auto"
-                              class="tw:text-[14px]"
-                            >
-                              Warning: The displayed timezone is approximate.
-                              Verify and select the correct timezone manually.
-                            </q-tooltip>
+                            <OTooltip
+                              side="right"
+                              content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                            />
                           </OIcon>
                         </template>
                       </div>
@@ -688,64 +659,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             class="silence-notification-input"
                           >
-                            <q-input
+                            <OInput
                               data-test="scheduled-pipeline-frequency-input-field"
                               v-if="triggerData.frequency_type == 'minutes'"
                               v-model="triggerData.frequency"
                               type="number"
-                              dense
-                              filled
                               :min="
                                 Math.ceil(
                                   store.state?.zoConfig
                                     ?.min_auto_refresh_interval / 60,
                                 ) || 1
                               "
-                              style="background: none"
                               @update:model-value="updateFrequency"
                             />
                             <div
                               v-else
                               class="tw:flex tw:items-center o2-input tw:gap-y-2"
                             >
-                              <q-input
+                              <OInput
                                 data-test="scheduled-pipeline-cron-input-field"
                                 v-model="triggerData.cron"
-                                dense
-                                filled
                                 :label="t('reports.cronExpression') + ' *'"
-                                style="background: none; width: 130px"
-                                class="showLabelOnTop"
-                                stack-label
-                                outlined
+                                style="width: 130px"
                                 @update:model-value="updateCron"
-                                required
                               />
-                              <q-select
+                              <OSelect
                                 data-test="add-report-schedule-start-timezone-select"
                                 v-model="triggerData.timezone"
                                 :options="filteredTimezone"
-                                @blur="
-                                  browserTimezone =
-                                    browserTimezone == ''
-                                      ? Intl.DateTimeFormat().resolvedOptions()
-                                          .timeZone
-                                      : browserTimezone
-                                "
-                                use-input
-                                @filter="timezoneFilterFn"
-                                input-debounce="0"
-                                dense
-                                filled
-                                emit-value
-                                fill-input
-                                hide-selected
-                                :title="triggerData.timezone"
                                 :label="t('logStream.timezone') + ' *'"
-                                :display-value="`Timezone: ${browserTimezone}`"
-                                class="timezone-select showLabelOnTop q-ml-sm"
-                                stack-label
-                                outlined
+                                :title="triggerData.timezone"
+                                class="timezone-select q-ml-sm"
                                 style="width: 200px"
                               />
                             </div>
@@ -803,19 +747,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Period for which the query should run.<br />
-                              e.g. 10 minutes means that whenever the query will
-                              run it will use the last 10 minutes of data. If
-                              the query runs at 4:00 PM then it will use the
-                              data from 3:50 PM to 4:00 PM.</span
-                            >
-                          </q-tooltip>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Period for which the query should run.<br />
+                                e.g. 10 minutes means that whenever the query
+                                will run it will use the last 10 minutes of
+                                data. If the query runs at 4:00 PM then it will
+                                use the data from 3:50 PM to 4:00 PM.</span
+                              >
+                            </template>
+                          </OTooltip>
                         </OIcon>
                       </div>
                       <div style="min-height: 58px">
@@ -831,17 +773,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 87px; margin-left: 0 !important"
                             class="silence-notification-input"
                           >
-                            <q-input
+                            <OInput
                               v-model="triggerData.period"
                               type="number"
-                              dense
-                              filled
-                              min="1"
-                              style="background: none"
-                              v-bind:readonly="
+                              :min="1"
+                              :readonly="
                                 triggerData.frequency_type == 'minutes'
                               "
-                              v-bind:disable="
+                              :disabled="
                                 triggerData.frequency_type == 'minutes'
                               "
                               @update:model-value="updateTrigger"
@@ -904,18 +843,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Delay for which the pipeline is scheduled to
-                              run.<br />
-                              e.g. 10 minutes delay means that the pipeline will
-                              run 10 minutes after its scheduled time.</span
-                            >
-                          </q-tooltip>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Delay for which the pipeline is scheduled to
+                                run.<br />
+                                e.g. 10 minutes delay means that the pipeline
+                                will run 10 minutes after its scheduled
+                                time.</span
+                              >
+                            </template>
+                          </OTooltip>
                         </OIcon>
                       </div>
                       <div style="min-height: 58px">
@@ -931,13 +869,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 87px; margin-left: 0 !important"
                             class="silence-notification-input"
                           >
-                            <q-input
+                            <OInput
                               v-model="delayCondition"
                               type="number"
-                              dense
-                              filled
-                              min="0"
-                              style="background: none"
+                              :min="0"
                               @update:model-value="updateDelay"
                             />
                           </div>
@@ -1072,7 +1007,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
+                      <OIcon
+                        name="info"
+                        size="md"
+                        class="tw:align-middle tw:mr-1"
+                      />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -1087,8 +1026,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <OIcon name="info"
-size="md" />
+                      <OIcon name="info" size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -1129,7 +1067,7 @@ size="md" />
                     @mousedown.prevent
                     @click="$emit('cancel:form')"
                   >
-                    {{ t('alerts.cancel') }}
+                    {{ t("alerts.cancel") }}
                   </OButton>
                   <OButton
                     data-test="stream-routing-query-save-btn"
@@ -1141,8 +1079,8 @@ size="md" />
                   >
                     {{
                       validatingSqlQuery
-                        ? t('pipeline.validating')
-                        : t('pipeline.validateAndClose')
+                        ? t("pipeline.validating")
+                        : t("pipeline.validateAndClose")
                     }}
                   </OButton>
                 </div>
@@ -1201,10 +1139,12 @@ import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   timestampToTimezoneDate,
+  formatTimeWithSuffix,
+  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard, useQuasar } from "quasar";
 import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import IndexList from "@/plugins/logs/IndexList.vue";
@@ -1214,14 +1154,32 @@ import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
 import useLogs from "@/composables/useLogs";
 
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import FieldList from "@/components/common/FieldList.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
+import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import useStreams from "@/composables/useStreams";
+import useFieldValuesStream from "@/composables/useFieldValuesStream";
+import useDurationPercentiles from "@/composables/useDurationPercentiles";
 import AppTabs from "@/components/common/AppTabs.vue";
+import {
+  applyFieldGrouping,
+  buildSemanticIndex,
+  type FieldObj,
+} from "@/utils/fieldCategories";
+import {
+  useServiceCorrelation,
+  type KeyFieldsConfig,
+  type FieldGroupingConfig,
+} from "@/composables/useServiceCorrelation";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1234,9 +1192,13 @@ import { debounce } from "lodash-es";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
+);
+const FieldExpansion = defineAsyncComponent(
+  () => import("@/components/common/FieldExpansion.vue"),
 );
 
 const props = defineProps([
@@ -1288,6 +1250,8 @@ const emits = defineEmits([
 const { pipelineObj } = useDragAndDrop();
 const { searchObj } = useLogs();
 const { getStream, getStreams } = useStreams();
+const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
+  useServiceCorrelation();
 const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
@@ -1384,6 +1348,54 @@ const aiChatInputContext = ref("");
 const aiChatAppendMode = ref(true);
 
 const userDefinedFields = ref<any[]>([]);
+
+// ─── Field value streaming & duration percentiles ────────────────────
+
+const {
+  fieldValues,
+  fieldValuesFinalizedValues,
+  fieldValuesCurrentSize,
+  fetchFieldValues,
+  cancelFieldStream,
+  resetFieldValues,
+} = useFieldValuesStream();
+
+const PERCENTILE_LABELS = [
+  { key: "p25", label: "P25" },
+  { key: "p50", label: "P50" },
+  { key: "p75", label: "P75" },
+  { key: "p95", label: "P95" },
+  { key: "p99", label: "P99" },
+  { key: "max", label: "Max" },
+] as const;
+
+const {
+  percentiles: durationPercentiles,
+  isLoading: durationPercentilesLoading,
+  fetchPercentiles,
+  cancelFetch: cancelPercentileFetch,
+  errMsg: durationPercentileErrMsg,
+} = useDurationPercentiles();
+
+const hasDurationPercentiles = computed(() =>
+  PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
+);
+
+const expandedRows: Ref<Record<string, boolean>> = ref({});
+const expandedIds = ref<string[]>([]);
+const currentSizePerField: Ref<Record<string, number>> = ref({});
+const currentKeyword: Ref<Record<string, string>> = ref({});
+const fieldValuesTimeRange: Ref<
+  Record<string, { start_time: number; end_time: number }>
+> = ref({});
+
+const defaultValuesCount = computed(
+  () => store.state.zoConfig?.query_values_default_num || 10,
+);
+
+const showFtsFieldValues = computed(
+  () => store.state.zoConfig?.showFtsFieldValues ?? false,
+);
 
 const selectedStreamType = ref(props.streamType || "logs");
 
@@ -1665,6 +1677,7 @@ const promqlCondition = ref(props.promql_condition);
 const aggregationData = ref(props.aggregation);
 
 const filteredFields = ref(props.columns);
+const groupByErrors = ref<Record<number, string>>({});
 
 const getNumericColumns = computed(() => {
   if (
@@ -1714,6 +1727,13 @@ const addField = () => {
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
+
+const isCronMode = computed({
+  get: () => triggerData.value.frequency_type === "cron",
+  set: (val: boolean) => {
+    triggerData.value.frequency_type = val ? "cron" : "minutes";
+  },
+});
 
 const selectedFunction = ref("");
 
@@ -1958,8 +1978,8 @@ const validateInputs = (notify: boolean = true) => {
 
   if (cronJobError.value) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: cronJobError.value,
         timeout: 2000,
       });
@@ -1971,8 +1991,8 @@ const validateInputs = (notify: boolean = true) => {
     isNaN(Number(triggerData.value.period))
   ) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Period should be greater than 0",
         timeout: 1500,
       });
@@ -1988,8 +2008,8 @@ const validateInputs = (notify: boolean = true) => {
         !aggregationData.value.having.operator)
     ) {
       notify &&
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("pipeline.thresholdShouldNotBeEmpty"),
           timeout: 1500,
         });
@@ -2006,8 +2026,8 @@ const validateInputs = (notify: boolean = true) => {
       !triggerData.value.operator)
   ) {
     notify &&
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: t("pipeline.thresholdShouldNotBeEmpty"),
         timeout: 1500,
       });
@@ -2058,7 +2078,7 @@ const collapseFieldList = () => {
 const getStreamFields = () => {
   return new Promise((resolve) => {
     getStream(selectedStreamName.value, selectedStreamType.value, true)
-      .then((stream: any) => {
+      .then(async (stream: any) => {
         streamFields.value = [];
         userDefinedFields.value = [];
         const ftsKeys: string[] = stream.settings?.full_text_search_keys || [];
@@ -2066,6 +2086,8 @@ const getStreamFields = () => {
         stream.schema?.forEach((field: any) => {
           streamFields.value.push({
             ...field,
+            dataType: field.type,
+            isSchemaField: true,
             showValues: field.name !== timestampColumn,
             ftsKey: ftsKeys.includes(field.name),
           });
@@ -2075,6 +2097,46 @@ const getStreamFields = () => {
             ...field,
           });
         });
+
+        // Apply field grouping (same as logs/traces)
+        try {
+          const isEnterprise =
+            config.isEnterprise === "true" || config.isCloud === "true";
+          const [semanticAliases, keyFieldsConfig, fieldGrouping] =
+            await Promise.all([
+              isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+              loadKeyFields(),
+              loadFieldGrouping(),
+            ]);
+          const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
+            ? (fieldGrouping as FieldGroupingConfig)
+            : null;
+          const semanticIndex =
+            semanticAliases.length > 0
+              ? buildSemanticIndex(semanticAliases, grouping)
+              : null;
+          const keySpec = (keyFieldsConfig as KeyFieldsConfig)[
+            selectedStreamType.value
+          ] ?? { fields: [], groups: [] };
+          const keyFieldSet = new Set(
+            keySpec.fields.map((f: string) => f.toLowerCase()),
+          );
+          const keyGroupSet = new Set(
+            keySpec.groups.map((g: string) => g.toLowerCase()),
+          );
+
+          streamFields.value = applyFieldGrouping(
+            streamFields.value as FieldObj[],
+            semanticIndex,
+            keyFieldSet,
+            keyGroupSet,
+          );
+        } catch (groupErr) {
+          console.warn(
+            "Field grouping failed for pipeline, using flat list",
+            groupErr,
+          );
+        }
       })
       .finally(() => {
         // Note: Default query generation removed
@@ -2086,6 +2148,195 @@ const getStreamFields = () => {
       });
   });
 };
+
+// ─── Field value helpers (moved from sidebar/FieldList) ──────────────
+
+const buildSql = (streamName: string, whereClause?: string) =>
+  b64EncodeUnicode(
+    `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
+  ) || "";
+
+function isFieldExpandable(row: any) {
+  if (row.isGroup || row.label) return false;
+  if (row.ftsKey && !showFtsFieldValues.value) return false;
+  if (!row.showValues) return false;
+  return true;
+}
+
+// Default to last 15 min when dateTime hasn't been set yet (mount-order race
+// with the parent's DateTime component — see Query.vue).
+const getEffectiveTimeRange = () => {
+  const now = Date.now() * 1000;
+  return {
+    start_time: dateTime.value.startTime ?? (now - 900_000_000),
+    end_time: dateTime.value.endTime ?? now,
+  };
+};
+
+function openFilterCreator({ name, ftsKey, stream_name }: any) {
+  if (ftsKey && !showFtsFieldValues.value) return;
+
+  expandedRows.value[name] = true;
+  expandedIds.value = [name];
+
+  // Duration field in traces — fetch percentiles instead of regular values
+  if (name === "duration" && selectedStreamType.value === "traces") {
+    cancelPercentileFetch();
+    const { start_time, end_time } = getEffectiveTimeRange();
+    fetchPercentiles({
+      streamName: stream_name || selectedStreamName.value,
+      startTime: start_time,
+      endTime: end_time,
+      whereClause: "",
+    });
+    return;
+  }
+
+  cancelFieldStream(name);
+  currentSizePerField.value[name] = defaultValuesCount.value;
+  currentKeyword.value[name] = "";
+  const { start_time, end_time } = getEffectiveTimeRange();
+  fieldValuesTimeRange.value[name] = { start_time, end_time };
+  resetFieldValues(name, true);
+
+  const resolvedStream = stream_name || selectedStreamName.value;
+  fieldValuesCurrentSize.value[name] = defaultValuesCount.value;
+
+  fetchFieldValues({
+    fields: [name],
+    size: defaultValuesCount.value,
+    no_count: false,
+    start_time,
+    end_time,
+    stream_name: resolvedStream,
+    stream_type: selectedStreamType.value,
+    sql: buildSql(resolvedStream),
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  });
+}
+
+function closeField(fieldName: string) {
+  if (fieldName === "duration" && selectedStreamType.value === "traces") {
+    cancelPercentileFetch();
+  } else {
+    cancelFieldStream(fieldName);
+    currentSizePerField.value[fieldName] = 0;
+    currentKeyword.value[fieldName] = "";
+    delete fieldValuesTimeRange.value[fieldName];
+    resetFieldValues(fieldName);
+  }
+  expandedRows.value[fieldName] = false;
+  expandedIds.value = expandedIds.value.filter((id) => id !== fieldName);
+}
+
+function onFieldRowClick(row: any) {
+  if (!isFieldExpandable(row)) return;
+  const currentlyExpanded = expandedRows.value[row.name];
+  if (currentlyExpanded) {
+    closeField(row.name);
+  } else {
+    openFilterCreator(row);
+  }
+}
+
+const handleSearchFieldValues = (fieldName: string, term: string) => {
+  const row: any = (streamFields.value as any[]).find(
+    (f: any) => f.name === fieldName,
+  );
+  const resolvedStream = row?.stream_name || selectedStreamName.value;
+  currentKeyword.value[fieldName] = term;
+  currentSizePerField.value[fieldName] = defaultValuesCount.value;
+  fieldValuesCurrentSize.value[fieldName] = defaultValuesCount.value;
+  delete fieldValuesFinalizedValues.value[fieldName];
+  cancelFieldStream(fieldName);
+  resetFieldValues(fieldName, true);
+
+  const pinnedTime = fieldValuesTimeRange.value[fieldName];
+  const effective = getEffectiveTimeRange();
+  fetchFieldValues({
+    fields: [fieldName],
+    size: defaultValuesCount.value,
+    no_count: false,
+    start_time: pinnedTime?.start_time ?? effective.start_time,
+    end_time: pinnedTime?.end_time ?? effective.end_time,
+    stream_name: resolvedStream,
+    stream_type: selectedStreamType.value,
+    sql: buildSql(resolvedStream),
+    keyword: term || undefined,
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  });
+};
+
+const handleLoadMoreValues = (fieldName: string) => {
+  const row: any = (streamFields.value as any[]).find(
+    (f: any) => f.name === fieldName,
+  );
+  const resolvedStream = row?.stream_name || selectedStreamName.value;
+  const newSize =
+    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) +
+    defaultValuesCount.value;
+  currentSizePerField.value[fieldName] = newSize;
+  fieldValuesCurrentSize.value[fieldName] = newSize;
+  fieldValuesFinalizedValues.value[fieldName] = [
+    ...(fieldValues.value[fieldName]?.values || []),
+  ];
+
+  const pinnedTime = fieldValuesTimeRange.value[fieldName];
+  const effective2 = getEffectiveTimeRange();
+  fetchFieldValues({
+    fields: [fieldName],
+    size: newSize,
+    no_count: false,
+    start_time: pinnedTime?.start_time ?? effective2.start_time,
+    end_time: pinnedTime?.end_time ?? effective2.end_time,
+    stream_name: resolvedStream,
+    stream_type: selectedStreamType.value,
+    sql: buildSql(resolvedStream),
+    keyword: currentKeyword.value[fieldName] || undefined,
+    timeout: 30000,
+    use_cache: (globalThis as any).use_cache ?? true,
+  });
+};
+
+const isNullValue = (v: string) =>
+  v === null || v === undefined || v === "" || v.toLowerCase() === "null";
+
+const buildExpression = (fieldName: string, v: string, action: string) =>
+  isNullValue(v)
+    ? action === "include"
+      ? `${fieldName} IS NULL`
+      : `${fieldName} IS NOT NULL`
+    : action === "include"
+      ? `${fieldName}='${v}'`
+      : `${fieldName}!='${v}'`;
+
+const handleAddSearchTerm = (
+  fieldName: string,
+  value: string,
+  action: string,
+) => {
+  handleSidebarEvent("add-field", buildExpression(fieldName, value, action));
+};
+
+const handleAddMultipleSearchTerms = (
+  fieldName: string,
+  values: string[],
+  action: string,
+) => {
+  const joinOp = action === "include" ? " or " : " and ";
+  const expressions = values.map((v) => buildExpression(fieldName, v, action));
+  handleSidebarEvent(
+    "add-field",
+    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0],
+  );
+};
+
+const addFieldSearchTerm = (term: string) => {
+  handleSidebarEvent("add-field", term);
+};
+
 const filterStreams = (val: string, update: any) => {
   update(() => {
     if (!val || val === "") {
@@ -2151,7 +2402,7 @@ watch(
   },
 );
 
-const handleSidebarEvent = (event: string, value: any) => {
+function handleSidebarEvent(event: string, value: any) {
   if (pipelineEditorRef.value) {
     const currentQuery: string = pipelineEditorRef.value.getValue() ?? "";
 
@@ -2292,8 +2543,8 @@ const expandLog = (index: any) => {
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData).then(() =>
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Content Copied Successfully!",
       timeout: 1000,
     }),

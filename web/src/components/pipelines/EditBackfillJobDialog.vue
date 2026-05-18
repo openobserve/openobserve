@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-    <q-form @submit="onSubmit" id="edit-backfill-form" class="tw:mx-5 tw:my-3">
+    <div id="edit-backfill-form" class="tw:mx-5 tw:my-3">
           <!-- Time Range Section -->
           <div>
             <div class="text-subtitle2 q-mb-sm">
@@ -132,13 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="q-mr-sm" />
         {{ errorMessage }}
       </div>
-    </q-form>
+    </div>
   </ODrawer>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -147,6 +146,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   modelValue: boolean;
@@ -161,7 +161,6 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
 
 const show = computed({
@@ -280,12 +279,10 @@ const onSubmit = async () => {
         "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
       cancel: {
         label: "Cancel",
-        color: "grey-8",
         flat: true,
       },
       ok: {
         label: "Yes, Delete and Backfill",
-        color: "negative",
       },
       persistent: true,
       focus: "cancel", // Focus on cancel button by default for safety
@@ -314,8 +311,8 @@ const updateBackfillJobRequest = async () => {
       },
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job updated successfully",
       timeout: 3000,
     });

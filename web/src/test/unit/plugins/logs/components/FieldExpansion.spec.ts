@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import FieldExpansion from "@/plugins/logs/components/FieldExpansion.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import i18n from "@/locales";
 import { Quasar } from "quasar";
 
@@ -154,16 +154,13 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-inner-loading": {
-              template: "<div class='loading'>Fetching values...</div>",
-            },
             "OIcon": true,
             "q-btn": true,
           },
         },
       });
 
-      expect(wrapper.find(".loading").exists()).toBe(true);
+      expect(wrapper.find('[data-test="field-values-panel-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Fetching values...");
     });
 
@@ -184,14 +181,13 @@ describe("FieldExpansion.vue", () => {
             },
             "q-card": { template: "<div><slot /></div>" },
             "q-card-section": { template: "<div><slot /></div>" },
-            "q-inner-loading": { template: "<div class='loading' />" },
             "OIcon": true,
             "q-btn": true,
           },
         },
       });
 
-      expect(wrapper.find(".loading").exists()).toBe(true);
+      expect(wrapper.find('[data-test="field-values-panel-loading-indicator"]').exists()).toBe(true);
     });
   });
 

@@ -104,11 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroup>
               </div>
               <div data-test="edit-role-permissions-search-input">
-                <q-input
+                <OInput
                   v-model="filter.value"
-                  borderless
                   :debounce="500"
-                  dense
                   class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
@@ -117,26 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #prepend>
                     <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <div data-test="edit-role-permissions-resource-select-input">
-                <q-select
+                <OSelect
                   v-model="filter.resource"
-                  :options="filteredResources"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-mr-sm"
+                  :options="resourceOptions"
                   placeholder="Select Resource"
-                  map-options
-                  use-input
-                  emit-value
-                  fill-input
-                  hide-selected
-                  borderless
-                  dense
                   clearable
+                  searchable
                   style="width: 200px"
-                  @filter="filterResourceOptions"
                   @update:model-value="onResourceChange"
                 />
               </div>
@@ -217,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="toggleHelpSection"
                     />
                   </div>
-                  <q-separator class="q-mt-sm q-mb-md" />
+                  <OSeparator class="tw:mt-2 tw:mb-4" />
                   <div class="q-mt-sm q-px-sm">
                     <div>
                       Configure access with JSON objects specifying "object"
@@ -274,6 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { cloneDeep } from "lodash-es";
 import { defineAsyncComponent, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -290,7 +280,6 @@ import {
   getResourcePermission,
   getRoleUsers,
 } from "@/services/iam";
-import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
@@ -315,6 +304,8 @@ import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -334,7 +325,6 @@ const { permissionsState } = usePermissions();
 
 const router = useRouter();
 
-const q = useQuasar();
 
 const store = useStore();
 
@@ -471,12 +461,11 @@ const getRoleDetails = () => {
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
-      q.notify({
+      toast({
         message: error?.response?.status === 404
           ? "Role not found or has been deleted. Redirecting to roles list."
           : error?.message || "Failed to load role details. Redirecting to roles list.",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       router.push({
@@ -2221,8 +2210,8 @@ const saveRole = () => {
       payload.remove_users.length
     )
   ) {
-    q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `No updates detected.`,
       timeout: 3000,
     });
@@ -2238,8 +2227,8 @@ const saveRole = () => {
     .then(async (res) => {
       // combine permissionsHash and selectedPermissionsHash
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Updated role successfully!`,
         timeout: 3000,
       });
@@ -2279,8 +2268,8 @@ const saveRole = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error while updating role!`,
           timeout: 3000,
         });

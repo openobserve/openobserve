@@ -41,17 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-        <q-separator />
+        <OSeparator />
         <div class="row q-col-gutter-sm q-px-lg">
-          <q-toggle
+          <OSwitch
             data-test="create-stream-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-xs tw:mr-3 q-mt-md"
-            size="xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
+            class="q-mb-sm tw:h-[36px] tw:mr-3 q-mt-md"
             :label="'Create new Destination'"
             v-model="createNewDestination"
           />
@@ -67,34 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Select Existing Destination -->
           <div v-else class="col-12">
             <div class="col-12 q-py-xs destination-method-select">
-              <q-select
+              <OSelect
                 data-test="external-destination-select"
                 v-model="selectedDestination"
                 :label="'Destination *'"
                 :options="getFormattedDestinations"
-                color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
                 tabindex="0"
-              >
-                <template v-slot:option="scope">
-                  <q-item
-                    style="max-width: calc(40vw - 42px)"
-                    v-bind="scope.itemProps"
-                  >
-                    <q-item-section class="flex flex-col">
-                      <q-item-label>
-                        <span class="text-bold"> {{ scope.opt.label }}</span> -
-                        <span class="truncate-url"> {{ scope.opt.url }}</span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
+              />
             </div>
 
             <!-- Action buttons for existing destination selection -->
@@ -138,13 +112,16 @@ import { ref, computed, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
@@ -158,19 +135,13 @@ function handleDrawerClose(v: boolean) {
     setTimeout(() => emit("cancel:hideform"), 300);
   }
 }
-const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const createNewDestination = ref(false);
-const selectedDestination: any = ref(
-  pipelineObj.currentSelectedNodeData?.data?.destination_name
-    ? {
-        label: pipelineObj.currentSelectedNodeData.data.destination_name,
-        value: pipelineObj.currentSelectedNodeData.data.destination_name,
-      }
-    : { label: "", value: "" },
+const selectedDestination = ref<string>(
+  pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "",
 );
 const destinations = ref([]);
 
@@ -211,8 +182,8 @@ const getFormattedDestinations = computed(() => {
 });
 
 const getDestinations = () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading destinations...",
   });
   destinationService
@@ -229,8 +200,8 @@ const getDestinations = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling destinations.",
           timeout: 2000,
         });
@@ -242,19 +213,15 @@ const getDestinations = () => {
 
 const saveDestination = () => {
   const destinationData = {
-    destination_name: selectedDestination.value.value,
+    destination_name: selectedDestination.value,
     node_type: "remote_stream",
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (
-    selectedDestination.value.hasOwnProperty("value") &&
-    selectedDestination.value.value === ""
-  ) {
-    q.notify({
+  if (!selectedDestination.value) {
+    toast({
+      variant: "warning",
       message: "Please select External destination from the list",
-      color: "negative",
-      position: "bottom",
       timeout: 2000,
     });
     return;
@@ -265,10 +232,7 @@ const saveDestination = () => {
 
 const handleDestinationCreated = (destinationName: string) => {
   // Switch back to selection mode and select the newly created destination
-  selectedDestination.value = {
-    label: destinationName,
-    value: destinationName,
-  };
+  selectedDestination.value = destinationName;
   createNewDestination.value = false;
   getDestinations();
 };

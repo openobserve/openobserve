@@ -135,6 +135,7 @@ const triggerClasses = computed<string>(() => {
       >
         <OIcon name="check" size="sm" v-if="done && !error" class="tw:size-4" :stroke-width="2.5" />
         <OIcon name="error-outline" size="sm" v-else-if="error" class="tw:size-4" :stroke-width="2.5" />
+        <OIcon v-else-if="typeof icon === 'string'" :name="(icon as any)" class="tw:size-4" />
         <component :is="icon as Component" v-else-if="icon" class="tw:size-4" />
         <span v-else aria-hidden="true">{{ name }}</span>
       </button>

@@ -82,6 +82,9 @@ export interface Step {
 
 export default defineComponent({
   name: "HorizontalStepper",
+  components: {
+    OIcon,
+  },
   props: {
     currentStep: {
       type: Number,

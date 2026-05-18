@@ -46,12 +46,11 @@ vi.mock("@/utils/zincutils", () => ({
 
 vi.mock("axios");
 
-// Quasar Notify is used inside http.ts — stub it to prevent errors
+// Quasar  is used inside http.ts — stub it to prevent errors
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return {
-    ...actual,
-    Notify: { create: vi.fn() },
+    ...actual: { create: vi.fn() },
     useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
   };
 });

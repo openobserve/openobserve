@@ -174,7 +174,6 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  "q-spinner-hourglass": true,
   "OIcon": { template: "<span />", props: ["name", "size", "color"] },
   "q-btn": { template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>', props: ["label", "flat", "dense", "color", "loading", "icon"], emits: ["click"] },
   "q-btn-toggle": { template: "<div />", props: ["modelValue", "options", "dense", "unelevated"] },
@@ -182,8 +181,6 @@ const globalStubs = {
   "q-select": { template: "<select />", props: ["modelValue", "dense", "filled", "options", "emitValue", "mapOptions"] },
   "q-table": { template: '<div class="q-table"><slot name="no-data" /></div>', props: ["rows", "columns", "pagination", "filter", "loading", "dense"] },
   "q-tooltip": { template: "<span><slot /></span>" },
-  "q-chip": { template: "<span class='q-chip'><slot /></span>", props: ["dense", "size", "color", "textColor"] },
-  "q-badge": { template: "<span><slot /></span>", props: ["color"] },
   "q-card": { template: "<div><slot /></div>" },
   "q-card-section": { template: "<div><slot /></div>" },
   "q-card-actions": { template: "<div><slot /></div>" },

@@ -41,12 +41,10 @@
               <div class="text-subtitle1 q-mb-md">
                 {{ t("about.enter_license_key") }}
               </div>
-              <q-input
+              <OTextarea
                 data-test="no-license-key-input"
                 v-model="licenseKey"
-                outlined
-                type="textarea"
-                rows="8"
+                :rows="8"
                 :placeholder="t('about.paste_license_placeholder')"
                 style="height: 200px"
               />
@@ -99,13 +97,13 @@
                       {{ t("about.status_lbl") }}
                     </td>
                     <td>
-                      <q-badge :color="licenseData?.expired ? 'red' : 'green'">
+                      <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
                         {{
                           licenseData?.expired
                             ? t("about.expired_lbl")
                             : t("about.active_lbl")
                         }}
-                      </q-badge>
+                      </OBadge>
                     </td>
                   </tr>
                   <tr>
@@ -189,12 +187,10 @@
               <div class="text-subtitle1 q-mb-sm">
                 {{ t("about.update_license_key") }}
               </div>
-              <q-input
+              <OTextarea
                 data-test="update-license-key-input"
                 v-model="licenseKey"
-                outlined
-                type="textarea"
-                rows="6"
+                :rows="6"
                 :placeholder="t('about.paste_new_license_placeholder')"
                 style="min-height: 150px"
               />
@@ -255,7 +251,11 @@
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
                     <OIcon name="info" size="sm" class="tw:flex-shrink-0" />
+                    <span v-if="isIngestionUnlimited">
+                      {{ t("about.license_allows_unlimited_ingestion") }}
+                    </span>
                     <span
+                      v-else
                       v-html="
                         DOMPurify.sanitize(
                           t('about.license_allows_ingestion', {
@@ -271,7 +271,10 @@
                   </div>
 
                   <!-- Line 2: Exceeded Status -->
-                  <div class="tw:flex tw:items-center tw:gap-2">
+                  <div
+                    v-if="!isIngestionUnlimited"
+                    class="tw:flex tw:items-center tw:gap-2"
+                  >
                     <OIcon
                       v-if="
                         licenseData?.ingestion_exceeded &&
@@ -414,13 +417,11 @@
       <div class="text-body2 q-mb-md">
         {{ t('about.your_complete_license_key') }}
       </div>
-      <q-input
+      <OTextarea
         data-test="modal-license-key-display"
         v-model="licenseData.key"
-        outlined
         readonly
-        type="textarea"
-        rows="8"
+        :rows="8"
         style="font-family: monospace; font-size: 12px"
       />
     </ODialog>
@@ -435,7 +436,6 @@ import {
   computed,
   defineAsyncComponent,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
@@ -445,6 +445,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -459,9 +462,10 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
+    OBadge,
+    OTextarea,
 },
   setup() {
-    const $q = useQuasar();
     const { t } = useI18n();
     const loading = ref(false);
     const updating = ref(false);
@@ -482,8 +486,8 @@ export default defineComponent({
         checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("about.failed_to_load_license_info"),
         });
       } finally {
@@ -495,8 +499,8 @@ export default defineComponent({
       try {
         updating.value = true;
         await licenseServer.update_license(licenseKey.value.trim());
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("about.license_updated_success"),
         });
         licenseKey.value = "";
@@ -512,8 +516,8 @@ export default defineComponent({
         await loadLicenseData();
       } catch (error) {
         console.error("Error updating license:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             t("about.failed_to_update_license") +
             " : " +
@@ -554,15 +558,15 @@ export default defineComponent({
       try {
         if (!licenseData.value.key) return;
         await navigator.clipboard.writeText(licenseData.value.key);
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("about.license_key_copied"),
         });
         showLicenseKeyModal.value = false;
       } catch (error) {
         console.error("Error copying license key:", error);
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("about.failed_to_copy_license"),
         });
       }
@@ -595,13 +599,11 @@ export default defineComponent({
               persistent: true,
               ok: {
                 label: t("about.yes_update_license"),
-                color: "primary",
                 noCaps: true,
                 unelevated: true,
               },
               cancel: {
                 label: t("about.no_keep_current"),
-                color: "grey-7",
                 noCaps: true,
                 outline: true,
               },
@@ -732,7 +734,7 @@ export default defineComponent({
         thresholds.push({
           type: "yAxis",
           name: "Limit Exceeded",
-          value: ingestionLimitGB,
+          value: ingestionLimit,
           color: "#FF0000", // Red
           lineStyle: "solid",
           width: 2,
@@ -868,7 +870,6 @@ export default defineComponent({
                           label: "",
                           alias: "y_axis_1",
                           column: "y_axis_1",
-                          color: "#FF0000",
                           isDerived: false,
                         },
                       ],

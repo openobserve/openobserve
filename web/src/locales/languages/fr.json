@@ -791,7 +791,8 @@
     "no_keep_current": "Non, restez au courant",
     "feature_correlation_management": "Gestion des corrélations",
     "feature_log_patterns": "Modèles de journaux",
-    "environment_type": "Type d'environnement"
+    "environment_type": "Type d'environnement",
+    "license_allows_unlimited_ingestion": "La licence actuelle permet une ingestion de données illimitée."
   },
   "login": {
     "userid": "ID utilisateur",
@@ -1591,7 +1592,8 @@
     "axisLabelRotateTooltipText": "Faites pivoter le texte de l'étiquette sur l'axe X selon un angle choisi (en degrés) pour améliorer la lisibilité lorsque les étiquettes sont longues ou encombrées.",
     "axisLabelTruncateTooltipText": "Tronquez les étiquettes de l'axe X à la largeur spécifiée (en pixels).",
     "axisLabelTooltipNotePrefix": "Remarque :",
-    "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques."
+    "axisLabelTooltipNoteText": " Cette option n'est pas prise en charge pour les champs de l'axe X de séries chronologiques.",
+    "allFolders": "Tous les dossiers"
   },
   "panel": {
     "header": "Panneau",

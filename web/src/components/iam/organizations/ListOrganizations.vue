@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
           <div class="full-width tw:flex tw:justify-end tw:gap-3">
 
-            <q-input
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('organization.search')"
             >
               <template #prepend>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           
             <OButton
               variant="primary"
@@ -102,10 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, onUpdated, computed } from "vue";
+import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
@@ -113,12 +111,14 @@ import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -126,6 +126,7 @@ export default defineComponent({
     AddUpdateOrganization,
     NoData,
     OButton,
+    OInput,
     OIcon,
     OTable,
 },
@@ -133,7 +134,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
@@ -235,36 +235,9 @@ export default defineComponent({
       }
     });
 
-    onUpdated(() => {
-      if (
-        router.currentRoute.value.query.action == "add"
-      ) {
-        showAddOrganizationDialog.value = true;
-      }
-      else if (
-        router.currentRoute.value.query.action == "update"
-      ) {
-        showAddOrganizationDialog.value = true;
-        toBeUpdatedOrganization.value = {
-          id: router.currentRoute.value.query?.to_be_updated_org_id || "",
-          name: router.currentRoute.value.query?.to_be_updated_org_name || "",
-          identifier: router.currentRoute.value.query?.to_be_updated_org_id || "",
-        };
-      }
-
-      if (router.currentRoute.value.query.action == "invite") {
-        organizations.value.map((org) => {
-          if (org.identifier == router.currentRoute.value.query.id) {
-            organization.value = org;
-            showJoinOrganizationDialog.value = true;
-          }
-        });
-      }
-    });
-
     const getOrganizations = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading organizations...",
       });
       organizationsService.list(0, 1000000, "name", false, "").then((res) => {
@@ -454,14 +427,14 @@ export default defineComponent({
       }
       this.getOrganizations();
 
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
       });
     },
     joinOrganization() {
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Request completed successfully.",
         timeout: 5000,
       });
@@ -470,15 +443,15 @@ export default defineComponent({
     copyAPIKey() {
       copyToClipboard(this.organizationAPIKey)
         .then(() => {
-          this.$q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "API Key Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy API Key.",
             timeout: 5000,
           });

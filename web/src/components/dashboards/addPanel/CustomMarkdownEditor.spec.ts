@@ -16,12 +16,12 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 describe("CustomMarkdownEditor", () => {
@@ -61,7 +61,6 @@ describe("CustomMarkdownEditor", () => {
             props: ['modelValue'],
             emits: ['update:modelValue']
           },
-          'q-avatar': true
         },
         mocks: {
           $t: (key: string) => key
@@ -182,7 +181,6 @@ describe("CustomMarkdownEditor", () => {
                 props: ['modelValue'],
                 emits: ['update:modelValue']
               },
-              'q-avatar': true
             },
             mocks: {
               $t: (key: string) => key
@@ -233,7 +231,6 @@ describe("CustomMarkdownEditor", () => {
                 props: ['modelValue'],
                 emits: ['update:modelValue']
               },
-              'q-avatar': true
             },
             mocks: {
               $t: (key: string) => key
@@ -543,7 +540,6 @@ console.log('Hello World');
 
       const avatar = wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]');
       expect(avatar.exists()).toBe(true);
-      // Since q-avatar is stubbed, we just verify the element exists
     });
 
     it("should position drag indicator correctly", () => {
@@ -875,7 +871,6 @@ And some more content.
                 props: ['modelValue'],
                 emits: ['update:modelValue']
               },
-              'q-avatar': true
             },
             mocks: {
               $t: (key: string) => key

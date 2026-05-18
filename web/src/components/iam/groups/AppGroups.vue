@@ -15,44 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
-    <div>
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div class="card-container tw:mb-[0.625rem]">
-    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
-      >
-    <div
-      data-test="iam-groups-section-title"
-      class="q-table__title tw:font-[600]"
-    >
-      {{ t("iam.groups") }}
-    </div>
-    <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-        <div data-test="iam-groups-search-input">
-          <q-input
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
+        <div
+          data-test="iam-groups-section-title"
+          class="q-table__title tw:font-[600]"
+        >
+          {{ t("iam.groups") }}
+        </div>
+        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
+          <div data-test="iam-groups-search-input">
+            <OInput
               v-model="filterQuery"
-              borderless
-              dense
               class="q-ml-auto no-border o2-search-input tw:h-[36px]"
               :placeholder="t('iam.searchGroup')"
             >
               <template #prepend>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
-            </q-input>
+            </OInput>
+          </div>
+          <OButton
+            data-test="iam-groups-add-group-btn"
+            variant="primary"
+            size="sm"
+            @click="addGroup"
+          >
+            {{ t('iam.addGroup') }}
+          </OButton>
         </div>
-        <OButton
-          data-test="iam-groups-add-group-btn"
-          variant="primary"
-          size="sm"
-          @click="addGroup"
-        >
-          {{ t('iam.addGroup') }}
-        </OButton>
       </div>
     </div>
-    </div>
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container"  style="height: calc(100vh - var(--navbar-height) - 92px)">      
+    <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
         <OTable
           data-test="iam-groups-table-section"
           :data="rows"
@@ -91,6 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
+          <template #empty>
+            <NoData />
+          </template>
           <template #bottom>
             <OButton
               v-if="selectedGroups.length > 0"
@@ -104,8 +102,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
         </OTable>
-    </div>
-    </div>
     </div>
     <AddGroup
       v-model:open="showAddGroup"
@@ -133,18 +129,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { getGroups, deleteGroup, bulkDeleteGroups } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const showAddGroup = ref(false);
 
@@ -162,7 +160,6 @@ const { groupsState } = usePermissions();
 
 const filterQuery = ref("");
 
-const q = useQuasar();
 
 const deleteConformDialog = ref({
   show: false,
@@ -267,19 +264,17 @@ const hideAddGroup = () => {
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
-      q.notify({
+      toast({
         message: "Group deleted successfully!",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
       setupGroups();
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message: "Error while deleting group!",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
         });
       }
     });
@@ -314,22 +309,19 @@ const bulkDeleteUserGroups = async () => {
     }
 
     if (successful.length > 0 && unsuccessful.length === 0) {
-      q.notify({
+      toast({
         message: `Successfully deleted ${successful.length} group(s)`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
-        color: "warning",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Failed to delete ${unsuccessful.length} group(s)`,
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
 
@@ -338,10 +330,9 @@ const bulkDeleteUserGroups = async () => {
     confirmBulkDelete.value = false;
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
+      toast({
         message: error.response?.data?.message || error?.message || "Error while deleting groups",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
     confirmBulkDelete.value = false;

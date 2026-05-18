@@ -43,7 +43,7 @@ vi.mock("@/services/service_streams", () => ({
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
 import serviceStreamsApi from "@/services/service_streams";
@@ -53,7 +53,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Install Quasar globally
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -593,25 +593,25 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Utility Functions - Status Colors", () => {
+  describe("Utility Functions - Status Variants", () => {
     beforeEach(async () => {
       wrapper = await createWrapper();
     });
 
-    it("should return correct color for open status", () => {
-      expect(wrapper.vm.getStatusColor("open")).toBe("negative");
+    it("should return correct variant for open status", () => {
+      expect(wrapper.vm.getStatusVariant("open")).toBe("error-soft");
     });
 
-    it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("orange");
+    it("should return correct variant for acknowledged status", () => {
+      expect(wrapper.vm.getStatusVariant("acknowledged")).toBe("warning-soft");
     });
 
-    it("should return correct color for resolved status", () => {
-      expect(wrapper.vm.getStatusColor("resolved")).toBe("positive");
+    it("should return correct variant for resolved status", () => {
+      expect(wrapper.vm.getStatusVariant("resolved")).toBe("success-soft");
     });
 
-    it("should return grey for unknown status", () => {
-      expect(wrapper.vm.getStatusColor("unknown")).toBe("grey");
+    it("should return default-soft for unknown status", () => {
+      expect(wrapper.vm.getStatusVariant("unknown")).toBe("default-soft");
     });
   });
 

@@ -22,14 +22,10 @@
               <q-menu class="q-pa-md">
                 <div style="width: 350px">
                   <!-- Label Selection -->
-                  <q-select
+                  <OSelect
                     v-model="label.label"
                     :options="filteredLabelOptions"
                     label="Label"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
                     class="label-filter-label-select showLabelOnTop tw:normal-case! q-mb-sm"
                     input-class="tw:normal-case!"
                     use-input
@@ -52,31 +48,22 @@
                         </q-item-section>
                       </q-item>
                     </template>
-                  </q-select>
+                  </OSelect>
 
                   <!-- Operator Selection -->
-                  <q-select
+                  <OSelect
                     v-model="label.op"
                     :options="operatorOptions"
                     label="Operator"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
                     class="label-filter-operator-select showLabelOnTop q-mb-sm"
-                    input-class="tw:normal-case!"
                     data-test="promql-operator-select"
                   />
 
                   <!-- Value Selection -->
-                  <q-select
+                  <OSelect
                     v-model="label.value"
                     :options="getLabelValueOptions(label.label)"
                     label="Value"
-                    dense
-                    borderless
-                    stack-label
-                    hide-bottom-space
                     class="label-filter-value-select showLabelOnTop"
                     input-class="tw:normal-case!"
                     use-input
@@ -123,7 +110,7 @@
                     <template v-slot:hint>
                       {{ getOperatorHint(label.op) }}
                     </template>
-                  </q-select>
+                  </OSelect>
                 </div>
               </q-menu>
             </OButton>
@@ -147,7 +134,7 @@
           data-test="promql-add-label-filter"
         >
           <OIcon name="add" size="xs" />
-          <q-tooltip>Add label filter</q-tooltip>
+          <OTooltip content="Add label filter" side="top" />
         </OButton>
       </div>
     </div>
@@ -158,6 +145,8 @@
 import { ref, watch, computed, inject } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";

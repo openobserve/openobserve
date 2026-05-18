@@ -86,23 +86,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
               >
                 <div>
-                  <OSpinner size="md" class="tw:mx-auto tw:block" />
+                  <OSpinner
+                    size="md"
+                    class="tw:mx-auto tw:block"
+                    data-test="app-errors-loading-indicator"
+                  />
                   <div class="text-center full-width">
                     {{ t("rum.loadingApplicationErrors") }}
                   </div>
                 </div>
               </div>
             </template>
-            <AppTable
-              :columns="columns"
-              :rows="errorTrackingState.data.errors"
-              class="app-table-container tw:h-full"
-              @event-emitted="handleTableEvent"
+            <OTable
+              :data="tableErrors"
+              :columns="tableColumns"
+              row-key="_rowKey"
+              pagination="none"
+              virtual-scroll
+              dense
+              class="tw:h-full"
+              data-test="rum-app-errors-table"
+              @row-click="handleRowClick"
             >
-              <template v-slot:error_details="slotProps">
-                <ErrorDetail :column="slotProps.column.row" />
+              <template #cell-error="{ row }">
+                <ErrorDetail :column="row" />
               </template>
-            </AppTable>
+            </OTable>
           </div>
         </div>
       </template>
@@ -112,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import {
+  computed,
   nextTick,
   onBeforeMount,
   onMounted,
@@ -119,7 +129,7 @@ import {
   type Ref,
   defineAsyncComponent,
 } from "vue";
-import AppTable from "@/components/rum/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
@@ -133,13 +143,13 @@ import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
-import { useQuasar } from "quasar";
 import {
   applyFilterTerm,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -161,34 +171,38 @@ const isMounted = ref(false);
 const { getStream } = useStreams();
 const totalErrorsCount = ref(0);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const columns = ref([
+
+const tableErrors = computed(() => {
+  const errors = errorTrackingState.data.errors;
+  if (!Array.isArray(errors)) return [];
+  return errors.map((e: any, i: number) => ({
+    _rowKey: e.latest_error_id || e.zo_sql_timestamp || `err_${i}`,
+    ...e,
+  }));
+});
+const tableColumns = [
   {
-    name: "error",
-    field: (row: any) => row["error"],
-    prop: (row: any) => row["error"],
-    label: t("rum.error"),
-    align: "left",
+    id: "error",
+    header: t("rum.error"),
+    accessorKey: "error",
     sortable: true,
-    slot: true,
-    slotName: "error_details",
+    meta: { align: "left" },
   },
   {
-    name: "events",
-    field: (row: any) => row["events"],
-    prop: (row: any) => row["events"],
-    label: t("rum.events"),
-    align: "left",
+    id: "events",
+    header: t("rum.events"),
+    accessorKey: "events",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "initial_view_name",
-    field: (row: any) => row["view_url"],
-    prop: (row: any) => row["view_url"],
-    label: t("rum.viewURL"),
-    align: "left",
+    id: "initial_view_name",
+    header: t("rum.viewURL"),
+    accessorKey: "view_url",
     sortable: true,
+    meta: { align: "left" },
   },
-]);
+];
 
 const userDataSet = new Set([
   "user_agent_device_brand",
@@ -240,7 +254,6 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const q = useQuasar();
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -388,11 +401,10 @@ const getErrorLogs = () => {
       );
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message || "Error while fetching error events",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })
@@ -431,14 +443,8 @@ const handleErrorTypeClick = async (payload: any) => {
   });
 };
 
-const handleTableEvent = (event: string, payload: any) => {
-  const eventsToHandle = ["cell-click"];
-  if (eventsToHandle.indexOf(event) === -1) return;
-
-  const eventMapping: { [key: string]: (payload: any) => Promise<void> } = {
-    "cell-click": handleErrorTypeClick,
-  };
-  eventMapping[event](payload);
+const handleRowClick = (row: any) => {
+  handleErrorTypeClick({ row });
 };
 
 function restoreUrlQueryParams() {

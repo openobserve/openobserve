@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-h6 q-mt-xs" data-test="rumweb-title-text">
         {{ t("ingestion.npmStepTitle") }}
       </div>
-      <q-separator class="q-my-sm"></q-separator>
+      <OSeparator class="tw:my-2" />
 
       <SanitizedHtmlRenderer
         class="text-subtitle1 q-mt-xs"
@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onUpdated, onActivated } from "vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
@@ -59,6 +60,7 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 export default defineComponent({
   name: "rum-web-page",
   components: {
+    OSeparator,
     CopyContent,
     SanitizedHtmlRenderer,
   },

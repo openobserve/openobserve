@@ -52,8 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:before>
             <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
-              <q-form id="addFunctionForm" ref="addJSTransformForm">
-                <div class="add-function-name-input q-pb-sm o2-input">
+              <div class="add-function-name-input q-pb-sm o2-input">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -109,8 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </div>
-                </div>
-              </q-form>
+              </div>
             </div>
           </template>
           <template v-slot:after>
@@ -157,7 +155,6 @@ import {
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
@@ -167,6 +164,7 @@ import { onBeforeRouteLeave } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -214,8 +212,7 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
-    const disableColor: any = ref("");
+    const addJSTransformForm: any = ref(null);    const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
       function: "",
@@ -224,7 +221,6 @@ export default defineComponent({
     });
     const indexOptions = ref([]);
     const { t } = useI18n();
-    const $q = useQuasar();
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const streams: any = ref({});
@@ -370,8 +366,8 @@ export default defineComponent({
             return false;
           }
 
-          const loadingNotification = $q.notify({
-            spinner: true,
+          const loadingNotification = toast({
+            variant: "loading",
             message: "Please wait...",
             timeout: 0,
           });
@@ -406,18 +402,17 @@ export default defineComponent({
                 formData.value = { ...defaultValue() };
 
                 emit("update:list", _formData);
-                addJSTransformForm?.value?.resetValidation();
 
                 loadingNotification();
-                $q.notify({
-                  type: "positive",
+                toast({
+                  variant: "success",
                   message: res.data.message || "Function saved successfully",
                 });
               })
               .catch((err) => {
                 compilationErr.value = err?.response?.data["message"];
-                $q.notify({
-                  type: "negative",
+                toast({
+                  variant: "error",
                   message:
                     err.response?.data?.message ?? "Function creation failed",
                 });
@@ -569,12 +564,10 @@ export default defineComponent({
 
     return {
       t,
-      $q,
       emit,
       disableColor,
       beingUpdated,
       formData,
-      addJSTransformForm,
       store,
       compilationErr,
       indexOptions,

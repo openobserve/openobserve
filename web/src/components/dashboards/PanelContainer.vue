@@ -23,10 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test-panel-id="props.data.id"
   >
     <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
-      <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
-        dense
-        class="q-px-xs"
+      <div
+        :class="store.state.theme == 'dark' ? 'dark-mode' : ''"
+        class="tw:flex tw:flex-nowrap tw:items-center tw:w-full tw:min-h-7 tw:px-1"
         style="border-top-left-radius: 3px; border-top-right-radius: 3px"
         data-test="dashboard-panel-bar"
       >
@@ -38,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div :title="props.data.title" class="panelHeader">
           {{ props.data.title }}
         </div>
-        <q-space />
+        <div class="tw:flex-1" />
         <OIcon
           v-if="
             !viewOnly &&
@@ -50,11 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ props.data.description }}
-            </div>
-          </q-tooltip>
+          <OTooltip side="bottom" align="end" max-width="220px">
+            <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
+          </OTooltip>
         </OIcon>
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
@@ -74,11 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
           icon-left="warning"
         >
-          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-            Some dynamic variables are not applied because the field is not
-            present in the query's stream. Open Query Inspector to see all the
-            details of the variables and queries executed to render this panel
-          </q-tooltip>
+          <OTooltip side="bottom" align="end" max-width="220px" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
         </OButton>
         <!-- show error here -->
         <PanelErrorButtons
@@ -103,13 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isPanelLoading"
           icon-left="refresh"
         >
-          <q-tooltip>
-            {{
-              variablesDataUpdated
-                ? t("panel.refreshToApplyVariables")
-                : t("panel.refresh")
-            }}
-          </q-tooltip>
+          <OTooltip :content="variablesDataUpdated ? t('panel.refreshToApplyVariables') : t('panel.refresh')" />
         </OButton>
         <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
         <OButton
@@ -259,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.createAlert") }}
           </ODropdownItem>
         </ODropdown>
-      </q-bar>
+      </div>
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
@@ -355,7 +342,6 @@ import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
@@ -373,11 +359,13 @@ import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -436,6 +424,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    OTooltip,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -444,7 +433,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const $q = useQuasar();
     const { t } = useI18n();
     const metaData = ref();
     const showViewPanel = ref(false);
@@ -593,7 +581,6 @@ export default defineComponent({
       const showNotification = showPositiveNotification(
         "Redirecting to logs page",
         {
-          color: "warning",
         },
       );
       const queryDetails = props.data;
@@ -652,8 +639,8 @@ export default defineComponent({
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
       // Show a loading spinner notification.
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -943,8 +930,8 @@ export default defineComponent({
     },
     createAlertFromPanel() {
       if (!this.props.data.queries || this.props.data.queries.length === 0) {
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: this.t("panel.noQueriesToCreateAlert"),
           timeout: 2000,
         });
@@ -953,8 +940,8 @@ export default defineComponent({
 
       const query = this.props.data.queries[0];
       if (!query.fields?.stream) {
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: this.t("panel.panelQueryMustHaveStream"),
           timeout: 2000,
         });
@@ -963,8 +950,8 @@ export default defineComponent({
 
       const unsupportedTypes = ["markdown", "html", "geomap", "sankey"];
       if (unsupportedTypes.includes(this.props.data.type)) {
-        this.$q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: this.t("panel.unsupportedPanelTypeAlert", {
             type: this.props.data.type,
           }),

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar, Dialog, Notify } from 'quasar';
+import { Quasar, Dialog } from 'quasar';
 import AssociatedRegexPatterns, { PatternAssociation } from './AssociatedRegexPatterns.vue';
 import { installQuasar } from '@/test/unit/helpers';
 import regexPatternsService from '@/services/regex_pattern';
@@ -41,7 +41,7 @@ vi.mock('vuex', () => ({
 }));
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 describe('AssociatedRegexPatterns.vue', () => {
@@ -128,6 +128,8 @@ describe('AssociatedRegexPatterns.vue', () => {
         vm: {
           filterPattern: '',
           allPatterns: [],
+          filteredAppliedPatterns: [],
+          filteredAllPatterns: [],
           selectedPatterns: [],
           listLoading: false,
           resultTotal: 0,
@@ -527,6 +529,8 @@ describe('AssociatedRegexPatterns.vue', () => {
       const requiredProperties = [
         'filterPattern',
         'allPatterns',
+        'filteredAppliedPatterns',
+        'filteredAllPatterns',
         'selectedPatterns',
         'listLoading',
         'resultTotal',
@@ -1351,7 +1355,9 @@ describe('AssociatedRegexPatterns.vue', () => {
       const vm = wrapper.vm as any;
       const requiredProperties = [
         'filterPattern',
-        'allPatterns', 
+        'allPatterns',
+        'filteredAppliedPatterns',
+        'filteredAllPatterns',
         'selectedPatterns',
         'listLoading',
         'resultTotal',

@@ -127,13 +127,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: 69%"
                       class="q-pr-sm"
                     >
-                      <q-file
+                      <OFile
                         v-model="jsonFiles"
                         bottom-slots
                         :label="t('dashboard.dropFileMsg')"
                         accept=".json"
                         multiple
-                        filled
                         :disable="!!isLoading"
                       >
                         <template v-slot:prepend>
@@ -147,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </template>
                         <template v-slot:hint> .json files only </template>
-                      </q-file>
+                      </OFile>
                     </div>
                     <div
                       style="width: calc(30%); position: relative; bottom: 21px"
@@ -194,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
             >
               <div class="text-center text-h6 tw:py-2">Error Validations</div>
-              <q-separator class="q-mt-md" />
+              <OSeparator class="tw:mt-4" />
               <div
                 class="error-section"
                 v-if="dashboardErrorsToDisplay.length > 0"
@@ -292,6 +291,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -853,7 +854,7 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
     OIcon,
 },
 });

@@ -26,38 +26,30 @@ document.body.appendChild(node);
 
 // Install Quasar plugins
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
+  plugins: [quasar.Dialog, quasar.quasar.Loading],
 });
 
-// Mock AppTable component
-vi.mock("@/components/AppTable.vue", () => ({
+// Mock OTable component
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "AppTable",
+    name: "OTable",
     template: `
-      <div data-test="app-table">
+      <div data-test="o-table">
         <div v-for="(column, index) in columns" :key="index" class="column">
-          {{ column.label }}
+          {{ column.header }}
         </div>
-        <div v-for="(row, index) in rows" :key="index" class="row-data">
+        <div v-for="(row, index) in data" :key="index" class="row-data">
+          <slot name="cell-type" :row="row">
+            <span>default-type</span>
+          </slot>
+          <slot name="cell-description" :row="row">
+            <span>default-description</span>
+          </slot>
           {{ row.type }}
         </div>
-        <template v-for="slot in Object.keys($slots)" :key="slot">
-          <div :data-test="'slot-' + slot">
-            <slot :name="slot" :column="{ row: mockRowData }" />
-          </div>
-        </template>
       </div>
     `,
-    props: ["columns", "rows"],
-    setup() {
-      return {
-        mockRowData: {
-          type: "error",
-          error_type: "TypeError",
-          _timestamp: 1704110400000000,
-        },
-      };
-    },
+    props: ["data", "columns", "rowKey", "pagination"],
   },
 }));
 
@@ -168,9 +160,9 @@ describe("ErrorEvents Component", () => {
       expect(container.classes()).toContain("q-mt-lg");
     });
 
-    it("should render AppTable component", () => {
-      const appTable = wrapper.find('[data-test="app-table"]');
-      expect(appTable.exists()).toBe(true);
+    it("should render OTable component", () => {
+      const oTable = wrapper.find('[data-test="o-table"]');
+      expect(oTable.exists()).toBe(true);
     });
   });
 
@@ -195,52 +187,50 @@ describe("ErrorEvents Component", () => {
       expect(wrapper.vm.columns).toHaveLength(5);
     });
 
-    it("should have type column with slot", () => {
+    it("should have type column with cell slot", () => {
       const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+        (col: any) => col.id === "type",
       );
       expect(typeColumn).toBeDefined();
-      expect(typeColumn.label).toBe("Type");
-      expect(typeColumn.slot).toBe(true);
-      expect(typeColumn.slotName).toBe("error-type");
+      expect(typeColumn.header).toBe("Type");
+      expect(typeColumn.cell).toBe(" ");
+      expect(typeColumn.accessorKey).toBe("type");
     });
 
-    it("should have category column with field function", () => {
+    it("should have category column with accessorFn", () => {
       const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
+        (col: any) => col.id === "category",
       );
       expect(categoryColumn).toBeDefined();
-      expect(categoryColumn.label).toBe("Category");
-      expect(typeof categoryColumn.field).toBe("function");
-      expect(typeof categoryColumn.prop).toBe("function");
+      expect(categoryColumn.header).toBe("Category");
+      expect(typeof categoryColumn.accessorFn).toBe("function");
     });
 
-    it("should have description column with slot", () => {
+    it("should have description column with cell slot", () => {
       const descColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "description",
+        (col: any) => col.id === "description",
       );
       expect(descColumn).toBeDefined();
-      expect(descColumn.label).toBe("Description");
-      expect(descColumn.slot).toBe(true);
-      expect(descColumn.slotName).toBe("description");
+      expect(descColumn.header).toBe("Description");
+      expect(descColumn.cell).toBe(" ");
     });
 
-    it("should have level column with field function", () => {
+    it("should have level column with accessorFn", () => {
       const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
+        (col: any) => col.id === "level",
       );
       expect(levelColumn).toBeDefined();
-      expect(levelColumn.label).toBe("Level");
-      expect(typeof levelColumn.field).toBe("function");
+      expect(levelColumn.header).toBe("Level");
+      expect(typeof levelColumn.accessorFn).toBe("function");
     });
 
-    it("should have timestamp column with field function", () => {
+    it("should have timestamp column with accessorFn", () => {
       const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
+        (col: any) => col.id === "timestamp",
       );
       expect(timestampColumn).toBeDefined();
-      expect(timestampColumn.label).toBe("Timestamp");
-      expect(typeof timestampColumn.field).toBe("function");
+      expect(timestampColumn.header).toBe("Timestamp");
+      expect(typeof timestampColumn.accessorFn).toBe("function");
     });
   });
 
@@ -288,135 +278,107 @@ describe("ErrorEvents Component", () => {
     });
   });
 
-  describe("Column Field Functions", () => {
-    it("should compute category field correctly", () => {
+  describe("Column Accessor Functions", () => {
+    it("should compute category via accessorFn", () => {
       const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
+        (col: any) => col.id === "category",
       );
       const mockRow = { type: "error", error_type: "ReferenceError" };
 
-      const fieldResult = categoryColumn.field(mockRow);
-      const propResult = categoryColumn.prop(mockRow);
-
-      expect(fieldResult).toBe("ReferenceError");
-      expect(propResult).toBe("ReferenceError");
+      const result = categoryColumn.accessorFn(mockRow);
+      expect(result).toBe("ReferenceError");
     });
 
-    it("should compute level field correctly for error events", () => {
+    it("should compute level via accessorFn for error events", () => {
       const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
+        (col: any) => col.id === "level",
       );
       const errorRow = { type: "error" };
       const nonErrorRow = { type: "view" };
 
-      expect(levelColumn.field(errorRow)).toBe("error");
-      expect(levelColumn.field(nonErrorRow)).toBe("info");
-      expect(levelColumn.prop(errorRow)).toBe("error");
-      expect(levelColumn.prop(nonErrorRow)).toBe("info");
+      expect(levelColumn.accessorFn(errorRow)).toBe("error");
+      expect(levelColumn.accessorFn(nonErrorRow)).toBe("info");
     });
 
-    it("should compute timestamp field correctly", () => {
+    it("should compute timestamp via accessorFn", () => {
       const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
+        (col: any) => col.id === "timestamp",
       );
       const mockRow = { _timestamp: 1704110400000000 };
 
-      const result = timestampColumn.field(mockRow);
+      const result = timestampColumn.accessorFn(mockRow);
       expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
     });
   });
 
-  describe("Column Styling", () => {
-    it("should apply error styling to error rows", () => {
+  describe("Column Metadata", () => {
+    it("should set correct cellClass for type column", () => {
       const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+        (col: any) => col.id === "type",
       );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      const errorStyle = typeColumn.style(errorRow);
-      const nonErrorStyle = typeColumn.style(nonErrorRow);
-
-      expect(errorStyle).toBe("border-bottom: 1px solid red");
-      expect(nonErrorStyle).toBe("");
+      expect(typeColumn.meta.cellClass).toBe("error-type");
     });
 
-    it("should apply error styling to level column with color", () => {
+    it("should set correct cellClass for description column", () => {
+      const descColumn = wrapper.vm.columns.find(
+        (col: any) => col.id === "description",
+      );
+      expect(descColumn.meta.cellClass).toBe("description-column");
+    });
+
+    it("should set correct cellClass for level column", () => {
       const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
+        (col: any) => col.id === "level",
       );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      const errorStyle = levelColumn.style(errorRow);
-      const nonErrorStyle = levelColumn.style(nonErrorRow);
-
-      expect(errorStyle).toBe("color: red; border-bottom: 1px solid red");
-      expect(nonErrorStyle).toBe("");
-    });
-
-    it("should apply consistent styling across all columns for error rows", () => {
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      const columnsWithStyling = wrapper.vm.columns.filter(
-        (col: any) => col.style,
-      );
-
-      columnsWithStyling.forEach((column: any) => {
-        if (column.name === "level") {
-          expect(column.style(errorRow)).toContain("color: red");
-        } else {
-          expect(column.style(errorRow)).toBe("border-bottom: 1px solid red");
-        }
-        expect(column.style(nonErrorRow)).toBe("");
-      });
+      expect(levelColumn.meta.cellClass).toBe("error-level");
     });
   });
 
   describe("Slot Integration", () => {
-    it("should render error-type slot", () => {
-      const errorTypeSlot = wrapper.find('[data-test="slot-error-type"]');
-      expect(errorTypeSlot.exists()).toBe(true);
-    });
-
-    it("should render description slot", () => {
-      const descriptionSlot = wrapper.find('[data-test="slot-description"]');
-      expect(descriptionSlot.exists()).toBe(true);
-    });
-
-    it("should pass correct data to error type slot", () => {
+    it("should render ErrorTypeIcons inside cell-type slot", () => {
       const errorTypeIcons = wrapper.findComponent({ name: "ErrorTypeIcons" });
       expect(errorTypeIcons.exists()).toBe(true);
-      expect(errorTypeIcons.props("column")).toEqual({
-        type: "error",
-        error_type: "TypeError",
-        _timestamp: 1704110400000000,
-      });
     });
 
-    it("should pass correct data to description slot", () => {
+    it("should render ErrorEventDescription inside cell-description slot", () => {
       const errorEventDescription = wrapper.findComponent({
         name: "ErrorEventDescription",
       });
       expect(errorEventDescription.exists()).toBe(true);
+    });
+
+    it("should pass row data directly to ErrorTypeIcons via column prop", () => {
+      const errorTypeIcons = wrapper.findComponent({ name: "ErrorTypeIcons" });
+      expect(errorTypeIcons.props("column")).toEqual({
+        type: "error",
+        error_type: "TypeError",
+        error_message: "Cannot read property 'foo' of undefined",
+        _timestamp: 1704110400000000,
+      });
+    });
+
+    it("should pass row data directly to ErrorEventDescription via column prop", () => {
+      const errorEventDescription = wrapper.findComponent({
+        name: "ErrorEventDescription",
+      });
       expect(errorEventDescription.props("column")).toEqual({
         type: "error",
         error_type: "TypeError",
+        error_message: "Cannot read property 'foo' of undefined",
         _timestamp: 1704110400000000,
       });
     });
   });
 
   describe("Props Integration", () => {
-    it("should pass columns to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("columns")).toEqual(wrapper.vm.columns);
+    it("should pass columns to OTable", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("columns")).toEqual(wrapper.vm.columns);
     });
 
-    it("should pass events data to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(mockError.events);
+    it("should pass events data to OTable", () => {
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual(mockError.events);
     });
 
     it("should handle empty events array", async () => {
@@ -424,8 +386,8 @@ describe("ErrorEvents Component", () => {
         error: { events: [] },
       });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual([]);
     });
 
     it("should handle missing events property", async () => {
@@ -433,8 +395,8 @@ describe("ErrorEvents Component", () => {
         error: {},
       });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual([]);
     });
 
     it("should handle null events", async () => {
@@ -442,8 +404,8 @@ describe("ErrorEvents Component", () => {
         error: { events: null },
       });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual([]);
     });
   });
 
@@ -486,39 +448,39 @@ describe("ErrorEvents Component", () => {
 
       await wrapper.setProps({ error: customError });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(customError.events);
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toEqual(customError.events);
     });
   });
 
   describe("Column Classes", () => {
-    it("should apply correct CSS classes to columns", () => {
+    it("should apply correct CSS classes to columns via meta", () => {
       const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
+        (col: any) => col.id === "type",
       );
       const descColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "description",
+        (col: any) => col.id === "description",
       );
       const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
+        (col: any) => col.id === "level",
       );
 
-      expect(typeColumn.classes).toBe("error-type");
-      expect(descColumn.classes).toBe("description-column");
-      expect(levelColumn.classes).toBe("error-level");
+      expect(typeColumn.meta.cellClass).toBe("error-type");
+      expect(descColumn.meta.cellClass).toBe("description-column");
+      expect(levelColumn.meta.cellClass).toBe("error-level");
     });
 
     it("should mark appropriate columns as sortable", () => {
       const sortableColumns = wrapper.vm.columns.filter(
         (col: any) => col.sortable,
       );
-      const sortableNames = sortableColumns.map((col: any) => col.name);
+      const sortableIds = sortableColumns.map((col: any) => col.id);
 
-      expect(sortableNames).toContain("type");
-      expect(sortableNames).toContain("category");
-      expect(sortableNames).toContain("description");
-      expect(sortableNames).toContain("timestamp");
-      expect(sortableNames).not.toContain("level"); // level is not sortable
+      expect(sortableIds).toContain("type");
+      expect(sortableIds).toContain("category");
+      expect(sortableIds).toContain("description");
+      expect(sortableIds).toContain("timestamp");
+      expect(sortableIds).not.toContain("level"); // level is not sortable
     });
   });
 
@@ -526,11 +488,11 @@ describe("ErrorEvents Component", () => {
     it("should have proper element hierarchy", () => {
       const container = wrapper.find(".q-mt-lg");
       const title = container.find(".tags-title");
-      const appTable = container.findComponent({ name: "AppTable" });
+      const oTable = container.findComponent({ name: "OTable" });
 
       expect(container.exists()).toBe(true);
       expect(title.exists()).toBe(true);
-      expect(appTable.exists()).toBe(true);
+      expect(oTable.exists()).toBe(true);
     });
 
     it("should maintain correct order of elements", () => {
@@ -538,7 +500,7 @@ describe("ErrorEvents Component", () => {
       const children = Array.from(container.element.children);
 
       expect(children[0].classList.contains("tags-title")).toBe(true);
-      expect(children[1].getAttribute("data-test")).toBe("app-table");
+      expect(children[1].getAttribute("data-test")).toBe("o-table");
     });
   });
 
@@ -552,20 +514,19 @@ describe("ErrorEvents Component", () => {
 
     it("should handle malformed timestamps", () => {
       const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
+        (col: any) => col.id === "timestamp",
       );
       const invalidRow = { _timestamp: "invalid" };
 
-      expect(() => timestampColumn.field(invalidRow)).not.toThrow();
+      expect(() => timestampColumn.accessorFn(invalidRow)).not.toThrow();
     });
 
     it("should handle null row data", () => {
       const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
+        (col: any) => col.id === "category",
       );
 
-      // The actual component will error on null data - this reflects real behavior
-      expect(() => categoryColumn.field(null)).toThrow();
+      expect(() => categoryColumn.accessorFn(null)).toThrow();
     });
   });
 
@@ -581,8 +542,8 @@ describe("ErrorEvents Component", () => {
         error: { events: largeEvents },
       });
 
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toHaveLength(1000);
+      const oTable = wrapper.findComponent({ name: "OTable" });
+      expect(oTable.props("data")).toHaveLength(1000);
     });
   });
 
@@ -594,8 +555,8 @@ describe("ErrorEvents Component", () => {
 
       for (const events of [events1, events2, events3]) {
         await wrapper.setProps({ error: { events } });
-        const appTable = wrapper.findComponent({ name: "AppTable" });
-        expect(appTable.props("rows")).toEqual(events);
+        const oTable = wrapper.findComponent({ name: "OTable" });
+        expect(oTable.props("data")).toEqual(events);
       }
     });
   });

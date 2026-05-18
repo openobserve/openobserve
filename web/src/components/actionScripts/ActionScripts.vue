@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -57,74 +57,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-124px)]">
-          <q-table
+          <OTable
             data-test="action-scripts-table"
-            ref="qTable"
-            :rows="visibleRows"
+            :data="visibleRows"
             :columns="columns"
             row-key="id"
-            :pagination="pagination"
-            style="width: 100%"
-            :style="{
-              height: hasVisibleRows
-                ? 'calc(100vh - var(--navbar-height) - 77px)'
-                : '',
-            }"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
+            :selected-ids="selectedActionScriptIds"
             selection="multiple"
-            v-model:selected="selectedActionScripts"
+            pagination="client"
+            :page-size="20"
+            :page-size-options="[5, 10, 20, 50, 100]"
+            sorting="client"
+            filter-mode="client"
+            :default-columns="false"
+            :show-global-filter="false"
+            @update:selected-ids="handleSelectedIdsUpdate"
           >
-            <template #no-data>
+            <template #empty>
               <NoData />
             </template>
-            <template v-slot:body-selection="scope">
-              <OCheckbox
-                v-model="scope.selected"
-                class="o2-table-checkbox"
-              />
-            </template>
-            <template v-slot:body-cell-actions="props">
-              <q-td :props="props">
-                <div
-                  data-test="action-scripts-loading"
-                  v-if="alertStateLoadingMap[props.row.uuid]"
-                  style="display: inline-block; width: 33.14px; height: auto"
-                  class="flex justify-center items-center q-ml-xs"
-                  :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-                >
-                  <OSpinner size="xs" />
-                </div>
-                <OButton
-                  :data-test="`alert-list-${props.row.name}-update-alert`"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.edit')"
-                  @click="showAddUpdateFn(props)"
-                  ><OIcon name="edit" size="sm"
-                /></OButton>
-                <OButton
-                  :data-test="`alert-list-${props.row.name}-delete-alert`"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.delete')"
-                  @click="showDeleteDialogFn(props)"
-                  ><OIcon name="delete" size="sm"
-                /></OButton>
-              </q-td>
+            <template #cell-actions="{ row }">
+              <div
+                data-test="action-scripts-loading"
+                v-if="alertStateLoadingMap[row.uuid]"
+                style="display: inline-block; width: 33.14px; height: auto"
+                class="flex justify-center items-center q-ml-xs"
+                :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+              >
+                <OSpinner size="xs" />
+              </div>
+              <OButton
+                :data-test="`alert-list-${row.name}-update-alert`"
+                variant="ghost"
+                size="icon-circle-sm"
+                :title="t('alerts.edit')"
+                @click="showAddUpdateFn({ row })"
+                ><OIcon name="edit" size="sm"
+              /></OButton>
+              <OButton
+                :data-test="`alert-list-${row.name}-delete-alert`"
+                variant="ghost"
+                size="icon-circle-sm"
+                :title="t('alerts.delete')"
+                @click="showDeleteDialogFn({ row })"
+                ><OIcon name="delete" size="sm"
+              /></OButton>
             </template>
 
-            <template v-slot:body-cell-function="props">
-              <q-td :props="props">
-                <OTooltip>
-                  <template #content>
-                    <pre>{{ props.row.sql }}</pre>
-                  </template>
-                </OTooltip>
-                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-              </q-td>
-            </template>
-
-            <template #bottom="scope">
+            <template #bottom>
               <div
                 class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
               >
@@ -145,45 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ></OButton
                   >
                 </div>
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
               </div>
             </template>
-
-            <template v-slot:header="props">
-              <q-tr :props="props">
-                <!-- Adding this block to render the select-all checkbox -->
-                <q-th v-if="columns.length > 0" auto-width>
-                  <OCheckbox
-                    v-model="props.selected"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'o2-table-checkbox-dark'
-                        : 'o2-table-checkbox-light'
-                    "
-                    class="o2-table-checkbox"
-                  />
-                </q-th>
-
-                <!-- Rendering the rest of the columns -->
-                <!-- here we can add the classes class so that the head will be sticky -->
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                  :class="col.classes"
-                  :style="col.style"
-                >
-                  {{ col.label }}
-                </q-th>
-              </q-tr>
-            </template>
-          </q-table>
+          </OTable>
         </div>
       </div>
     </div>
@@ -211,55 +155,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-    <template>
-      <ODialog data-test="action-scripts-form-dialog"
-        v-model:open="showForm"
-        persistent
-        size="md"
-        :show-close="false"
-        :title="t('alerts.cloneTitle')"
-        :secondary-button-label="t('alerts.cancel')"
-        :primary-button-label="t('alerts.save')"
-        :primary-button-disabled="isSubmitting"
-        @click:secondary="showForm = false"
-        @click:primary="submitForm"
-      >
-        <template #header-left>
-          <div
-            data-test="add-action-back-btn"
-            class="flex justify-center items-center cursor-pointer"
-            style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
-            title="Go Back"
-            @click="showForm = false"
-          >
-            <OIcon name="arrow-back-ios-new" size="xs" />
-          </div>
-        </template>
-            <q-form id="action-script-clone-form" @submit="submitForm">
-              <OInput
-                data-test="to-be-clone-action-name"
-                v-model="toBeCloneAlertName"
-                label="Alert Name"
-              />
-              <OSelect
-                data-test="to-be-clone-stream-type"
-                v-model="toBeClonestreamType"
-                label="Stream Type"
-                :options="streamTypes"
-                @update:model-value="updateStreams()"
-              />
-              <OSelect
-                data-test="to-be-clone-stream-name"
-                v-model="toBeClonestreamName"
-                :loading="isFetchingStreams"
-                :disabled="!toBeClonestreamType"
-                label="Stream Name"
-                :options="streamNames"
-                @update:model-value="updateStreamName"
-              />
-            </q-form>
-        </ODialog>
+    <ODialog
+      data-test="action-scripts-form-dialog"
+      v-model:open="showForm"
+      persistent
+      size="md"
+      :show-close="false"
+      :title="t('alerts.cloneTitle')"
+      :secondary-button-label="t('alerts.cancel')"
+      :primary-button-label="t('alerts.save')"
+      :primary-button-disabled="isSubmitting"
+      @click:secondary="showForm = false"
+      @click:primary="submitForm"
+    >
+      <template #header-left>
+        <div
+          data-test="add-action-back-btn"
+          class="flex justify-center items-center cursor-pointer"
+          style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
+          title="Go Back"
+          @click="showForm = false"
+        >
+          <OIcon name="arrow-back-ios-new" size="xs" />
+        </div>
       </template>
+      <q-form id="action-script-clone-form" @submit="submitForm">
+        <OInput
+          data-test="to-be-clone-action-name"
+          v-model="toBeCloneAlertName"
+          label="Alert Name"
+        />
+        <OSelect
+          data-test="to-be-clone-stream-type"
+          v-model="toBeClonestreamType"
+          label="Stream Type"
+          :options="streamTypes"
+          @update:model-value="updateStreams()"
+        />
+        <OSelect
+          data-test="to-be-clone-stream-name"
+          v-model="toBeClonestreamName"
+          :loading="isFetchingStreams"
+          :disabled="!toBeClonestreamType"
+          label="Stream Name"
+          :options="streamNames"
+          @update:model-value="updateStreamName"
+        />
+      </q-form>
+    </ODialog>
   </div>
 </template>
 
@@ -278,9 +221,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { QTable, date, useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
@@ -306,27 +247,26 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ActionScriptList {
-  "#": string | number; // If this represents a serial number or row index
-  id: any; // The unique identifier, specify the type (e.g., string, number) if known
-  name: any; // Name of the action script
-  uuid: any; // Unique UUID for the action script
-  created_by: any; // The user who created the script
-  created_at: string; // Creation timestamp, in ISO format or a specific format
-  last_run_at: string; // Timestamp of the last run, in ISO format or a specific format
-  last_successful_at: string; // Timestamp of the last successful run
-  status: any; // Current status of the action script
+  "#": string | number;
+  id: any;
+  name: any;
+  uuid: any;
+  created_by: any;
+  created_at: string;
+  last_run_at: string;
+  last_successful_at: string;
+  status: any;
 }
 
-// import alertList from "./alerts";
-
-// TODO code clean up needs to be done
 export default defineComponent({
   name: "AlertList",
   components: {
     OIcon,
-    QTablePagination,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
     ),
@@ -339,6 +279,7 @@ export default defineComponent({
     OCheckbox,
     OTooltip,
     OSelect,
+    OTable,
   },
   emits: [
     "updated:fields",
@@ -348,14 +289,12 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const alerts: Ref<Alert[]> = ref([]);
     const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
     const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddActionScriptDialog: any = ref(false);
-    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -389,80 +328,94 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const columns: any = ref<QTableProps["columns"]>([
+
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "center",
-        style: "width: 67px;",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 67,
+        meta: { align: "center" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("alerts.name"),
-        align: "left",
+        id: "name",
+        header: t("alerts.name"),
+        accessorKey: "name",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "created_by",
-        field: "created_by",
-        label: t("alerts.createdBy"),
-        align: "center",
+        id: "created_by",
+        header: t("alerts.createdBy"),
+        accessorKey: "created_by",
         sortable: true,
+        meta: { align: "center" },
       },
       {
-        name: "created_at",
-        field: "created_at",
-        label: t("alerts.createdAt"),
-        align: "left",
+        id: "created_at",
+        header: t("alerts.createdAt"),
+        accessorKey: "created_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "execution_details_type",
-        field: "execution_details_type",
-        label: t("actions.type"),
-        align: "left",
+        id: "execution_details_type",
+        header: t("actions.type"),
+        accessorKey: "execution_details_type",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "last_run_at",
-        field: "last_run_at",
-        label: t("alerts.lastRunAt"),
-        align: "left",
+        id: "last_run_at",
+        header: t("alerts.lastRunAt"),
+        accessorKey: "last_run_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "last_successful_at",
-        field: "last_successful_at",
-        label: t("alerts.lastSuccessfulAt"),
-        align: "left",
+        id: "last_successful_at",
+        header: t("alerts.lastSuccessfulAt"),
+        accessorKey: "last_successful_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "status",
-        field: "status",
-        label: t("alerts.status"),
-        align: "left",
+        id: "status",
+        header: t("alerts.status"),
+        accessorKey: "status",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("alerts.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-        style: "width: 100px",
+        id: "actions",
+        header: t("alerts.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 100,
+        meta: { align: "center" },
       },
-    ]);
+    ];
+
+    const selectedActionScriptIds = computed(() =>
+      selectedActionScripts.value.map((s: any) => s.id),
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const map = new Map(
+        actionsScriptRows.value.map((r: any) => [r.id, r]),
+      );
+      selectedActionScripts.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
+    };
+
     const activeTab: any = ref("alerts");
     const destinations = ref([0]);
     const templates = ref([0]);
 
     const getActionScripts = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading actions...",
       });
 
@@ -521,8 +474,8 @@ export default defineComponent({
         .catch((e) => {
           console.error(e);
           dismiss();
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while pulling Actions.",
             timeout: 2000,
           });
@@ -544,24 +497,7 @@ export default defineComponent({
       },
     );
 
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
-    ];
     const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
-    };
 
     const addAlert = () => {
       track("Button Click", {
@@ -575,10 +511,6 @@ export default defineComponent({
       formData.value = alerts.value.find(
         (alert: any) => alert.uuid === props.row?.uuid,
       ) as Alert;
-      //use this comment for testing multi_time_range shifts
-      // if( formData.value){
-      //   formData.value.query_condition.multi_time_range = [{offSet:"30m"}];
-      // }
       let action;
       if (!props.row) {
         isUpdated.value = false;
@@ -634,15 +566,15 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
               timeout: 2000,
             });
             getActionScripts();
           } else {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res.data.message,
               timeout: 2000,
             });
@@ -652,8 +584,8 @@ export default defineComponent({
           if (err.response?.status == 403) {
             return;
           }
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.data?.message || "Error while deleting alert.",
             timeout: 2000,
           });
@@ -681,8 +613,8 @@ export default defineComponent({
     const bulkDeleteActionScripts = async () => {
       try {
         if (selectedActionScripts.value.length === 0) {
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: "No action scripts selected",
             timeout: 2000,
           });
@@ -704,20 +636,20 @@ export default defineComponent({
         }
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `Successfully deleted ${successful.length} action script(s)`,
             timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: `Deleted ${successful.length} action script(s). Failed to delete ${unsuccessful.length} action script(s)`,
             timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Failed to delete ${unsuccessful.length} action script(s)`,
             timeout: 2000,
           });
@@ -728,8 +660,8 @@ export default defineComponent({
         confirmBulkDelete.value = false;
       } catch (error: any) {
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               error.response?.data?.message ||
               error?.message ||
@@ -794,30 +726,6 @@ export default defineComponent({
       streamNames.value = filterColumns(indexOptions.value, val, update);
     };
 
-    // const toggleAlertState = (row: any) => {
-    //   alertStateLoadingMap.value[row.uuid] = true;
-    //   const alert: Alert = alerts.value.find(
-    //     (alert) => alert.uuid === row.uuid,
-    //   ) as Alert;
-    //   alertsService
-    //     .toggleState(
-    //       store.state.selectedOrganization.identifier,
-    //       alert.stream_name,
-    //       alert.name,
-    //       !alert?.enabled,
-    //       alert.stream_type,
-    //     )
-    //     .then(() => {
-    //       alert.enabled = !alert.enabled;
-    //       actionsScriptRows.value.forEach((alert) => {
-    //         alert.uuid === row.uuid ? (alert.enabled = !alert.enabled) : null;
-    //       });
-    //     })
-    //     .finally(() => {
-    //       alertStateLoadingMap.value[row.uuid] = false;
-    //     });
-    // };
-
     const routeTo = (name: string) => {
       router.push({
         name: name,
@@ -827,10 +735,6 @@ export default defineComponent({
         },
       });
     };
-
-    // const refreshDestination = async () => {
-    //   await getDestinations();
-    // };
 
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -867,7 +771,6 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       store,
       router,
       alerts,
@@ -877,17 +780,13 @@ export default defineComponent({
       confirmDelete,
       selectedDelete,
       getActionScripts,
-      pagination,
       resultTotal,
       refreshList,
-      perPageOptions,
-      selectedPerPage,
       addAlert,
       deleteAlert,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
-      changePagination,
       maxRecordToReturn,
       showAddActionScriptDialog,
       toBeCloneAlertName,
@@ -916,6 +815,8 @@ export default defineComponent({
       hasVisibleRows,
       confirmBulkDelete,
       selectedActionScripts,
+      selectedActionScriptIds,
+      handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteActionScripts,
       getAlertByName,

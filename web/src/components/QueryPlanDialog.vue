@@ -15,170 +15,168 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="showDialog" data-test="query-plan-dialog" size="full" :title="t('search.queryPlan')" @update:open="(v) => !v && onClose()">
+  <ODialog
+    v-model:open="showDialog"
+    data-test="query-plan-dialog"
+    size="full"
+    :title="t('search.queryPlan')"
+    @update:open="(v) => !v && onClose()"
+  >
     <div class="query-plan-content full-height q-pa-none">
-        <q-splitter v-model="splitterPosition" class="full-height">
-          <!-- Left Pane: SQL Query -->
-          <template #before>
-            <div class="sql-query-pane full-height">
-              <div
-                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'pane-header-dark'
-                    : 'pane-header-light'
-                "
-              >
-                <OIcon name="code" size="md" class="q-mr-sm" />
-                <div class="text-subtitle1 text-weight-medium">SQL Query</div>
-              </div>
-              <q-separator />
-              <div
-                class="sql-query-content q-pa-md"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'sql-query-content-dark'
-                    : 'sql-query-content-light'
-                "
-              >
-                <div class="sql-query-wrapper">
-                  <pre class="sql-query-text">{{ sqlQuery }}</pre>
-                </div>
+      <q-splitter v-model="splitterPosition" class="full-height">
+        <!-- Left Pane: SQL Query -->
+        <template #before>
+          <div class="sql-query-pane full-height">
+            <div
+              class="pane-header q-pa-sm tw:px-[1rem] row items-center"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'pane-header-dark'
+                  : 'pane-header-light'
+              "
+            >
+              <OIcon name="code" size="md" class="q-mr-sm" />
+              <div class="text-subtitle1 text-weight-medium">SQL Query</div>
+            </div>
+            <OSeparator />
+            <div
+              class="sql-query-content q-pa-md"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'sql-query-content-dark'
+                  : 'sql-query-content-light'
+              "
+            >
+              <div class="sql-query-wrapper">
+                <pre class="sql-query-text">{{ sqlQuery }}</pre>
               </div>
             </div>
-          </template>
+          </div>
+        </template>
 
-          <!-- Right Pane: Explain/Analyze Results -->
-          <template #after>
-            <div class="explain-results-pane full-height">
-              <div
-                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'pane-header-dark'
-                    : 'pane-header-light'
-                "
+        <!-- Right Pane: Explain/Analyze Results -->
+        <template #after>
+          <div class="explain-results-pane full-height">
+            <div
+              class="pane-header q-pa-sm tw:px-[1rem] row items-center"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'pane-header-dark'
+                  : 'pane-header-light'
+              "
+            >
+              <div class="text-subtitle1 text-weight-medium">
+                {{
+                  showAnalyzeResults
+                    ? t("search.analyzeResults")
+                    : t("search.explainResults")
+                }}
+              </div>
+              <div class="tw:flex-1" />
+              <OButton
+                v-if="!isAnalyzing && !showAnalyzeResults"
+                variant="primary"
+                size="sm"
+                :loading="loading"
+                @click="runAnalyze"
               >
-                <div class="text-subtitle1 text-weight-medium">
+                {{ t("search.analyze") }}
+                <OTooltip :content="t('search.analyzeTooltip')" />
+              </OButton>
+            </div>
+            <OSeparator />
+
+            <div v-if="loading" class="flex flex-center q-pa-xl full-height">
+              <div class="text-center">
+                <OSpinner variant="dots" size="lg" />
+                <div class="q-mt-md">
                   {{
-                    showAnalyzeResults
-                      ? t("search.analyzeResults")
-                      : t("search.explainResults")
+                    isAnalyzing
+                      ? t("search.runningAnalyze")
+                      : t("search.loadingPlan")
                   }}
                 </div>
-                <q-space />
-                <OButton
-                  v-if="!isAnalyzing && !showAnalyzeResults"
-                  variant="primary"
-                  size="sm"
-                  :loading="loading"
-                  @click="runAnalyze"
-                >
-                  {{ t('search.analyze') }}
-                  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
-                </OButton>
-              </div>
-              <q-separator />
-
-              <div v-if="loading" class="flex flex-center q-pa-xl full-height">
-                <div class="text-center">
-                  <OSpinner variant="dots" size="lg" />
-                  <div class="q-mt-md">
-                    {{
-                      isAnalyzing
-                        ? t("search.runningAnalyze")
-                        : t("search.loadingPlan")
-                    }}
-                  </div>
-                </div>
-              </div>
-
-              <div v-else-if="error" class="q-pa-md">
-                <q-banner class="bg-negative text-white">
-                  <template v-slot:avatar>
-                    <OIcon name="error" size="sm" />
-                  </template>
-                  {{ error }}
-                </q-banner>
-              </div>
-
-              <!-- EXPLAIN ANALYZE view -->
-              <div
-                v-else-if="showAnalyzeResults"
-                class="plan-container q-pa-md"
-              >
-                <!-- Metrics Summary Card -->
-                <MetricsSummaryCard
-                  v-if="summaryMetrics"
-                  :metrics="summaryMetrics"
-                  class="q-mb-md"
-                />
-
-                <!-- Execution Plan Tree -->
-                <q-card flat bordered class="plan-card">
-                  <q-card-section class="q-pa-none">
-                    <div class="plan-scroll-area">
-                      <QueryPlanTree
-                        v-if="planTree"
-                        :tree="planTree"
-                        :is-analyze="true"
-                      />
-                      <div v-else class="q-pa-md text-grey-6">
-                        {{ t("search.noAnalyzePlanFound") }}
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </div>
-
-              <!-- EXPLAIN view (tabs for logical/physical) -->
-              <div v-else class="plan-container q-pa-md">
-                <q-card flat bordered class="plan-card">
-                  <OTabs
-                    v-model="activeTab"
-                    dense
-                    class="text-grey"
-                    align="left"
-                  >
-                    <OTab name="logical" :label="t('search.logicalPlan')" />
-                    <OTab name="physical" :label="t('search.physicalPlan')" />
-                  </OTabs>
-
-                  <q-separator />
-
-                  <OTabPanels v-model="activeTab" animated>
-                    <OTabPanel name="logical">
-                      <div class="plan-scroll-area">
-                        <QueryPlanTree
-                          v-if="logicalPlanTree"
-                          :tree="logicalPlanTree"
-                          :is-analyze="false"
-                        />
-                        <div v-else class="q-pa-md text-grey-6">
-                          {{ t("search.noLogicalPlan") }}
-                        </div>
-                      </div>
-                    </OTabPanel>
-
-                    <OTabPanel name="physical">
-                      <div class="plan-scroll-area">
-                        <QueryPlanTree
-                          v-if="physicalPlanTree"
-                          :tree="physicalPlanTree"
-                          :is-analyze="false"
-                        />
-                        <div v-else class="q-pa-md text-grey-6">
-                          {{ t("search.noPhysicalPlan") }}
-                        </div>
-                      </div>
-                    </OTabPanel>
-                  </OTabPanels>
-                </q-card>
               </div>
             </div>
-          </template>
-        </q-splitter>
-      </div>
+
+            <div v-else-if="error" class="q-pa-md">
+              <q-banner class="bg-negative text-white">
+                <template v-slot:avatar>
+                  <OIcon name="error" size="sm" />
+                </template>
+                {{ error }}
+              </q-banner>
+            </div>
+
+            <!-- EXPLAIN ANALYZE view -->
+            <div v-else-if="showAnalyzeResults" class="plan-container q-pa-md">
+              <!-- Metrics Summary Card -->
+              <MetricsSummaryCard
+                v-if="summaryMetrics"
+                :metrics="summaryMetrics"
+                class="q-mb-md"
+              />
+
+              <!-- Execution Plan Tree -->
+              <q-card flat bordered class="plan-card">
+                <q-card-section class="q-pa-none">
+                  <div class="plan-scroll-area">
+                    <QueryPlanTree
+                      v-if="planTree"
+                      :tree="planTree"
+                      :is-analyze="true"
+                    />
+                    <div v-else class="q-pa-md text-grey-6">
+                      {{ t("search.noAnalyzePlanFound") }}
+                    </div>
+                  </div>
+                </q-card-section>
+              </q-card>
+            </div>
+
+            <!-- EXPLAIN view (tabs for logical/physical) -->
+            <div v-else class="plan-container q-pa-md">
+              <q-card flat bordered class="plan-card">
+                <OTabs v-model="activeTab" dense class="text-grey" align="left">
+                  <OTab name="logical" :label="t('search.logicalPlan')" />
+                  <OTab name="physical" :label="t('search.physicalPlan')" />
+                </OTabs>
+
+                <OSeparator />
+
+                <OTabPanels v-model="activeTab" animated>
+                  <OTabPanel name="logical">
+                    <div class="plan-scroll-area">
+                      <QueryPlanTree
+                        v-if="logicalPlanTree"
+                        :tree="logicalPlanTree"
+                        :is-analyze="false"
+                      />
+                      <div v-else class="q-pa-md text-grey-6">
+                        {{ t("search.noLogicalPlan") }}
+                      </div>
+                    </div>
+                  </OTabPanel>
+
+                  <OTabPanel name="physical">
+                    <div class="plan-scroll-area">
+                      <QueryPlanTree
+                        v-if="physicalPlanTree"
+                        :tree="physicalPlanTree"
+                        :is-analyze="false"
+                      />
+                      <div v-else class="q-pa-md text-grey-6">
+                        {{ t("search.noPhysicalPlan") }}
+                      </div>
+                    </div>
+                  </OTabPanel>
+                </OTabPanels>
+              </q-card>
+            </div>
+          </div>
+        </template>
+      </q-splitter>
+    </div>
   </ODialog>
 </template>
 
@@ -189,11 +187,11 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -208,10 +206,12 @@ import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "QueryPlanDialog",
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,
@@ -222,7 +222,8 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
-},
+    OTooltip,
+  },
   props: {
     modelValue: {
       type: Boolean,
@@ -237,7 +238,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const { getSearchQueryPayload } = useSearchStream();
 
     const loading = ref(false);

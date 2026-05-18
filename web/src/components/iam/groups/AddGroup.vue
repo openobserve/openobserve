@@ -21,28 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="emits('update:open', $event)"
   >
     <div data-test="add-group-section" class="tw:p-4">
-      <q-input
+      <OInput
         v-model.trim="name"
         :label="t('common.name') + ' *'"
         class="showLabelOnTop tw:mt-2"
-        stack-label
-        hide-bottom-space
-        borderless
-        dense
-        :rules="[
-          (val: any, rules: any) =>
-            !!val
-              ? isValidGroupName ||
-                `Use alphanumeric and '_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
         maxlength="100"
         data-test="add-group-groupname-input-btn"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '_' characters only, without spaces.
-        </template>
-      </q-input>
+        :error="showNameError"
+        :error-message="nameErrorMessage"
+        @update:model-value="showNameError = false"
+      />
 
       <div class="flex justify-start tw:mt-6 tw:gap-2">
         <OButton
@@ -71,11 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { createGroup } from "@/services/iam";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { useQuasar } from "quasar";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -97,7 +86,6 @@ const emits = defineEmits(["update:open", "added:group"]);
 
 const name = ref(props.group?.name || "");
 
-const q = useQuasar();
 
 const { track } = useReo();
 
@@ -105,9 +93,13 @@ const store = useStore();
 
 const isValidGroupName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9_]+$/;
-  // Check if the role name is valid
   return roleNameRegex.test(name.value);
 });
+
+const showNameError = ref(false);
+const nameErrorMessage = computed(() =>
+  !name.value ? t('common.nameRequired') : `Use alphanumeric and '_' characters only, without spaces.`
+);
 
 const saveGroup = () => {
   if (!name.value || !isValidGroupName.value) return;
@@ -116,19 +108,17 @@ const saveGroup = () => {
       emits("added:group", res.data);
       emits("update:open", false);
 
-      q.notify({
+      toast({
         message: `User Group "${name.value}" Created Successfully!`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
+        toast({
         message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       }

@@ -19,9 +19,9 @@
           class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full"
         >
           <div class="tw:flex tw:items-center tw:gap-2">
-            <q-avatar size="24px">
-              <img :src="o2AiTitleLogo" />
-            </q-avatar>
+            <div class="tw:inline-flex tw:w-6 tw:h-6 tw:rounded-full tw:overflow-hidden">
+              <img :src="o2AiTitleLogo" class="tw:w-full tw:h-full tw:object-cover" />
+            </div>
 
             <OButton
               variant="ghost"
@@ -34,15 +34,13 @@
                   class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
                 >
                   {{ displayedTitle || "New Chat" }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="displayedTitle && displayedTitle.length > 25"
-                    :delay="500"
-                    anchor="bottom middle"
-                    self="top middle"
-                    :offset="[0, 8]"
-                  >
-                    {{ displayedTitle }}
-                  </q-tooltip>
+                    :sideOffset="8"
+                    side="bottom"
+                    align="center"
+                    :content="displayedTitle"
+                  />
                 </span>
                 <OIcon
                   name="arrow-drop-down"
@@ -54,17 +52,15 @@
                 <!-- History menu with search -->
                 <div class="history-menu-container">
                   <div class="search-history-bar-sticky">
-                    <q-input
+                    <OInput
                       v-model="historySearchTerm"
                       placeholder="Search chat history"
-                      dense
-                      borderless
                       class="tw:mt-1"
                     >
                       <template #prepend>
                         <OIcon name="search" size="sm" />
                       </template>
-                    </q-input>
+                    </OInput>
                   </div>
                   <div class="history-list-container">
                     <q-list
@@ -72,7 +68,7 @@
                         min-width: 200px;
                         width: 300px;
                         max-width: 300px;
-                        border: 1px solid var(--q-separator-color);
+                        border: 1px solid var(--color-separator);
                       "
                       padding
                     >
@@ -105,7 +101,7 @@
                               @click.stop="deleteChat(chat.id)"
                             >
                               <OIcon name="delete" size="sm" />
-                              <q-tooltip :delay="500">Delete chat</q-tooltip>
+                              <OTooltip content="Delete chat" />
                             </OButton>
                           </div>
                         </q-item-section>
@@ -123,7 +119,7 @@
                     v-if="filteredChatHistory.length > 0"
                     class="clear-all-container"
                   >
-                    <q-separator />
+                    <OSeparator />
                     <OButton
                       variant="ghost"
                       class="clear-all-btn"
@@ -149,7 +145,7 @@
               @click.stop="openEditTitleDialog"
             >
               <OIcon name="edit" size="sm" />
-              <q-tooltip :delay="500">Edit title</q-tooltip>
+              <OTooltip content="Edit title" />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="addNewChat">
               <OIcon name="add" size="sm" />
@@ -160,31 +156,33 @@
               data-test="ai-chat-expand-btn"
               @click="toggleExpand"
             >
-              <OIcon :name="
-                store.state.isAiChatExpanded
-                  ? 'close-fullscreen'
-                  : 'open-in-full'
-              " size="sm" />
-              <q-tooltip :delay="500"
-                >{{ store.state.isAiChatExpanded ? "Collapse" : "Expand" }} ({{
-                  isMac ? "⌘" : "Ctrl+"
-                }}B)</q-tooltip
-              >
+              <OIcon
+                :name="
+                  store.state.isAiChatExpanded
+                    ? 'close-fullscreen'
+                    : 'open-in-full'
+                "
+                size="sm"
+              />
+              <OTooltip
+                :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`"
+              />
             </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              @click="$emit('close')"
-            >
+            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
               <OIcon name="close" size="sm" />
             </OButton>
           </div>
         </div>
       </div>
-      <q-separator class="tw:bg-[#DBDBDB]" />
+      <OSeparator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
+      <ODrawer
+        data-test="o2-ai-chat-history-drawer"
+        v-model:open="showHistory"
+        size="sm"
+        title="Chat History"
+      >
         <q-list separator>
           <q-item
             v-for="chat in chatHistory"
@@ -198,16 +196,15 @@
               <q-item-label caption>
                 {{ new Date(chat.timestamp).toLocaleString() }}
               </q-item-label>
-              <q-item-label caption>
-                Model: {{ chat.model }}
-              </q-item-label>
+              <q-item-label caption> Model: {{ chat.model }} </q-item-label>
             </q-item-section>
           </q-item>
         </q-list>
       </ODrawer>
 
       <!-- Edit Title Dialog -->
-      <ODialog data-test="o2-ai-chat-edit-title-dialog"
+      <ODialog
+        data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
         size="sm"
         title="Edit Chat Title"
@@ -216,10 +213,8 @@
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
-        <q-input
+        <OInput
           v-model="editingTitle"
-          dense
-          borderless
           autofocus
           @keyup.enter="saveEditedTitle"
           placeholder="Enter chat title"
@@ -245,13 +240,21 @@
       />
 
       <!-- Image Preview Dialog -->
-      <ODialog data-test="o2-ai-chat-image-preview-dialog" v-model:open="showImagePreview" @update:open="(v) => !v && closeImagePreview()" size="lg" :title="previewImage?.filename">
+      <ODialog
+        data-test="o2-ai-chat-image-preview-dialog"
+        v-model:open="showImagePreview"
+        @update:open="(v) => !v && closeImagePreview()"
+        size="lg"
+        :title="previewImage?.filename"
+      >
         <div class="tw:flex tw:justify-center">
           <img
             v-if="previewImage"
-            :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+            :src="
+              'data:' + previewImage.mimeType + ';base64,' + previewImage.data
+            "
             :alt="previewImage.filename"
-            style="max-width: 100%; max-height: 80vh; object-fit: contain;"
+            style="max-width: 100%; max-height: 80vh; object-fit: contain"
           />
         </div>
       </ODialog>
@@ -341,9 +344,9 @@
             ]"
           >
             <div class="message-content">
-              <q-avatar
+              <div
                 v-if="message.role === 'user'"
-                size="24px"
+                class="tw:inline-flex tw:items-center tw:justify-center tw:w-6 tw:h-6 tw:rounded-full"
                 :class="
                   store.state.theme == 'dark'
                     ? 'dark-user-avatar'
@@ -355,7 +358,7 @@
                   name="person"
                   :color="store.state.theme == 'dark' ? 'white' : '#4a5568'"
                 />
-              </q-avatar>
+              </div>
               <div
                 class="message-blocks"
                 style="background-color: transparent"
@@ -365,7 +368,7 @@
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
                 <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
-                  <q-spinner-dots color="primary" size="1.5em" />
+                  <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
@@ -442,9 +445,7 @@
                           handleNavigationAction(block.navigationAction)
                         "
                       >
-                        <q-tooltip>{{
-                          block.navigationAction.label
-                        }}</q-tooltip>
+                        <OTooltip :content="block.navigationAction.label" />
                       </OIcon>
                       <OIcon
                         v-if="
@@ -547,14 +548,19 @@
                       >
                         <div class="detail-header">
                           <span class="detail-label">Query</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.query,
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy query</q-tooltip>
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy query" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           getToolCallDisplayData(block.context)?.query
@@ -639,14 +645,19 @@
                       >
                         <div class="detail-header">
                           <span class="detail-label">VRL</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.vrl,
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy VRL</q-tooltip>
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy VRL" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           getToolCallDisplayData(block.context)?.vrl
@@ -658,14 +669,19 @@
                       >
                         <div class="detail-header">
                           <span class="detail-label">Command</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 getToolCallDisplayData(block.context)?.command,
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy command</q-tooltip>
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy command" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           getToolCallDisplayData(block.context)?.command
@@ -676,14 +692,19 @@
                         <div class="detail-item">
                           <div class="detail-header">
                             <span class="detail-label">Results</span>
-                            <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
+                              class="copy-btn"
+                              @click.stop="
                                 copyToClipboard(
                                   JSON.stringify(block.response.hits, null, 2),
                                 )
-                              ">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy results</q-tooltip>
-            </OButton>
+                              "
+                            >
+                              <OIcon name="content-copy" size="sm" />
+                              <OTooltip content="Copy results" />
+                            </OButton>
                           </div>
                           <div class="tool-response-hits">
                             <div
@@ -798,14 +819,19 @@
                         >
                           <div class="detail-header">
                             <span class="detail-label">Items</span>
-                            <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
+                              class="copy-btn"
+                              @click.stop="
                                 copyToClipboard(
                                   JSON.stringify(block.response.items, null, 2),
                                 )
-                              ">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy items</q-tooltip>
-            </OButton>
+                              "
+                            >
+                              <OIcon name="content-copy" size="sm" />
+                              <OTooltip content="Copy items" />
+                            </OButton>
                           </div>
                           <div class="tool-response-hits">
                             <div
@@ -833,16 +859,21 @@
                       <div v-else-if="block.response" class="detail-item">
                         <div class="detail-header">
                           <span class="detail-label">Response</span>
-                          <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn"
+                            @click.stop="
                               copyToClipboard(
                                 typeof block.response === 'string'
                                   ? block.response
                                   : JSON.stringify(block.response, null, 2),
                               )
-                            ">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy response</q-tooltip>
-            </OButton>
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip content="Copy response" />
+                          </OButton>
                         </div>
                         <code class="detail-value query-value">{{
                           typeof block.response === "string"
@@ -883,10 +914,15 @@
                       @click.stop
                     >
                       <div class="log-entry-content">
-                        <OButton variant="ghost" size="icon-xs-circle" class="copy-btn" @click.stop="copyToClipboard(block.content)">
-              <OIcon name="content-copy" size="sm" />
-              <q-tooltip>Copy content</q-tooltip>
-            </OButton>
+                        <OButton
+                          variant="ghost"
+                          size="icon-xs-circle"
+                          class="copy-btn"
+                          @click.stop="copyToClipboard(block.content)"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                          <OTooltip content="Copy content" />
+                        </OButton>
                         <code
                           class="log-entry-code"
                           v-html="formatLogEntryContent(block.content)"
@@ -903,8 +939,7 @@
                     "
                   >
                     <div class="stream-error-header">
-                      <OIcon name="warning"
-size="sm" />
+                      <OIcon name="warning" size="sm" />
                       <span class="stream-error-message">{{
                         block.message
                       }}</span>
@@ -932,10 +967,17 @@ size="sm" />
                       store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
                     "
                   >
-                    <OButton variant="primary" size="xs" class="navigation-block-btn" @click="handleNavigationAction(block.navigationAction)">
-                    <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
-                    {{ block.navigationAction.label }}
-                  </OButton>
+                    <OButton
+                      variant="primary"
+                      size="xs"
+                      class="navigation-block-btn"
+                      @click="handleNavigationAction(block.navigationAction)"
+                    >
+                      <template #icon-left
+                        ><OIcon :name="'open-in-new'" size="sm"
+                      /></template>
+                      {{ block.navigationAction.label }}
+                    </OButton>
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
@@ -953,10 +995,15 @@ size="sm" />
                           >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
-                          <OButton variant="ghost" size="xs" class="copy-button" @click="copyToClipboard(textBlock.content)">
-                        <OIcon size="sm" name="content-copy" />
-                        <span class="tw:ml-1">Copy</span>
-                      </OButton>
+                          <OButton
+                            variant="ghost"
+                            size="xs"
+                            class="copy-button"
+                            @click="copyToClipboard(textBlock.content)"
+                          >
+                            <OIcon size="sm" name="content-copy" />
+                            <span class="tw:ml-1">Copy</span>
+                          </OButton>
                         </div>
                         <span class="generated-code-block">
                           <code
@@ -967,10 +1014,15 @@ size="sm" />
                         <div
                           class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
                         >
-                          <OButton variant="ghost" size="xs" class="retry-button" @click="retryGeneration(message)">
-                        <OIcon size="sm" name="refresh" />
-                        <span class="tw:ml-1">Retry</span>
-                      </OButton>
+                          <OButton
+                            variant="ghost"
+                            size="xs"
+                            class="retry-button"
+                            @click="retryGeneration(message)"
+                          >
+                            <OIcon size="sm" name="refresh" />
+                            <span class="tw:ml-1">Retry</span>
+                          </OButton>
                         </div>
                       </div>
                       <div
@@ -1007,7 +1059,7 @@ size="sm" />
                         class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded tw:border tw:border-gray-300 tw:cursor-pointer"
                         @click="openImagePreview(img)"
                       />
-                      <q-tooltip>{{ img.filename }}</q-tooltip>
+                      <OTooltip :content="img.filename" />
                     </div>
                   </div>
                   <template
@@ -1019,10 +1071,15 @@ size="sm" />
                         <span v-if="block.language" class="code-type-label">
                           {{ getLanguageDisplay(block.language) }}
                         </span>
-                        <OButton variant="ghost" size="xs" class="copy-button" @click="copyToClipboard(block.content)">
-                        <OIcon size="sm" name="content-copy" />
-                        <span class="tw:ml-1">Copy</span>
-                      </OButton>
+                        <OButton
+                          variant="ghost"
+                          size="xs"
+                          class="copy-button"
+                          @click="copyToClipboard(block.content)"
+                        >
+                          <OIcon size="sm" name="content-copy" />
+                          <span class="tw:ml-1">Copy</span>
+                        </OButton>
                       </div>
                       <span class="generated-code-block">
                         <code
@@ -1048,17 +1105,31 @@ size="sm" />
                   class="feedback-buttons"
                   :class="{ 'feedback-active': message.feedback }"
                 >
-                  <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_up'" :class="{
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    :disabled="message.feedback === 'thumbs_up'"
+                    :class="{
                       'feedback-selected': message.feedback === 'thumbs_up',
-                    }" data-test="o2-ai-chat-thumbs-up-btn" @click="likeCodeBlock(index)">
+                    }"
+                    data-test="o2-ai-chat-thumbs-up-btn"
+                    @click="likeCodeBlock(index)"
+                  >
                     <OIcon name="thumb-up-off-alt" size="xs" />
-                    <q-tooltip>Helpful</q-tooltip>
+                    <OTooltip content="Helpful" />
                   </OButton>
-                  <OButton variant="ghost" size="icon-xs-circle" :disabled="message.feedback === 'thumbs_down'" :class="{
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    :disabled="message.feedback === 'thumbs_down'"
+                    :class="{
                       'feedback-selected': message.feedback === 'thumbs_down',
-                    }" data-test="o2-ai-chat-thumbs-down-btn" @click="dislikeCodeBlock(index)">
+                    }"
+                    data-test="o2-ai-chat-thumbs-down-btn"
+                    @click="dislikeCodeBlock(index)"
+                  >
                     <OIcon name="thumb-down-off-alt" size="xs" />
-                    <q-tooltip>Not helpful</q-tooltip>
+                    <OTooltip content="Not helpful" />
                   </OButton>
                 </div>
               </div>
@@ -1144,11 +1215,14 @@ size="sm" />
 
         <!-- Scroll to bottom button -->
         <div v-show="showScrollToBottom" class="scroll-to-bottom-container">
-          <OButton variant="ghost" size="icon-sm" class="scroll-to-bottom-btn" @click="scrollToBottomSmooth">
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            class="scroll-to-bottom-btn"
+            @click="scrollToBottomSmooth"
+          >
             <OIcon name="arrow-downward" size="sm" />
-            <q-tooltip anchor="top middle" self="bottom middle">
-              Scroll to bottom
-            </q-tooltip>
+            <OTooltip side="top" align="center" content="Scroll to bottom" />
           </OButton>
         </div>
       </div>
@@ -1214,14 +1288,17 @@ size="sm" />
                 :alt="img.filename"
                 class="preview-image"
               />
-              <OButton variant="ghost" size="icon-xs-circle" class="image-remove-btn" @click.stop="removeImage(index)">
+              <OButton
+                variant="ghost"
+                size="icon-xs-circle"
+                class="image-remove-btn"
+                @click.stop="removeImage(index)"
+              >
                 <OIcon name="close" size="xs" />
               </OButton>
-              <q-tooltip
-                >{{ img.filename }} ({{
-                  (img.size / 1024).toFixed(0)
-                }}KB)</q-tooltip
-              >
+              <OTooltip
+                :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`"
+              />
             </div>
           </div>
 
@@ -1254,7 +1331,7 @@ size="sm" />
                   size="sm"
                   :color="store.state.theme == 'dark' ? 'white' : 'grey-7'"
                 />
-                <q-tooltip>Attach images (PNG, JPEG, max 2MB)</q-tooltip>
+                <OTooltip content="Attach images (PNG, JPEG, max 2MB)" />
               </OButton>
               <div v-else class="tw:w-8"></div>
 
@@ -1284,13 +1361,13 @@ size="sm" />
                   class="auto-nav-icon"
                 />
                 <span class="auto-nav-label tw:ml-1">Auto Navigation</span>
-                <q-tooltip>
-                  {{
+                <OTooltip
+                  :content="
                     isAutoNavigationEnabled
-                      ? "Auto navigation enabled - O2 Assistant will auto navigate without confirmation"
-                      : "Auto navigation disabled - O2 Assistant will ask before navigating"
-                  }}
-                </q-tooltip>
+                      ? 'Auto navigation enabled - O2 Assistant will auto navigate without confirmation'
+                      : 'Auto navigation disabled - O2 Assistant will ask before navigating'
+                  "
+                />
               </OButton>
             </div>
 
@@ -1342,7 +1419,6 @@ import "highlight.js/styles/github-dark.css";
 import { marked } from "marked";
 import { MarkedOptions } from "marked";
 import DOMPurify from "dompurify";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
@@ -1371,6 +1447,10 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1407,6 +1487,7 @@ function renderMarkdown(content: any) {
 export default defineComponent({
   name: "O2AIChat",
   components: {
+    OSeparator,
     OButton,
     ConfirmDialog,
     RichTextInput,
@@ -1416,7 +1497,9 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OIcon,
-},
+    OTooltip,
+    OInput,
+  },
   props: {
     isOpen: {
       type: Boolean,
@@ -1449,7 +1532,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const $q = useQuasar();
     const router = useRouter();
     const inputMessage = ref(
       props.aiChatInputContext ? props.aiChatInputContext : "",
@@ -1893,12 +1975,10 @@ export default defineComponent({
         currentAbortController.value = null;
 
         // Show user notification about successful cancellation
-        $q.notify({
+        toast({
           message: "Response generation stopped",
-          color: "secondary",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
-          icon: "stop",
         });
 
         // Update UI state to reflect cancellation
@@ -4376,20 +4456,20 @@ export default defineComponent({
     const addImage = async (file: File): Promise<boolean> => {
       // Validate file size first (before reading)
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
-          position: "top",
+          position: "top-center",
         });
         return false;
       }
 
       // Basic file type check for immediate feedback (backend will detect actual type)
       if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Only PNG and JPEG images are supported",
-          position: "top",
+          position: "top-center",
         });
         return false;
       }
@@ -4579,10 +4659,10 @@ export default defineComponent({
           resolve(true);
         };
         reader.onerror = () => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Failed to read image: ${file.name}`,
-            position: "top",
+            position: "top-center",
           });
           resolve(false);
         };
@@ -4933,18 +5013,16 @@ export default defineComponent({
     const copyToClipboard = async (text: string) => {
       try {
         await navigator.clipboard.writeText(text);
-        $q.notify({
+        toast({
           message: "Code copied to clipboard",
-          color: "positive",
-          position: "top",
+          position: "top-center",
           timeout: 1000,
         });
       } catch (err) {
         console.error("Failed to copy text: ", err);
-        $q.notify({
+        toast({
           message: "Failed to copy code",
-          color: "negative",
-          position: "top",
+          position: "top-center",
         });
       }
     };
@@ -5222,7 +5300,6 @@ export default defineComponent({
         sql: "SQL",
         vrl: "VRL",
         json: "JSON",
-        html: "HTML",
         css: "CSS",
         scss: "SCSS",
         bash: "Bash",
@@ -5458,8 +5535,8 @@ export default defineComponent({
       if (success) {
         message.feedback = "thumbs_up";
         await saveToHistory();
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Thanks for your feedback!",
           timeout: 1500,
         });
@@ -5482,8 +5559,8 @@ export default defineComponent({
       if (success) {
         message.feedback = "thumbs_down";
         await saveToHistory();
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Thanks for your feedback!",
           timeout: 1500,
         });
@@ -5638,7 +5715,7 @@ export default defineComponent({
     display: flex;
     justify-content: space-between;
     align-items: end;
-    border-bottom: 1px solid var(--q-separator-color);
+    border-bottom: 1px solid var(--color-separator);
     flex-shrink: 0;
     background: var(--q-page-background);
     z-index: 2;
@@ -5683,7 +5760,7 @@ export default defineComponent({
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    border-bottom: 1px solid var(--q-separator-color);
+    border-bottom: 1px solid var(--color-separator);
 
     &.light-mode {
       color: #1a202c;
@@ -6434,7 +6511,7 @@ export default defineComponent({
   z-index: 2;
   background: var(--q-page-background);
   padding: 8px;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   flex-shrink: 0;
 }
 
@@ -6461,7 +6538,7 @@ export default defineComponent({
 .clear-all-container {
   background: var(--q-page-background);
   padding: 8px;
-  border-top: 1px solid var(--q-separator-color);
+  border-top: 1px solid var(--color-separator);
   flex-shrink: 0;
 
   .clear-all-btn {

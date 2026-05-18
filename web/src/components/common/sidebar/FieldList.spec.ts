@@ -11,7 +11,6 @@ import {
   QList,
   QItem,
   QIcon,
-  QInnerLoading,
 } from "quasar";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
@@ -231,7 +230,6 @@ describe("FieldList.vue Comprehensive Coverage", () => {
           QList,
           QItem,
           QIcon,
-          QInnerLoading,
         },
       },
     });

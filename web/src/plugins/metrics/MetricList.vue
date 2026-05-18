@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
-    <q-select
+    <OSelect
       data-test="log-search-index-list-select-stream"
       v-model="selectedMetric"
       :label="selectedMetric ? '' : t('search.selectIndex')"
@@ -27,9 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-cy="index-dropdown"
       input-debounce="0"
       behavior="menu"
-      filled
-      borderless
-      dense
       use-input
       hide-selected
       fill-input
@@ -74,177 +71,173 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item-section> {{ t("search.noResult") }}</q-item-section>
         </q-item>
       </template>
-    </q-select>
+    </OSelect>
     <div class="metric-list">
-      <div class="metrics-label-table q-mt-xs">
-        <q-table
-          data-test="log-search-index-list-fields-table"
-          :visible-columns="['name']"
-          :rows="filteredMetricLabels"
-          :row-key="(row: any) => row.name"
-          :filter="searchMetricLabel"
-          :filter-method="filterMetricLabels"
-          :pagination="{ rowsPerPage: 10000 }"
-          hide-header
-          hide-bottom
+      <div
+        class="metrics-label-table q-mt-xs"
+        data-test="log-search-index-list-fields-table"
+      >
+        <OTable
+          :data="visibleMetricLabels"
+          :columns="metricColumns"
+          row-key="name"
+          pagination="none"
+          :show-global-filter="false"
           class="field-table"
-          id="fieldList"
         >
-          <template #body-cell-name="props">
-            <q-tr :props="props">
-              <q-td :props="props" class="field_list">
-                <!-- TODO OK : Repeated code make separate component to display field  -->
-                <template
-                  v-if="
-                    props.row.name === store.state.zoConfig.timestamp_column
+          <template #cell-name="{ row }">
+            <div class="field_list">
+              <!-- TODO OK : Repeated code make separate component to display field  -->
+              <template
+                v-if="
+                  row.name === store.state.zoConfig.timestamp_column
+                "
+              >
+                <div class="field_label ellipsis q-pl-lg">
+                  {{ row.name }}
+                </div>
+              </template>
+              <template v-else>
+                <q-expansion-item
+                  dense
+                  switch-toggle-side
+                  :label="row.name"
+                  expand-icon-class="field-expansion-icon"
+                  expand-icon="expand_more"
+                  expanded-icon="expand_less"
+                  @before-show="
+                    (event: any) => openFilterCreator(event, row)
                   "
                 >
-                  <div class="field_label ellipsis q-pl-lg">
-                    {{ props.row.name }}
-                  </div>
-                </template>
-                <template v-else>
-                  <q-expansion-item
-                    dense
-                    switch-toggle-side
-                    :label="props.row.name"
-                    expand-icon-class="field-expansion-icon"
-                    expand-icon="expand_more"
-                    expanded-icon="expand_less"
-                    @before-show="
-                      (event: any) => openFilterCreator(event, props.row)
-                    "
-                  >
-                    <template v-slot:header>
-                      <div
-                        class="flex content-center ellipsis"
-                        :title="props.row.name"
-                      >
-                        <div class="field_label ellipsis">
-                          {{ props.row.name }}
-                        </div>
-                        <div class="field_overlay">
-                          <OButton
-                            icon-left="add"
-                            :data-test="`metrics-list-add-${props.row.name}-label-btn`"
-                            variant="ghost"
-                            size="icon-xs"
-                            class="q-mr-none"
-                            @click.stop="addValueToEditor(props.row.name, '', '=')"
+                  <template v-slot:header>
+                    <div
+                      class="flex content-center ellipsis"
+                      :title="row.name"
+                    >
+                      <div class="field_label ellipsis">
+                        {{ row.name }}
+                      </div>
+                      <div class="field_overlay">
+                        <OButton
+                          icon-left="add"
+                          :data-test="`metrics-list-add-${row.name}-label-btn`"
+                          variant="ghost"
+                          size="icon-xs"
+                          class="q-mr-none"
+                          @click.stop="addValueToEditor(row.name, '', '=')"
+                        />
+                      </div>
+                    </div>
+                  </template>
+                  <q-card>
+                    <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+                      <div class="filter-values-container">
+                        <div
+                          v-show="
+                            metricLabelValues[row.name]?.isLoading
+                          "
+                          class="q-pl-md q-py-xs"
+                          style="height: 60px"
+                        >
+                          <OInnerLoading
+                            :showing="
+                              metricLabelValues[row.name]?.isLoading
+                            "
+                            label="Fetching values..."
+                            size="xs"
                           />
                         </div>
-                      </div>
-                    </template>
-                    <q-card>
-                      <q-card-section class="q-pl-md q-pr-xs q-py-xs">
-                        <div class="filter-values-container">
-                          <div
-                            v-show="
-                              metricLabelValues[props.row.name]?.isLoading
-                            "
-                            class="q-pl-md q-py-xs"
-                            style="height: 60px"
-                          >
-                            <OInnerLoading
-                              :showing="
-                                metricLabelValues[props.row.name]?.isLoading
-                              "
-                              label="Fetching values..."
-                              size="xs"
-                            />
-                          </div>
-                          <div
-                            v-show="
-                              !metricLabelValues[props.row.name]?.values
-                                ?.length &&
-                              !metricLabelValues[props.row.name]?.isLoading
-                            "
-                            class="q-pl-md q-py-xs text-subtitle2"
-                          >
-                            No values found
-                          </div>
-                          <div
-                            v-for="value in metricLabelValues[props.row.name]
-                              ?.values || []"
-                            :key="value.key + value.count"
-                          >
-                            <q-list dense>
-                              <q-item tag="label" class="q-pr-none">
-                                <div
-                                  class="flex row wrap justify-between"
-                                  style="width: calc(100% - 46px)"
-                                  :class="
-                                    store.state.theme === 'dark'
-                                      ? 'text-grey-4'
-                                      : 'text-grey-8'
-                                  "
-                                >
-                                  <div
-                                    :title="value.key"
-                                    class="ellipsis q-pr-xs"
-                                    style="width: calc(100% - 50px)"
-                                  >
-                                    {{ value.key }}
-                                  </div>
-                                  <div
-                                    :title="value.count?.toString()"
-                                    class="ellipsis text-right q-pr-sm"
-                                    style="width: 50px"
-                                  >
-                                    {{ value.count }}
-                                  </div>
-                                </div>
-                                <div
-                                  class="flex row"
-                                  :class="
-                                    store.state.theme === 'dark'
-                                      ? 'text-white'
-                                      : 'text-black'
-                                  "
-                                >
-                                  <OButton
-                                    class="q-mr-xs"
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    title="Include Term"
-                                    @click="
-                                      addValueToEditor(
-                                        props.row.name,
-                                        value.key,
-                                        '=',
-                                      )
-                                    "
-                                  >
-                                    <EqualIcon class="tw:size-3" />
-                                  </OButton>
-                                  <OButton
-                                    class="q-mr-xs"
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    title="Exclude Term"
-                                    @click="
-                                      addValueToEditor(
-                                        props.row.name,
-                                        value.key,
-                                        '!=',
-                                      )
-                                    "
-                                  >
-                                    <NotEqualIcon class="tw:size-3" />
-                                  </OButton>
-                                </div>
-                              </q-item>
-                            </q-list>
-                          </div>
+                        <div
+                          v-show="
+                            !metricLabelValues[row.name]?.values
+                              ?.length &&
+                            !metricLabelValues[row.name]?.isLoading
+                          "
+                          class="q-pl-md q-py-xs text-subtitle2"
+                        >
+                          No values found
                         </div>
-                      </q-card-section>
-                    </q-card>
-                  </q-expansion-item>
-                </template>
-              </q-td>
-            </q-tr>
+                        <div
+                          v-for="value in metricLabelValues[row.name]
+                            ?.values || []"
+                          :key="value.key + value.count"
+                        >
+                          <q-list dense>
+                            <q-item tag="label" class="q-pr-none">
+                              <div
+                                class="flex row wrap justify-between"
+                                style="width: calc(100% - 46px)"
+                                :class="
+                                  store.state.theme === 'dark'
+                                    ? 'text-grey-4'
+                                    : 'text-grey-8'
+                                "
+                              >
+                                <div
+                                  :title="value.key"
+                                  class="ellipsis q-pr-xs"
+                                  style="width: calc(100% - 50px)"
+                                >
+                                  {{ value.key }}
+                                </div>
+                                <div
+                                  :title="value.count?.toString()"
+                                  class="ellipsis text-right q-pr-sm"
+                                  style="width: 50px"
+                                >
+                                  {{ value.count }}
+                                </div>
+                              </div>
+                              <div
+                                class="flex row"
+                                :class="
+                                  store.state.theme === 'dark'
+                                    ? 'text-white'
+                                    : 'text-black'
+                                "
+                              >
+                                <OButton
+                                  class="q-mr-xs"
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  title="Include Term"
+                                  @click="
+                                    addValueToEditor(
+                                      row.name,
+                                      value.key,
+                                      '=',
+                                    )
+                                  "
+                                >
+                                  <EqualIcon class="tw:size-3" />
+                                </OButton>
+                                <OButton
+                                  class="q-mr-xs"
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  title="Exclude Term"
+                                  @click="
+                                    addValueToEditor(
+                                      row.name,
+                                      value.key,
+                                      '!=',
+                                    )
+                                  "
+                                >
+                                  <NotEqualIcon class="tw:size-3" />
+                                </OButton>
+                              </div>
+                            </q-item>
+                          </q-list>
+                        </div>
+                      </div>
+                    </q-card-section>
+                  </q-card>
+                </q-expansion-item>
+              </template>
+            </div>
           </template>
-          <template #top-right>
+          <template #top>
             <OInput
               data-test="log-search-index-list-field-search-input"
               v-model="searchMetricLabel"
@@ -258,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OInput>
           </template>
-        </q-table>
+        </OTable>
       </div>
     </div>
   </div>
@@ -276,7 +269,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useMetrics from "../../composables/useMetrics";
 import { formatLargeNumber, getImageURL } from "../../utils/zincutils";
@@ -289,21 +281,23 @@ import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
   components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
-    OIcon,
+    OIcon, OTable,
 },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const quasar = useQuasar();
     const { searchObj } = useMetrics();
     const streamOptions: any = ref(props.metricsList || []);
     const selectedMetricLabels = ref([]);
@@ -373,6 +367,13 @@ export default defineComponent({
       },
       { immediate: true, deep: true },
     );
+    const metricColumns = [{ id: "name", header: "", accessorKey: "name" }];
+
+    const visibleMetricLabels = computed(() => {
+      if (!searchMetricLabel.value) return filteredMetricLabels.value;
+      return filterMetricLabels(filteredMetricLabels.value, searchMetricLabel.value);
+    });
+
     const filterMetricLabels = (rows: any, terms: any) => {
       var filtered = [];
       if (terms != "") {
@@ -417,8 +418,8 @@ export default defineComponent({
             }
           })
           .catch(() => {
-            quasar.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while fetching field values",
             });
           })
@@ -426,8 +427,8 @@ export default defineComponent({
             metricLabelValues.value[name]["isLoading"] = false;
           });
       } catch (err) {
-        quasar.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while fetching field values",
         });
       }
@@ -523,6 +524,8 @@ export default defineComponent({
       filterMetrics,
       filteredMetricLabels,
       searchMetricLabel,
+      metricColumns,
+      visibleMetricLabels,
       filterMetricLabels,
       openFilterCreator,
       metricLabelValues,
@@ -652,38 +655,37 @@ export default defineComponent({
 
   .metrics-label-table {
     width: 100%;
-    // border: 1px solid rgba(0, 0, 0, 0.02);
 
-    .q-table {
+    :deep(table) {
       display: table;
       table-layout: fixed !important;
     }
 
-    tr {
+    :deep(thead) {
+      display: none;
+    }
+
+    :deep(tr) {
       margin-bottom: 1px;
     }
 
-    tbody,
-    tr,
-    td {
+    :deep(tbody),
+    :deep(tr),
+    :deep(td) {
       width: 100%;
       display: block;
       height: fit-content;
       overflow: hidden;
     }
 
-    .q-table__control,
+    :deep(.q-table__control),
     label.q-field {
       width: 100%;
     }
 
-    .q-table thead tr,
-    .q-table tbody td {
+    :deep(thead tr),
+    :deep(tbody td) {
       height: auto;
-    }
-
-    .q-table__top {
-      border-bottom: unset;
     }
   }
 
@@ -799,7 +801,7 @@ export default defineComponent({
 
 <style lang="scss">
 .metrics-label-table {
-  .q-table {
+  table {
     width: 100%;
     table-layout: fixed;
 

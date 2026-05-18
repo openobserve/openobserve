@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
+  <div
+    class="tw:rounded-md q-pa-none tw:flex tw:flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -77,23 +78,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                   "
                 >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
+                  <OTooltip
+                    side="right"
                     max-width="300px"
-                  >
-                    <span style="font-size: 13px">{{
-                      t("modelPricing.modelNameTooltip")
-                    }}</span>
-                  </q-tooltip>
+                    :content="t('modelPricing.modelNameTooltip')"
+                  />
                 </OIcon>
               </div>
-              <q-input
+              <OInput
                 v-model="model.name"
                 :placeholder="t('modelPricing.modelNamePlaceholder')"
-                class="showLabelOnTop"
-                dense
-                borderless
                 :error="nameTouched && !!nameError"
                 :error-message="nameError"
                 @blur="nameTouched = true"
@@ -117,23 +111,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'text-grey-7'
                     "
                   >
-                    <q-tooltip
-                      anchor="center right"
-                      self="center left"
+                    <OTooltip
+                      side="right"
                       max-width="300px"
-                    >
-                      <span style="font-size: 13px">{{
-                        t("modelPricing.matchPatternTooltip")
-                      }}</span>
-                    </q-tooltip>
+                      :content="t('modelPricing.matchPatternTooltip')"
+                    />
                   </OIcon>
                 </div>
-                <q-input
+                <OInput
                   v-model="model.match_pattern"
                   :placeholder="t('modelPricing.matchPatternPlaceholder')"
-                  class="showLabelOnTop"
-                  dense
-                  borderless
                   :error="patternTouched && !!regexError"
                   :error-message="regexError"
                   @blur="patternTouched = true"
@@ -148,25 +135,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="showExamples = true"
               >
                 <OIcon name="lightbulb-outline" size="xs" />
-                <q-tooltip
-                  anchor="top right"
-                  self="bottom right"
-                  :offset="[0, 4]"
-                >
-                  {{ t("modelPricing.patternExamplesBtn") }}
-                </q-tooltip>
+                <OTooltip
+                  side="top"
+                  align="end"
+                  :side-offset="4"
+                  :content="t('modelPricing.patternExamplesBtn')"
+                />
               </OButton>
 
               <!-- Pattern Examples Dialog -->
-              <ODialog data-test="model-pricing-editor-examples-dialog" v-model:open="showExamples" size="sm"
+              <ODialog
+                data-test="model-pricing-editor-examples-dialog"
+                v-model:open="showExamples"
+                size="sm"
                 :title="t('modelPricing.patternExamplesTitle')"
                 :sub-title="t('modelPricing.patternExamplesDesc')"
               >
                 <div class="examples-table">
                   <div class="examples-table-head">
-                    <span>{{
-                      t("modelPricing.patternExamplesModelCol")
-                    }}</span>
+                    <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                     <span>{{
                       t("modelPricing.patternExamplesPatternCol")
                     }}</span>
@@ -177,9 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="examples-table-row"
                   >
                     <span class="examples-model-name">{{ ex.name }}</span>
-                    <code class="examples-pattern">{{
-                      ex.match_pattern
-                    }}</code>
+                    <code class="examples-pattern">{{ ex.match_pattern }}</code>
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -187,15 +172,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="copyPattern(ex.match_pattern)"
                     >
                       <OIcon
-                        :name="copiedPattern === ex.match-pattern ? 'check' : 'content-copy'"
+                        :name="
+                          copiedPattern === ex.match_pattern
+                            ? 'check'
+                            : 'content-copy'
+                        "
                         size="12px"
-                        :class="copiedPattern === ex.match_pattern ? 'text-positive' : ''"
+                        :class="
+                          copiedPattern === ex.match_pattern
+                            ? 'text-positive'
+                            : ''
+                        "
                       />
-                      <q-tooltip :offset="[0, 4]">{{
-                        copiedPattern === ex.match_pattern
-                          ? t("modelPricing.copied")
-                          : t("modelPricing.copyPattern")
-                      }}</q-tooltip>
+                      <OTooltip
+                        :side-offset="4"
+                        :content="
+                          copiedPattern === ex.match_pattern
+                            ? t('modelPricing.copied')
+                            : t('modelPricing.copyPattern')
+                        "
+                      />
                     </OButton>
                   </div>
                 </div>
@@ -229,11 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="tier-name-label">{{
                     t("modelPricing.tierName")
                   }}</span>
-                  <q-input
+                  <OInput
                     v-model="tier.name"
                     :placeholder="t('modelPricing.tierNamePlaceholder')"
-                    dense
-                    borderless
                   />
                 </div>
                 <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
@@ -259,35 +253,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
                   <div class="tw:flex tw:gap-2 tw:items-start tw:flex-wrap">
-                    <q-input
+                    <OInput
                       v-model="tier.condition.usage_key"
                       :label="t('modelPricing.usageKeyCol')"
-                      dense
-                      borderless
                       class="tw:flex-1 tw:min-w-[130px]"
                       :placeholder="t('modelPricing.usageKeyPlaceholder')"
                     />
-                    <q-select
+                    <OSelect
                       v-model="tier.condition.operator"
                       :options="operators"
-                      dense
-                      borderless
-                      options-dense
-                      emit-value
-                      map-options
+                      labelKey="label"
+                      valueKey="value"
                       class="tw:w-[90px] tw:flex-shrink-0"
-                      :display-value="
-                        operators.find(
-                          (o: any) => o.value === tier.condition.operator,
-                        )?.label || ''
-                      "
                     />
-                    <q-input
+                    <OInput
                       v-model.number="tier.condition.value"
                       :label="t('modelPricing.threshold')"
                       type="number"
-                      dense
-                      borderless
                       class="tw:w-[140px] tw:flex-shrink-0"
                     />
                   </div>
@@ -306,7 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="applyTemplate(tier, tpl.keys)"
                   >
                     <template #icon-left>
-                      <span class="pricing-chip-dot" :style="{ background: tpl.color }" />
+                      <span
+                        class="pricing-chip-dot"
+                        :style="{ background: tpl.color }"
+                      />
                     </template>
                     {{ tpl.name }}
                     <span
@@ -345,23 +330,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="entry.stableId"
                       class="price-row"
                     >
-                      <q-input
+                      <OInput
                         :model-value="entry.key"
                         :placeholder="t('modelPricing.usageKeyPlaceholder')"
-                        dense
-                        borderless
                         @update:model-value="
                           (val: any) => renamePriceByIndex(tier, entryIdx, val)
                         "
                       />
-                      <q-input
+                      <OInput
                         :model-value="toPerMillion(entry.value)"
                         type="number"
                         :min="0"
                         step="0.01"
                         :placeholder="t('modelPricing.pricePlaceholder')"
-                        dense
-                        borderless
                         @update:model-value="
                           (val: any) =>
                             updatePrice(
@@ -374,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #prepend
                           ><span class="price-dollar">$</span></template
                         >
-                      </q-input>
+                      </OInput>
                       <OButton
                         variant="outline-destructive"
                         size="icon"
@@ -405,25 +386,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           .length,
                       }"
                     >
-                      <q-input
+                      <OInput
                         v-model="addState[idx as number].key"
-                        dense
-                        borderless
                         :placeholder="t('modelPricing.addUsageKeyPlaceholder')"
                       />
-                      <q-input
+                      <OInput
                         v-model.number="addState[idx as number].value"
                         type="number"
                         :min="0"
                         step="0.01"
-                        dense
-                        borderless
                         :placeholder="t('modelPricing.pricePlaceholder')"
                       >
                         <template #prepend
                           ><span class="price-dollar">$</span></template
                         >
-                      </q-input>
+                      </OInput>
                       <OButton
                         variant="outline"
                         size="icon"
@@ -540,17 +517,19 @@ import { ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const q = useQuasar();
 
 const saving = ref(false);
 const existingModels = ref<any[]>([]);
@@ -645,7 +624,6 @@ function resetAddState(tierCount: number) {
 const usageTemplates = [
   {
     name: "OpenAI",
-    color: "#10a37f",
     keys: [
       "input",
       "output",
@@ -655,7 +633,6 @@ const usageTemplates = [
   },
   {
     name: "Anthropic",
-    color: "#d97706",
     keys: [
       "input",
       "output",
@@ -836,7 +813,7 @@ function goBack() {
 }
 
 function notifyWarn(message: string) {
-  q.notify({ type: "negative", message, position: "bottom", timeout: 4000 });
+  toast({ variant: "error", message, position: "bottom-center", timeout: 4000 });
 }
 
 /** Show error notification only for non-403 errors.
@@ -845,10 +822,10 @@ function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
   const msg =
     e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
-  q.notify({
-    type: "negative",
+  toast({
+    variant: "error",
     message: `${prefix}: ${msg}`,
-    position: "bottom",
+    position: "bottom-center",
     timeout: 5000,
   });
 }
@@ -931,17 +908,17 @@ async function save() {
     }
     if (patternConflicts.length > 0) {
       const winner = patternConflicts[0].name;
-      q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: t("modelPricing.saveShadowedWarning", { winner }),
-        position: "bottom",
+        position: "bottom-center",
         timeout: 8000,
       });
     } else {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("modelPricing.modelPricingSaved"),
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     }

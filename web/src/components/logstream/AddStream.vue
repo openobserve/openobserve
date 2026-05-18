@@ -28,46 +28,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="submitForm()"
   >
     <div class="q-px-md q-py-md add-stream-inputs">
-      <q-form ref="addStreamFormRef" @submit="saveStream">
+      <div>
         <div data-test="add-stream-name-input">
-          <q-input
+          <OInput
             v-model="streamInputs.name"
             :label="t('common.name') + ' *'"
             class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
             tabindex="0"
           />
         </div>
 
         <div data-test="add-stream-type-input">
-          <q-select
+          <OSelect
             v-model="streamInputs.stream_type"
             :options="filteredStreamTypes"
             :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'capitalize' }"
+            labelKey="label"
+            valueKey="value"
             class="showLabelOnTop no-case"
-            map-options
-            stack-label
-            emit-value
-            borderless
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
+            :error="!!streamTypeError"
+            :error-message="streamTypeError"
+            @update:model-value="streamTypeError = ''"
           />
         </div>
 
-        <div data-test="add-stream-data-retention-input">
-          <q-input
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention">
+          <OInput
             v-model="streamInputs.dataRetentionDays"
             :label="t('logStream.dataRetention') + ' *'"
             class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
             type="number"
-            :rules="[(val: any) => val > 0 || 'Field is required!']"
+            :error="!!dataRetentionError"
+            :error-message="dataRetentionError"
+            @update:model-value="dataRetentionError = ''"
           />
         </div>
 
@@ -76,52 +72,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add="addField"
           @remove="removeField"
         />
-      </q-form>
+      </div>
     </div>
   </ODrawer>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
   <div v-else class="q-px-md q-py-md add-stream-inputs">
-    <q-form ref="addStreamFormRef" @submit="saveStream">
+    <div>
       <div data-test="add-stream-name-input">
-        <q-input
+        <OInput
           v-model="streamInputs.name"
           :label="t('common.name') + ' *'"
           class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
-          :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+          :error="!!nameError"
+          :error-message="nameError"
+          @update:model-value="nameError = ''"
           tabindex="0"
         />
       </div>
 
       <div data-test="add-stream-type-input">
-        <q-select
+        <OSelect
           v-model="streamInputs.stream_type"
           :options="filteredStreamTypes"
           :label="t('alerts.streamType') + ' *'"
-          :popup-content-style="{ textTransform: 'capitalize' }"
+          labelKey="label"
+          valueKey="value"
           class="showLabelOnTop no-case"
-          map-options
-          stack-label
-          emit-value
-          borderless
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
+          :error="!!streamTypeError"
+          :error-message="streamTypeError"
+          @update:model-value="streamTypeError = ''"
         />
       </div>
 
-      <div data-test="add-stream-data-retention-input">
-        <q-input
+      <div data-test="add-stream-data-retention-input" v-if="showDataRetention">
+        <OInput
           v-model="streamInputs.dataRetentionDays"
           :label="t('logStream.dataRetention') + ' *'"
           class="showLabelOnTop"
-          stack-label
-          borderless
-          dense
           type="number"
-          :rules="[(val: any) => val > 0 || 'Field is required!']"
+          :error="!!dataRetentionError"
+          :error-message="dataRetentionError"
+          @update:model-value="dataRetentionError = ''"
         />
       </div>
 
@@ -142,10 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-stream-save-btn"
           variant="primary"
           size="sm-action"
-          type="submit"
+          @click="saveStream"
         >{{ t('common.save') }}</OButton>
       </div>
-    </q-form>
+    </div>
   </div>
 </template>
 
@@ -157,11 +149,13 @@ import type { Ref } from "vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 
@@ -183,14 +177,17 @@ const { addStream, getStream } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 const addStreamFormRef = ref<any>(null);
+const nameError = ref('');
+const streamTypeError = ref('');
+const dataRetentionError = ref('');
 
 const submitForm = () => {
-  addStreamFormRef.value?.submit();
+  if (!validateStream()) return;
+  saveStream();
 };
 
 const store = useStore();
 
-const q = useQuasar();
 
 const { track } = useReo();
 
@@ -227,7 +224,25 @@ const showDataRetention = computed(
     streamInputs.value.stream_type !== "enrichment_tables"
 );
 
+const validateStream = () => {
+  let valid = true;
+  if (!streamInputs.value.name.trim()) {
+    nameError.value = 'Field is required!';
+    valid = false;
+  }
+  if (!streamInputs.value.stream_type) {
+    streamTypeError.value = 'Field is required!';
+    valid = false;
+  }
+  if (showDataRetention.value && !(streamInputs.value.dataRetentionDays > 0)) {
+    dataRetentionError.value = 'Field is required!';
+    valid = false;
+  }
+  return valid;
+};
+
 const saveStream = async () => {
+  if (!validateStream()) return;
   let isStreamPresent = false;
 
   await getStream(
@@ -236,8 +251,7 @@ const saveStream = async () => {
     false
   )
     .then(() => {
-      q.notify({
-        color: "negative",
+      toast({
         message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
         timeout: 4000,
       });
@@ -256,8 +270,7 @@ const saveStream = async () => {
       payload
     )
     .then(() => {
-      q.notify({
-        color: "positive",
+      toast({
         message: "Stream created successfully",
         timeout: 4000,
       });
@@ -277,8 +290,7 @@ const saveStream = async () => {
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
-        color: "negative",
+        toast({
         message: err.response?.data?.message || "Failed to create stream",
         timeout: 4000,
       });
@@ -314,8 +326,7 @@ const getStreamPayload = () => {
   };
 
   if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
-    q.notify({
-      color: "negative",
+    toast({
       message:
         "Invalid Data Retention Period: Retention period must be at least 1 day.",
       timeout: 4000,

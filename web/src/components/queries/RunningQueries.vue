@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
         {{ t("queries.runningQueries") }}
       </div>
-      <q-space />
+      <div class="tw:flex-1" />
       <div class="flex items-start">
         <div
           data-test="running-queries-filter-container"
@@ -42,24 +42,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
           <div class=" o2-select-input o2-input">
-          <q-select
+          <OSelect
             v-model="selectedSearchField"
-            dense
-            map-options
-            emit-value
-            filled
             :options="searchFieldOptions"
+            labelKey="label"
+            valueKey="value"
             class="q-pa-none tw:w-[140px] q-mr-sm"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
-          ></q-select>
+          />
           </div>
  
-          <q-input
+          <OInput
             v-if="selectedSearchField == 'all'"
             v-model="filterQuery"
-            dense
-            borderless
             class="no-border search-input q-pa-none search-running-query o2-search-input tw:h-[36px]"
             :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
             :placeholder="t('queries.search')"
@@ -68,22 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #prepend>
               <OIcon name="search" size="sm" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
             </template>
-          </q-input>
+          </OInput>
           <div v-else class=" o2-select-input o2-input ">
-            <q-select
+            <OSelect
             v-model="filterQuery"
-            borderless
-            map-options
-            emit-value
-            filled
-            dense
-
             :label="filterQuery ? '' : 'Select option'"
             :options="otherFieldOptions"
+            labelKey="label"
+            valueKey="value"
             class="no-border search-input"
-            :placeholder="t('queries.search')"
             data-test="running-queries-search-input"
-          ></q-select>
+          />
           </div>
           <OButton
             data-test="running-queries-refresh-btn"
@@ -176,11 +167,13 @@ import {
   toRaw,
   watch,
 } from "vue";
-import { useQuasar, type QTableProps, QTable } from "quasar";
+import { type QTableProps, QTable } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
@@ -189,10 +182,11 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer,
+  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OInput,
     OIcon,
 },
   setup() {
@@ -366,7 +360,6 @@ export default defineComponent({
     };
     const filterQuery = ref("");
 
-    const q = useQuasar();
 
     const localTimeToMicroseconds = () => {
       // Create a Date object representing the current local time
@@ -627,11 +620,10 @@ export default defineComponent({
     });
 
     const getRunningQueries = () => {
-      const dismiss = q.notify({
+      const dismiss = toast({
         message: "Fetching running queries...",
-        color: "primary",
-        position: "bottom",
-        spinner: true,
+        position: "bottom-center",
+        variant: "loading",
       });
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
@@ -652,12 +644,11 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          q.notify({
+          toast({
             message:
               error.response?.data?.message ||
               "Failed to fetch running queries",
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2500,
           });
         })
@@ -676,18 +667,16 @@ export default defineComponent({
 
           getRunningQueries();
 
-          q.notify({
+          toast({
             message: "Query cancelled",
-            color: "positive",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1500,
           });
         })
         .catch((error: any) => {
-          q.notify({
+          toast({
             message: error.response?.data?.message || "Failed to cancel query",
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1500,
           });
         })

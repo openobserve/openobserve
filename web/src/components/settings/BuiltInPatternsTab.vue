@@ -20,31 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="filters-bar q-pa-md">
       <div class="row q-col-gutter-md">
         <div class="col-12 col-md-6">
-          <q-input
+          <OInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
-            borderless
-            dense
-            flat
             clearable
-            class="no-border tw:w-full"
+            class="tw:w-full"
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
               <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
         <div class="col-12 col-md-4">
-          <q-select
+          <OSelect
             v-model="selectedTags"
-            :options="availableTags"
-            :label="t('regex_patterns.filter_by_tag')"
-            dense
+            :options="tagOptions"
+            :placeholder="t('regex_patterns.filter_by_tag')"
             multiple
-            use-chips
             clearable
-            borderless
             data-test="built-in-pattern-tag-filter"
           />
         </div>
@@ -102,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`pattern-item-${index}`"
           >
             <q-item-section side>
-              <q-checkbox
+              <OCheckbox
                 v-model="pattern.selected"
                 @update:model-value="updateSelection"
                 :data-test="`pattern-checkbox-${index}`"
@@ -115,19 +109,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </q-item-label>
               <q-item-label caption lines="2">
                 <div class="q-mb-xs">
-                  <q-chip
+                  <OBadge
                     v-for="tag in pattern.tags.slice(0, 3)"
                     :key="tag"
                     size="sm"
-                    color="primary"
-                    text-color="white"
-                    dense
+                    variant="primary"
                   >
                     {{ tag }}
-                  </q-chip>
-                  <q-chip v-if="pattern.tags.length > 3" size="sm" dense>
+                  </OBadge>
+                  <OBadge v-if="pattern.tags.length > 3" size="sm">
                     +{{ pattern.tags.length - 3 }}
-                  </q-chip>
+                  </OBadge>
                 </div>
                 <div class="pattern-preview">
                   {{ pattern.pattern.substring(0, 100)
@@ -144,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`pattern-preview-${index}`"
               >
                 <OIcon name="more-vert" size="xs" />
-                <q-tooltip>{{ t("regex_patterns.preview") }}</q-tooltip>
+                <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
             </q-item-section>
           </q-item>
@@ -186,27 +178,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-mb-md">
           <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.pattern') }}</div>
-          <q-input
+          <OTextarea
             :model-value="previewedPattern?.pattern"
-            type="textarea"
             readonly
-            outlined
-            dense
             rows="3"
           />
         </div>
 
         <div class="q-mb-md">
           <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.tags') }}</div>
-          <q-chip
+          <OBadge
             v-for="tag in previewedPattern?.tags"
             :key="tag"
-            color="primary"
-            text-color="white"
-            dense
+            variant="primary"
           >
             {{ tag }}
-          </q-chip>
+          </OBadge>
         </div>
 
         <div class="q-mb-md">
@@ -243,13 +230,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface PatternExample {
   Valid: string[];
@@ -269,14 +262,11 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner,
-    OIcon,
-},
+  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const patterns = ref<BuiltInPattern[]>([]);
     const loading = ref(false);
@@ -294,6 +284,10 @@ export default defineComponent({
       });
       return Array.from(tags).sort();
     });
+
+    const tagOptions = computed(() =>
+      availableTags.value.map((tag) => ({ label: tag, value: tag }))
+    );
 
     const filteredPatterns = computed(() => {
       let filtered = patterns.value;
@@ -350,12 +344,11 @@ export default defineComponent({
 
             // console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
 
-            q.notify({
+            toast({
               message: t("regex_patterns.patterns_loaded", {
                 count: patterns.value.length,
               }),
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
             loading.value = false;
@@ -377,12 +370,11 @@ export default defineComponent({
           selected: false,
         }));
 
-        q.notify({
+        toast({
           message: t("regex_patterns.patterns_loaded", {
             count: patterns.value.length,
           }),
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       } catch (e: any) {
@@ -390,10 +382,9 @@ export default defineComponent({
           e.response?.data?.message ||
           e.message ||
           t("regex_patterns.failed_to_load");
-        q.notify({
+        toast({
           message: error.value,
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 4000,
         });
       } finally {
@@ -426,10 +417,9 @@ export default defineComponent({
       const selected = selectedPatterns.value;
 
       if (selected.length === 0) {
-        q.notify({
+        toast({
           message: t("regex_patterns.no_patterns_selected"),
-          color: "warning",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;
@@ -458,6 +448,7 @@ export default defineComponent({
       searchQuery,
       selectedTags,
       availableTags,
+      tagOptions,
       filteredPatterns,
       selectedCount,
       showPreview,

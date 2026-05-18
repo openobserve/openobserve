@@ -23,11 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
-            <q-input
+            <OInput
               data-test="others-list-search-input"
               v-model="tabsFilter"
-              borderless
-              dense
               clearable
               class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
               :placeholder="t('common.search')"
@@ -35,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #prepend>
                 <OIcon name="search" size="sm" class="cursor-pointer" />
               </template>
-            </q-input>
+            </OInput>
             <OTabs
               v-model="ingestTabType"
               orientation="vertical"
@@ -77,12 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
@@ -90,7 +89,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "OthersPage",
-  components: { OTabs, ORouteTab,
+  components: { OTabs, ORouteTab, OInput,
     OIcon,
 },
   props: {
@@ -102,7 +101,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const tabs = ref("");
     const currentOrgIdentifier: any = ref(

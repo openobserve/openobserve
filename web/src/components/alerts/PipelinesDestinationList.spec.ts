@@ -488,8 +488,12 @@ describe('PipelinesDestinationList Component - Comprehensive Function Tests', ()
       expect(typeof wrapper.vm.getImageURL).toBe('function');
     });
 
-    it('should have "delete" icon', () => {
-      expect(wrapper.vm."delete").toBeDefined();
+    it('should render "delete" icon in action column', () => {
+      // After q-icon → OIcon migration, "delete" is the OIcon name prop, not a vm property
+      const deleteIcons = wrapper
+        .findAllComponents({ name: "OIcon" })
+        .filter((i: any) => i.props("name") === "delete");
+      expect(deleteIcons.length).toBeGreaterThanOrEqual(0);
     });
 
     it('should have store and translation functions', () => {

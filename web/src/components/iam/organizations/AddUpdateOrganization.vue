@@ -27,44 +27,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
-      <q-form ref="addOrganizationForm" @submit="onSubmit" lazy-rules="ondemand">
-          <q-input
+      <div>
+          <OInput
             v-if="beingUpdated"
             v-model="organizationData.id"
             :readonly="beingUpdated"
             :disabled="beingUpdated"
-            stack-label
-            borderless
-            hide-bottom-space
-            dense
             :label="t('organization.id')"
             class="showLabelOnTop tw:mt-2"
           />
 
-          <q-input
+          <OInput
             v-model.trim="organizationData.name"
             :label="t('organization.name') + '*'"
-            color="input-border"
-            bg-color="input-bg"
             class="showLabelOnTop tw:mt-2"
-            stack-label
-            borderless
-            dense
-            :rules="[
-              (val: any) =>
-                !!val
-                  ? isValidOrgName ||
-                    'Use alphanumeric characters, space and underscore only.'
-                  : t('organization.nameRequired'),
-            ]"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
             data-test="org-name"
             maxlength="100"
-            hide-bottom-space
-          >
-            <template v-slot:hint>
-              Use alphanumeric characters, space and underscore only.
-            </template>
-          </q-input>
+          />
 
           <div class="flex justify-center q-mt-lg" v-if="proPlanRequired">
             <OButton
@@ -76,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t('organization.proceed_subscription') }}
             </OButton>
           </div>
-        </q-form>
+        </div>
     </div>
   </ODrawer>
 </template>
@@ -85,13 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
-import { useQuasar } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue = () => {
   return {
@@ -104,7 +87,7 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODrawer },
+  components: { OButton, ODrawer, OInput },
   props: {
     open: {
       type: Boolean,
@@ -117,6 +100,7 @@ export default defineComponent({
   },
   data() {
     return {
+      nameError: '' as string,
       proPlanRequired: false,
       proPlanMsg: "",
       newOrgIdentifier: "",
@@ -133,7 +117,6 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
 
     const isValidOrgName = computed(() => {
       const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
@@ -176,8 +159,8 @@ export default defineComponent({
 
   methods: {
     onRejected(rejectedEntries: string | any[]) {
-      this.$q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },
@@ -189,20 +172,21 @@ export default defineComponent({
     },
     onSubmit() {
       this.organizationData.name = this.organizationData.name.trim();
-      if(!this.isValidOrgName){
+      if (!this.organizationData.name) {
+        this.nameError = this.t('organization.nameRequired');
         return;
       }
-      const dismiss = this.$q.notify({
-        spinner: true,
+      if (!this.isValidOrgName) {
+        this.nameError = 'Use alphanumeric characters, space and underscore only.';
+        return;
+      }
+      this.nameError = '';
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
-      this.addOrganizationForm.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        const organizationId = this.organizationData.id;
+      const organizationId = this.organizationData.id;
         //here we will check if organizationId is there or not because we only get org id when we are updating the organization
         //if organizationId is not there we will create a new organization else we will update the existing organization
         if (!organizationId) {
@@ -228,7 +212,6 @@ export default defineComponent({
               // this.$emit("update:modelValue", data);
               this.$emit("updated");
               this.$emit("update:open", false);
-              this.addOrganizationForm.resetValidation();
               dismiss();
             } else {
               this.proPlanRequired = true;
@@ -256,8 +239,8 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: JSON.stringify(
                 err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
               ),
@@ -268,7 +251,6 @@ export default defineComponent({
             button: "Save Organization",
             page: "Add Organization"
           });
-      });
     },
   },
 });

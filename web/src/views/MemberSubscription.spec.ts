@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createRouter, createWebHistory } from 'vue-router';
-import { Quasar, Notify } from 'quasar';
+import { Quasar } from 'quasar';
 import MemberSubscription from './MemberSubscription.vue';
 import organizationsService from '@/services/organizations';
 import * as zincutils from '@/utils/zincutils';
@@ -79,8 +79,7 @@ describe('MemberSubscription.vue', () => {
           router,
           [Quasar, {
             plugins: {
-              Notify,
-            },
+              },
           }],
         ],
         mocks: {

@@ -32,65 +32,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-separator />
+    <OSeparator />
 
-    <q-form
-      ref="formRef"
-      @submit="onSubmit"
+    <div
       style="height: calc(100vh - 120px); overflow: auto"
     >
       <div class="tw:max-w-2xl tw:mx-4 tw:mt-4">
         <!-- Name -->
         <div class="o2-input tw:mb-4">
-          <q-input
+          <OInput
             data-test="ai-toolset-name-input"
             v-model="form.name"
             :label="t('aiToolset.name') + ' *'"
             class="showLabelOnTop full-width"
-            stack-label
-            borderless
-            dense
             :readonly="isEditing"
-            :disable="isEditing"
-            :rules="[
-              (val: string) => !!val || t('aiToolset.nameRequired'),
-              (val: string) =>
-                /^[a-zA-Z0-9_-]+$/.test(val) || t('aiToolset.nameInvalid'),
-              (val: string) => val.length <= 256 || t('aiToolset.nameTooLong'),
-            ]"
+            :disabled="isEditing"
+            :error="!!nameError"
+            :error-message="nameError"
+            @update:model-value="nameError = ''"
           />
         </div>
 
         <!-- Kind -->
         <div class="o2-input tw:mb-4">
-          <q-select
+          <OSelect
             data-test="ai-toolset-kind-select"
             v-model="form.kind"
             :label="t('aiToolset.kind') + ' *'"
             :options="kindOptions"
+            labelKey="label"
+            valueKey="value"
             class="showLabelOnTop full-width"
-            stack-label
-            borderless
-            dense
-            emit-value
-            map-options
-            :readonly="isEditing"
-            :disable="isEditing"
-            :rules="[(val: string) => !!val || t('aiToolset.kindRequired')]"
+            :disabled="isEditing"
+            :error="!!kindError"
+            :error-message="kindError"
+            @update:model-value="kindError = ''"
           />
         </div>
 
         <!-- Description -->
         <div class="o2-input tw:mb-4">
-          <q-input
+          <OTextarea
             data-test="ai-toolset-description-input"
             v-model="form.description"
             :label="t('aiToolset.description')"
             class="showLabelOnTop full-width"
-            stack-label
-            borderless
-            dense
-            autogrow
           />
         </div>
 
@@ -100,27 +86,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("aiToolset.mcpConfig") }}
           </div>
           <div class="o2-input tw:mb-4">
-            <q-input
+            <OInput
               data-test="ai-toolset-mcp-url"
               v-model="mcpData.url"
               :label="t('aiToolset.mcpUrl') + ' *'"
               class="showLabelOnTop full-width"
-              stack-label
-              borderless
-              dense
               placeholder="https://api.example.com/mcp/"
-              :rules="[(val: string) => !!val || t('aiToolset.mcpUrlRequired')]"
+              :error="!!mcpUrlError"
+              :error-message="mcpUrlError"
+              @update:model-value="mcpUrlError = ''"
             />
           </div>
           <div class="o2-input tw:mb-4">
-            <q-input
+            <OInput
               data-test="ai-toolset-mcp-timeout"
               v-model.number="mcpData.timeout_seconds"
               :label="t('aiToolset.timeoutSeconds')"
               class="showLabelOnTop full-width"
-              stack-label
-              borderless
-              dense
               type="number"
               min="1"
             />
@@ -132,18 +114,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="idx"
             class="tw:flex tw:gap-2 tw:mb-2"
           >
-            <q-input
+            <OInput
               v-model="header.key"
               :label="t('aiToolset.headerKey')"
-              borderless
-              dense
               class="o2-input tw:flex-1"
             />
-            <q-input
+            <OInput
               v-model="header.value"
               :label="t('aiToolset.headerValue')"
-              borderless
-              dense
               class="o2-input tw:flex-1"
               :type="header.visible ? 'text' : 'password'"
             >
@@ -154,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="header.visible = !header.visible"
                 />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               variant="ghost-destructive"
               size="icon-xs-sq"
@@ -178,79 +156,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-caption text-grey-6"
                 >{{ t("aiToolset.presets") }}:</span
               >
-              <q-chip
+              <OBadge
                 v-for="preset in CLI_PRESETS"
                 :key="preset.id"
                 clickable
-                dense
-                color="blue-1"
-                text-color="blue-9"
+                variant="primary-soft"
                 class="tw:cursor-pointer"
                 :data-test="`cli-preset-${preset.id}`"
                 @click="applyPreset(preset)"
               >
                 {{ preset.label }}
-              </q-chip>
+              </OBadge>
             </div>
           </div>
           <div class="o2-input tw:mb-4">
-            <q-input
+            <OInput
               data-test="ai-toolset-cli-command"
               v-model="cliData.command"
               :label="t('aiToolset.cliCommand') + ' *'"
               class="showLabelOnTop full-width"
-              stack-label
-              borderless
-              dense
               placeholder="kubectl"
-              :rules="[
-                (val: string) => !!val || t('aiToolset.cliCommandRequired'),
-              ]"
+              :error="!!cliCommandError"
+              :error-message="cliCommandError"
+              @update:model-value="cliCommandError = ''"
             />
           </div>
           <div class="o2-input tw:mb-4">
-            <q-input
+            <OInput
               v-model="cliData.allowed_subcommands_raw"
               :label="t('aiToolset.allowedSubcommands')"
-              :hint="t('aiToolset.subcommandsHint')"
+              :helpText="t('aiToolset.subcommandsHint')"
               class="showLabelOnTop full-width"
-              stack-label
-              borderless
-              dense
               placeholder="get, describe, logs"
             />
           </div>
           <div class="tw:flex tw:gap-4 tw:mb-4">
             <div class="o2-input tw:flex-1">
-              <q-input
+              <OInput
                 v-model.number="cliData.timeout_seconds"
                 :label="t('aiToolset.timeoutSeconds')"
                 class="showLabelOnTop full-width"
-                stack-label
-                borderless
-                dense
                 type="number"
                 min="1"
               />
             </div>
             <div class="o2-input tw:flex-1">
-              <q-input
+              <OInput
                 v-model.number="cliData.max_output_bytes"
                 :label="t('aiToolset.maxOutputBytes')"
                 class="showLabelOnTop full-width"
-                stack-label
-                borderless
-                dense
                 type="number"
                 min="1"
               />
             </div>
           </div>
           <div class="tw:mb-4">
-            <q-toggle
+            <OSwitch
               v-model="cliData.requires_confirmation"
               :label="t('aiToolset.requiresConfirmation')"
-              dense
             />
           </div>
           <!-- Env vars -->
@@ -260,18 +223,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="'env-' + idx"
             class="tw:flex tw:gap-2 tw:mb-2"
           >
-            <q-input
+            <OInput
               v-model="env.key"
               :label="t('aiToolset.envKey')"
-              borderless
-              dense
               class="o2-input tw:flex-1"
             />
-            <q-input
+            <OInput
               v-model="env.value"
               :label="t('aiToolset.envValue')"
-              borderless
-              dense
               class="o2-input tw:flex-1"
               :type="env.visible ? 'text' : 'password'"
             >
@@ -282,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="env.visible = !env.visible"
                 />
               </template>
-            </q-input>
+            </OInput>
             <OButton
               variant="ghost-destructive"
               size="icon-xs-sq"
@@ -305,12 +264,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mb-4"
           >
             <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
-              <q-input
+              <OInput
                 v-model="cred.key"
                 :label="t('aiToolset.credEnvVar')"
-                hint="e.g. KUBECONFIG"
-                borderless
-                dense
+                helpText="e.g. KUBECONFIG"
                 class="o2-input tw:w-48"
               />
               <OButton
@@ -375,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-toolset-save-btn"
           variant="primary"
           size="sm-action"
-          type="submit"
+          @click="onSubmit"
           :loading="saving"
         >
           {{ isEditing ? t("common.update") : t("common.save") }}
@@ -389,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("common.cancel") }}
         </OButton>
       </div>
-    </q-form>
+    </div>
   </div>
 </template>
 
@@ -403,12 +360,18 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { ToolsetKind } from "@/services/ai_toolsets";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -416,17 +379,18 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { QueryEditor, OButton,
-    OIcon,
-},
+  components: { OSeparator, OBadge, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const formRef = ref<any>(null);
     const saving = ref(false);
+    const nameError = ref('');
+    const kindError = ref('');
+    const mcpUrlError = ref('');
+    const cliCommandError = ref('');
 
     const editingId = ref<string | null>(null);
     const isEditing = ref(false);
@@ -550,7 +514,7 @@ export default defineComponent({
           skillData.value.content = data.content || "";
         }
       } catch {
-        $q.notify({ type: "negative", message: "Failed to load toolset" });
+        toast({ variant: "error", message: "Failed to load toolset" });
       }
     };
 
@@ -616,13 +580,22 @@ export default defineComponent({
     // Submit
     // -----------------------------------------------------------------------
     const onSubmit = async () => {
-      const valid = await formRef.value?.validate();
-      // Monaco editor is outside q-form validation — check skill content manually.
+      // Validate manually
+      nameError.value = !form.value.name
+        ? t('aiToolset.nameRequired')
+        : !/^[a-zA-Z0-9_-]+$/.test(form.value.name)
+        ? t('aiToolset.nameInvalid')
+        : form.value.name.length > 256
+        ? t('aiToolset.nameTooLong')
+        : '';
+      kindError.value = !form.value.kind ? t('aiToolset.kindRequired') : '';
+      mcpUrlError.value = form.value.kind === 'mcp' && !mcpData.value.url ? t('aiToolset.mcpUrlRequired') : '';
+      cliCommandError.value = form.value.kind === 'cli' && !cliData.value.command ? t('aiToolset.cliCommandRequired') : '';
+      // Monaco editor is outside form validation — check skill content manually.
       if (form.value.kind === "skill") {
         skillContentError.value = !skillData.value.content.trim();
-        if (skillContentError.value) return;
       }
-      if (!valid) return;
+      if (nameError.value || kindError.value || mcpUrlError.value || cliCommandError.value || skillContentError.value) return;
 
       saving.value = true;
       const org = store.state.selectedOrganization.identifier;
@@ -634,8 +607,8 @@ export default defineComponent({
             description: form.value.description || undefined,
             data,
           });
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t("aiToolset.updatedSuccessfully"),
             timeout: 2000,
           });
@@ -646,8 +619,8 @@ export default defineComponent({
             description: form.value.description || undefined,
             data,
           });
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t("aiToolset.createdSuccessfully"),
             timeout: 2000,
           });
@@ -659,7 +632,7 @@ export default defineComponent({
           (isEditing.value
             ? t("aiToolset.updateFailed")
             : t("aiToolset.createFailed"));
-        $q.notify({ type: "negative", message: msg, timeout: 4000 });
+        toast({ variant: "error", message: msg, timeout: 4000 });
       } finally {
         saving.value = false;
       }
@@ -672,6 +645,10 @@ export default defineComponent({
       form,
       isEditing,
       saving,
+      nameError,
+      kindError,
+      mcpUrlError,
+      cliCommandError,
       kindOptions,
       // MCP
       mcpData,

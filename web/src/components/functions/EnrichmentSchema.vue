@@ -31,7 +31,7 @@
           class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
           style="max-width: 450px"
         >
-          <OSpinner size="md" />
+          <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div
@@ -100,30 +100,15 @@
               style="margin-bottom: 30px"
               class="q-mt-lg"
             >
-              <q-table
-                ref="qTable"
+              <OTable
                 data-test="schema-log-stream-field-mapping-table"
-                :rows="schemaData.schema"
+                :data="schemaData.schema"
                 :columns="columns"
-                :row-key="(row) => 'tr_' + row.name"
-                :filter-method="filterFieldFn"
-                :pagination="pagination"
-                class="q-table"
-                id="schemaFieldList"
-                :rows-per-page-options="[]"
-                dense
-                :filter="filterField"
-              >
-                <template #bottom="scope" >
-                  <QTablePagination
-                    :scope="scope"
-                    :position="'bottom'"
-                    :resultTotal="resultTotal"
-                    :perPageOptions="perPageOptions"
-                    @update:changeRecordPerPage="changePagination"
-                  />
-                </template>
-              </q-table>
+                row-key="name"
+                :global-filter="filterField"
+                :show-global-filter="false"
+                :page-size-options="[5, 10, 20, 50]"
+              />
             </div>
           </div>
         </div>
@@ -142,7 +127,7 @@
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
-    import { useQuasar, date, format } from "quasar";
+    import { date, format } from "quasar";
     import streamService from "../../services/stream";
     import segment from "../../services/segment_analytics";
     import {
@@ -158,7 +143,7 @@
     import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
     import AppTabs from "@/components/common/AppTabs.vue";
 
-    import QTablePagination from "@/components/shared/grid/Pagination.vue";
+    import OTable from "@/lib/core/Table/OTable.vue";
         import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -193,7 +178,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
         ConfirmDialog,
         StreamFieldsInputs,
         AppTabs,
-        QTablePagination,
+        OTable,
         ODrawer,
         OButton,
         OInput,
@@ -204,40 +189,27 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
     setup(props) {
         const { t } = useI18n();
         const store = useStore();
-        const q = useQuasar();
         const { getStream } = useStreams();
-        const qTable = ref<any>(null);
         const columns = [
             {
-                name: "name",
-                label: t("logStream.propertyName"),
-                align: "left",
+                id: "name",
+                header: t("logStream.propertyName"),
+                accessorKey: "name",
                 sortable: true,
-                field: "name",
-                style:'width: 50vw'
-
+                meta: { align: "left" },
             },
             {
-                name: "type",
-                label: t("logStream.propertyType"),
-                align: "left",
+                id: "type",
+                header: t("logStream.propertyType"),
+                accessorKey: "type",
                 sortable: true,
-                field: "type",
-            }
-            ];
-        const schemaRows = ref([]);
+                meta: { align: "left" },
+            },
+        ];
         const loadingState = ref(false);
         const schemaData = ref(defaultStreamData);
         const isCloud = config.isCloud;
-        const resultTotal = ref<number>(0);
-        const selectedPerPage = ref<number>(20);
         const filterField = ref('');
-        const perPageOptions : any = [
-            { label: "5", value: 5 },
-            { label: "10", value: 10 },
-            { label: "20", value: 20 },
-            { label: "50", value: 50 },
-        ];
 
         watch(
             () => props.open,
@@ -252,7 +224,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
                 const streamData = await getStream(props.selectedEnrichmentTable, 'enrichment_tables', true);
                 if (streamData) {
                     schemaData.value = streamData;
-                    resultTotal.value = streamData.schema.length;
                 }
             } catch (error) {
                 console.error(error);
@@ -263,39 +234,17 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
         }
 
 
-        const filterFieldFn = (rows: any, terms: any) => {
-            return rows.filter((row: any) => row.name.toLowerCase().includes(terms));
-        }
-        const pagination: any = ref({
-            rowsPerPage: 20,
-        });
-        const changePagination = (val: { label: string; value: any }) => {
-            selectedPerPage.value = val.value;
-            pagination.value.rowsPerPage = val.value;
-            qTable.value?.setPagination(pagination.value);
-        };
-
-
-
         return {
         t,
         q,
         store,
         columns,
-        schemaRows,
         loadingState,
         schemaData,
         selectedEnrichmentTable: props.selectedEnrichmentTable,
         getStream,
         formatSizeFromMB,
         isCloud,
-        filterFieldFn,
-        changePagination,
-        selectedPerPage,
-        perPageOptions,
-        pagination,
-        qTable,
-        resultTotal,
         filterField,
         };
     },

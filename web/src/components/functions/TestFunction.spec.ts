@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { Quasar, Notify } from 'quasar';
+import { Quasar } from 'quasar';
 import TestFunction from './TestFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
@@ -99,7 +99,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: darkStore,
           },
@@ -121,7 +121,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -158,7 +158,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -201,7 +201,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -236,7 +236,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -264,7 +264,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -309,7 +309,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
             $q: { notify: vi.fn() },
@@ -361,7 +361,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -404,7 +404,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
             $q: { notify: vi.fn() },
@@ -450,7 +450,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -497,7 +497,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -549,7 +549,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: {
             store: mockStore,
           },
@@ -608,7 +608,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: jsProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -629,7 +629,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -650,7 +650,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -670,7 +670,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -690,7 +690,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -713,7 +713,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -735,7 +735,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -758,7 +758,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -778,7 +778,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -802,7 +802,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -822,7 +822,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -846,7 +846,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -875,7 +875,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,
@@ -897,7 +897,7 @@ describe('TestFunction.vue Branch Coverage', () => {
       const wrapper = mount(TestFunction, {
         props: defaultProps,
         global: {
-          plugins: [[Quasar, { plugins: [Notify] }], mockI18n],
+          plugins: [[Quasar, { plugins: [] }], mockI18n],
           provide: { store: mockStore },
           stubs: {
             'query-editor': true,

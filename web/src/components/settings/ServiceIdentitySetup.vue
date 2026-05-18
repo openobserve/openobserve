@@ -225,7 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Field Mapping Dialog -->
-          <ODialog data-test="service-identity-setup-field-mapping-dialog"
+          <ODialog
+            data-test="service-identity-setup-field-mapping-dialog"
             v-model:open="showFieldMappingDialog"
             size="sm"
             :title="t('settings.correlation.customizeFieldMappings')"
@@ -239,22 +240,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TagInput
               :model-value="editableServiceFields"
               @update:model-value="editableServiceFields = $event"
-              :placeholder="
-                t('settings.correlation.fieldMappingPlaceholder')
-              "
+              :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
               label=""
             />
           </ODialog>
 
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="tw:mb-3">
-            <q-toggle
+            <OSwitch
               data-test="service-identity-service-optional-btn"
               v-model="serviceOptional"
               :label="t('settings.correlation.serviceOptionalLabel')"
               size="sm"
-              dense
-              class="tw:text-[13px] tw:font-semibold"
             />
             <div
               class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
@@ -274,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:font-bold tw:text-sm">{{
                 t("settings.correlation.distinguishByLabel")
               }}</span>
-              <span class="tw:flex-1"><q-separator /></span>
+              <span class="tw:flex-1"><OSeparator /></span>
             </div>
             <div
               class="tw:text-xs tw:mb-3"
@@ -315,9 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-identity-add-distinguish-btn"
                 @click="addingToEnv = activeEnvironment"
               >
-                <template #icon-left
-                  ><OIcon name="add" size="xs"
-                /></template>
+                <template #icon-left><OIcon name="add" size="xs" /></template>
                 {{ t("settings.correlation.addField") }}
               </OButton>
             </div>
@@ -383,81 +378,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{
                       getGroupByValue(fieldId)?.display ?? fieldId
                     }}</span>
-                    <q-tooltip
+                    <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs"
-                    >
-                      {{ getFieldCardinalityTooltip(fieldId) }}
-                    </q-tooltip>
+                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      side="top"
+                    />
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
                       @click="removeFieldByIdFromEnv(envKey, fieldId)"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
                     </OButton>
                   </div>
 
                   <!-- Inline add select for this group -->
                   <template v-if="addingToEnv === envKey">
-                    <q-select
+                    <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
                       :options="getAddFieldOptionsForEnv(envKey)"
-                      option-label="label"
-                      option-value="value"
-                      emit-value
-                      map-options
-                      use-input
-                      input-debounce="0"
-                      dense
-                      borderless
+                      labelKey="label"
+                      valueKey="value"
+                      searchable
                       :placeholder="t('settings.correlation.selectField')"
                       style="min-width: 220px"
                       data-test="service-identity-add-distinguish-btn"
-                      @filter="onAddFieldFilter"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
-                    >
-                      <template #option="scope">
-                        <q-item v-bind="scope.itemProps">
-                          <q-item-section>
-                            <q-item-label
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              {{ scope.opt.label }}
-                              <q-badge
-                                v-if="scope.opt.cardinalityLabel"
-                                :color="scope.opt.cardinalityColor"
-                                outline
-                                :label="scope.opt.cardinalityLabel"
-                                class="tw:text-[10px]"
-                              />
-                              <q-badge
-                                v-if="scope.opt.recommended"
-                                color="positive"
-                                outline
-                                label="recommended"
-                                class="tw:text-[10px]"
-                              />
-                            </q-item-label>
-                            <q-item-label
-                              caption
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              <span v-if="scope.opt.uniqueValues"
-                                >{{ scope.opt.uniqueValues }} unique
-                                values</span
-                              >
-                              <span v-if="scope.opt.streamTypes">{{
-                                scope.opt.streamTypes.join(", ")
-                              }}</span>
-                            </q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
+                    />
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -466,7 +428,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         addFieldValue = '';
                       "
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
                     </OButton>
                   </template>
 
@@ -482,13 +458,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="add"
                   >
                     {{ t("settings.correlation.addField") }}
-                    <q-tooltip
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs tw:max-w-[240px]"
-                    >
-                      {{ t("settings.correlation.addFieldTooltip") }}
-                    </q-tooltip>
+                    <OTooltip
+                      side="top"
+                      :content="t('settings.correlation.addFieldTooltip')"
+                      max-width="240px"
+                    />
                   </OButton>
                 </div>
               </template>
@@ -501,61 +475,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
                   style="border-top: 1px solid var(--o2-border-color)"
                 >
-                  <q-select
+                  <OSelect
                     ref="addFieldSelectRef"
                     v-model="addFieldValue"
                     :options="getAddFieldOptionsForEnv(addingToEnv)"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     :placeholder="t('settings.correlation.selectField')"
                     style="min-width: 220px"
                     data-test="service-identity-add-distinguish-btn"
-                    @filter="onAddFieldFilter"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
-                  >
-                    <template #option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            {{ scope.opt.label }}
-                            <q-badge
-                              v-if="scope.opt.cardinalityLabel"
-                              :color="scope.opt.cardinalityColor"
-                              outline
-                              :label="scope.opt.cardinalityLabel"
-                              class="tw:text-[10px]"
-                            />
-                            <q-badge
-                              v-if="scope.opt.recommended"
-                              color="positive"
-                              outline
-                              label="recommended"
-                              class="tw:text-[10px]"
-                            />
-                          </q-item-label>
-                          <q-item-label
-                            caption
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            <span v-if="scope.opt.uniqueValues"
-                              >{{ scope.opt.uniqueValues }} unique values</span
-                            >
-                            <span v-if="scope.opt.streamTypes">{{
-                              scope.opt.streamTypes.join(", ")
-                            }}</span>
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
+                  />
                   <OButton
                     variant="ghost"
                     size="icon-xs-sq"
@@ -564,7 +495,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       addFieldValue = '';
                     "
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </OButton>
                 </div>
               </template>
@@ -581,13 +526,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="add"
                 >
                   {{ t("settings.correlation.addGroup") }}
-                  <q-tooltip
-                    anchor="top middle"
-                    self="bottom middle"
-                    class="tw:text-xs tw:max-w-[240px]"
-                  >
-                    {{ t("settings.correlation.addGroupTooltip") }}
-                  </q-tooltip>
+                  <OTooltip
+                    side="top"
+                    :content="t('settings.correlation.addGroupTooltip')"
+                    max-width="240px"
+                  />
                 </OButton>
                 <OButton
                   variant="primary"
@@ -711,23 +654,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </OButton>
                 </div>
                 <!-- Inline add select -->
                 <template v-if="addingTrackedAlias">
-                  <q-select
+                  <OSelect
                     ref="addTrackedAliasSelectRef"
                     v-model="addTrackedAliasValue"
                     :options="trackedAliasAddOptions"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     placeholder="Select alias group"
                     style="min-width: 220px"
                     @update:model-value="onAddTrackedAlias($event)"
@@ -740,7 +692,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       addTrackedAliasValue = '';
                     "
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </OButton>
                 </template>
                 <!-- Add field button -->
@@ -1044,7 +1010,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Workload Insight Sidebar -->
-        <ODrawer data-test="service-identity-setup-insight-drawer"
+        <ODrawer
+          data-test="service-identity-setup-insight-drawer"
           v-model:open="insightDialogOpen"
           :width="insightPanelWidthPct"
         >
@@ -1064,12 +1031,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   {{ insightData.title }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="insightData.title.length > 25"
-                    class="tw:text-xs"
-                  >
-                    {{ insightData.title }}
-                  </q-tooltip>
+                    :content="insightData.title"
+                    side="top"
+                  />
                 </span>
               </div>
               <div
@@ -1084,11 +1050,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-grey-6'
                 "
               >
-                <OIcon
-                  name="verified"
-                  size="xs"
-                  class="tw:text-positive"
-                />
+                <OIcon name="verified" size="xs" class="tw:text-positive" />
                 <span
                   >{{ insightData.coverage }}% of services
                   <span
@@ -1101,234 +1063,223 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </template>
-              <!-- Stream contribution chart (single-value only) -->
-              <template
-                v-if="
-                  !(insightData as any).isCardLevel &&
-                  (insightData as any).streamDetails?.length > 0
+          <!-- Stream contribution chart (single-value only) -->
+          <template
+            v-if="
+              !(insightData as any).isCardLevel &&
+              (insightData as any).streamDetails?.length > 0
+            "
+          >
+            <div class="tw:mb-3 tw:shrink-0">
+              <div
+                class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
+                :class="
+                  store.state.theme === 'dark'
+                    ? 'tw:text-grey-5'
+                    : 'tw:text-grey-5'
                 "
               >
-                <div class="tw:mb-3 tw:shrink-0">
+                Stream Sources
+              </div>
+              <div style="height: 40vh; min-height: 180px">
+                <CustomChartRenderer :data="insightChartData.options" />
+              </div>
+              <!-- Legend -->
+              <div
+                class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2"
+              >
+                <div
+                  v-for="sd in (insightData as any).streamDetails"
+                  :key="sd.streamType"
+                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:text-grey-4'
+                      : 'tw:text-grey-6'
+                  "
+                >
+                  <span
+                    class="tw:w-2 tw:h-2 tw:rounded-full"
+                    :class="{
+                      'tw:bg-blue-500': sd.streamType === 'logs',
+                      'tw:bg-orange-500': sd.streamType === 'traces',
+                      'tw:bg-green-500': sd.streamType === 'metrics',
+                    }"
+                  />
+                  <span class="tw:capitalize">{{ sd.streamType }}</span>
+                  <span class="tw:font-medium">{{
+                    sd.streamNames.length
+                  }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <OSeparator class="tw:mb-3 tw:shrink-0" />
+
+          <!-- Card-level: all values with bars -->
+          <template
+            v-if="
+              (insightData as any).isCardLevel &&
+              insightData.children.length > 0
+            "
+          >
+            <div
+              class="tw:text-[11px] tw:font-medium tw:mb-3"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:text-grey-5'
+                  : 'tw:text-grey-5'
+              "
+            >
+              All values ({{ insightData.children.length }})
+            </div>
+            <div class="tw:flex tw:flex-col tw:gap-2.5">
+              <div
+                v-for="child in insightData.children"
+                :key="child.name"
+                class="tw:flex tw:flex-col tw:gap-1"
+              >
+                <div
+                  class="tw:flex tw:items-center tw:justify-between tw:text-xs"
+                >
+                  <span class="tw:truncate tw:min-w-0 tw:font-medium">{{
+                    child.name
+                  }}</span>
+                  <span
+                    class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-4'
+                        : 'tw:text-grey-6'
+                    "
+                    >{{ child.count }} {{ insightData.childCountLabel }}</span
+                  >
+                </div>
+                <div
+                  class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:bg-grey-8'
+                      : 'tw:bg-grey-2'
+                  "
+                >
                   <div
-                    class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
+                    class="tw:h-full tw:rounded-full tw:transition-all"
+                    :class="
+                      insightDialogLevel === 'primary'
+                        ? 'tw:bg-blue-5'
+                        : insightDialogLevel === 'secondary'
+                          ? 'tw:bg-teal-5'
+                          : 'tw:bg-purple-5'
+                    "
+                    :style="{
+                      width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
+                    }"
+                  />
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Single-value: related dimension columns (read-only) -->
+          <template
+            v-if="
+              !(insightData as any).isCardLevel &&
+              (insightData as any).relatedDimensions?.length > 0
+            "
+          >
+            <!-- Explanation -->
+            <div
+              class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw:bg-grey-9 tw:text-grey-5'
+                  : 'tw:bg-blue-1/40 tw:text-grey-6'
+              "
+            >
+              <OIcon name="info" size="xs" />
+              <span
+                >These are the related
+                <strong>{{
+                  formatDimLabels((insightData as any).relatedDimensions)
+                }}</strong>
+                values co-occurring with
+                <strong>{{ insightData.title }}</strong
+                >.</span
+              >
+            </div>
+            <div class="tw:flex tw:flex-1 tw:min-h-0 tw:py-3">
+              <div
+                v-for="(dim, dimIdx) in (insightData as any).relatedDimensions"
+                :key="dim.label + dimIdx"
+                class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:px-3"
+                :class="[
+                  dimIdx > 0
+                    ? store.state.theme === 'dark'
+                      ? 'tw:border-l tw:border-grey-8'
+                      : 'tw:border-l tw:border-grey-3'
+                    : '',
+                ]"
+              >
+                <div
+                  class="tw:text-[13px] tw:font-bold tw:mb-2"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tw:text-grey-3'
+                      : 'tw:text-grey-8'
+                  "
+                >
+                  {{ dim.label }}
+                  <span
+                    class="tw:font-normal"
                     :class="
                       store.state.theme === 'dark'
                         ? 'tw:text-grey-5'
                         : 'tw:text-grey-5'
                     "
+                    >({{ dim.values.length }})</span
                   >
-                    Stream Sources
-                  </div>
-                  <div style="height: 40vh; min-height: 180px">
-                    <CustomChartRenderer :data="insightChartData.options" />
-                  </div>
-                  <!-- Legend -->
-                  <div
-                    class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2"
-                  >
-                    <div
-                      v-for="sd in (insightData as any).streamDetails"
-                      :key="sd.streamType"
-                      class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:text-grey-4'
-                          : 'tw:text-grey-6'
-                      "
-                    >
-                      <span
-                        class="tw:w-2 tw:h-2 tw:rounded-full"
-                        :class="{
-                          'tw:bg-blue-500': sd.streamType === 'logs',
-                          'tw:bg-orange-500': sd.streamType === 'traces',
-                          'tw:bg-green-500': sd.streamType === 'metrics',
-                        }"
-                      />
-                      <span class="tw:capitalize">{{ sd.streamType }}</span>
-                      <span class="tw:font-medium">{{
-                        sd.streamNames.length
-                      }}</span>
-                    </div>
-                  </div>
                 </div>
-              </template>
-
-              <q-separator
-                :class="store.state.theme === 'dark' ? 'tw:!bg-grey-8' : ''"
-                class="tw:mb-3 tw:shrink-0"
-              />
-
-              <!-- Card-level: all values with bars -->
-              <template
-                v-if="
-                  (insightData as any).isCardLevel &&
-                  insightData.children.length > 0
-                "
-              >
                 <div
-                  class="tw:text-[11px] tw:font-medium tw:mb-3"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tw:text-grey-5'
-                      : 'tw:text-grey-5'
-                  "
+                  class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0"
                 >
-                  All values ({{ insightData.children.length }})
-                </div>
-                <div class="tw:flex tw:flex-col tw:gap-2.5">
-                  <div
-                    v-for="child in insightData.children"
-                    :key="child.name"
-                    class="tw:flex tw:flex-col tw:gap-1"
-                  >
-                    <div
-                      class="tw:flex tw:items-center tw:justify-between tw:text-xs"
-                    >
-                      <span class="tw:truncate tw:min-w-0 tw:font-medium">{{
-                        child.name
-                      }}</span>
-                      <span
-                        class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-grey-4'
-                            : 'tw:text-grey-6'
-                        "
-                        >{{ child.count }}
-                        {{ insightData.childCountLabel }}</span
-                      >
-                    </div>
-                    <div
-                      class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:bg-grey-8'
-                          : 'tw:bg-grey-2'
-                      "
-                    >
-                      <div
-                        class="tw:h-full tw:rounded-full tw:transition-all"
-                        :class="
-                          insightDialogLevel === 'primary'
-                            ? 'tw:bg-blue-5'
-                            : insightDialogLevel === 'secondary'
-                              ? 'tw:bg-teal-5'
-                              : 'tw:bg-purple-5'
-                        "
-                        :style="{
-                          width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
-                        }"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Single-value: related dimension columns (read-only) -->
-              <template
-                v-if="
-                  !(insightData as any).isCardLevel &&
-                  (insightData as any).relatedDimensions?.length > 0
-                "
-              >
-                <!-- Explanation -->
-                <div
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tw:bg-grey-9 tw:text-grey-5'
-                      : 'tw:bg-blue-1/40 tw:text-grey-6'
-                  "
-                >
-                  <OIcon name="info" size="xs" />
                   <span
-                    >These are the related
-                    <strong>{{
-                      formatDimLabels((insightData as any).relatedDimensions)
-                    }}</strong>
-                    values co-occurring with
-                    <strong>{{ insightData.title }}</strong
-                    >.</span
+                    v-for="dVal in dim.values"
+                    :key="dVal"
+                    class="tw:text-[13px] tw:py-1 tw:px-2.5 tw:rounded-md tw:border tw:truncate tw:shrink-0"
+                    :class="{
+                      'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3':
+                        dim.color === 'teal' && store.state.theme === 'dark',
+                      'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8':
+                        dim.color === 'teal' && store.state.theme !== 'dark',
+                      'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3':
+                        dim.color === 'purple' && store.state.theme === 'dark',
+                      'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8':
+                        dim.color === 'purple' && store.state.theme !== 'dark',
+                      'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3':
+                        dim.color === 'blue' && store.state.theme === 'dark',
+                      'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8':
+                        dim.color === 'blue' && store.state.theme !== 'dark',
+                    }"
+                    :title="dVal"
+                    >{{ dVal }}</span
+                  >
+                  <span
+                    v-if="dim.values.length === 0"
+                    class="tw:text-xs tw:italic"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-grey-6'
+                        : 'tw:text-grey-5'
+                    "
+                    >No values</span
                   >
                 </div>
-                <div class="tw:flex tw:flex-1 tw:min-h-0 tw:py-3">
-                  <div
-                    v-for="(dim, dimIdx) in (insightData as any)
-                      .relatedDimensions"
-                    :key="dim.label + dimIdx"
-                    class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:px-3"
-                    :class="[
-                      dimIdx > 0
-                        ? store.state.theme === 'dark'
-                          ? 'tw:border-l tw:border-grey-8'
-                          : 'tw:border-l tw:border-grey-3'
-                        : '',
-                    ]"
-                  >
-                    <div
-                      class="tw:text-[13px] tw:font-bold tw:mb-2"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'tw:text-grey-3'
-                          : 'tw:text-grey-8'
-                      "
-                    >
-                      {{ dim.label }}
-                      <span
-                        class="tw:font-normal"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-grey-5'
-                            : 'tw:text-grey-5'
-                        "
-                        >({{ dim.values.length }})</span
-                      >
-                    </div>
-                    <div
-                      class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0"
-                    >
-                      <span
-                        v-for="dVal in dim.values"
-                        :key="dVal"
-                        class="tw:text-[13px] tw:py-1 tw:px-2.5 tw:rounded-md tw:border tw:truncate tw:shrink-0"
-                        :class="{
-                          'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3':
-                            dim.color === 'teal' &&
-                            store.state.theme === 'dark',
-                          'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8':
-                            dim.color === 'teal' &&
-                            store.state.theme !== 'dark',
-                          'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3':
-                            dim.color === 'purple' &&
-                            store.state.theme === 'dark',
-                          'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8':
-                            dim.color === 'purple' &&
-                            store.state.theme !== 'dark',
-                          'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3':
-                            dim.color === 'blue' &&
-                            store.state.theme === 'dark',
-                          'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8':
-                            dim.color === 'blue' &&
-                            store.state.theme !== 'dark',
-                        }"
-                        :title="dVal"
-                        >{{ dVal }}</span
-                      >
-                      <span
-                        v-if="dim.values.length === 0"
-                        class="tw:text-xs tw:italic"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-grey-6'
-                            : 'tw:text-grey-5'
-                        "
-                        >No values</span
-                      >
-                    </div>
-                  </div>
-                </div>
-              </template>
-          </ODrawer>
+              </div>
+            </div>
+          </template>
+        </ODrawer>
       </div>
 
       <!-- Section 3: Warnings -->
@@ -1350,225 +1301,219 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field Details Dialog -->
-      <ODialog data-test="service-identity-setup-details-dialog"
+      <ODialog
+        data-test="service-identity-setup-details-dialog"
         v-model:open="detailsDialogVisible"
-        @update:open="(v) => { if (!v) { preselectedValue = ''; popupPrimaryValue = ''; popupColumnSelections = []; } }"
+        @update:open="
+          (v) => {
+            if (!v) {
+              preselectedValue = '';
+              popupPrimaryValue = '';
+              popupColumnSelections = [];
+            }
+          }
+        "
         size="md"
         :title="primaryDim?.display"
         :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-
-          <q-card-section
-            class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t"
-          >
-            <!-- Header section with cardinality details -->
-            <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
-              <span class="tw:font-medium">Cardinality:</span>
-              <q-badge
-                :color="
-                  cardinalityColor(
-                    dimensionAnalytics[primaryDim?.group_id]
-                      ?.cardinality_class || 'Unknown',
-                  )
-                "
-                rounded
-                class="tw:px-2"
-              >
-                {{
-                  dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0
-                }}
-                unique values
-              </q-badge>
-              <q-badge
-                outline
-                :color="
-                  cardinalityColor(
-                    dimensionAnalytics[primaryDim?.group_id]
-                      ?.cardinality_class || 'Unknown',
-                  )
-                "
-              >
-                {{
+        <q-card-section class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
+          <!-- Header section with cardinality details -->
+          <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
+            <span class="tw:font-medium">Cardinality:</span>
+            <OBadge
+              :variant="
+                cardinalityColor(
                   dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
-                  "Unknown"
-                }}
-              </q-badge>
+                    'Unknown',
+                )
+              "
+              class="tw:px-2"
+            >
+              {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
+              unique values
+            </OBadge>
+            <OBadge
+              :variant="`${cardinalityColor(
+                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                  'Unknown',
+              )}-outline`"
+            >
+              {{
+                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                "Unknown"
+              }}
+            </OBadge>
+          </div>
+
+          <!-- Two-pane Layout for Streams and Values -->
+          <div
+            v-if="
+              selectedFieldAnalytics?.sample_values &&
+              Object.keys(selectedFieldAnalytics.sample_values).length
+            "
+            class="tw:flex tw:h-[300px]"
+          >
+            <!-- Left Pane: Streams List -->
+            <div
+              class="tw:w-1/3 tw:border-r tw:bg-grey-1 dark:tw:bg-dark tw:flex tw:flex-col"
+            >
+              <!-- Static column header — never scrolls, never gets covered -->
+              <div
+                class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
+                :style="{
+                  backgroundColor:
+                    store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
+                }"
+              >
+                <span>{{
+                  selectedStreamType ||
+                  ["logs", "metrics", "traces"].find(
+                    (t) => selectedFieldAnalytics.sample_values[t],
+                  )
+                }}</span>
+                <span class="tw:text-grey-5">Streams</span>
+              </div>
+
+              <!-- Scrollable content -->
+              <div class="tw:overflow-y-auto tw:flex-1">
+                <!-- Filtered to one type: no section header needed -->
+                <template
+                  v-if="
+                    selectedStreamType &&
+                    selectedFieldAnalytics.sample_values[selectedStreamType]
+                  "
+                >
+                  <div
+                    v-for="streamName in Object.keys(
+                      selectedFieldAnalytics.sample_values[selectedStreamType],
+                    )"
+                    :key="streamName"
+                    class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
+                    :class="{
+                      'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                        activeStreamId === streamName,
+                    }"
+                    @click="activeStreamId = streamName"
+                  >
+                    {{ streamName }}
+                  </div>
+                </template>
+
+                <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
+                <template v-else>
+                  <template
+                    v-for="(typeName, typeIdx) in [
+                      'logs',
+                      'metrics',
+                      'traces',
+                    ].filter((t) => selectedFieldAnalytics.sample_values[t])"
+                    :key="typeName"
+                  >
+                    <div
+                      v-if="typeIdx > 0"
+                      class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-grey-5 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
+                      :style="{
+                        backgroundColor:
+                          store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
+                      }"
+                    >
+                      {{ typeName }}
+                    </div>
+                    <div
+                      v-for="streamName in Object.keys(
+                        selectedFieldAnalytics.sample_values[typeName],
+                      )"
+                      :key="typeName + '-' + streamName"
+                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
+                      :class="{
+                        'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                          activeStreamId === streamName &&
+                          activeStreamType === typeName,
+                      }"
+                      @click="
+                        activeStreamId = streamName;
+                        activeStreamType = typeName;
+                      "
+                    >
+                      {{ streamName }}
+                    </div>
+                  </template>
+                </template>
+              </div>
             </div>
 
-            <!-- Two-pane Layout for Streams and Values -->
+            <!-- Right Pane: N-1 hierarchy columns -->
             <div
-              v-if="
-                selectedFieldAnalytics?.sample_values &&
-                Object.keys(selectedFieldAnalytics.sample_values).length
-              "
-              class="tw:flex tw:h-[300px]"
+              class="tw:flex-1 tw:flex tw:overflow-x-auto"
+              :style="{
+                backgroundColor:
+                  store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff',
+              }"
             >
-              <!-- Left Pane: Streams List -->
               <div
-                class="tw:w-1/3 tw:border-r tw:bg-grey-1 dark:tw:bg-dark tw:flex tw:flex-col"
+                v-for="(col, colIdx) in popupColumns"
+                :key="col.group_id"
+                class="tw:min-w-[160px] tw:flex-1 tw:overflow-y-auto"
+                :class="{ 'tw:border-l': colIdx > 0 }"
               >
-                <!-- Static column header — never scrolls, never gets covered -->
                 <div
-                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
+                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:sticky tw:top-0 tw:z-10 tw:border-b"
                   :style="{
                     backgroundColor:
                       store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
                   }"
                 >
-                  <span>{{
-                    selectedStreamType ||
-                    ["logs", "metrics", "traces"].find(
-                      (t) => selectedFieldAnalytics.sample_values[t],
-                    )
-                  }}</span>
-                  <span class="tw:text-grey-5">Streams</span>
+                  {{ col.display }}
                 </div>
-
-                <!-- Scrollable content -->
-                <div class="tw:overflow-y-auto tw:flex-1">
-                  <!-- Filtered to one type: no section header needed -->
-                  <template
-                    v-if="
-                      selectedStreamType &&
-                      selectedFieldAnalytics.sample_values[selectedStreamType]
-                    "
-                  >
-                    <div
-                      v-for="streamName in Object.keys(
-                        selectedFieldAnalytics.sample_values[
-                          selectedStreamType
-                        ],
-                      )"
-                      :key="streamName"
-                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
-                      :class="{
-                        'tw:bg-primary/20 tw:text-primary tw:font-medium':
-                          activeStreamId === streamName,
-                      }"
-                      @click="activeStreamId = streamName"
-                    >
-                      {{ streamName }}
-                    </div>
-                  </template>
-
-                  <!-- All types: sticky section labels for 2nd+ types only; first is already in the static header -->
-                  <template v-else>
-                    <template
-                      v-for="(typeName, typeIdx) in [
-                        'logs',
-                        'metrics',
-                        'traces',
-                      ].filter((t) => selectedFieldAnalytics.sample_values[t])"
-                      :key="typeName"
-                    >
-                      <div
-                        v-if="typeIdx > 0"
-                        class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-grey-5 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
-                        :style="{
-                          backgroundColor:
-                            store.state.theme === 'dark'
-                              ? '#1d1d1d'
-                              : '#eeeeee',
-                        }"
-                      >
-                        {{ typeName }}
-                      </div>
-                      <div
-                        v-for="streamName in Object.keys(
-                          selectedFieldAnalytics.sample_values[typeName],
-                        )"
-                        :key="typeName + '-' + streamName"
-                        class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate hover:tw:bg-primary/10"
-                        :class="{
-                          'tw:bg-primary/20 tw:text-primary tw:font-medium':
-                            activeStreamId === streamName &&
-                            activeStreamType === typeName,
-                        }"
-                        @click="
-                          activeStreamId = streamName;
-                          activeStreamType = typeName;
-                        "
-                      >
-                        {{ streamName }}
-                      </div>
-                    </template>
-                  </template>
-                </div>
-              </div>
-
-              <!-- Right Pane: N-1 hierarchy columns -->
-              <div
-                class="tw:flex-1 tw:flex tw:overflow-x-auto"
-                :style="{
-                  backgroundColor:
-                    store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff',
-                }"
-              >
-                <div
-                  v-for="(col, colIdx) in popupColumns"
-                  :key="col.group_id"
-                  class="tw:min-w-[160px] tw:flex-1 tw:overflow-y-auto"
-                  :class="{ 'tw:border-l': colIdx > 0 }"
-                >
+                <div class="tw:p-4 tw:flex tw:flex-col tw:gap-2">
                   <div
-                    class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:sticky tw:top-0 tw:z-10 tw:border-b"
-                    :style="{
-                      backgroundColor:
-                        store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
-                    }"
+                    v-for="val in getPopupColumnValues(colIdx)"
+                    :key="val"
+                    class="tw:px-3 tw:py-2 tw:rounded tw:border tw:transition-colors tw:cursor-pointer tw:font-mono tw:truncate"
+                    :style="
+                      popupColumnSelections[colIdx] === val
+                        ? {}
+                        : {
+                            backgroundColor:
+                              store.state.theme === 'dark'
+                                ? '#2d2d2d'
+                                : '#f5f5f5',
+                            borderColor:
+                              store.state.theme === 'dark' ? '#444' : '#e0e0e0',
+                          }
+                    "
+                    :class="
+                      popupColumnSelections[colIdx] === val
+                        ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
+                        : ''
+                    "
+                    @click="selectPopupColumnValue(colIdx, val)"
                   >
-                    {{ col.display }}
+                    {{ val }}
                   </div>
-                  <div class="tw:p-4 tw:flex tw:flex-col tw:gap-2">
-                    <div
-                      v-for="val in getPopupColumnValues(colIdx)"
-                      :key="val"
-                      class="tw:px-3 tw:py-2 tw:rounded tw:border tw:transition-colors tw:cursor-pointer tw:font-mono tw:truncate"
-                      :style="
-                        popupColumnSelections[colIdx] === val
-                          ? {}
-                          : {
-                              backgroundColor:
-                                store.state.theme === 'dark'
-                                  ? '#2d2d2d'
-                                  : '#f5f5f5',
-                              borderColor:
-                                store.state.theme === 'dark'
-                                  ? '#444'
-                                  : '#e0e0e0',
-                            }
-                      "
-                      :class="
-                        popupColumnSelections[colIdx] === val
-                          ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
-                          : ''
-                      "
-                      @click="selectPopupColumnValue(colIdx, val)"
-                    >
-                      {{ val }}
-                    </div>
-                    <div
-                      v-if="getPopupColumnValues(colIdx).length === 0"
-                      class="tw:text-grey-5 tw:text-xs tw:italic tw:p-2"
-                    >
-                      No values
-                    </div>
+                  <div
+                    v-if="getPopupColumnValues(colIdx).length === 0"
+                    class="tw:text-grey-5 tw:text-xs tw:italic tw:p-2"
+                  >
+                    No values
                   </div>
-                </div>
-                <!-- Fallback when no ranked dims beyond the selected field -->
-                <div
-                  v-if="popupColumns.length === 0"
-                  class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-grey-5 tw:text-sm tw:italic"
-                >
-                  No additional dimensions detected.
                 </div>
               </div>
+              <!-- Fallback when no ranked dims beyond the selected field -->
+              <div
+                v-if="popupColumns.length === 0"
+                class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-grey-5 tw:text-sm tw:italic"
+              >
+                No additional dimensions detected.
+              </div>
             </div>
+          </div>
 
-            <div v-else class="text-grey tw:italic tw:p-4 tw:text-center">
-              No sample data available for this field.
-            </div>
-          </q-card-section>
+          <div v-else class="text-grey tw:italic tw:p-4 tw:text-center">
+            No sample data available for this field.
+          </div>
+        </q-card-section>
       </ODialog>
     </div>
   </div>
@@ -1577,7 +1522,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
@@ -1587,6 +1531,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1598,6 +1547,8 @@ import type {
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1622,7 +1573,6 @@ const props = defineProps<{
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -1648,7 +1598,6 @@ const addFieldValue = ref("");
 const addingTrackedAlias = ref(false);
 const addTrackedAliasValue = ref("");
 const addTrackedAliasSelectRef = ref<any>(null);
-const addFieldFilter = ref("");
 
 /** All env keys that have at least one configured field, ordered by detected env order */
 const allConfiguredEnvs = computed(() => {
@@ -3187,16 +3136,16 @@ function pluralize(val: string): string {
   return val + "s";
 }
 
-/** Returns a Quasar color token for a cardinality class */
-function cardinalityColor(cardClass: string): string {
-  const map: Record<string, string> = {
-    VeryLow: "positive",
-    Low: "positive",
+/** Returns a BadgeVariant token for a cardinality class */
+function cardinalityColor(cardClass: string): BadgeVariant {
+  const map: Record<string, BadgeVariant> = {
+    VeryLow: "success",
+    Low: "success",
     Medium: "warning",
-    High: "negative",
-    VeryHigh: "negative",
+    High: "error",
+    VeryHigh: "error",
   };
-  return map[cardClass] ?? "grey";
+  return map[cardClass] ?? "default";
 }
 
 /** Get the best available cardinality class for a group */
@@ -3363,15 +3312,8 @@ function getAddFieldOptionsForEnv(envKey: string) {
     .flat()
     .filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
-  const needle = addFieldFilter.value.toLowerCase();
   return availableGroups.value
     .filter((g) => !used.has(g.group_id))
-    .filter(
-      (g) =>
-        !needle ||
-        g.display.toLowerCase().includes(needle) ||
-        g.group_id.toLowerCase().includes(needle),
-    )
     .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
@@ -3382,21 +3324,14 @@ function getAddFieldOptionsForEnv(envKey: string) {
         recommended: g.recommended,
         uniqueValues: dim?.cardinality ?? g.unique_values ?? null,
         cardinalityLabel: cardClass,
-        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "grey",
+        cardinalityColor: cardClass ? cardinalityColor(cardClass) : "default",
       };
     });
-}
-
-function onAddFieldFilter(val: string, update: (fn: () => void) => void) {
-  update(() => {
-    addFieldFilter.value = val;
-  });
 }
 
 /** Called when user picks a field in the inline select for a specific env */
 function onAddFieldToEnv(envKey: string, val: string) {
   if (!val) return;
-  addFieldFilter.value = "";
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,
@@ -3412,8 +3347,8 @@ function applySuggestion() {
   }
   addingToEnv.value = "";
   suggestionDismissed.value = true;
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message:
       'Recommended configuration applied. Click "Save Configuration" to save.',
     timeout: 3000,
@@ -3616,8 +3551,8 @@ async function loadData() {
     }
   } catch (err: any) {
     console.error("Failed to load workload detection data:", err);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.correlation.loadRecommendationsFailed"),
       timeout: 3000,
     });
@@ -3664,8 +3599,8 @@ async function saveConfig() {
       }));
 
     if (sets.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: t(
           "settings.correlation.identityConfigNoSets",
           "Configure at least one identity set before saving.",
@@ -3676,8 +3611,8 @@ async function saveConfig() {
     }
 
     if (trackedAliasIds.value.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: "Select at least one tracked alias group.",
         timeout: 3000,
       });
@@ -3688,11 +3623,11 @@ async function saveConfig() {
     // Also drop orphan ids that no longer correspond to any known group (e.g. the
     // group was deleted from Field Mappings after being added to tracked aliases).
     const knownGroupIds = new Set([
-      ...availableGroups.value.map(g => g.group_id),
-      ...trackedAliasOptions.value.map(o => o.value),
+      ...availableGroups.value.map((g) => g.group_id),
+      ...trackedAliasOptions.value.map((o) => o.value),
     ]);
-    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(id =>
-      id !== "service" && knownGroupIds.has(id)
+    const sanitizedTrackedAliasIds = trackedAliasIds.value.filter(
+      (id) => id !== "service" && knownGroupIds.has(id),
     );
     const payload: ServiceIdentityConfig = {
       sets,
@@ -3713,14 +3648,14 @@ async function saveConfig() {
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.identityConfigSaved"),
       timeout: 2000,
     });
   } catch (err: any) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err?.response?.data?.message ||
         err?.message ||

@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import AddFunction, { defaultValue } from "./AddFunction.vue"; // Import defaultValue for prop tests
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -67,7 +67,7 @@ vi.mock('quasar', async (importOriginal) => {
 });
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
   config: {
     notify: {},
     platform: {

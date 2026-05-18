@@ -23,31 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
-      <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-        <q-input
+      <div>
+        <OInput
           v-model="orgMemberData.first_name"
           :label="t('user.name')"
-          color="input-border"
-          bg-color="input-bg"
           class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
           readonly
-          filled
-          dense
         />
 
-        <q-select
+        <OSelect
           v-model="orgMemberData.role"
           :label="t('user.role')"
           :options="roleOptions"
-          color="input-border"
-          bg-color="input-bg"
           class="q-pt-md q-pb-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
         />
 
         <div class="flex justify-center q-mt-lg tw:gap-2">
@@ -61,12 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="onSubmit"
           >
             {{ t('user.save') }}
           </OButton>
         </div>
-      </q-form>
+      </div>
     </div>
   </ODrawer>
 </template>
@@ -75,12 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -94,7 +84,7 @@ let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
-  components: { OButton, ODrawer },
+  components: { OButton, ODrawer, OInput, OSelect },
   props: {
     open: {
       type: Boolean,
@@ -109,7 +99,6 @@ export default defineComponent({
   setup() {
     const store: any = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const roleOptions = ["admin"];
     const orgMemberData: any = ref(defaultValue());
     const updateUserForm: any = ref(null);
@@ -135,8 +124,8 @@ export default defineComponent({
   },
   methods: {
     onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -159,14 +148,14 @@ export default defineComponent({
           if (res?.data?.error_members != null) {
             const message = `Error while updating organization member`;
 
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: message,
               timeout: 15000,
             });
           } else {
-            this.$q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Organization member updated successfully.",
               timeout: 3000,
             });

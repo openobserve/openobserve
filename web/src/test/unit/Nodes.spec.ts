@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar, Notify } from "quasar";
+import { Quasar } from "quasar";
 import Nodes from "../../components/settings/Nodes.vue";
 import store from "./helpers/store";
 import { createI18n } from "vue-i18n";
@@ -187,7 +187,7 @@ describe("Nodes.vue", () => {
 
     wrapper = mount(Nodes, {
       global: {
-        plugins: [store, i18n, [Quasar, { plugins: [Notify] }]],
+        plugins: [store, i18n, [Quasar, { plugins: [] }]],
         mocks: {
           $q
         },

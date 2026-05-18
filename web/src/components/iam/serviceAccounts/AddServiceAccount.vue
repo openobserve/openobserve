@@ -22,32 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div class="tw:p-4">
-      <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <q-input
+      <div>
+          <OInput
             v-if="!beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
             class="showLabelOnTop tw:mt-2"
-            ref="email"
-            stack-label
-            hide-bottom-space
-            borderless
-            dense
-            :rules="[
-              (val: any, rules: any) =>
-                rules.email(val) || 'Please enter a valid email address',
-            ]"
+            :error="!!emailError"
+            :error-message="emailError"
+            @update:model-value="emailError = ''"
           />
 
-          <q-input
+          <OInput
             v-model="firstName"
             :label="t('user.description')"
             class="showLabelOnTop tw:mt-2"
-            ref="description"
-            stack-label
-            hide-bottom-space
-            borderless
-            dense
           />
           <div class="flex justify-start tw:mt-6 tw:gap-2">
             <OButton
@@ -61,12 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm-action"
-              type="submit"
+              @click="onSubmit"
             >
               {{ t('user.save') }}
             </OButton>
           </div>
-        </q-form>
+        </div>
     </div>
   </ODrawer>
 </template>
@@ -75,13 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue: any = () => {
   return {
@@ -95,7 +85,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODrawer },
+  components: { OButton, ODrawer, OInput },
   props: {
     open: {
       type: Boolean,
@@ -116,7 +106,6 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const $q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(false);
     const beingUpdated: any = ref(false);
@@ -126,6 +115,7 @@ export default defineComponent({
     const logout_confirm = ref(false);
 
     const firstName = ref(formData.value.first_name);
+    const emailError = ref('');
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -151,7 +141,6 @@ export default defineComponent({
 
     return {
       t,
-      $q,
       store,
       router,
       formData,
@@ -164,13 +153,21 @@ export default defineComponent({
       logout_confirm,
       firstName,
       track,
+      emailError,
     };
   },
 
   methods: {
     onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
+      if (!this.beingUpdated) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!this.formData.email || !emailRegex.test(this.formData.email)) {
+          this.emailError = 'Please enter a valid email address';
+          return;
+        }
+      }
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -194,8 +191,7 @@ export default defineComponent({
           .catch((err: any) => {
             if (err.response?.status != 403) {
               if (err?.response?.data?.message) {
-                this.$q.notify({
-                  color: "negative",
+                toast({
                   message: err?.response?.data?.message,
                   timeout: 2000,
                 });
@@ -220,8 +216,7 @@ export default defineComponent({
             .catch((err: any) => {
               if(err.response?.status != 403){
                 if(err?.response?.data?.message ) {
-                  this.$q.notify({
-                    color: "negative",
+                  toast({
                     message: err?.response?.data?.message,
                     timeout: 2000,
                   });

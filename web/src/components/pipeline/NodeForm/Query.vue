@@ -57,13 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="onRunQuery"
       >
         {{ t('search.runQuery') }}
-        <q-tooltip
+        <OTooltip
           v-if="!scheduledPipelineRef?.selectedStreamName"
-          anchor="bottom middle"
-          self="top middle"
-        >
-          {{ t('search.selectStreamFirst') }}
-        </q-tooltip>
+          :content="t('search.selectStreamFirst')"
+          side="bottom"
+        />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
@@ -86,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
     >
     <div class="stream-routing-container q-px-md">
-      <q-form ref="queryFormRef">
+      <div>
         <div class="full-width">
           <scheduled-pipeline
             ref="scheduledPipelineRef"
@@ -122,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-mt-sm"
           />
         </div>
-      </q-form>
+      </div>
     </div>
     </div>
   </ODrawer>
@@ -155,7 +153,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
 import config from "@/aws-exports";
-import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -163,6 +160,8 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
@@ -231,7 +230,6 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -289,8 +287,6 @@ const indexOptions = ref([]);
 const originalStreamFields: Ref<any[]> = ref([]);
 
 const isAggregationEnabled = ref(false);
-
-const queryFormRef = ref<any>(null);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
@@ -475,14 +471,6 @@ const saveQueryData = async () => {
     return false; // Don't close dialog on SQL validation failure
   }
 
-  //this is not needed as we are using validateInputs in scheduledPipeline.vue
-
-  // queryFormRef.value.validate().then((valid: any) => {
-  //   if (!valid) {
-  //     return false;
-  //   }
-  // });
-
   const formData = streamRoute.value;
   if (typeof formData.trigger_condition.period === "string") {
     formData.trigger_condition.period = parseInt(
@@ -629,8 +617,8 @@ const validateSqlQuery = async () => {
           const message = err?.response?.data?.message
             ? `Invalid SQL Query: ${err?.response?.data?.message}`
             : "Invalid SQL Query";
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `${message}`,
             timeout: 3000,
           });

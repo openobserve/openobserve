@@ -50,102 +50,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="q-mr-md"
         style="width: 400px"
       >
-        <q-input
+        <OInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          borderless
-          dense
           class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
           placeholder="Search User"
         >
           <template #prepend>
             <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon"/>
           </template>
-        </q-input>
+        </OInput>
       </div>
 
       <div
           class="q-mx-sm current-organization"
         >
-        <q-select
+        <OSelect
           v-if="
             store.state.selectedOrganization.identifier ===
               store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
           v-model="selectedOrg"
-          borderless
-          use-input
-          input-debounce="300"
-          :options="orgList"
-          option-label="label"
-          option-value="value"
-          class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
-          @filter="filterOrganizations"
+          :options="orgOptions"
+          labelKey="label"
+          valueKey="value"
+          searchable
+          class="organizationlist"
           @update:model-value="updateOrganization"
           placeholder="Select Organization"
-          virtual-scroll
         />
 
         </div>
     </div>
     <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
-      <template v-if="rows.length">
-        <OTable
-          :data="rows"
-          :columns="columns"
-          row-key="email"
-          :global-filter="userSearchKey"
-          pagination="client"
-          :page-size="100"
-          sorting="client"
-          filter-mode="client"
-          :default-columns="false"
-          :show-global-filter="false"
-          dense
-        >
-          <template #cell-select="{ row }">
-            <OCheckbox
-              :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
-              size="sm"
-              :model-value="row.isInGroup"
-              class="filter-check-box cursor-pointer"
-              @update:model-value="toggleUserSelection(row)"
-            />
-          </template>
-          <template #cell-email="{ row }">
-            <div class="flex items-center">
-              <span>{{ row.email }}</span>
-              <OIcon
-                v-if="shouldShowWarning(row)"
-                name="info"
-                size="sm"
-                class="q-ml-xs cursor-pointer"
-                :data-test="`iam-external-user-warning-icon-${row.email}`"
-              >
-                <q-tooltip
-                  anchor="center right"
-                  self="center left"
-                  :offset="[10, 0]"
-                  max-width="300px"
-                >
-                  <div style="font-size: 12px; line-height: 1.5;">
-                    <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                    <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
-                  </div>
-                </q-tooltip>
-              </OIcon>
-            </div>
-          </template>
-        </OTable>
-      </template>
-      <div
-        data-test="iam-users-selection-table-no-users-text"
-        v-if="!rows.length"
-        class="text-bold q-pl-md q-py-md"
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="email"
+        :global-filter="userSearchKey"
+        pagination="client"
+        :page-size="100"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        dense
       >
-        No users added
-      </div>
+        <template #cell-select="{ row }">
+          <OCheckbox
+            :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
+            size="sm"
+            :model-value="row.isInGroup"
+            class="filter-check-box cursor-pointer"
+            @update:model-value="toggleUserSelection(row)"
+          />
+        </template>
+        <template #cell-email="{ row }">
+          <div class="flex items-center">
+            <span>{{ row.email }}</span>
+            <OIcon
+              v-if="shouldShowWarning(row)"
+              name="info"
+              size="sm"
+              class="q-ml-xs cursor-pointer"
+              :data-test="`iam-external-user-warning-icon-${row.email}`"
+            >
+              <OTooltip side="right">
+                <div style="font-size: 12px; line-height: 1.5;">
+                  <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
+                  <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
+                </div>
+              </OTooltip>
+            </OIcon>
+          </div>
+        </template>
+        <template #empty>
+          <NoData />
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
@@ -153,9 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import { computed, watch } from "vue";

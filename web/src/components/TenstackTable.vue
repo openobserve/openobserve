@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
                 >
-                  <OSpinner size="xs" />
+                  <OSpinner size="xs" data-test="tenstack-table-loading-indicator" />
                   {{ t("confirmDialog.loading") }}
                 </div>
               </slot>

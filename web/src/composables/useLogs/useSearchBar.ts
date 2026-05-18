@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -34,6 +33,7 @@ import useSearchStream from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export const useSearchBar = () => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams();
@@ -42,7 +42,6 @@ export const useSearchBar = () => {
 
   const store = useStore();
   const router = useRouter();
-  const $q = useQuasar();
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 
@@ -896,21 +895,19 @@ export const useSearchBar = () => {
             const isCancelled = res.data.some((item: any) => item.is_success);
             if (isCancelled) {
               searchObj.data.isOperationCancelled = false;
-              $q.notify({
+              toast({
                 message: "Running query cancelled successfully",
-                color: "positive",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 4000,
               });
             }
           })
           .catch((error: any) => {
-            $q.notify({
+            toast({
               message:
                 error.response?.data?.message ||
                 "Failed to cancel running query",
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 1500,
             });
           })
@@ -922,10 +919,9 @@ export const useSearchBar = () => {
             resolve(true);
           });
       } catch (error) {
-        $q.notify({
+        toast({
           message: "Failed to cancel running query",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 1500,
         });
         resolve(true);

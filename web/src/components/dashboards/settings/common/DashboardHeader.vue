@@ -36,17 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="right"></slot>
       </div>
     </div>
-    <q-separator class="q-mb-sm" />
+    <OSeparator class="tw:mb-2" />
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "DashboardHeader",
-  components: { OButton },
+  components: { OSeparator, OButton },
   props: {
     title: {
       type: String,

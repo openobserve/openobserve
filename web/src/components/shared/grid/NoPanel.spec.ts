@@ -41,11 +41,6 @@ const i18n = createI18n({
 });
 
 // Stubs for Quasar components not under test
-const qImgStub = {
-  template: '<img :src="src" />',
-  props: ["src", "style"],
-};
-
 const qBtnStub = {
   template:
     "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",
@@ -65,7 +60,6 @@ function mountNoPanel(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       stubs: {
-        "q-img": qImgStub,
         "q-btn": qBtnStub,
         OButton: oBtnStub,
       },
@@ -97,8 +91,8 @@ describe("NoPanel", () => {
       );
     });
 
-    it("should render a q-img element", () => {
-      expect(wrapper.find("img").exists()).toBe(true);
+    it("should render an img element", () => {
+      expect(wrapper.find('[data-test="no-panel-image"]').exists()).toBe(true);
     });
 
     it("should call getImageURL with the clipboard icon path", () => {
@@ -108,7 +102,7 @@ describe("NoPanel", () => {
     });
 
     it("should set img src to the value returned by getImageURL", () => {
-      const img = wrapper.find("img");
+      const img = wrapper.find('[data-test="no-panel-image"]');
       expect(img.attributes("src")).toBe(
         "/mock/images/common/clipboard_icon.svg",
       );
@@ -189,7 +183,7 @@ describe("NoPanel", () => {
       await wrapper.setProps({ viewOnly: true });
       // getImageURL is not expected to be called again — image is already rendered
       // The image still exists in the DOM regardless of viewOnly
-      expect(wrapper.find("img").exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-panel-image"]').exists()).toBe(true);
     });
   });
 });

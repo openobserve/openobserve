@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Error Validations
         </div>
         <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
-        <q-separator class="q-mx-md q-mt-md" />
+        <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
           <div
@@ -72,19 +72,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ errorMessage.message }}
 
                     <div style="width: 300px">
-                      <q-input
+                      <OInput
                         data-test="pipeline-import-name-input"
                         :model-value="userSelectedPipelineName[index] || ''"
                         :label="t('alerts.name') + ' *'"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="showLabelOnTop"
-                        stack-label
-                        outlined
-                        filled
-                        dense
+                        :error="touchedPipelineName[index] && !userSelectedPipelineName[index]"
+                        :error-message="touchedPipelineName[index] && !userSelectedPipelineName[index] ? 'Name is required' : ''"
                         tabindex="0"
                         @update:model-value="(val: string) => {
+                          touchedPipelineName[index] = true;
                           userSelectedPipelineName[index] = val;
                           updatePipelineName(val as string, index);
                         }"
@@ -101,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-source-stream-name-input"
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
@@ -110,11 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           textTransform: 'lowercase',
                         }"
                         color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
                         use-input
                         hide-selected
                         fill-input
@@ -139,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                     </div>
                   </span>
                   <!-- source stream type should be one of the valid stream types -->
@@ -152,29 +145,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-source-stream-type-input"
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        @update:model-value="(val) => {
+                        style="width: 300px"
+                        :error="touchedStreamType[index] && !userSelectedStreamType[index]"
+                        :error-message="touchedStreamType[index] && !userSelectedStreamType[index] ? 'Stream type is required' : ''"
+                        @update:model-value="(val: any) => {
+                          touchedStreamType[index] = true;
                           userSelectedStreamType[index] = val;
                           getSourceStreamsList(val, index);
                         }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
@@ -212,29 +196,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedDestinationStreamType[index] || ''"
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        @update:model-value="(val) => {
+                        style="width: 300px"
+                        :error="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index]"
+                        :error-message="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index] ? 'Stream type is required' : ''"
+                        @update:model-value="(val: any) => {
+                          touchedDestinationStreamType[index] = true;
                           userSelectedDestinationStreamType[index] = val;
                           getDestinationStreamsList(val, index);
                         }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
@@ -248,31 +223,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-org-id-input"
                         :model-value="userSelectedOrgId[index] || null"
                         :options="organizationData"
                         :label="'Organization Id'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
+                        labelKey="label"
+                        valueKey="value"
+                        searchable
                         class="q-py-sm showLabelOnTop no-case"
-                        filled
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        :input-debounce="400"
-                        @update:model-value="(val) => {
+                        @update:model-value="(val: any) => {
                           userSelectedOrgId[index] = val;
                           updateOrgId(val?.value || val, index);
                         }"
-                        behavior="menu"
-                      >
-                      </q-select>
+                      />
                     </div>
                   </span>
                   <!-- source stream type should be one of the valid stream types -->
@@ -285,29 +249,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-destination-function-name-input"
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
                         :label="'Function Name'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        @update:model-value="(val) => {
+                        style="width: 300px"
+                        :error="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex]"
+                        :error-message="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex] ? 'Function name is required' : ''"
+                        @update:model-value="(val: any) => {
+                          touchedFunctionName[errorMessage.nodeIndex] = true;
                           userSelectedFunctionName[errorMessage.nodeIndex] = val;
                           updateFunctionName(val, index, errorMessage.nodeIndex);
                         }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
@@ -321,29 +276,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
-                        :popup-content-style="{
-                          textTransform: 'lowercase',
-                        }"
-                        color="input-border"
-                        bg-color="input-bg"
                         class="q-py-sm showLabelOnTop no-case"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        @update:model-value="(val) => {
+                        style="width: 300px"
+                        :error="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]"
+                        :error-message="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index] ? 'Remote destination is required' : ''"
+                        @update:model-value="(val: any) => {
+                          touchedRemoteDestination[index] = true;
                           userSelectedRemoteDestination[index] = val;
                           updateRemoteDestination(val, index);
                         }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
@@ -356,26 +302,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <q-select
+                      <OSelect
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedTimezone[index] || ''"
                         :options="timezoneOptions"
                         :label="'Timezone'"
-                        color="input-border"
-                        bg-color="input-bg"
+                        searchable
                         class="q-py-sm showLabelOnTop no-case"
-                        stack-label
-                        outlined
-                        filled
-                        dense
-                        @update:model-value="(val) => {
+                        style="width: 300px"
+                        :error="touchedTimezone[index] && !userSelectedTimezone[index]"
+                        :error-message="touchedTimezone[index] && !userSelectedTimezone[index] ? 'Timezone is required' : ''"
+                        @update:model-value="(val: any) => {
+                          touchedTimezone[index] = true;
                           userSelectedTimezone[index] = val;
                           updateTimezone(val, index);
                         }"
-                        :rules="[
-                          (val: any) => !!val || 'Field is required!',
-                        ]"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
@@ -435,13 +376,14 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
 import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -452,10 +394,13 @@ import {
 export default defineComponent({
   name: "ImportPipeline",
   components: {
+    OSeparator,
     BaseImport,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OInput: defineAsyncComponent(() => import("@/lib/forms/Input/OInput.vue")),
+    OSelect: defineAsyncComponent(() => import("@/lib/forms/Select/OSelect.vue")),
   },
   props: {
     destinations: {
@@ -489,13 +434,13 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    const q = useQuasar();
     const { getStreams } = useStreams();
     const { getPipelineDestinations } = usePipelines();
 
     const baseImportRef = ref<any>(null);
     const pipelineErrorsToDisplay = ref<PipelineErrors>([]);
     const userSelectedPipelineName = ref<string[]>([]);
+    const touchedPipelineName = ref<boolean[]>([]);
 
     const pipelineCreators = ref<pipelineCreator>([]);
     const streamList = ref<any>([]);
@@ -503,8 +448,11 @@ export default defineComponent({
     const userSelectedStreamName = ref<string[]>([]);
     const userSelectedDestinationStreamName = ref<string[]>([]);
     const userSelectedStreamType = ref<string[]>([]);
+    const touchedStreamType = ref<boolean[]>([]);
     const userSelectedDestinationStreamType = ref<string[]>([]);
+    const touchedDestinationStreamType = ref<boolean[]>([]);
     const userSelectedRemoteDestination = ref<string[]>([]);
+    const touchedRemoteDestination = ref<boolean[]>([]);
 
     // Use computed to directly reference BaseImport's jsonArrayOfObj
     const jsonArrayOfObj = computed({
@@ -528,6 +476,7 @@ export default defineComponent({
     const alertDestinations = ref<any>([]);
     const userSelectedSqlQuery = ref<string[]>([]);
     const userSelectedFunctionName = ref<any[]>([]);
+    const touchedFunctionName = ref<boolean[]>([]);
     const scheduledPipelines = ref<any>([]);
     const userSelectedOrgId = ref<any[]>([]);
     const isPipelineImporting = ref(false);
@@ -545,6 +494,7 @@ export default defineComponent({
     });
 
     const userSelectedTimezone = ref<string[]>([]);
+    const touchedTimezone = ref<boolean[]>([]);
 
     // @ts-ignore
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -726,10 +676,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -751,10 +700,9 @@ export default defineComponent({
       }
 
       if (allPipelinesCreated) {
-        q.notify({
+        toast({
           message: "Pipeline(s) imported successfully",
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -789,10 +737,9 @@ export default defineComponent({
           return await createPipeline(jsonObj, index);
         }
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Pipeline(s) please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;
@@ -1532,6 +1479,12 @@ export default defineComponent({
       organizationData,
       updateOrgId,
       userSelectedTimezone,
+      touchedPipelineName,
+      touchedStreamType,
+      touchedDestinationStreamType,
+      touchedRemoteDestination,
+      touchedFunctionName,
+      touchedTimezone,
       store,
       isPipelineImporting,
       // Exposed internal functions for testing

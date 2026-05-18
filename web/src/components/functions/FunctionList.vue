@@ -49,73 +49,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
           <div class="card-container tw:h-[calc(100vh-127px)]">
-            <q-table
-              ref="qTable"
-              :rows="visibleRows"
+            <OTable
+              :data="visibleRows"
               :columns="columns"
               row-key="name"
-              :pagination="pagination"
-              :filter="filterQuery"
+              pagination="client"
+              :page-size="pageSize"
+              :page-size-options="pageSizeOptions"
               selection="multiple"
-              v-model:selected="selectedFunctions"
-              style="width: 100%"
+              v-model:selected-ids="selectedFunctionIds"
+              :show-global-filter="false"
+              width="100%"
               :style="hasVisibleRows
                   ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
                   : 'width: 100%'"
-              class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             >
-              <template #no-data>
+              <template #empty>
                 <NoData />
               </template>
-              <template v-slot:body-cell-actions="props">
-                <q-td :props="props">
+
+              <template #cell-actions="{ row }">
+                <div class="tw:flex tw:items-center actions-container">
                   <OButton
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
-                    @click="showAddUpdateFn(props)"
+                    @click="showAddUpdateFn({ row })"
                     icon-left="edit"
                   />
                   <OButton
                     variant="ghost-destructive"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
-                    @click="showDeleteDialogFn(props)"
+                    @click="showDeleteDialogFn({ row })"
                     icon-left="delete"
                   />
                   <OButton
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     :title="'Associated Pipelines'"
-                    @click="getAssociatedPipelines(props)"
+                    @click="getAssociatedPipelines({ row })"
                   >
                     <OIcon name="account-tree" size="xs" />
                   </OButton>
-                </q-td>
-              </template>
-
-              <template v-slot:body-cell-function="props">
-                <q-td :props="props">
-                  <OTooltip>
-                    <template #content><pre>{{ props.row.function }}</pre></template>
-                  </OTooltip>
-                  <pre style="white-space: break-spaces">{{
-                    props.row.function
-                  }}</pre>
-                </q-td>
-              </template>
-
-              <template v-slot:body-selection="scope">
-                <OCheckbox v-model="scope.selected" class="o2-table-checkbox" />
+                </div>
               </template>
 
               <template #bottom="scope">
                 <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
-                        {{ resultTotal }} {{ t('function.header') }}
-                      </div>
+                    {{ resultTotal }} {{ t('function.header') }}
+                  </div>
                   <OButton
                     v-if="selectedFunctions.length > 0"
                     data-test="function-list-delete-functions-btn"
@@ -127,41 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Delete
                   </OButton>
-                  <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
                 </div>
-
               </template>
-
-              <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <OCheckbox
-                        v-model="props.selected"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
-
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
-            </q-table>
+            </OTable>
           </div>
         </div>
       </div>
@@ -233,10 +187,10 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import QTablePagination from "../shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -250,11 +204,12 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "functionList",
   components: {
-    QTablePagination,
+    OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
     ConfirmDialog,
@@ -274,47 +229,44 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
-    const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
-    const selectedFunctions = ref<any[]>([]);
     const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const filterQuery = ref("");
     const { track } = useReo();
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("function.name"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("function.actions"),
-        align: "center",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
         sortable: false,
-        classes:'actions-column'
+        size: 67,
+        meta: { align: "left" },
       },
-    ]);
+      {
+        id: "name",
+        accessorKey: "name",
+        header: t("function.name"),
+        sortable: true,
+        meta: { align: "left", autoWidth: true },
+      },
+      {
+        id: "actions",
+        header: t("function.actions"),
+        isAction: true,
+        size: 150,
+        meta: { align: "center", cellClass: "actions-column" },
+      },
+    ];
 
     const onPipelineSelect = (pipeline: any) => {
       const routeUrl = router.resolve({
@@ -330,8 +282,8 @@ export default defineComponent({
     };
 
     const getJSTransforms = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading functions...",
       });
 
@@ -380,8 +332,8 @@ export default defineComponent({
 
           dismiss();
           if (err?.response?.status && err?.response?.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while pulling function.",
               timeout: 2000,
             });
@@ -393,31 +345,20 @@ export default defineComponent({
       getJSTransforms();
     }
 
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
     const resultTotal = ref<number>(0);
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
+    const pageSize = ref(20);
+    const pageSizeOptions = [20, 50, 100, 250, 500];
+
+    const selectedFunctionIds = ref<string[]>([]);
+    const selectedFunctions = computed({
+      get: () =>
+        (jsTransforms.value || []).filter((row: any) =>
+          selectedFunctionIds.value.includes(row.name),
+        ),
+      set: (val) => {
+        selectedFunctionIds.value = val.map((row: any) => row.name);
+      },
     });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
 
     const addTransform = () => {
       showAddJSTransformDialog.value = true;
@@ -502,15 +443,15 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
               timeout: 2000,
             });
             getJSTransforms();
           } else {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res.data.message,
               timeout: 2000,
             });
@@ -518,15 +459,14 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err.response.data.code == 409) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
               timeout: 10000,
               actions: [
                 {
                   label: "View",
-                  color: "white",
                   handler: () => {
                     forceRemoveFunction(err.response.data["message"]);
                   },
@@ -536,8 +476,8 @@ export default defineComponent({
             return;
           }
           if (err.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response.data["message"]) ||
                 "Function deletion failed.",
@@ -624,16 +564,16 @@ export default defineComponent({
     };
 
     const bulkDeleteFunctions = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting functions...",
         timeout: 0,
       });
 
       try {
         if (selectedFunctions.value.length === 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No functions selected for deletion",
             timeout: 2000,
           });
@@ -661,30 +601,30 @@ export default defineComponent({
 
           if (failCount > 0 && successCount > 0) {
             // Partial success
-            $q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} function(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} function(s)`,
               timeout: 3000,
             });
           } else {
             // All successful
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} function(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
           // Fallback success message
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedFunctions.value.length} function(s) deleted successfully`,
             timeout: 2000,
           });
@@ -700,8 +640,8 @@ export default defineComponent({
         // Show error message from response if available
         const errorMessage = error.response?.data?.message || error?.message || "Error deleting functions. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });
@@ -713,7 +653,6 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       store,
       router,
       jsTransforms,
@@ -723,20 +662,16 @@ export default defineComponent({
       confirmDelete,
       selectedDelete,
       getJSTransforms,
-      pagination,
       resultTotal,
       refreshList,
-      perPageOptions,
-      selectedPerPage,
+      pageSize,
+      pageSizeOptions,
       addTransform,
       deleteFn,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
-      changePagination,
-      maxRecordToReturn,
       showAddJSTransformDialog,
-      changeMaxRecordToReturn,
       forceDeleteFn,
       confirmForceDelete,
       pipelineList,
@@ -756,6 +691,7 @@ export default defineComponent({
       bulkDeleteFunctions,
       confirmBulkDelete,
       selectedFunctions,
+      selectedFunctionIds,
     };
   },
   computed: {

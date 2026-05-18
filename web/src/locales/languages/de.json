@@ -791,7 +791,8 @@
     "no_keep_current": "Nein, auf dem Laufenden bleiben",
     "feature_correlation_management": "Korrelationsmanagement",
     "feature_log_patterns": "Muster protokollieren",
-    "environment_type": "Art der Umgebung"
+    "environment_type": "Art der Umgebung",
+    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme."
   },
   "login": {
     "userid": "Benutzer-ID",
@@ -1591,7 +1592,8 @@
     "axisLabelRotateTooltipText": "Drehen Sie den Beschriftungstext auf der X-Achse um einen bestimmten Winkel (in Grad), um die Lesbarkeit zu verbessern, wenn Beschriftungen lang oder überfüllt sind.",
     "axisLabelTruncateTooltipText": "Kürzt die Beschriftungen der X-Achse auf die angegebene Breite (in Pixeln).",
     "axisLabelTooltipNotePrefix": "Hinweis:",
-    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt."
+    "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
+    "allFolders": "Alle Ordner"
   },
   "panel": {
     "header": "Panel",

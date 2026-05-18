@@ -791,7 +791,8 @@
     "no_keep_current": "不，保持最新状态",
     "feature_correlation_management": "关联管理",
     "feature_log_patterns": "日志模式",
-    "environment_type": "环境类型"
+    "environment_type": "环境类型",
+    "license_allows_unlimited_ingestion": "当前的许可证允许无限制地摄取数据。"
   },
   "login": {
     "userid": "账号",
@@ -1591,7 +1592,8 @@
     "axisLabelRotateTooltipText": "按选定角度（以度为单位）旋转 x 轴标签文本，以提高标签较长或拥挤时的可读性。",
     "axisLabelTruncateTooltipText": "将 x 轴标签截断为指定宽度（以像素为单位）。",
     "axisLabelTooltipNotePrefix": "注意：",
-    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。"
+    "axisLabelTooltipNoteText": " 时间序列 x 轴字段不支持此选项。",
+    "allFolders": "所有文件夹"
   },
   "panel": {
     "header": "面板",

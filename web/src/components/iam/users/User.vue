@@ -199,7 +199,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
@@ -220,6 +219,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { computed } from "vue";
 import { getRoles } from "@/services/iam";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -243,7 +243,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const showUpdateUserDialog: any = ref(false);
     const showAddUserDialog: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -399,8 +398,8 @@ export default defineComponent({
     };
 
     const getInvitedMembers = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading users...",
       });
 
@@ -424,8 +423,8 @@ export default defineComponent({
     }
 
     const getOrgMembers = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading users...",
       });
 
@@ -474,8 +473,8 @@ export default defineComponent({
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Failed to load users: " + (err?.response?.data?.message || err?.message || "Unknown error"),
               timeout: 5000,
             });
@@ -687,8 +686,7 @@ export default defineComponent({
         try {
           await getOrgMembers();
         } catch (error) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: "Failed to refresh user list",
           });
         }
@@ -719,8 +717,7 @@ export default defineComponent({
         await getOrgMembers();
         updateUserActions();
         if (operationType == "created") {
-          $q.notify({
-            color: "positive",
+          toast({
             message: "User added successfully.",
           });
           // if (
@@ -748,8 +745,7 @@ export default defineComponent({
           //   usersState.users.push(user);
           // }
         } else {
-          $q.notify({
-            color: "positive",
+          toast({
             message: "User updated successfully.",
           });
           // usersState.users.forEach((member: any, key: number) => {
@@ -781,8 +777,7 @@ export default defineComponent({
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "User deleted successfully.",
             });
             await getOrgMembers();
@@ -791,8 +786,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: "Error while deleting user.",
             });
           }
@@ -807,8 +801,8 @@ export default defineComponent({
 
     const revokeInvite = async () => {
       confirmRevoke.value = false;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -817,8 +811,7 @@ export default defineComponent({
         .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
         .then(async (res: any) => {
           dismiss();
-          $q.notify({
-            color: "positive",
+          toast({
             message: "Invitation revoked successfully.",
             timeout: 3000,
           });
@@ -834,8 +827,7 @@ export default defineComponent({
         })
         .catch((err: any) => {
           dismiss();
-          $q.notify({
-            color: "negative",
+          toast({
             message: err?.response?.data?.message || "Error while revoking invitation.",
             timeout: 5000,
           });
@@ -862,20 +854,17 @@ export default defineComponent({
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
-            color: "positive",
+          toast({
             message: `Successfully deleted ${successful.length} user(s)`,
             timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
-            color: "warning",
+          toast({
             message: `Deleted ${successful.length} user(s), but ${unsuccessful.length} failed`,
             timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: `Failed to delete ${unsuccessful.length} user(s)`,
             timeout: 2000,
           });
@@ -887,8 +876,7 @@ export default defineComponent({
         updateUserActions();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: err.response?.data?.message || err?.message || "Error while deleting users",
             timeout: 2000,
           });
@@ -897,8 +885,8 @@ export default defineComponent({
     };
 
     const updateUserRole = (row: any) => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -916,14 +904,14 @@ export default defineComponent({
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
             const message = `Error while updating organization member`;
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: message,
               timeout: 15000,
             });
           } else {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Organization member updated successfully.",
               timeout: 3000,
             });

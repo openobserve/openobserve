@@ -62,33 +62,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <i18n-t keypath="settings.correlation.exampleText" tag="span">
                 <template #dim1>
-                  <q-chip
-                    dense
+                  <OBadge
                     size="sm"
-                    color="primary"
-                    text-color="white"
+                    variant="primary"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >k8s-cluster=prod</q-chip
+                    >k8s-cluster=prod</OBadge
                   >
                 </template>
                 <template #dim2>
-                  <q-chip
-                    dense
+                  <OBadge
                     size="sm"
-                    color="secondary"
-                    text-color="white"
+                    variant="primary"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >k8s-deployment=api-server</q-chip
+                    >k8s-deployment=api-server</OBadge
                   >
                 </template>
                 <template #value>
-                  <q-chip
-                    dense
+                  <OBadge
                     size="sm"
-                    color="positive"
-                    text-color="white"
+                    variant="success"
                     class="tw:mx-1 tw:my-1 example-chip"
-                    >prod/api-server</q-chip
+                    >prod/api-server</OBadge
                   >
                 </template>
               </i18n-t>
@@ -153,17 +147,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import GroupHeader from "@/components/common/GroupHeader.vue";
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 interface FieldAlias {
@@ -208,8 +202,8 @@ const saveSemanticMappings = async () => {
 
     for (const group of localSemanticGroups.value) {
       if (!group.id) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: group.group + t("settings.correlation.emptyIdError"),
           timeout: 3000,
         });
@@ -219,8 +213,8 @@ const saveSemanticMappings = async () => {
 
       // Validate display name is not empty
       if (!group.display || group.display.trim() === "") {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("common.nameRequired"),
           timeout: 3000,
         });
@@ -230,8 +224,8 @@ const saveSemanticMappings = async () => {
 
       // Validate fields array is not empty
       if (!group.fields || group.fields.length === 0) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `"${group.display || group.id}": ${t("settings.correlation.emptyFieldsError")}`,
           timeout: 3000,
         });
@@ -252,8 +246,8 @@ const saveSemanticMappings = async () => {
         const existingId = categoryMap.get(displayNameLower);
         // Only flag as duplicate if it's a different group (different ID)
         if (existingId !== group.id) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("settings.correlation.duplicateNamesInCategoryError", {
               name: group.display,
               category: category,
@@ -276,8 +270,8 @@ const saveSemanticMappings = async () => {
     }
 
     if (duplicateIds.length > 0) {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: t("settings.correlation.duplicateIdsError", {
           ids: duplicateIds.join(", "),
         }),
@@ -296,8 +290,8 @@ const saveSemanticMappings = async () => {
       "Semantic field groups for dimension extraction and correlation",
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.semanticMappingsSaved"),
       timeout: 2000,
     });
@@ -305,8 +299,8 @@ const saveSemanticMappings = async () => {
     emit("saved");
   } catch (error: any) {
     console.error("Error saving semantic mappings:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.correlation.configSaveFailed"),
       timeout: 3000,
     });

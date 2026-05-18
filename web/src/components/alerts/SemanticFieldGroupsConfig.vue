@@ -59,19 +59,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :disabled="localGroups.length === 0"
           @click="exportGroups"
-        >{{ t('correlation.exportToJson') }}</OButton>
+          >{{ t("correlation.exportToJson") }}</OButton
+        >
         <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
           variant="outline"
           size="sm"
           @click="navigateToImport"
-        >{{ t('correlation.importFromJson') }}</OButton>
+          >{{ t("correlation.importFromJson") }}</OButton
+        >
         <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
           variant="primary"
           size="sm"
           @click="addGroup"
-        >{{ t('correlation.addCustomGroup') }}</OButton>
+          >{{ t("correlation.addCustomGroup") }}</OButton
+        >
         <slot name="header-actions" />
       </div>
     </div>
@@ -165,11 +168,11 @@ import { useI18n } from "vue-i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
-import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
@@ -238,16 +241,16 @@ const normalizeCategoryName = (category: string): string => {
 
   // Map common variations to consistent names
   const categoryMap: Record<string, string> = {
-    'kubernetes': 'Kubernetes',
-    'k8s': 'Kubernetes',
-    'aws': 'AWS',
-    'amazon': 'AWS',
-    'azure': 'Azure',
-    'gcp': 'GCP',
-    'google': 'GCP',
-    'common': 'Common',
-    'generic': 'Common',
-    'other': 'Other'
+    kubernetes: "Kubernetes",
+    k8s: "Kubernetes",
+    aws: "AWS",
+    amazon: "AWS",
+    azure: "Azure",
+    gcp: "GCP",
+    google: "GCP",
+    common: "Common",
+    generic: "Common",
+    other: "Other",
   };
 
   return categoryMap[normalized] || category;
@@ -283,7 +286,8 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
+    (group) =>
+      normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
 });
 
@@ -388,7 +392,9 @@ onMounted(async () => {
 
   if (props.scrollToGroupId) {
     // Find and switch to the category that contains the requested group
-    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
+    const targetGroup = localGroups.value.find(
+      (g) => g.id === props.scrollToGroupId,
+    );
     if (targetGroup) {
       selectedCategory.value = targetGroup.group || "Other";
       await nextTick(); // wait for filteredGroups to re-render
@@ -400,17 +406,23 @@ onMounted(async () => {
   if (props.scrollToGroupId) {
     await nextTick();
     const el = document.querySelector(
-      `[data-group-id="${props.scrollToGroupId}"]`
+      `[data-group-id="${props.scrollToGroupId}"]`,
     ) as HTMLElement | null;
     if (el) {
       // Scroll within the nearest scrollable parent to avoid pushing
       // ancestor containers (main page layout) out of view
-      const scrollParent = el.closest('.tw\\:overflow-y-auto') as HTMLElement | null;
+      const scrollParent = el.closest(
+        ".tw\\:overflow-y-auto",
+      ) as HTMLElement | null;
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
-        const offset = elRect.top - parentRect.top - (parentRect.height / 2) + (elRect.height / 2);
-        scrollParent.scrollBy({ top: offset, behavior: 'smooth' });
+        const offset =
+          elRect.top -
+          parentRect.top -
+          parentRect.height / 2 +
+          elRect.height / 2;
+        scrollParent.scrollBy({ top: offset, behavior: "smooth" });
       } else {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }
@@ -428,7 +440,7 @@ onMounted(async () => {
 }
 
 .section-header {
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   padding-bottom: 12px;
 }
 
@@ -443,12 +455,18 @@ onMounted(async () => {
 }
 
 @keyframes group-border-blink {
-  0%, 100% { outline: 2px solid transparent; }
-  50%       { outline: 2px solid var(--q-primary); border-radius: 4px; }
+  0%,
+  100% {
+    outline: 2px solid transparent;
+  }
+  50% {
+    outline: 2px solid var(--q-primary);
+    border-radius: 4px;
+  }
 }
 
 .fingerprint-section {
-  border-top: 1px solid var(--q-separator-color);
+  border-top: 1px solid var(--color-separator);
   padding-top: 16px;
 }
 

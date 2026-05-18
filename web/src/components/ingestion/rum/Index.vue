@@ -61,11 +61,12 @@ import { defineComponent, ref, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "IngestRum",
@@ -83,7 +84,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
@@ -118,15 +118,15 @@ export default defineComponent({
     const copyToClipboardFn = (content: any) => {
       copyToClipboard(content.innerText)
         .then(() => {
-          q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "Content Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy content.",
             timeout: 5000,
           });

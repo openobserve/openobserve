@@ -23,38 +23,34 @@
           </div>
         </div>
       </q-card-section>
-      <q-separator />
+      <OSeparator />
     </div>
 
-    <q-table
-      class="my-sticky-virtscroll-table"
-      virtual-scroll
-      v-model:pagination="pagination"
-      :rows-per-page-options="[0]"
-      :virtual-scroll-sticky-size-start="48"
+    <OTable
+      class="my-sticky-virtscroll-table o2-table-hide-header"
+      :data="queryRows"
+      :columns="queryListColumns"
+      row-key="_rowKey"
+      pagination="none"
       dense
-      :rows="getRows(schemaData)"
-      hide-bottom
-      hide-header
-      row-key="index"
-      wrap-cells
       data-test="queryList-table"
-    >
-    </q-table>
+    />
   </q-card>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTable from '@/lib/core/Table/OTable.vue';
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "QueryList",
-  components: { OButton },
+  components: { OSeparator, OButton, OTable },
   emits: ["save", "close"],
   props: {
     schemaData: Object,
@@ -151,16 +147,32 @@ export default defineComponent({
       return rows;
     };
 
+    const queryRows = computed(() => {
+      const rows = getRows(props.schemaData);
+      return rows.map(([key, value]: [string, any], index: number) => ({
+        _rowKey: `row_${index}`,
+        key,
+        value,
+      }));
+    });
+
+    const queryListColumns = [
+      { id: "key", header: "", accessorKey: "key", sortable: false, meta: { align: "left" as const } },
+      { id: "value", header: "", accessorKey: "value", sortable: false, meta: { align: "left" as const } },
+    ];
+
     return {
       queryData,
       t,
       getRows,
-      pagination: ref({
-        rowsPerPage: 0,
-      }),
+      queryRows,
+      queryListColumns,
     };
   },
 });
 </script>
 
-<style scoped></style>
+<style scoped>.o2-table-hide-header :deep(thead) {
+  display: none;
+}
+</style>

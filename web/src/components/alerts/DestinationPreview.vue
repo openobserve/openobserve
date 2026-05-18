@@ -259,10 +259,10 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   modelValue: {
@@ -280,7 +280,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
-const $q = useQuasar();
 const { t } = useI18n();
 
 const isOpen = computed({
@@ -309,14 +308,14 @@ const getDestinationTypeName = (type: string): string => {
 // Copy template to clipboard
 const copyTemplate = () => {
   navigator.clipboard.writeText(props.templateContent).then(() => {
-    $q.notify({
-      type: 'positive',
+    toast({
+      variant: "success",
       message: 'Template copied to clipboard',
       timeout: 2000
     });
   }).catch(() => {
-    $q.notify({
-      type: 'negative',
+    toast({
+      variant: "error",
       message: 'Failed to copy template',
       timeout: 2000
     });

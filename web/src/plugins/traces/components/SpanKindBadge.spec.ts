@@ -31,7 +31,6 @@ const tooltipStub = {
 function mountBadge(kind: string): VueWrapper {
   return mount(SpanKindBadge, {
     props: { kind },
-    global: { stubs: { "q-tooltip": tooltipStub } },
   });
 }
 
@@ -168,25 +167,26 @@ describe("SpanKindBadge", () => {
   // -------------------------------------------------------------------------
 
   describe("tooltip content", () => {
-    it('should render a tooltip with text "Client" when kind is "Client"', () => {
+    it('should render a tooltip with content "Client" when kind is "Client"', () => {
       wrapper = mountBadge("Client");
-      const tooltip = wrapper.find('[data-test="tooltip-stub"]');
-      expect(tooltip.exists()).toBe(true);
-      expect(tooltip.text()).toBe("Client");
+      // OTooltip uses :content prop, not slot — find component and check prop
+      const tooltipComp = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltipComp.exists()).toBe(true);
+      expect(tooltipComp.props("content")).toBe("Client");
     });
 
-    it('should render a tooltip with text "Server" when kind is "Server"', () => {
+    it('should render a tooltip with content "Server" when kind is "Server"', () => {
       wrapper = mountBadge("Server");
-      const tooltip = wrapper.find('[data-test="tooltip-stub"]');
-      expect(tooltip.exists()).toBe(true);
-      expect(tooltip.text()).toBe("Server");
+      const tooltipComp = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltipComp.exists()).toBe(true);
+      expect(tooltipComp.props("content")).toBe("Server");
     });
 
-    it('should render a tooltip with text "Consumer" when kind is "Consumer"', () => {
+    it('should render a tooltip with content "Consumer" when kind is "Consumer"', () => {
       wrapper = mountBadge("Consumer");
-      const tooltip = wrapper.find('[data-test="tooltip-stub"]');
-      expect(tooltip.exists()).toBe(true);
-      expect(tooltip.text()).toBe("Consumer");
+      const tooltipComp = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltipComp.exists()).toBe(true);
+      expect(tooltipComp.props("content")).toBe("Consumer");
     });
   });
 });

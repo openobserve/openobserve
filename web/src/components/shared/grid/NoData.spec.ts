@@ -28,12 +28,6 @@ describe('NoData.vue', () => {
     return mount(NoData, {
       global: {
         plugins: [Quasar],
-        stubs: {
-          'q-img': {
-            template: '<div class="q-img-stub" :data-src="src">{{ src }}</div>',
-            props: ['src', 'style']
-          }
-        }
       }
     });
   };
