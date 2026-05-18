@@ -358,7 +358,7 @@ export default defineComponent({
       },
       {
         title: t("menu.search"),
-        icon: "description",
+        icon: "search",
         link: "/logs",
         name: "logs",
       },
