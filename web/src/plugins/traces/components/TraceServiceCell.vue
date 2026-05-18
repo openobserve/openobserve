@@ -42,9 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { QTooltip } from "quasar";
+import { useQuasar, QTooltip } from "quasar";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+
+const $q = useQuasar();
 
 const props = defineProps<{
   item: Record<string, any>;

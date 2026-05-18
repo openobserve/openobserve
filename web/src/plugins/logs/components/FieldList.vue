@@ -148,12 +148,13 @@
     <!-- After list: pagination + toggles -->
     <template #after-list="bottomProps">
       <FieldListPagination
-        :show-user-defined-schema-toggle="showUserDefinedSchemaToggle"
+        :data-test-prefix="'logs-page'"
+        :show-schema-toggle="showUserDefinedSchemaToggle"
         :show-quick-mode="showQuickMode"
         :use-user-defined-schemas="useUserDefinedSchemas"
         :show-only-interesting-fields="showOnlyInterestingFields"
-        :user-defined-schema-btn-group-option="userDefinedSchemaBtnGroupOption"
-        :selected-fields-btn-group-option="selectedFieldsBtnGroupOption"
+        :schema-toggle-options="userDefinedSchemaBtnGroupOption"
+        :interesting-fields-toggle-options="selectedFieldsBtnGroupOption"
         :current-page="bottomProps.currentPage"
         :pages-number="bottomProps.totalPages"
         :is-first-page="bottomProps.isFirstPage"
@@ -173,9 +174,9 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import FieldRow from "./FieldRow.vue";
-import FieldExpansion from "./FieldExpansion.vue";
-import FieldListPagination from "./FieldListPagination.vue";
+import FieldRow from "@/components/common/FieldRow.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
+import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";

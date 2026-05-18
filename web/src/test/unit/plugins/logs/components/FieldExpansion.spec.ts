@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import FieldExpansion from "@/plugins/logs/components/FieldExpansion.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import i18n from "@/locales";
 import { Quasar } from "quasar";
 

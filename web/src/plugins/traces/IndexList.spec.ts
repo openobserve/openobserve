@@ -226,7 +226,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
       plugins: [i18n, router],
       provide: { store },
       stubs: {
-        // FieldRow stub exposes the expansion slot so BasicValuesFilter renders
+        // FieldRow stub exposes the expansion slot so FieldExpansion renders
         FieldRow: {
           template: '<div><slot name="expansion" :field="field" /></div>',
           props: [
@@ -238,15 +238,19 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "showVisibilityToggle",
           ],
         },
-        BasicValuesFilter: {
+        FieldExpansion: {
           template:
-            '<div data-test="basic-values-filter">Basic Values Filter</div>',
+            '<div data-test="field-expansion">Field Expansion</div>',
           props: [
-            "row",
+            "field",
+            "fieldValues",
             "activeIncludeValues",
             "activeExcludeValues",
             "selectedFields",
             "showVisibilityToggle",
+            "showFilterIcon",
+            "showQuickMode",
+            "valueMapper",
           ],
         },
         OTable: {
@@ -380,8 +384,8 @@ describe("IndexList Component", () => {
       expect(fieldCells.length).toBeGreaterThan(0);
     });
 
-    it("should show BasicValuesFilter for fields with showValues=true", () => {
-      const basicFilters = wrapper.findAll('[data-test="basic-values-filter"]');
+    it("should show FieldExpansion for fields with showValues=true", () => {
+      const basicFilters = wrapper.findAll('[data-test="field-expansion"]');
       expect(basicFilters.length).toBeGreaterThan(0);
     });
   });
