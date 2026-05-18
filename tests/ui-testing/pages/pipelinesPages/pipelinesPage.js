@@ -2261,9 +2261,14 @@ export class PipelinesPage {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
-        await this.streamNameLabel.fill(streamName);
-        await this.page.getByRole("option", { name: streamName }).first().waitFor({ state: 'visible', timeout: 5000 });
-        await this.page.getByRole("option", { name: streamName }).first().click();
+        // Clear and type character by character — pressSequentially fires
+        // per-keyboard-event that Quasar autocomplete needs for filtering,
+        // unlike fill() which may not trigger filtering on re-selection
+        await this.streamNameLabel.fill('');
+        await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
+        await this.streamNameLabel.pressSequentially(streamName);
+        await this.page.getByRole("option", { name: streamName, exact: true }).waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.getByRole("option", { name: streamName, exact: true }).click();
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
