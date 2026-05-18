@@ -191,7 +191,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton },
+  components: { OButton, OInput },
 
   setup() {
     const store = useStore();
