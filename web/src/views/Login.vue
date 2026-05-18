@@ -271,7 +271,6 @@ export default defineComponent({
     };
 
     return {
-      q,
       store,
       config,
       router,
