@@ -1802,8 +1802,8 @@ pub struct Limit {
     pub inverted_index_result_cache_max_entry_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // bytes, default is 5% of total memory
-        help = "Maximum memory size in bytes for the footer cache. Higher values allow caching more file footers but increase memory usage."
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
     pub footer_cache_max_size: usize,
     #[env_config(
