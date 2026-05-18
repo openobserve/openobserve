@@ -5,6 +5,7 @@ import type {
   DropdownItemSlots,
 } from "./ODropdown.types";
 import { DropdownMenuItem } from "reka-ui";
+import OIcon from "../../core/Icon/OIcon.vue";
 
 const props = withDefaults(defineProps<DropdownItemProps>(), {
   disabled: false,
@@ -39,7 +40,9 @@ const variantClasses: Record<
     ]"
     @select="(e) => emit('select', e)"
   >
-    <slot name="icon-left" />
+    <slot name="icon-left">
+      <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
+    </slot>
     <slot />
     <slot name="icon-right" />
   </DropdownMenuItem>

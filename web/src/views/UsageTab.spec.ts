@@ -93,7 +93,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 });
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedWindow: "outlined_window",
+  "window": "outlined_window",
 }));
 
 // Mock Quasar useQuasar — notify must return a function for the dismiss pattern
@@ -148,8 +148,8 @@ function mountUsageTab() {
           template: '<a data-test="usage-tab-router-link"><slot /></a>',
           props: ["to", "exact"],
         },
-        "q-icon": {
-          template: '<span class="q-icon-stub"></span>',
+        "OIcon": {
+          template: '<span class="OIcon-stub"></span>',
           props: ["name", "size"],
         },
       },

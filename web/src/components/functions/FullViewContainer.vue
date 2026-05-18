@@ -5,9 +5,9 @@
   >
     <div class="tw:flex tw:justify-between">
       <div class="tw:flex tw:items-center">
-        <q-icon
+        <OIcon
           v-if="showExpandIcon"
-          name="keyboard_arrow_up"
+          name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
           class="tw:mr-1 tw:cursor-pointer tw:transition-all"
           :class="[
@@ -16,7 +16,7 @@
               : 'tw:text-gray-500',
             expanded ? 'tw:transform tw:rotate-180' : '',
           ]"
-          size="20px"
+          size="md"
         />
         <div
           @click="showExpandIcon ? expanded = !expanded : null"
@@ -42,6 +42,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   name: {

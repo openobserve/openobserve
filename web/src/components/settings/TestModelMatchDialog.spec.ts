@@ -116,7 +116,7 @@ const QInputStub = {
 const QIconStub = {
   name: "QIcon",
   props: ["name", "size", "color"],
-  template: `<i data-test="q-icon" :data-name="name" :class="$attrs.class" />`,
+  template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
 };
 
 const QBadgeStub = {
@@ -142,7 +142,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: ODialogStub,
         OButton: OButtonStub,
         "q-input": QInputStub,
-        "q-icon": QIconStub,
+        "OIcon": QIconStub,
         "q-badge": QBadgeStub,
       },
     },
@@ -232,7 +232,7 @@ describe("TestModelMatchDialog", () => {
             ODialog: ODialogStub,
             OButton: OButtonStub,
             "q-input": QInputStub,
-            "q-icon": QIconStub,
+            "OIcon": QIconStub,
             "q-badge": QBadgeStub,
           },
         },

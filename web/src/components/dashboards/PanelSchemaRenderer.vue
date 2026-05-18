@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         class="errorMessage"
       >
-        <q-icon size="md" name="warning" />
+        <OIcon size="md" name="warning" />
         <div style="height: 80%; width: 100%">
           {{
             errorDetail?.code?.toString().startsWith("4")
@@ -208,11 +208,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-circle"
           @click="$emit('show-legends')"
+          icon-left="format-list-bulleted"
         >
-          <template #icon-left><q-icon name="format_list_bulleted" /></template>
-          <q-tooltip anchor="top middle" self="bottom right">
-            Show Legends
-          </q-tooltip>
+          <OTooltip content="Show Legends" side="top" align="end" />
         </OButton>
         <OButton
           v-if="
@@ -235,13 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleAddAnnotationMode"
         >
           <template #icon-left
-            ><q-icon :name="isAddAnnotationMode ? 'cancel' : 'edit'"
+            ><OIcon :name="isAddAnnotationMode ? 'cancel' : 'edit'" size="sm"
           /></template>
-          <q-tooltip anchor="top middle" self="bottom right">
-            {{
-              isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
-            }}
-          </q-tooltip>
+          <OTooltip :content="isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="top" align="end" />
         </OButton>
       </div>
       <div
@@ -269,10 +263,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="drilldown-menu-item"
             @click="openDrilldown(index)"
           >
-            <q-icon
+            <OIcon
               size="xs"
               class="q-mr-sm"
-              :name="drilldown._isCrossLink ? 'open_in_new' : 'link'"
+              :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
             />
             <span>{{ drilldown.name }}</span>
           </div>
@@ -406,6 +400,8 @@ const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "PanelSchemaRenderer",
@@ -422,7 +418,9 @@ export default defineComponent({
     CustomChartRenderer,
     LoadingProgress,
     OButton,
-  },
+    OIcon,
+    OTooltip,
+},
   props: {
     selectedTimeObj: {
       required: true,

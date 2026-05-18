@@ -40,19 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @trigger="refreshData"
             />
             <OButton
+              icon-left="refresh"
               :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
               size="icon-toolbar"
               data-test="rum-performance-refresh"
               @click="refreshData"
             >
-              <q-icon name="refresh" size="16px" />
-              <q-tooltip>
-                {{
-                  isVariablesChanged
-                    ? t("dashboard.refreshToApplyVariableChanges")
-                    : t("dashboard.refresh")
-                }}
-              </q-tooltip>
+              <OTooltip :content="isVariablesChanged ? t('dashboard.refreshToApplyVariableChanges') : t('dashboard.refresh')" />
             </OButton>
           </div>
         </div>
@@ -119,6 +113,7 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -128,6 +123,7 @@ export default defineComponent({
     OTab,
     DateTimePickerDashboard,
     OButton,
+    OTooltip,
   },
   setup() {
     const { t } = useI18n();

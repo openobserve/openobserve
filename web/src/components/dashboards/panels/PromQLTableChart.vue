@@ -40,20 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bottom="scope" v-if="showLegendFooter">
           <div class="row items-center full-width" data-test="dashboard-table-pagination">
             <div class="row items-center q-gutter-xs">
-              <q-select
+              <OSelect
                 v-model="selectedLegend"
                 :options="legendOptions"
-                outlined
-                dense
-                emit-value
-                map-options
                 style="min-width: 200px; max-width: 400px"
                 placeholder="Select series to filter"
               >
-                <template v-slot:prepend>
-                  <q-icon name="filter_list" size="xs" />
+                <template #icon-left>
+                  <OIcon name="filter-list" size="xs" />
                 </template>
-              </q-select>
+              </OSelect>
             </div>
             <q-space />
             <TablePaginationControls
@@ -82,6 +78,8 @@ import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -95,7 +93,9 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  components: { TableRenderer, TablePaginationControls },
+  components: { TableRenderer, TablePaginationControls, OSelect,
+    OIcon,
+},
   setup(props) {
     const store = useStore();
     const filter = ref("");

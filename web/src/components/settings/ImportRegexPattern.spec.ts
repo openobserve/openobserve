@@ -95,7 +95,7 @@ describe("ImportRegexPattern", () => {
             props: ['tabs', 'activeTab'],
             emits: ['update:active-tab']
           },
-          "q-icon": true,
+          "OIcon": true,
           "built-in-patterns-tab": true
         }
       }

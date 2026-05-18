@@ -65,7 +65,7 @@ describe("CreateDestinationForm", () => {
           "q-input": false,
           "q-select": false,
           "q-btn": false,
-          "q-icon": false,
+          "OIcon": false,
           "q-card": false,
           "q-card-section": false,
           "q-toggle": false,

@@ -50,7 +50,7 @@
             @click="copyQuery"
             :disabled="!generatedQuery"
           >
-            <q-icon name="content_copy" size="14px" class="q-mr-xs" />
+            <OIcon name="content-copy" size="xs" class="q-mr-xs" />
             Copy Query
           </OButton>
           <OButton
@@ -58,7 +58,7 @@
             size="sm-action"
             @click="clearQuery"
           >
-            <q-icon name="clear" size="14px" class="q-mr-xs" />
+            <OIcon name="close" size="xs" class="q-mr-xs" />
             Clear All
           </OButton>
           <OButton
@@ -67,7 +67,7 @@
             @click="testQuery"
             :disabled="!generatedQuery"
           >
-            <q-icon name="play_arrow" size="14px" class="q-mr-xs" />
+            <OIcon name="play-arrow" size="xs" class="q-mr-xs" />
             Test Query
           </OButton>
         </div>
@@ -95,6 +95,7 @@ import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const $q = useQuasar();
 

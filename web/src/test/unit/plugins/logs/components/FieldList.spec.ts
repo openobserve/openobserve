@@ -17,7 +17,46 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import FieldList from "@/plugins/logs/components/FieldList.vue";
 import i18n from "@/locales";
-import { Quasar } from "quasar";
+
+// Stub OFieldList: renders slots and emits search
+const OFieldListStub = {
+  name: "OFieldList",
+  template: `
+    <div data-test="o-field-list">
+      <input
+        data-test="log-search-index-list-field-search-input"
+        :value="search"
+        @input="$emit('update:search', $event.target.value)"
+      />
+      <div v-if="loading" class="o-field-list-loading">Loading...</div>
+      <div v-for="(row, idx) in fields" :key="idx">
+        <div v-if="row.isGroup">
+          <slot name="group-header" :row="row" :group-name="row.groupName" />
+        </div>
+        <div v-else data-test="log-search-field-row">
+          <slot name="field-row" :row="row" :index="idx" />
+        </div>
+      </div>
+      <div v-if="fields.length === 0">
+        <slot name="empty" />
+      </div>
+      <div>
+        <slot name="after-list" />
+      </div>
+    </div>
+  `,
+  props: [
+    "fields",
+    "search",
+    "searchPlaceholder",
+    "loading",
+    "pageSize",
+    "pageSizeOptions",
+    "rowKey",
+    "showPagination",
+  ],
+  emits: ["update:search", "row-click", "update:currentPage"],
+};
 
 describe("FieldList.vue", () => {
   const defaultProps = {
@@ -63,15 +102,17 @@ describe("FieldList.vue", () => {
     userDefinedSchemaBtnGroupOption: [],
     selectedFieldsBtnGroupOption: [],
     totalFieldsCount: 2,
+    showFtsFieldValues: false,
   };
 
   describe("rendering", () => {
-    it("should render q-table with correct data-test attribute", () => {
+    it("should render OFieldList component", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -79,15 +120,18 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="log-search-index-list-fields-table"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="o-field-list"]').exists(),
+      ).toBe(true);
     });
 
-    it("should render search input", () => {
+    it("should render search input via OFieldList", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -95,40 +139,23 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="log-search-index-list-field-search-input"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="log-search-index-list-field-search-input"]')
+          .exists(),
+      ).toBe(true);
     });
 
-    it("should render loading state when loadingStream is true", () => {
+    it("should pass loading prop to OFieldList", () => {
       const wrapper = mount(FieldList, {
         props: {
           ...defaultProps,
           loadingStream: true,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
-            FieldRow: true,
-            FieldExpansion: true,
-            FieldListPagination: true,
-            "q-spinner-hourglass": {
-              template: '<div class="q-spinner-hourglass" />',
-            },
-          },
-        },
-      });
-
-      expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
-    });
-
-    it("should apply loading-fields class when loadingStream is true", () => {
-      const wrapper = mount(FieldList, {
-        props: {
-          ...defaultProps,
-          loadingStream: true,
-        },
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -136,18 +163,19 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field-table").classes()).toContain("loading-fields");
+      expect(wrapper.find(".o-field-list-loading").exists()).toBe(true);
     });
 
-    it("should render no matching fields message", () => {
+    it("should render no matching fields message via empty slot", () => {
       const wrapper = mount(FieldList, {
         props: {
           ...defaultProps,
-          streamFieldsRows: [{ name: "no-fields-found" }],
+          streamFieldsRows: [],
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -164,8 +192,9 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -180,8 +209,9 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -196,8 +226,9 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -213,8 +244,9 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -222,13 +254,9 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const groupHeader = wrapper.find(".field-group-header").element.parentElement;
-      if (groupHeader) {
-        await groupHeader.dispatchEvent(new Event("click"));
-      }
-
-      await wrapper.vm.$nextTick();
+      await wrapper.find(".field-group-header").trigger("click");
       expect(wrapper.emitted("toggle-group")).toBeTruthy();
+      expect(wrapper.emitted("toggle-group")?.[0]).toEqual(["schema"]);
     });
   });
 
@@ -237,11 +265,19 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: {
               template: '<div class="field-row"></div>',
-              props: ["field", "selectedFields", "timestampColumn", "theme", "showQuickMode"],
+              props: [
+                "field",
+                "selectedFields",
+                "timestampColumn",
+                "theme",
+                "showQuickMode",
+                "showFtsFieldValues",
+              ],
             },
             FieldExpansion: true,
             FieldListPagination: true,
@@ -249,27 +285,8 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const fieldRows = wrapper.findAll(".field-row");
-      expect(fieldRows.length).toBeGreaterThan(0);
-    });
-
-    it("should pass correct props to FieldRow", () => {
-      const wrapper = mount(FieldList, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            FieldRow: {
-              template: '<div class="field-row" />',
-              props: ["field", "selectedFields", "timestampColumn", "theme", "showQuickMode"],
-            },
-            FieldExpansion: true,
-            FieldListPagination: true,
-          },
-        },
-      });
-
-      expect(wrapper.findComponent({ name: "FieldRow" }).exists()).toBe(false); // Stub doesn't have name
+      const fieldRows = wrapper.findAll('[data-test="log-search-field-row"]');
+      expect(fieldRows.length).toBe(2); // Two non-label rows in defaultProps
     });
 
     it("should apply selected class to selected fields", () => {
@@ -279,8 +296,9 @@ describe("FieldList.vue", () => {
           selectedFields: ["status"],
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -288,7 +306,9 @@ describe("FieldList.vue", () => {
         },
       });
 
-      expect(wrapper.find(".field_list").exists()).toBe(true);
+      expect(wrapper.find('[data-test="log-search-field-row"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -297,8 +317,9 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -306,26 +327,12 @@ describe("FieldList.vue", () => {
         },
       });
 
-      const searchInput = wrapper.find('[data-test="log-search-index-list-field-search-input"]');
+      const searchInput = wrapper.find(
+        '[data-test="log-search-index-list-field-search-input"]',
+      );
       await searchInput.setValue("test");
 
       expect(wrapper.emitted("update:filter-field")).toBeTruthy();
-    });
-
-    it("should show search icon in input prepend", () => {
-      const wrapper = mount(FieldList, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            FieldRow: true,
-            FieldExpansion: true,
-            FieldListPagination: true,
-          },
-        },
-      });
-
-      expect(wrapper.find(".o2-search-input-icon").exists()).toBe(true);
     });
   });
 
@@ -334,8 +341,9 @@ describe("FieldList.vue", () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: {
@@ -348,47 +356,59 @@ describe("FieldList.vue", () => {
       expect(wrapper.find(".field-list-pagination").exists()).toBe(true);
     });
 
-    it("should emit update:pagination event", async () => {
+    it("should emit set-page when pagination changes", async () => {
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
-            FieldListPagination: true,
+            FieldListPagination: {
+              template:
+                '<button class="next-btn" @click="$emit(\'set-page\', 2)" />',
+              props: [
+                "currentPage",
+                "pagesNumber",
+                "isFirstPage",
+                "isLastPage",
+                "totalFieldsCount",
+              ],
+              emits: ["set-page", "first-page", "last-page", "reset-fields"],
+            },
           },
         },
       });
 
-      const table = wrapper.findComponent({ name: "q-table" });
-      const newPagination = {
-        page: 2,
-        rowsPerPage: 100,
-        sortBy: null,
-        descending: false
-      };
-      await table.vm.$emit("update:pagination", newPagination);
-
-      // Check that the event is emitted (forwarded from q-table)
-      expect(wrapper.emitted("update:pagination")).toBeTruthy();
-      expect(wrapper.emitted("update:pagination")?.length).toBeGreaterThan(0);
+      await wrapper.find(".next-btn").trigger("click");
+      expect(wrapper.emitted("set-page")).toBeTruthy();
+      expect(wrapper.emitted("set-page")?.[0]).toEqual([2]);
     });
   });
 
   describe("event forwarding", () => {
     it("should forward add-to-filter event from FieldRow", async () => {
       const FieldRowStub = {
-        template: '<div class="field-row-stub" @click="$emit(\'add-to-filter\', \'test\')"></div>',
-        props: ["field", "selectedFields", "timestampColumn", "theme", "showQuickMode"],
+        template:
+          '<div class="field-row-stub" @click="$emit(\'add-to-filter\', \'test\')"></div>',
+        props: [
+          "field",
+          "selectedFields",
+          "timestampColumn",
+          "theme",
+          "showQuickMode",
+          "showFtsFieldValues",
+        ],
         emits: ["add-to-filter"],
       };
 
       const wrapper = mount(FieldList, {
         props: defaultProps,
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: FieldRowStub,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -401,23 +421,6 @@ describe("FieldList.vue", () => {
 
       expect(wrapper.emitted("add-to-filter")).toBeTruthy();
     });
-
-    it("should forward toggle-field event", () => {
-      const wrapper = mount(FieldList, {
-        props: defaultProps,
-        global: {
-          plugins: [i18n, Quasar],
-          stubs: {
-            FieldRow: true,
-            FieldExpansion: true,
-            FieldListPagination: true,
-          },
-        },
-      });
-
-      // Event forwarding is set up in template
-      expect(wrapper.vm.$options.emits).toBeDefined();
-    });
   });
 
   describe("interesting fields mode", () => {
@@ -428,8 +431,9 @@ describe("FieldList.vue", () => {
           showOnlyInterestingFields: true,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -437,6 +441,7 @@ describe("FieldList.vue", () => {
         },
       });
 
+      // Group should show interesting count (1) instead of total (2)
       expect(wrapper.text()).toContain("Fields (1)");
     });
 
@@ -447,8 +452,9 @@ describe("FieldList.vue", () => {
           showOnlyInterestingFields: true,
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -456,8 +462,29 @@ describe("FieldList.vue", () => {
         },
       });
 
-      // Should show interesting count (1) instead of total count (2)
       expect(wrapper.html()).toContain("1");
+    });
+
+    it("should filter out non-interesting field rows", () => {
+      const wrapper = mount(FieldList, {
+        props: {
+          ...defaultProps,
+          showOnlyInterestingFields: true,
+        },
+        global: {
+          plugins: [i18n],
+          stubs: {
+            OFieldList: OFieldListStub,
+            FieldRow: true,
+            FieldExpansion: true,
+            FieldListPagination: true,
+          },
+        },
+      });
+
+      // Only 1 interesting field row (message), not 2
+      const fieldRows = wrapper.findAll('[data-test="log-search-field-row"]');
+      expect(fieldRows.length).toBe(1);
     });
   });
 
@@ -469,8 +496,9 @@ describe("FieldList.vue", () => {
           theme: "dark",
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,
@@ -489,8 +517,9 @@ describe("FieldList.vue", () => {
           theme: "light",
         },
         global: {
-          plugins: [i18n, Quasar],
+          plugins: [i18n],
           stubs: {
+            OFieldList: OFieldListStub,
             FieldRow: true,
             FieldExpansion: true,
             FieldListPagination: true,

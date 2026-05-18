@@ -478,7 +478,7 @@ export class HomePage {
 
         // Alternative: Find by the icon name in the button
         const lightModeBtn = this.page.locator('button:has(.header-icon)').filter({
-            has: this.page.locator('i.q-icon')
+            has: this.page.locator('i.OIcon')
         });
 
         // Try to find the theme switcher using multiple strategies

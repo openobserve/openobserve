@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,134 +17,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
     <div>
-      <q-table
+      <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
+        <div class="q-table__title" data-test="org-management-list-title">
+          {{ t("settings.organizationManagement") }}
+        </div>
+        <OInput
+          data-test="org-management-search-input"
+          v-model="filterQuery"
+          class="q-ml-auto no-border o2-search-input"
+          :placeholder="t('settings.searchOrgs')"
+        >
+          <template #prepend>
+            <OIcon name="search" size="sm" />
+          </template>
+        </OInput>
+      </div>
+      <OTable
         data-test="org-management-list-table"
-        ref="qTable"
-        :rows="tabledata"
+        :data="visibleRows"
         :columns="columns"
         row-key="id"
-        :pagination="pagination"
-        :filter="filterQuery"
-        :filter-method="filterData"
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[5, 10, 20, 50, 100]"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
         :loading="loading"
-        table-style="table-layout: fixed"
-        style="
-          width: 100%;
-          height: calc(100vh - var(--navbar-height) - 87px);
-          overflow-y: auto;
-        "
       >
-        <template #no-data>
+        <template #empty>
           <NoData />
         </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-              <OButton
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="otg-management-extend-trial-btn"
-                @click.stop="toggleExtendTrialDialog(props.row)"
-              >
-                <q-icon name="event" size="14px" />
-                <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="props.row.billing_provider === '-'"
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="org-management-add-contract-btn"
-                @click.stop="toggleContractDialog(props.row, 'create')"
-              >
-                <q-icon name="note_add" size="14px" />
-                <q-tooltip>Add Contract</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="props.row.billing_provider === 'no_op'"
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="org-management-extend-contract-btn"
-                @click.stop="toggleContractDialog(props.row, 'extend')"
-              >
-                <q-icon name="event" size="14px" />
-                <q-tooltip>Extend Contract</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="props.row.billing_provider === 'no_op'"
-                variant="ghost-destructive"
-                size="icon-xs-circle"
-                data-test="org-management-revoke-contract-btn"
-                @click.stop="confirmRevokeContract(props.row)"
-              >
-                <q-icon name="block" size="14px" />
-                <q-tooltip>Revoke</q-tooltip>
-              </OButton>
-              <OButton
-                v-if="!props.row.org_storage_enabled"
-                variant="ghost"
-                size="icon-xs-circle"
-                data-test="org-management-storage-enable-btn"
-                @click.stop="toggleOrgStorage(props.row)"
-              >
-                <q-icon name="cloud_upload" size="14px" />
-                <q-tooltip>Enable Storage</q-tooltip>
-              </OButton>
-              <OButton
-                v-else
-                variant="ghost"
-                size="icon-xs-circle"
-                disabled
-                class="text-positive"
-                data-test="org-management-storage-enabled-btn"
-              >
-                <q-icon name="cloud_done" size="14px" />
-                <q-tooltip>Storage Enabled</q-tooltip>
-              </OButton>
-            </div>
-          </q-td>
-        </template>
-        <template #top="scope">
-          <div class="q-table__title" data-test="org-management-list-title">
-            {{ t("settings.organizationManagement") }}
+        <template #cell-actions="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+            <OButton
+              variant="ghost"
+              size="icon-xs-circle"
+              data-test="otg-management-extend-trial-btn"
+              @click.stop="toggleExtendTrialDialog(row)"
+            >
+              <OIcon name="event" size="xs" />
+              <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
+            </OButton>
+            <OButton
+              v-if="row.billing_provider === '-'"
+              variant="ghost"
+              size="icon-xs-circle"
+              data-test="org-management-add-contract-btn"
+              @click.stop="toggleContractDialog(row, 'create')"
+            >
+              <OIcon name="note-add" size="xs" />
+              <q-tooltip>Add Contract</q-tooltip>
+            </OButton>
+            <OButton
+              v-if="row.billing_provider === 'no_op'"
+              variant="ghost"
+              size="icon-xs-circle"
+              data-test="org-management-extend-contract-btn"
+              @click.stop="toggleContractDialog(row, 'extend')"
+            >
+              <OIcon name="event" size="xs" />
+              <q-tooltip>Extend Contract</q-tooltip>
+            </OButton>
+            <OButton
+              v-if="row.billing_provider === 'no_op'"
+              variant="ghost-destructive"
+              size="icon-xs-circle"
+              data-test="org-management-revoke-contract-btn"
+              @click.stop="confirmRevokeContract(row)"
+            >
+              <OIcon name="block" size="xs" />
+              <q-tooltip>Revoke</q-tooltip>
+            </OButton>
+            <OButton
+              v-if="!row.org_storage_enabled"
+              variant="ghost"
+              size="icon-xs-circle"
+              data-test="org-management-storage-enable-btn"
+              @click.stop="toggleOrgStorage(row)"
+            >
+              <OIcon name="cloud-upload" size="xs" />
+              <q-tooltip>Enable Storage</q-tooltip>
+            </OButton>
+            <OButton
+              v-else
+              variant="ghost"
+              size="icon-xs-circle"
+              disabled
+              class="text-positive"
+              data-test="org-management-storage-enabled-btn"
+            >
+              <OIcon name="cloud-done" size="xs" />
+              <q-tooltip>Storage Enabled</q-tooltip>
+            </OButton>
           </div>
-          <q-input
-            data-test="org-management-search-input"
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-ml-auto q-mb-xs no-border col-3"
-            :placeholder="t('settings.searchOrgs')"
-          >
-            <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
-            </template>
-          </q-input>
-
-          <QTablePagination
-            :scope="scope"
-            :pageTitle="t('settings.paginationOrganizationLabel')"
-            :position="'top'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
-        <template #bottom="scope">
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-      </q-table>
+      </OTable>
     </div>
 
     <!-- Extend Trial Dialog -->
-    <ODialog data-test="organization-management-extend-trial-dialog"
+    <ODialog
+      data-test="organization-management-extend-trial-dialog"
       v-model:open="extendTrialPrompt"
       size="sm"
       :title="`Extend Trial for ${extendTrialDataRow?.name}`"
@@ -175,7 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- External Contract Dialog -->
-    <ODialog data-test="organization-management-contract-dialog"
+    <ODialog
+      data-test="organization-management-contract-dialog"
       v-model:open="contractPrompt"
       size="sm"
       :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
@@ -188,10 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-bold q-mb-xs">
           {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
         </div>
-        <q-input
+        <OInput
           v-model="contractEndDate"
-          dense
-          outlined
           type="date"
           data-test="contract-end-date-input"
         />
@@ -208,34 +180,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import {
   ref,
-  onBeforeMount,
-  onActivated,
+  onMounted,
   watch,
   defineComponent,
-  onMounted,
+  computed,
 } from "vue";
-import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
+
 export default defineComponent({
   name: "PageAlerts",
   components: {
     NoData,
-    QTablePagination,
     OButton,
     ODialog,
+    OTooltip,
+    OInput,
+    OIcon,
+    OInput,
+    OTable,
   },
   setup() {
-    const qTable = ref();
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
@@ -247,10 +225,7 @@ export default defineComponent({
     const extendTrialPrompt = ref(false);
     const tabledata = ref<any>([]);
     const resultTotal = ref(0);
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+    const filterQuery = ref("");
 
     // Contract management state
     const contractPrompt = ref(false);
@@ -274,83 +249,70 @@ export default defineComponent({
       }
     });
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 50px",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 50,
+        meta: { align: "left" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("settings.org_name"),
-        align: "left",
+        id: "name",
+        header: t("settings.org_name"),
+        accessorKey: "name",
         sortable: true,
-        classes: "w-[150px]",
+        meta: { align: "left" },
       },
       {
-        name: "identifier",
-        field: "identifier",
-        label: t("settings.org_identifier"),
-        align: "left",
-        sortable: false,
-        style: "col-3",
+        id: "identifier",
+        header: t("settings.org_identifier"),
+        accessorKey: "identifier",
+        meta: { align: "left" },
       },
       {
-        name: "subscription_status",
-        field: "plan",
-        label: t("settings.subscription_status"),
-        align: "left",
+        id: "subscription_status",
+        header: t("settings.subscription_status"),
+        accessorKey: "plan",
         sortable: true,
-        style: "col-1",
+        meta: { align: "left" },
       },
       {
-        name: "billing_provider",
-        field: "billing_provider",
-        label: "Provider",
-        align: "left",
+        id: "billing_provider",
+        header: "Provider",
+        accessorKey: "billing_provider",
         sortable: true,
-        style: "col-1",
+        meta: { align: "left" },
       },
       {
-        name: "created_on",
-        field: "created_at",
-        label: t("settings.created_on"),
-        align: "left",
+        id: "created_on",
+        header: t("settings.created_on"),
+        accessorKey: "created_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "trial_expiry",
-        field: "trial_expires_at",
-        label: t("settings.trial_expiry"),
-        align: "left",
+        id: "trial_expiry",
+        header: t("settings.trial_expiry"),
+        accessorKey: "trial_expires_at",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "contract_end_date",
-        field: "contract_end_date_display",
-        label: "Contract End",
-        align: "left",
+        id: "contract_end_date",
+        header: "Contract End",
+        accessorKey: "contract_end_date_display",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("settings.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-        style: "width: 220px",
+        id: "actions",
+        header: t("settings.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 220,
+        meta: { align: "center" },
       },
-    ]);
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
     ];
 
     const subscriptionPlans: any = {
@@ -358,12 +320,6 @@ export default defineComponent({
       "1": "Pay as you go",
       "2": "Enterprise",
       "3": "External Contract",
-    };
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
 
     const formatMicrosToDate = (micros: number): string => {
@@ -651,15 +607,31 @@ export default defineComponent({
         });
     };
 
+    const filterData = (rows: string | any[], terms: string) => {
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms) ||
+          rows[i]["identifier"].toLowerCase().includes(terms) ||
+          rows[i]["plan"].toLowerCase().includes(terms)
+        ) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return tabledata.value || [];
+      return filterData(tabledata.value || [], filterQuery.value);
+    });
+
     return {
       t,
-      qTable,
       columns,
       getImageURL,
-      changePagination,
-      perPageOptions,
       resultTotal,
-      pagination,
       tabledata,
       loading,
       extendedTrial,
@@ -669,7 +641,6 @@ export default defineComponent({
       updateTrialPeriod,
       getData,
       getTimestampInMicroseconds,
-      selectedPerPage,
       contractPrompt,
       contractDataRow,
       contractMode,
@@ -679,27 +650,15 @@ export default defineComponent({
       confirmRevokeContract,
       toggleOrgStorage,
       formatMicrosToDate,
-      filterQuery: ref(""),
-      filterData(rows: string | any[], terms: string) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            rows[i]["identifier"].toLowerCase().includes(terms) ||
-            rows[i]["plan"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterQuery,
+      filterData,
+      visibleRows,
       store,
     };
   },
 });
 </script>
-<style scopped lang="scss">
+<style scoped lang="scss">
 .page-border {
   border: 1px solid lightgray;
 }

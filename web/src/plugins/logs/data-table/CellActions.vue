@@ -12,7 +12,7 @@
         @click.prevent.stop="copyLogToClipboard(row[column.id])"
         title="Copy"
       >
-        <q-icon name="content_copy" size="10px" />
+        <OIcon name="content-copy" size="10px" />
       </OButton>
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
@@ -25,9 +25,9 @@
         :data-test="`log-details-include-field-${row[column.id]}`"
         title="Include Term"
       >
-        <q-icon style="height: 8px; width: 8px">
+        <OIcon style="height: 8px; width: 8px">
           <EqualIcon></EqualIcon>
-        </q-icon>
+        </OIcon>
       </OButton>
     </span>
     <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
@@ -40,9 +40,9 @@
         title="Exclude Term"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
-        <q-icon style="height: 8px; width: 8px">
+        <OIcon style="height: 8px; width: 8px">
           <NotEqualIcon></NotEqualIcon>
-        </q-icon>
+        </OIcon>
       </OButton>
     </span>
     <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
@@ -66,6 +66,7 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   column: {

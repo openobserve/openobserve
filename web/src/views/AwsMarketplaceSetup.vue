@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="setup-container q-pa-xl">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <q-icon name="warning" size="80px" color="warning" />
+        <OIcon name="warning" size="80px" />
         <h5 class="q-mt-md">No Marketplace Token Found</h5>
         <p class="text-grey-7">
           Please start the registration process from AWS Marketplace.
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
+        <OIcon name="error" size="80px" />
         <h5 class="q-mt-md">{{ errorMessage }}</h5>
         <OButton
           variant="primary"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <q-icon name="cloud" size="60px" color="primary" />
+        <OIcon name="cloud" size="60px" />
         <h4 class="q-mt-md">Complete AWS Marketplace Setup</h4>
         <p class="text-grey-7 q-mb-lg">
           Link your AWS Marketplace subscription to an organization
@@ -72,13 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-grey-7">
                 Create a new organization with AWS Marketplace billing
               </p>
-              <q-input
+              <OInput
                 v-model="newOrgName"
                 label="Organization Name"
-                outlined
-                dense
                 class="q-mb-md"
-                :rules="[(val) => !!val || 'Organization name is required']"
+                :error="!!orgNameError"
+                :error-message="orgNameError"
+                @update:model-value="orgNameError = ''"
               />
               <OButton
                 variant="primary"
@@ -103,14 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-grey-7">
                 Link AWS billing to an existing organization
               </p>
-              <q-select
+              <OSelect
                 v-model="selectedOrg"
                 :options="eligibleOrganizations"
-                option-label="name"
-                option-value="identifier"
+                labelKey="name"
+                valueKey="identifier"
                 label="Select Organization"
-                outlined
-                dense
                 class="q-mb-md"
               />
               <OButton
@@ -146,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <q-icon name="check_circle" size="80px" color="positive" />
+        <OIcon name="check-circle" size="80px" />
         <h4 class="q-mt-md">Subscription Activated!</h4>
         <p class="text-grey-7">
           Your AWS Marketplace subscription is now active.
@@ -161,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <q-icon name="error" size="80px" color="negative" />
+        <OIcon name="error" size="80px" />
         <h5 class="q-mt-md">Payment Failed</h5>
         <p class="text-grey-7">
           There was an issue with your AWS Marketplace payment. Please check
@@ -188,7 +186,10 @@ import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 type SetupState =
   | "select_org"
@@ -201,7 +202,9 @@ type SetupState =
 
 export default defineComponent({
   name: "AwsMarketplaceSetup",
-  components: { OButton, OSpinner },
+  components: { OButton, OSpinner, OInput, OSelect,
+    OIcon,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -211,6 +214,7 @@ export default defineComponent({
     const errorMessage = ref("");
     const isProcessing = ref(false);
     const newOrgName = ref("");
+    const orgNameError = ref("");
     const selectedOrg = ref<{ identifier: string; name: string } | null>(null);
     const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
       []
@@ -264,10 +268,7 @@ export default defineComponent({
 
     const createNewOrgWithAws = async () => {
       if (!newOrgName.value) {
-        q.notify({
-          type: "negative",
-          message: "Please enter an organization name",
-        });
+        orgNameError.value = "Please enter an organization name";
         return;
       }
 
@@ -404,6 +405,7 @@ export default defineComponent({
       errorMessage,
       isProcessing,
       newOrgName,
+      orgNameError,
       selectedOrg,
       eligibleOrganizations,
       getImageURL,

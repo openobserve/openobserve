@@ -40,9 +40,8 @@
           class="draggable-row"
         >
           <div class="draggable-handle tw:self-center">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
+            <OIcon
+              name="drag-indicator" size="sm"
               class="q-mr-xs"
               :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
             />
@@ -83,32 +82,14 @@
             <div class="color-section tw:shrink-0 tw:w-40">
               <div
                 v-if="series.color !== null"
-                class="tw:items-center tw:flex"
+                class="tw:items-center tw:flex tw:gap-1"
               >
-                <q-input
+                <OColor
                   v-model="series.color"
-                  style="width: 90%"
-                  class="input-spacing"
-                  dense
-                  borderless
-                  hide-bottom-space
-                >
-                  <template v-slot:append>
-                    <q-icon
-                      name="colorize"
-                      class="cursor-pointer"
-                      :ref="`colorize-icon-${index}`"
-                      @click="openColorPicker(index)"
-                    >
-                      <q-popup-proxy cover transition-show="scale">
-                        <q-color v-model="series.color" />
-                      </q-popup-proxy>
-                    </q-icon>
-                  </template>
-                </q-input>
-                <q-icon
-                  :name="outlinedCancel"
-                  style="width: 10%"
+                  class="tw:flex-1"
+                />
+                <OIcon
+                  name="cancel"
                   class="cursor-pointer tw:align-middle"
                   size="xs"
                   title="Remove color"
@@ -126,18 +107,36 @@
               </div>
             </div>
 
-            <!-- Delete series -->
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="removecolorBySeriesByIndex(index)"
-              :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
-            >
-              <template #icon-left><q-icon name="close" /></template>
-            </OButton>
+              <!-- Delete series -->
+              <OButton
+                variant="ghost"
+                size="icon"
+                @click="removecolorBySeriesByIndex(index)"
+                :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
+              >
+                <template #icon-left><OIcon name="close" size="sm" /></template>
+              </OButton>
+            </div>
           </div>
-        </div>
-      </draggable>
+        </draggable>
+      </div>
+      <!-- Footer Buttons -->
+    <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click="addcolorBySeries"
+        data-test="dashboard-addpanel-config-color-by-series-add-btn"
+        >+ Add a new color</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
+        @click="applycolorBySeries"
+        :disabled="!isFormValid"
+        data-test="dashboard-addpanel-config-color-by-series-apply-btn"
+        >Save</OButton
+      >
     </div>
   </ODialog>
 </template>
@@ -147,11 +146,12 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import CommonAutoComplete from "./CommonAutoComplete.vue";
 import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
@@ -160,7 +160,9 @@ export default defineComponent({
     CommonAutoComplete,
     OButton,
     ODialog,
-  },
+    OColor,
+    OIcon,
+},
   props: {
     open: {
       type: Boolean,
@@ -332,7 +334,7 @@ export default defineComponent({
       applycolorBySeries,
       cancelEdit,
       editColorBySeries,
-      outlinedCancel,
+      "cancel": "cancel",
       seriesDataItems,
       openColorPicker,
       selectColorBySeriesOption,

@@ -21,20 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-caption" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
-      <q-select
+      <OSelect
         :model-value="pagination.rowsPerPage"
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
-        :options="paginationOptions"
-        :option-label="(opt: any) => (opt === 0 ? 'All' : opt)"
-        borderless
-        dense
-        options-dense
-        class="q-table__select"
+        :options="formattedPaginationOptions"
+        data-test="dashboard-table-rows-per-page-select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="text-caption q-pa-sm" data-test="dashboard-table-row-count">
+    <span class="text-caption q-px-sm" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 
@@ -46,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isFirstPage"
         @click="$emit('firstPage')"
+        icon-left="first-page"
       >
-        <template #icon-left><q-icon name="first_page" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -55,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isFirstPage"
         @click="$emit('prevPage')"
+        icon-left="chevron-left"
       >
-        <template #icon-left><q-icon name="chevron_left" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -64,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isLastPage"
         @click="$emit('nextPage')"
+        icon-left="chevron-right"
       >
-        <template #icon-left><q-icon name="chevron_right" /></template>
       </OButton>
       <OButton
         v-if="pagesNumber > 1"
@@ -73,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         :disabled="isLastPage"
         @click="$emit('lastPage')"
+        icon-left="last-page"
       >
-        <template #icon-left><q-icon name="last_page" /></template>
       </OButton>
     </template>
   </div>
@@ -84,9 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 export default defineComponent({
   name: "TablePaginationControls",
-  components: { OButton },
+  components: { OButton, OSelect },
   props: {
     showPagination: {
       type: Boolean,
@@ -140,10 +137,65 @@ export default defineComponent({
       return `${start}-${end} of ${totalRows}`;
     });
 
+    const formattedPaginationOptions = computed(() =>
+      props.paginationOptions.map((opt) => ({
+        label: opt === 0 ? "All" : String(opt),
+        value: opt,
+      })),
+    );
+
     return {
       countDisplay,
+      formattedPaginationOptions,
       t,
     };
   },
 });
 </script>
+
+<style lang="scss" scoped>
+// Ensure all pagination elements sit on the same baseline.
+[data-test="dashboard-table-pagination-controls"] {
+  display: flex !important;
+  align-items: center !important;
+
+  // Override q-gutter-sm margins on the container and all its children.
+  .q-gutter-sm {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+
+    > * {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+  }
+}
+
+.q-table__select {
+  min-height: auto !important;
+  height: auto !important;
+
+  :deep(.q-field__inner),
+  :deep(.q-field__control),
+  :deep(.q-field__native),
+  :deep(.q-field__append),
+  :deep(.q-field__marginal) {
+    min-height: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    line-height: 1;
+  }
+
+  // Keep a subtle border on the dropdown control.
+  :deep(.q-field__control) {
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 4px;
+    padding: 2px 4px !important;
+  }
+
+  // Shrink the dropdown arrow icon.
+  :deep(.q-select__dropdown-icon) {
+    font-size: 16px !important;
+  }
+}
+</style>

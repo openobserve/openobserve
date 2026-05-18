@@ -30,21 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <div class="stream-routing-container full-width q-py-md">
-      <q-toggle
+      <OSwitch
         v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
-        class="q-mb-sm tw:mr-3 tw:h-[36px] o2-toggle-button-lg q-ml-md"
-        size="lg"
-        :class="
-          store.state.theme === 'dark'
-            ? 'o2-toggle-button-lg-dark'
-            : 'o2-toggle-button-lg-light'
-        "
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
       />
 
-      <q-form @submit="saveStream">
+      <div>
         <div v-if="!createNewStream" class="q-px-md">
           <div class="flex justify-start items-center" style="padding-top: 0px">
             <div
@@ -52,20 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="alert-stream-type o2-input q-mr-sm full-width"
               style="padding-top: 0"
             >
-              <q-select
+              <OSelect
                 v-model="stream_type"
                 :options="filteredStreamTypes"
                 :label="t('alerts.streamType') + ' *'"
-                :popup-content-style="{ textTransform: 'none' }"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm showLabelOnTop no-case full-width"
-                stack-label
-                outlined
-                filled
-                dense
                 @update:model-value="updateStreams()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
+                data-test="input-node-stream-type-select"
               />
             </div>
             <div
@@ -73,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="alert-stream-type o2-input q-mr-sm full-width"
               style="padding-top: 0"
             >
-              <q-select
+              <OSelect
                 v-model="stream_name"
                 :options="filteredStreams"
                 option-label="label"
@@ -82,11 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isFetchingStreams"
                 :popup-content-style="{ textTransform: 'lowercase' }"
                 color="input-border"
-                bg-color="input-bg"
                 class="q-py-sm showLabelOnTop no-case full-width"
-                filled
-                stack-label
-                dense
                 use-input
                 hide-selected
                 fill-input
@@ -98,12 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @input-value="handleDynamicStreamName"
               />
 
-              <q-toggle
+              <OSwitch
                 v-if="
                   stream_type == 'enrichment_tables' &&
                   selectedNodeType == 'output'
                 "
-                class="col-12 q-py-md text-grey-8 text-bold"
                 v-model="appendData"
                 :label="t('function.appendData')"
               />
@@ -114,17 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="note-message"
             >
               <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Select an existing stream
+                <OIcon name="info" size="sm" class="q-pr-xs" /> Select an existing stream
                 from the list or enter the name to create a new one</span
               >
               <span class="tw:flex tw:items-center">
-                <q-icon name="info" class="q-pr-xs" /> Enrichment_tables as
+                <OIcon name="info" size="sm" class="q-pr-xs" /> Enrichment_tables as
                 destination stream is only available for scheduled
                 pipelines</span
               >
 
               <span class="tw:flex">
-                <q-icon name="info" class="q-pr-xs q-pt-xs" /> Use curly braces
+                <OIcon name="info" size="sm" class="q-pr-xs q-pt-xs" /> Use curly braces
                 '{}' to configure stream name dynamically. e.g.
                 static_text_{fieldname}_postfix. Static text before/after {} is
                 optional</span
@@ -161,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :is-in-pipeline="true"
           />
         </div>
-      </q-form>
+      </div>
     </div>
   </div>
   </ODrawer>
@@ -181,7 +161,10 @@ import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
@@ -189,7 +172,6 @@ import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });

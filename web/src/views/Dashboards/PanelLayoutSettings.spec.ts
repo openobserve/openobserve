@@ -56,7 +56,7 @@ const quasarStubs = {
   "q-separator": true,
   "q-form": true,
   "q-input": true,
-  "q-icon": true,
+  "OIcon": true,
   "q-tooltip": true,
 };
 

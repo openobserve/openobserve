@@ -35,10 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:bg-orange-50 tw:border-orange-400'
         ]">
           <template v-slot:avatar>
-            <q-icon
+            <OIcon
               name="warning"
               :class="store.state.theme === 'dark' ? 'tw:text-yellow-500/80' : 'tw:text-orange-500'"
-              size="24px"
+              size="md"
             />
           </template>
           <div :class="[
@@ -59,10 +59,13 @@ import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  components: { ODialog },
+  components: { ODialog,
+    OIcon,
+},
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: { type: String },

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="hero-content">
             <div class="hero-icon">
-              <q-icon name="workspace_premium" size="48px" />
+              <OIcon name="workspace-premium" size="xl" />
             </div>
 
             <h2 class="hero-title">{{ dialogConfig.heroTitle }}</h2>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded State: Show actual data -->
               <template v-else>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- License Limit Note (only for Enterprise without license) -->
             <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
+              <OIcon name="info" size="xs" class="q-mr-xs" />
               <span>{{ dialogConfig.licenseNoteText }}</span>
             </div>
 
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
-                  <q-icon :name="dialogConfig.primaryButtonIcon" />
+                  <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
                 </template>
               </OButton>
               <OButton
@@ -149,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -170,12 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -193,18 +193,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="15px" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
-                    <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                      {{ t('about.enterprise_offer.tooltip.high_availability_mode_only') }}
-                    </q-tooltip>
+                    <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -226,8 +224,10 @@ import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -276,10 +276,12 @@ const FEATURE_LINKS = {
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
   components: {
+    OIcon,
     ChartRenderer,
     OButton,
     ODialog,
     OSkeleton,
+    OTooltip,
   },
   props: {
     modelValue: {
@@ -437,7 +439,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.alerts.name"),
         note: t("about.enterprise_offer.core_features.alerts.note"),
-        icon: "notifications_active",
+        icon: "notifications-active",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.alerts,
       },
       {
@@ -461,19 +463,19 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.pipelines.name"),
         note: t("about.enterprise_offer.core_features.pipelines.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipelines,
       },
       {
         name: t("about.enterprise_offer.core_features.high_availability.name"),
         note: t("about.enterprise_offer.core_features.high_availability.note"),
-        icon: "cloud_done",
+        icon: "cloud-done",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.high_availability,
       },
       {
         name: t("about.enterprise_offer.core_features.multitenancy.name"),
         note: t("about.enterprise_offer.core_features.multitenancy.note"),
-        icon: "corporate_fare",
+        icon: "corporate-fare",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.multitenancy,
       },
       {
@@ -502,7 +504,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.rbac.name"),
         note: t("about.enterprise_offer.enterprise_features.rbac.note"),
-        icon: "admin_panel_settings",
+        icon: "admin-panel-settings",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rbac,
       },
@@ -530,7 +532,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
         note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
-        icon: "fact_check",
+        icon: "fact-check",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
       },
@@ -544,7 +546,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
         note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
-        icon: "alt_route",
+        icon: "alt-route",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipeline_remote_destinations,
       },
@@ -566,7 +568,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
-        icon: "smart_toy",
+        icon: "smart-toy",
         requiresHA: true,
         beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
@@ -582,7 +584,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
-        icon: "query_stats",
+        icon: "query-stats",
         requiresHA: false,
         beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
@@ -618,21 +620,21 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
         note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
-        icon: "call_merge",
+        icon: "call-merge",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.broadcast_join,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
         note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
-        icon: "auto_graph",
+        icon: "auto-graph",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces_correlation,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
         note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.service_maps,
       },
@@ -1095,7 +1097,7 @@ export default defineComponent({
     margin-bottom: 24px;
     backdrop-filter: blur(10px);
 
-    .q-icon {
+    .OIcon {
       color: white;
     }
   }
@@ -1144,7 +1146,7 @@ export default defineComponent({
       color: white;
       box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
 
-      .q-icon {
+      .OIcon {
         color: white;
         font-size: 20px;
       }
@@ -1155,7 +1157,7 @@ export default defineComponent({
         color: white;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
-        .q-icon {
+        .OIcon {
           color: white;
         }
       }
@@ -1205,7 +1207,7 @@ export default defineComponent({
     backdrop-filter: blur(10px);
     white-space: nowrap;
 
-    .q-icon {
+    .OIcon {
       color: rgba(255, 255, 255, 0.85);
     }
   }
@@ -1361,7 +1363,7 @@ export default defineComponent({
       justify-content: center;
       color: var(--q-primary);
 
-      .q-icon {
+      .OIcon {
         font-size: 15px;
       }
     }

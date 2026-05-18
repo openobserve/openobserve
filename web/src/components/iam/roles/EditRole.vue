@@ -104,39 +104,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroup>
               </div>
               <div data-test="edit-role-permissions-search-input">
-                <q-input
+                <OInput
                   v-model="filter.value"
-                  borderless
                   :debounce="500"
-                  dense
                   class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
                 >
                   <template #prepend>
-                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                    <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <div data-test="edit-role-permissions-resource-select-input">
-                <q-select
+                <OSelect
                   v-model="filter.resource"
-                  :options="filteredResources"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-mr-sm"
+                  :options="resourceOptions"
                   placeholder="Select Resource"
-                  map-options
-                  use-input
-                  emit-value
-                  fill-input
-                  hide-selected
-                  borderless
-                  dense
                   clearable
+                  searchable
                   style="width: 200px"
-                  @filter="filterResourceOptions"
                   @update:model-value="onResourceChange"
                 />
               </div>
@@ -184,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('menu.help')"
                   @click="toggleHelpSection"
                 >
-                  <q-icon name="help" size="17px" />
+                  <OIcon name="help" size="17px" />
                   <span class="q-ml-xs"> Help </span>
                 </div>
               </div>
@@ -209,10 +197,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
                   <div class="flex justify-between items-center q-px-sm">
                     <div style="font-size: 16px">Quick Reference</div>
-                    <q-icon
+                    <OIcon
                       class="cursor-pointer"
                       name="close"
-                      size="14px"
+                      size="xs"
                       :title="t('common.close')"
                       @click="toggleHelpSection"
                     />
@@ -274,6 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { cloneDeep } from "lodash-es";
 import { defineAsyncComponent, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { useI18n } from "vue-i18n";
@@ -305,9 +296,8 @@ import dashboardService from "@/services/dashboards";
 import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
-import AppTabs from "@/components/common/AppTabs.vue";
-import { Shield, Users, Bot, LayoutList, CheckSquare, Table2, Braces } from "lucide-vue-next";
 import GroupUsers from "../groups/GroupUsers.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
 import { nextTick } from "vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
@@ -380,12 +370,12 @@ const tabs = [
   {
     value: "permissions",
     label: "Permissions",
-    icon: Shield,
+    icon: "shield",
   },
   {
     value: "users",
     label: "Users",
-    icon: Users,
+    icon: "group",
   },
 ];
 
@@ -393,7 +383,7 @@ if (store.state.zoConfig.service_account_enabled) {
   tabs.push({
     value: "serviceAccounts",
     label: "Service Accounts",
-    icon: Bot,
+    icon: "smart-toy",
   });
 }
 
@@ -401,12 +391,12 @@ const permissionDisplayOptions = [
   {
     label: "All",
     value: "all",
-    icon: LayoutList,
+    icon: "format-list-bulleted",
   },
   {
     label: "Selected",
     value: "selected",
-    icon: CheckSquare,
+    icon: "check-box",
   },
 ];
 
@@ -414,12 +404,12 @@ const permissionUiOptions = [
   {
     label: "Table",
     value: "table",
-    icon: Table2,
+    icon: "table-chart",
   },
   {
     label: "JSON",
     value: "json",
-    icon: Braces,
+    icon: "data-object",
   },
 ];
 

@@ -40,113 +40,74 @@
           class="draggable-row"
         >
           <div class="draggable-handle tw:self-center">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
+            <OIcon
+              name="drag-indicator" size="sm"
               class="q-mr-xs"
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
           <div class="draggable-content tw:flex tw:gap-x-6">
-            <q-select
+            <OSelect
               v-model="mapping.type"
               :label="t('dashboard.valueMappingType')"
               :options="mappingTypes"
               :data-test="`dashboard-addpanel-config-value-mapping-type-select-${index}`"
-              emit-value
-              map-options
-              input-debounce="0"
-              behavior="menu"
-              borderless
-              dense
-              class="q-mb-xs tw:flex-1 o2-custom-select-dashboard"
-              hide-bottom-space
-            ></q-select>
+              class="tw:flex-1"
+            />
             <div
               v-if="mapping.type === 'value'"
               class="input-container tw:flex-1"
             >
-              <q-input
+              <OInput
                 v-model="mapping.value"
                 :label="t('dashboard.valueMappingValue')"
-                class="input-spacing"
-                dense
                 :data-test="`dashboard-addpanel-config-value-mapping-value-input-${index}`"
-                borderless
-                hide-bottom-space
               />
             </div>
             <div
               v-if="mapping.type === 'regex'"
               class="input-container tw:flex-1"
             >
-              <q-input
+              <OInput
                 v-model="mapping.pattern"
                 :label="t('dashboard.valueMappingRegex')"
-                class="input-spacing"
-                dense
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
-                borderless
-                hide-bottom-space
               />
             </div>
             <div
               v-if="mapping.type === 'range'"
               class="input-container tw:flex-1"
             >
-              <q-input
+              <OInput
                 v-model="mapping.from"
                 :label="t('dashboard.valueMappingFrom')"
-                class="input-spacing"
-                dense
                 :data-test="`dashboard-addpanel-config-value-mapping-from-input-${index}`"
-                borderless
-                hide-bottom-space
               />
-              <q-input
+              <OInput
                 v-model="mapping.to"
                 :label="t('dashboard.valueMappingTo')"
-                class="input-spacing tw:flex-1"
-                dense
+                class="tw:flex-1"
                 :data-test="`dashboard-addpanel-config-value-mapping-to-input-${index}`"
-                borderless
-                hide-bottom-space
               />
             </div>
-            <q-input
+            <OInput
               v-model="mapping.text"
               :label="t('dashboard.valueMappingDisplayValue')"
-              class="input-spacing tw:flex-1"
-              dense
+              class="tw:flex-1"
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
-              borderless
-              hide-bottom-space
             />
             <div class="color-section tw:flex-1">
               <div
                 v-if="mapping.color !== null"
-                class="tw:items-center tw:flex"
+                class="tw:items-center tw:flex tw:gap-1"
               >
-                <q-input
+                <OColor
                   v-model="mapping.color"
-                  style="width: 90%"
-                  class="input-spacing"
-                  dense
-                  borderless
-                  hide-bottom-space
-                >
-                  <template v-slot:append>
-                    <q-icon name="colorize" class="cursor-pointer">
-                      <q-popup-proxy cover transition-show="scale">
-                        <q-color v-model="mapping.color" />
-                      </q-popup-proxy>
-                    </q-icon>
-                  </template>
-                </q-input>
-                <q-icon
-                  :name="outlinedCancel"
-                  style="width: 10%"
-                  class="cursor-pointer tw:align-middle"
+                  class="tw:flex-1 tw:h-9 tw:mt-3"
+                />
+                <OIcon
+                  name="cancel"
+                  class="cursor-pointer"
                   size="xs"
                   :title="t('dashboard.valueMappingRemoveColor')"
                   @click="removeColorByIndex(index)"
@@ -167,8 +128,8 @@
               size="icon"
               @click="removeValueMappingByIndex(index)"
               :data-test="`dashboard-addpanel-config-value-mapping-delete-btn-${index}`"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
             </OButton>
           </div>
         </div>
@@ -182,13 +143,18 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OColor from "@/lib/forms/Color/OColor.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 export default defineComponent({
   name: "ValueMappingPopUp",
-  components: { draggable: VueDraggableNext as any, OButton, ODialog },
+  components: { draggable: VueDraggableNext as any, OButton, OInput, OSelect, OColor, ODialog,
+    OIcon,
+},
   props: {
     open: {
       type: Boolean,
@@ -298,7 +264,7 @@ export default defineComponent({
       applyValueMapping,
       cancelEdit,
       editedValueMapping,
-      outlinedCancel,
+      "cancel": "cancel",
     };
   },
 });

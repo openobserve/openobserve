@@ -20,31 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="filters-bar q-pa-md">
       <div class="row q-col-gutter-md">
         <div class="col-12 col-md-6">
-          <q-input
+          <OInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
-            borderless
-            dense
-            flat
             clearable
-            class="no-border tw:w-full"
+            class="tw:w-full"
             data-test="built-in-pattern-search"
           >
             <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
         <div class="col-12 col-md-4">
-          <q-select
+          <OSelect
             v-model="selectedTags"
-            :options="availableTags"
-            :label="t('regex_patterns.filter_by_tag')"
-            dense
+            :options="tagOptions"
+            :placeholder="t('regex_patterns.filter_by_tag')"
             multiple
-            use-chips
             clearable
-            borderless
             data-test="built-in-pattern-tag-filter"
           />
         </div>
@@ -57,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left
-              ><q-icon name="refresh" size="14px"
+              ><OIcon name="refresh" size="xs"
             /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>
@@ -73,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <OIcon name="error" size="50px" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
@@ -102,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`pattern-item-${index}`"
           >
             <q-item-section side>
-              <q-checkbox
+              <OCheckbox
                 v-model="pattern.selected"
                 @update:model-value="updateSelection"
                 :data-test="`pattern-checkbox-${index}`"
@@ -143,8 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
-                <q-icon name="more_vert" size="14px" />
-                <q-tooltip>{{ t("regex_patterns.preview") }}</q-tooltip>
+                <OIcon name="more-vert" size="xs" />
+                <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
             </q-item-section>
           </q-item>
@@ -152,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-item v-if="filteredPatterns.length === 0">
             <q-item-section class="text-center text-grey-6">
               <div class="q-pa-xl">
-                <q-icon name="search_off" size="50px" />
+                <OIcon name="search-off" size="50px" />
                 <div class="q-mt-md">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
@@ -186,12 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="q-mb-md">
           <div class="text-weight-bold q-mb-xs">{{ t('regex_patterns.pattern') }}</div>
-          <q-input
+          <OTextarea
             :model-value="previewedPattern?.pattern"
-            type="textarea"
             readonly
-            outlined
-            dense
             rows="3"
           />
         </div>
@@ -247,8 +238,14 @@ import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 
 interface PatternExample {
   Valid: string[];
@@ -268,7 +265,7 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner },
+  components: { OButton, ODialog, OSpinner, OIcon, OSelect },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -291,6 +288,10 @@ export default defineComponent({
       });
       return Array.from(tags).sort();
     });
+
+    const tagOptions = computed(() =>
+      availableTags.value.map((tag) => ({ label: tag, value: tag }))
+    );
 
     const filteredPatterns = computed(() => {
       let filtered = patterns.value;
@@ -455,6 +456,7 @@ export default defineComponent({
       searchQuery,
       selectedTags,
       availableTags,
+      tagOptions,
       filteredPatterns,
       selectedCount,
       showPreview,

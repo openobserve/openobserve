@@ -23,9 +23,9 @@
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="13px" />
                   </template>
-                  <q-tooltip>Drag to reorder</q-tooltip>
+                  <OTooltip content="Drag to reorder" side="top" />
                 </OButton>
                 <OButton
                   variant="primary"
@@ -36,7 +36,7 @@
                 >
                   {{ computedLabel(element) }}
                   <template #icon-right
-                    ><q-icon name="arrow_drop_down"
+                    ><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                   <q-menu class="q-pa-md">
                     <div style="width: 350px">
@@ -55,68 +55,40 @@
                         :key="paramIndex"
                       >
                         <!-- Number Parameter -->
-                        <q-input
+                        <OInput
                           v-if="param.type === 'number'"
                           v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
                           class="showLabelOnTop q-mb-sm"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
                         <!-- String Parameter -->
-                        <q-input
+                        <OInput
                           v-else-if="param.type === 'string'"
                           v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
                           class="showLabelOnTop q-mb-sm"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
                         <!-- Multi-Select Parameter for labels -->
-                        <q-select
+                        <OSelect
                           v-else-if="param.type === 'select'"
                           v-model="element.params[paramIndex] as string[]"
-                          :options="filteredLabels"
+                          :options="availableLabels"
                           :label="param.name"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
                           multiple
-                          use-input
-                          input-debounce="300"
-                          @filter="filterOperationLabels"
+                          searchable
                           class="operation-label-selector showLabelOnTop no-case q-mb-sm"
-                          input-class="tw:normal-case!"
                           :data-test="`promql-operation-param-${paramIndex}`"
-                          :hint="
-                            availableLabels.length
-                              ? 'Select one or more labels'
-                              : 'No labels available'
-                          "
                         >
-                          <template v-slot:no-option>
-                            <q-item>
-                              <q-item-section class="text-grey">
-                                {{
-                                  availableLabels.length
-                                    ? "No matching labels"
-                                    : "Select a metric first to load labels"
-                                }}
-                              </q-item-section>
-                            </q-item>
+                          <template #empty>
+                            <span>{{ availableLabels.length ? 'No matching labels' : 'Select a metric first to load labels' }}</span>
                           </template>
-                        </q-select>
+                        </OSelect>
                       </template>
                     </div>
                   </q-menu>
@@ -126,8 +98,8 @@
                   size="icon-chip"
                   @click="removeOperation(index)"
                   :data-test="`promql-operation-remove-${index}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -142,8 +114,8 @@
           class="add-operation-btn tw:ml-[0.25rem]"
           data-test="promql-add-operation"
         >
-          <q-icon name="add" size="14px" />
-          <q-tooltip>Add operation</q-tooltip>
+          <OIcon name="add" size="xs" />
+          <OTooltip content="Add operation" side="top" />
         </OButton>
       </div>
     </div>
@@ -153,19 +125,14 @@
       primary-button-label="Close"
       @click:primary="showOperationSelector = false"
     >
-      <q-input
+      <OInput
         v-model="searchQuery"
-        dense
-        borderless
-        stack-label
-        hide-bottom-space
-        class="showLabelOnTop"
         clearable
       >
         <template v-slot:prepend>
-          <q-icon name="search" />
+          <OIcon name="search" size="sm" />
         </template>
-      </q-input>
+      </OInput>
 
       <div style="max-height: 400px; overflow-y: auto">
         <q-list bordered separator>
@@ -200,7 +167,11 @@
 import { ref, computed, watch, onMounted } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {

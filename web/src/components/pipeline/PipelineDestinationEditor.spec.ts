@@ -102,7 +102,7 @@ describe("PipelineDestinationEditor - rendering", () => {
 
   it("renders the back arrow icon", async () => {
     wrapper = await mountComp();
-    expect(wrapper.find(".q-icon").exists()).toBe(true);
+    expect(wrapper.find(".OIcon").exists()).toBe(true);
   });
 });
 
@@ -115,7 +115,7 @@ describe("PipelineDestinationEditor - back arrow click emits cancel", () => {
 
   it("emits 'cancel' when back arrow container is clicked", async () => {
     wrapper = await mountComp();
-    // The clickable wrapper div is the parent of the q-icon
+    // The clickable wrapper div is the parent of the OIcon
     const backDiv = wrapper.find(".cursor-pointer");
     expect(backDiv.exists()).toBe(true);
     await backDiv.trigger("click");

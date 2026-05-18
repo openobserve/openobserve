@@ -78,8 +78,8 @@ describe('AddCipherKey.vue', () => {
           $q: mockQuasar
         },
         stubs: {
-                    'q-icon': {
-            template: '<div class="q-icon-stub">{{ name }}</div>',
+                    'OIcon': {
+            template: '<div class="OIcon-stub">{{ name }}</div>',
             props: ['name', 'size']
           },
           'q-separator': {

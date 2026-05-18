@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
-              <q-icon
-                :name="serviceNameDetected ? 'check_circle' : 'warning'"
+              <OIcon
+                :name="serviceNameDetected ? 'check-circle' : 'warning'"
                 size="18px"
                 :color="serviceNameDetected ? 'positive' : undefined"
                 :class="serviceNameDetected ? '' : 'tw:text-amber-500'"
@@ -75,11 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </template>
               </div>
-              <q-icon
+              <OIcon
                 :name="
                   serviceNameExpanded
-                    ? 'keyboard_arrow_up'
-                    : 'keyboard_arrow_down'
+                    ? 'keyboard-arrow-up'
+                    : 'keyboard-arrow-down'
                 "
                 size="18px"
                 class="tw:opacity-40 tw:shrink-0"
@@ -248,13 +248,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="tw:mb-3">
-            <q-toggle
+            <OSwitch
               data-test="service-identity-service-optional-btn"
               v-model="serviceOptional"
               :label="t('settings.correlation.serviceOptionalLabel')"
               size="sm"
-              dense
-              class="tw:text-[13px] tw:font-semibold"
             />
             <div
               class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
@@ -297,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'tw:border-grey-4 tw:bg-grey-1'
               "
             >
-              <q-icon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
+              <OIcon name="tune" size="28px" class="tw:text-grey-5 tw:mb-1" />
               <span
                 class="tw:text-sm tw:font-medium"
                 :class="
@@ -316,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="addingToEnv = activeEnvironment"
               >
                 <template #icon-left
-                  ><q-icon name="add" size="14px"
+                  ><OIcon name="add" size="xs"
                 /></template>
                 {{ t("settings.correlation.addField") }}
               </OButton>
@@ -334,9 +332,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:bg-blue-50 tw:text-blue-700'
                 "
               >
-                <q-icon
-                  name="auto_awesome"
-                  size="14px"
+                <OIcon
+                  name="auto-awesome"
+                  size="xs"
                   class="tw:shrink-0 tw:mt-0.5"
                 />
                 <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
@@ -383,14 +381,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{
                       getGroupByValue(fieldId)?.display ?? fieldId
                     }}</span>
-                    <q-tooltip
+                    <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs"
-                    >
-                      {{ getFieldCardinalityTooltip(fieldId) }}
-                    </q-tooltip>
+                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      side="top"
+                    />
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -402,62 +397,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Inline add select for this group -->
                   <template v-if="addingToEnv === envKey">
-                    <q-select
+                    <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
                       :options="getAddFieldOptionsForEnv(envKey)"
-                      option-label="label"
-                      option-value="value"
-                      emit-value
-                      map-options
-                      use-input
-                      input-debounce="0"
-                      dense
-                      borderless
+                      labelKey="label"
+                      valueKey="value"
+                      searchable
                       :placeholder="t('settings.correlation.selectField')"
                       style="min-width: 220px"
                       data-test="service-identity-add-distinguish-btn"
-                      @filter="onAddFieldFilter"
                       @update:model-value="onAddFieldToEnv(envKey, $event)"
-                    >
-                      <template #option="scope">
-                        <q-item v-bind="scope.itemProps">
-                          <q-item-section>
-                            <q-item-label
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              {{ scope.opt.label }}
-                              <q-badge
-                                v-if="scope.opt.cardinalityLabel"
-                                :color="scope.opt.cardinalityColor"
-                                outline
-                                :label="scope.opt.cardinalityLabel"
-                                class="tw:text-[10px]"
-                              />
-                              <q-badge
-                                v-if="scope.opt.recommended"
-                                color="positive"
-                                outline
-                                label="recommended"
-                                class="tw:text-[10px]"
-                              />
-                            </q-item-label>
-                            <q-item-label
-                              caption
-                              class="tw:flex tw:items-center tw:gap-2"
-                            >
-                              <span v-if="scope.opt.uniqueValues"
-                                >{{ scope.opt.uniqueValues }} unique
-                                values</span
-                              >
-                              <span v-if="scope.opt.streamTypes">{{
-                                scope.opt.streamTypes.join(", ")
-                              }}</span>
-                            </q-item-label>
-                          </q-item-section>
-                        </q-item>
-                      </template>
-                    </q-select>
+                    />
                     <OButton
                       variant="ghost"
                       size="icon-xs-sq"
@@ -479,16 +430,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline"
                     size="sm"
                     @click="addingToEnv = envKey"
+                    icon-left="add"
                   >
-                    <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                     {{ t("settings.correlation.addField") }}
-                    <q-tooltip
-                      anchor="top middle"
-                      self="bottom middle"
-                      class="tw:text-xs tw:max-w-[240px]"
-                    >
-                      {{ t("settings.correlation.addFieldTooltip") }}
-                    </q-tooltip>
+                    <OTooltip
+                      side="top"
+                      :content="t('settings.correlation.addFieldTooltip')"
+                      max-width="240px"
+                    />
                   </OButton>
                 </div>
               </template>
@@ -501,61 +450,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
                   style="border-top: 1px solid var(--o2-border-color)"
                 >
-                  <q-select
+                  <OSelect
                     ref="addFieldSelectRef"
                     v-model="addFieldValue"
                     :options="getAddFieldOptionsForEnv(addingToEnv)"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     :placeholder="t('settings.correlation.selectField')"
                     style="min-width: 220px"
                     data-test="service-identity-add-distinguish-btn"
-                    @filter="onAddFieldFilter"
                     @update:model-value="onAddFieldToEnv(addingToEnv, $event)"
-                  >
-                    <template #option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            {{ scope.opt.label }}
-                            <q-badge
-                              v-if="scope.opt.cardinalityLabel"
-                              :color="scope.opt.cardinalityColor"
-                              outline
-                              :label="scope.opt.cardinalityLabel"
-                              class="tw:text-[10px]"
-                            />
-                            <q-badge
-                              v-if="scope.opt.recommended"
-                              color="positive"
-                              outline
-                              label="recommended"
-                              class="tw:text-[10px]"
-                            />
-                          </q-item-label>
-                          <q-item-label
-                            caption
-                            class="tw:flex tw:items-center tw:gap-2"
-                          >
-                            <span v-if="scope.opt.uniqueValues"
-                              >{{ scope.opt.uniqueValues }} unique values</span
-                            >
-                            <span v-if="scope.opt.streamTypes">{{
-                              scope.opt.streamTypes.join(", ")
-                            }}</span>
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                  </q-select>
+                  />
                   <OButton
                     variant="ghost"
                     size="icon-xs-sq"
@@ -578,16 +484,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   @click="addingToEnv = generateGroupId()"
+                  icon-left="add"
                 >
-                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   {{ t("settings.correlation.addGroup") }}
-                  <q-tooltip
-                    anchor="top middle"
-                    self="bottom middle"
-                    class="tw:text-xs tw:max-w-[240px]"
-                  >
-                    {{ t("settings.correlation.addGroupTooltip") }}
-                  </q-tooltip>
+                  <OTooltip
+                    side="top"
+                    :content="t('settings.correlation.addGroupTooltip')"
+                    max-width="240px"
+                  />
                 </OButton>
                 <OButton
                   variant="primary"
@@ -618,7 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
-          <q-icon name="radar" size="18px" class="tw:text-teal-6" />
+          <OIcon name="radar" size="sm" class="tw:text-teal-6" />
           <span class="tw:font-bold tw:text-sm">Workload Detection</span>
         </div>
 
@@ -635,18 +539,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:opacity-80 tw:transition-opacity"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
-            <q-icon name="check_circle" size="18px" color="positive" />
+            <OIcon name="check-circle" size="sm" />
             <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
               Workload detected using fields
               <span class="tw:text-xs tw:opacity-60"
                 >({{ trackedAliasIds.length }})</span
               >
             </div>
-            <q-icon
+            <OIcon
               :name="
                 trackedAliasExpanded
-                  ? 'keyboard_arrow_up'
-                  : 'keyboard_arrow_down'
+                  ? 'keyboard-arrow-up'
+                  : 'keyboard-arrow-down'
               "
               size="18px"
               class="tw:opacity-40 tw:shrink-0"
@@ -716,18 +620,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Inline add select -->
                 <template v-if="addingTrackedAlias">
-                  <q-select
+                  <OSelect
                     ref="addTrackedAliasSelectRef"
                     v-model="addTrackedAliasValue"
                     :options="trackedAliasAddOptions"
-                    option-label="label"
-                    option-value="value"
-                    emit-value
-                    map-options
-                    use-input
-                    input-debounce="0"
-                    dense
-                    borderless
+                    labelKey="label"
+                    valueKey="value"
+                    searchable
                     placeholder="Select alias group"
                     style="min-width: 220px"
                     @update:model-value="onAddTrackedAlias($event)"
@@ -749,8 +648,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   @click="addingTrackedAlias = true"
+                  icon-left="add"
                 >
-                  <template #icon-left><Plus class="tw:size-3.5 tw:shrink-0" /></template>
                   Add field
                 </OButton>
               </div>
@@ -833,7 +732,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
               <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-                <q-icon name="add" size="16px" class="tw:text-grey-5" />
+                <OIcon name="add" size="sm" class="tw:text-grey-5" />
               </div>
 
               <!-- Dim card -->
@@ -846,7 +745,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               >
                 <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                  <q-icon
+                  <OIcon
                     :name="card.theme.icon"
                     size="14px"
                     :class="card.theme.iconClass"
@@ -1038,7 +937,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:opacity-40 hover:tw:opacity-100"
               @click="dismissSuggestion"
             >
-              <q-icon name="cancel" size="14px" />
+              <OIcon name="cancel" size="xs" />
             </OButton>
           </div>
         </div>
@@ -1064,12 +963,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ]"
                 >
                   {{ insightData.title }}
-                  <q-tooltip
+                  <OTooltip
                     v-if="insightData.title.length > 25"
-                    class="tw:text-xs"
-                  >
-                    {{ insightData.title }}
-                  </q-tooltip>
+                    :content="insightData.title"
+                    side="top"
+                  />
                 </span>
               </div>
               <div
@@ -1084,9 +982,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-grey-6'
                 "
               >
-                <q-icon
+                <OIcon
                   name="verified"
-                  size="14px"
+                  size="xs"
                   class="tw:text-positive"
                 />
                 <span
@@ -1240,7 +1138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'tw:bg-blue-1/40 tw:text-grey-6'
                   "
                 >
-                  <q-icon name="info" size="14px" />
+                  <OIcon name="info" size="xs" />
                   <span
                     >These are the related
                     <strong>{{
@@ -1339,7 +1237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-identity-warnings-banner"
         >
           <template #avatar>
-            <q-icon name="warning" color="warning" />
+            <OIcon name="warning" size="sm" />
           </template>
           <div class="tw:flex tw:flex-col tw:gap-1">
             <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
@@ -1584,9 +1482,12 @@ import TagInput from "@/components/alerts/TagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Plus } from "lucide-vue-next";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   ServiceIdentityConfig,
   IdentitySet,
@@ -1648,7 +1549,6 @@ const addFieldValue = ref("");
 const addingTrackedAlias = ref(false);
 const addTrackedAliasValue = ref("");
 const addTrackedAliasSelectRef = ref<any>(null);
-const addFieldFilter = ref("");
 
 /** All env keys that have at least one configured field, ordered by detected env order */
 const allConfiguredEnvs = computed(() => {
@@ -1958,7 +1858,7 @@ const DIM_CARD_THEMES = [
   },
   {
     // teal
-    icon: "folder_open",
+    icon: "folder-open",
     iconClass: "tw:text-teal-5",
     countClass: "tw:text-teal-6",
     borderDark:
@@ -3363,15 +3263,8 @@ function getAddFieldOptionsForEnv(envKey: string) {
     .flat()
     .filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
-  const needle = addFieldFilter.value.toLowerCase();
   return availableGroups.value
     .filter((g) => !used.has(g.group_id))
-    .filter(
-      (g) =>
-        !needle ||
-        g.display.toLowerCase().includes(needle) ||
-        g.group_id.toLowerCase().includes(needle),
-    )
     .map((g) => {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
@@ -3387,16 +3280,9 @@ function getAddFieldOptionsForEnv(envKey: string) {
     });
 }
 
-function onAddFieldFilter(val: string, update: (fn: () => void) => void) {
-  update(() => {
-    addFieldFilter.value = val;
-  });
-}
-
 /** Called when user picks a field in the inline select for a specific env */
 function onAddFieldToEnv(envKey: string, val: string) {
   if (!val) return;
-  addFieldFilter.value = "";
   const current = setDistinguishBy.value[envKey] ?? [];
   setDistinguishBy.value = {
     ...setDistinguishBy.value,

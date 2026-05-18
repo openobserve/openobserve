@@ -27,17 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("cipherKey.header") }}
             </div>
             <div class="col-auto flex">
-              <q-input
+              <OInput
                 v-model="filterQuery"
-                borderless
-                dense
                 class="q-ml-auto no-border o2-search-input"
                 :placeholder="t('cipherKey.search')"
               >
                 <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
+                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
                 </template>
-              </q-input>
+              </OInput>
               <OButton
                 variant="primary"
                 size="sm-action"
@@ -48,97 +46,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-      <q-table
-        ref="qTable"
-        :rows="visibleRows"
+      <OTable
+        :data="visibleRows"
         :columns="columns"
         row-key="name"
+        :selected-ids="selectedKeyIds"
         selection="multiple"
-        v-model:selected="selectedKeys"
-        :pagination="pagination"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'"
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        @update:selected-ids="handleSelectedIdsUpdate"
       >
-        <template #no-data><NoData /></template>
-        <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+        <template #empty><NoData /></template>
+        <template #cell-actions="{ row }">
+          <OButton
+            :data-test="`cipherkey-list-${row.name}-update`"
+            variant="ghost"
+            size="icon-sm"
+            class="q-ml-xs"
+            :title="t('common.edit')"
+            @click="editCipherKey(row)"
+            icon-left="edit"
+          />
+          <OButton
+            :data-test="`cipherkey-list-${row.name}-delete`"
+            variant="ghost-destructive"
+            size="icon-sm"
+            class="q-ml-xs"
+            :title="t('common.delete')"
+            @click="confirmDeleteCipherKey(row)"
+            icon-left="delete"
+          />
         </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <OButton
-              :data-test="`cipherkey-list-${props.row.name}-update`"
-              variant="ghost"
-              size="icon-sm"
-              class="q-ml-xs"
-              :title="t('common.edit')"
-              @click="editCipherKey(props.row)"
-            >
-              <Pencil class="tw:size-4" />
-            </OButton>
-            <OButton
-              :data-test="`cipherkey-list-${props.row.name}-delete`"
-              variant="ghost-destructive"
-              size="icon-sm"
-              class="q-ml-xs"
-              :title="t('common.delete')"
-              @click="confirmDeleteCipherKey(props.row)"
-            >
-              <Trash2 class="tw:size-4" />
-            </OButton>
-          </q-td>
+        <template
+          v-if="selectedKeys.length > 0"
+          #bottom
+        >
+          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+            {{ selectedKeys.length }} selected
+          </span>
+          <OButton
+            data-test="cipher-keys-list-delete-keys-btn"
+            variant="outline"
+            size="sm-action"
+            icon-left="delete"
+            @click="openBulkDeleteDialog"
+          >
+            Delete
+          </OButton>
         </template>
-        <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md">
-              {{ resultTotal }} {{ t('cipherKey.header') }}
-            </div>
-            <OButton
-              v-if="selectedKeys.length > 0"
-              data-test="cipher-keys-list-delete-keys-btn"
-              variant="outline"
-              size="sm-action"
-              class="q-mr-sm"
-              @click="openBulkDeleteDialog"
-            >
-              <template #icon-left><Trash2 class="tw:size-4 tw:shrink-0" /></template>
-              Delete
-            </OButton>
-            <QTablePagination
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
-            />
-          </div>
-        </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-
-              <!-- Render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-      </q-table>
+      </OTable>
     </div>
     <div v-else>
       <add-cipher-key @cancel:hideform="hideAddDialog" />
@@ -166,32 +127,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, onUpdated, watch, Ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, date, copyToClipboard, QTableProps } from "quasar";
+import { useQuasar, date, copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    QTablePagination,
     NoData,
     AddCipherKey,
     ConfirmDialog,
     OButton,
-    Pencil,
-    Trash2,
-  },
+    OInput,
+    OIcon,
+    OTable,
+},
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -199,62 +161,49 @@ export default defineComponent({
     const $q = useQuasar();
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
-    const qTable: any = ref(null);
     const loading = ref(false);
     const filterQuery = ref("");
-    const columns = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 67,
+        meta: { align: "left" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("cipherKey.name"),
-        align: "left",
+        id: "name",
+        header: t("cipherKey.name"),
+        accessorKey: "name",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "store_type",
-        field: "store_type",
-        label: t("cipherKey.storeType"),
-        align: "left",
+        id: "store_type",
+        header: t("cipherKey.storeType"),
+        accessorKey: "store_type",
         sortable: true,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "mechanism_type",
-        field: "mechanism_type",
-        label: t("cipherKey.mechanismType"),
-        align: "left",
+        id: "mechanism_type",
+        header: t("cipherKey.mechanismType"),
+        accessorKey: "mechanism_type",
         sortable: true,
-        style: "width: 150px",
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("cipherKey.actions"),
-        align: "center",
-        sortable: false,
-        classes:'actions-column'
+        id: "actions",
+        header: t("cipherKey.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 100,
+        meta: { align: "center" },
       },
-    ]);
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
     ];
     const resultTotal = ref<number>(0);
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
 
     const confirmDelete: Ref<{
       visible: boolean;
@@ -292,10 +241,13 @@ export default defineComponent({
       }
     });
 
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
+    const selectedKeyIds = computed(() =>
+      selectedKeys.value.map((k: any) => k.name),
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const map = new Map(tabledata.value.map((r: any) => [r.name, r]));
+      selectedKeys.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
     const addCipherKey = (evt: any) => {
@@ -434,7 +386,6 @@ export default defineComponent({
       if (!filterQuery.value) return tabledata.value || [];
       return filterData(tabledata.value || [], filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
     watch(visibleRows, (newVisibleRows) => {
@@ -491,31 +442,25 @@ export default defineComponent({
       t,
       store,
       router,
-      qTable,
       loading,
       tabledata,
       columns,
       showAddDialog,
       addCipherKey,
       getData,
-      pagination,
       resultTotal,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
-      maxRecordToReturn,
       filterQuery,
       hideAddDialog,
       cancelDeleteCipherKey,
       confirmDeleteCipherKey,
       confirmDelete,
-      outlinedDelete,
       editCipherKey,
       deleteCipherKey,
       visibleRows,
-      hasVisibleRows,
       filterData,
       selectedKeys,
+      selectedKeyIds,
+      handleSelectedIdsUpdate,
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteCipherKeys,

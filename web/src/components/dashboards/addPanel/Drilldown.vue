@@ -41,7 +41,7 @@
         >
           {{ index + 1 }}. {{ data.name }}
         </div>
-        <q-icon
+        <OIcon
           class="q-mr-xs"
           size="15px"
           name="close"
@@ -74,13 +74,16 @@ import { defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, OButton },
+  components: { DrilldownPopUp, OButton,
+    OIcon,
+},
   props: ["variablesData"],
   setup() {
     const { t } = useI18n();

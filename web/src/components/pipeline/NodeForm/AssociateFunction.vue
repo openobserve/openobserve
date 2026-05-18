@@ -40,16 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md"
     >
       <div class="tw:flex tw:items-center">
-        <q-toggle
+        <OSwitch
           data-test="create-function-toggle"
-          class="q-mb-sm tw:inline-block tw:h-[36px] o2-toggle-button-lg"
-          size="lg"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light',
-            !createNewFunction ? '-tw:ml-4' : '',
-          ]"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
           v-model="createNewFunction"
         />
@@ -60,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <q-form @submit="saveFunction">
+      <div>
         <div
           v-if="!createNewFunction"
           class="flex justify-start items-center full-width"
@@ -71,29 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="alert-stream-type o2-input q-mr-sm full-width"
             style="padding-top: 0"
           >
-            <q-select
+            <OSelect
               v-model="selectedFunction"
-              :options="filteredFunctions"
+              :options="props.functions"
               :label="t('function.selectFunction') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              use-input
-              input-debounce="300"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              searchable
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              :error="functionExists || !selectedFunction"
+              :error-message="functionExists ? 'Function is already associated' : ''"
               style="min-width: 220px"
-              v-bind:readonly="isUpdating"
-              v-bind:disable="isUpdating"
-              :error-message="
-                selectedFunction ? 'Function is already associated' : ''
-              "
-              @filter="filterFunctions"
-              :error="functionExists"
+              data-test="associate-function-select-function-input"
             />
           </div>
         </div>
@@ -140,15 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="padding-top: 12px"
           v-if="!createNewFunction"
         >
-          <q-toggle
+          <OSwitch
             data-test="associate-function-after-flattening-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-            size="lg"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-lg-dark'
-                : 'o2-toggle-button-lg-light'
-            "
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"
           />
@@ -159,14 +132,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="note-heading">Function Execution Guidelines:</div>
               <q-banner inline dense class="note-info">
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     ><span class="highlight">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened</span
                   >
                 </div>
                 <div>
-                  <q-icon name="info" color="orange" class="q-mr-sm" />
+                  <OIcon name="info" size="sm" class="q-mr-sm" />
                   <span
                     ><span class="highlight">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened</span
@@ -197,10 +170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="associate-function-save-btn"
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="saveFunction"
           >{{ createNewFunction ? t('alerts.createFunction') : t('alerts.save') }}</OButton>
         </div>
-      </q-form>
+      </div>
     </div>
     </div>
   </ODrawer>
@@ -227,7 +200,10 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

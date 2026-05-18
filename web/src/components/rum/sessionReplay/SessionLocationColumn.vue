@@ -25,14 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-grey-8">
           {{ column.city || "Unknown" }}
         </div>
-        <q-icon
+        <OIcon
           data-test="circle-icon"
           name="circle"
           size="4px"
           class="q-mx-md text-grey-6"
         />
         <div class="text-grey-8">{{ column.browser }}</div>
-        <q-icon
+        <OIcon
           data-test="circle-icon"
           name="circle"
           size="4px"
@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import "flag-icons/css/flag-icons.min.css";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineProps({
   column: {

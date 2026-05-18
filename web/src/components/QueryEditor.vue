@@ -22,25 +22,23 @@
           @click="cancelGeneration"
           class="ai-stop-button"
         >
-          <q-icon name="stop" />
-          <q-tooltip>{{ t('common.stopGenerating') }}</q-tooltip>
+          <OIcon name="stop" size="sm" />
+          <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
       </div>
       <!-- Normal input when not generating -->
       <div v-else class="tw:flex tw:items-center tw:gap-2">
-        <q-input
+        <OInput
           v-model="aiInputText"
-          dense
-          borderless
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
           :class="aiInputFieldClass"
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
         >
-          <template v-slot:prepend>
+          <template #prepend>
             <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
           </template>
-        </q-input>
+        </OInput>
         <!-- Send Button -->
         <OButton
           variant="ai-gradient"
@@ -50,13 +48,9 @@
           @click="handleAIGenerate"
           class="ai-send-button"
         >
-          <q-icon name="send" />
-          <q-tooltip v-if="props.disableAi && props.disableAiReason">
-            {{ props.disableAiReason }}
-          </q-tooltip>
-          <q-tooltip v-else-if="!aiInputText.trim()">
-            {{ props.aiTooltip || t("search.enterPrompt") }}
-          </q-tooltip>
+          <OIcon name="send" size="sm" />
+          <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
+          <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
         </OButton>
         <!-- Close Button -->
         <OButton
@@ -66,8 +60,8 @@
           @click="dismissAIMode"
           class="ai-close-button"
         >
-          <q-icon name="close" />
-          <q-tooltip>{{ t('common.close') }}</q-tooltip>
+          <OIcon name="close" size="sm" />
+          <OTooltip :content="t('common.close')" />
         </OButton>
       </div>
     </div>
@@ -107,7 +101,7 @@
         class="ai-floating-button"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
-        <q-tooltip>{{ props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle') }}</q-tooltip>
+        <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>
   </div>
@@ -119,11 +113,14 @@ import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
 import { useChatHistory } from '@/composables/useChatHistory';
 import type { ChatMessage } from '@/ts/interfaces/chat';
 import config from '@/aws-exports';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 type Language = 'sql' | 'promql' | 'vrl' | 'javascript';
 

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="navigateBack()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div>
           <div class="text-h6 text-weight-medium">Upload Source Maps</div>
@@ -41,41 +41,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form Content Area -->
     <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 192px); overflow: auto">
-      <q-form @submit="uploadSourceMaps" class="upload-form">
+      <div class="upload-form">
         <!-- Input Fields -->
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
           <!-- Service Input -->
           <div>
             <div class="text-subtitle2 text-weight-medium tw:mb-2">Service *</div>
-            <q-input
+            <OInput
               v-model="formData.service"
               placeholder="Enter service name"
-              borderless
-              dense
-              :rules="[val => !!val || 'Service is required']"
+              :error="!!serviceError"
+              :error-message="serviceError"
+              @update:model-value="serviceError = ''"
             />
           </div>
 
           <!-- Version Input -->
           <div>
             <div class="text-subtitle2 text-weight-medium tw:mb-2">Version *</div>
-            <q-input
+            <OInput
               v-model="formData.version"
               placeholder="Enter version (e.g., 1.0.0)"
-              borderless
-              dense
-              :rules="[val => !!val || 'Version is required']"
+              :error="!!versionError"
+              :error-message="versionError"
+              @update:model-value="versionError = ''"
             />
           </div>
 
           <!-- Environment Input -->
           <div>
             <div class="text-subtitle2 text-weight-medium tw:mb-2">Environment</div>
-            <q-input
+            <OInput
               v-model="formData.environment"
               placeholder="Enter environment (optional)"
-              borderless
-              dense
             />
           </div>
         </div>
@@ -100,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div v-if="!formData.file" class="upload-content">
-              <q-icon name="cloud_upload" size="3rem" color="grey-6" class="tw:mb-3" />
+              <OIcon name="backup" size="xl" class="tw:mb-3" />
               <div class="text-h6 text-grey-8 tw:mb-2">Drop your file here</div>
               <div class="text-body2 text-grey-6 tw:mb-3">or click to browse</div>
               <div class="text-caption text-grey-5">.zip files only</div>
@@ -109,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="file-info">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <q-icon name="insert_drive_file" size="2rem" color="primary" />
+                  <OIcon name="draft" size="lg" />
                   <div>
                     <div class="text-subtitle2 text-weight-medium">{{ formData.file.name }}</div>
                     <div class="text-caption text-grey-6">{{ formatFileSize(formData.file.size) }}</div>
@@ -118,15 +116,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon"
+                  icon-left="close"
                   @click.stop="removeFile"
-                >
-                  <q-icon name="close" size="16px" />
-                </OButton>
+                />
               </div>
             </div>
           </div>
         </div>
-      </q-form>
+      </div>
     </div>
 
     <!-- Bottom Action Bar -->
@@ -156,6 +153,8 @@ import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const router = useRouter();
@@ -173,6 +172,8 @@ const formData = ref({
 const isUploading = ref(false);
 const isDragging = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const serviceError = ref("");
+const versionError = ref("");
 
 // Pre-fill form data from query parameters on mount
 onMounted(() => {
@@ -260,10 +261,8 @@ const uploadSourceMaps = async () => {
   }
 
   if (!formData.value.service || !formData.value.version) {
-    $q.notify({
-      type: "negative",
-      message: "Please fill in all required fields",
-    });
+    serviceError.value = formData.value.service ? "" : "Service is required";
+    versionError.value = formData.value.version ? "" : "Version is required";
     return;
   }
 
@@ -365,7 +364,7 @@ const uploadSourceMaps = async () => {
 }
 
 .file-info {
-  .q-icon {
+  .OIcon {
     flex-shrink: 0;
   }
 }

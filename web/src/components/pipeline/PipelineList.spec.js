@@ -127,7 +127,7 @@ describe("PipelinesList", () => {
           'q-checkbox': true,
           'q-btn': true,
           'q-tooltip': true,
-          'q-icon': true,
+          'OIcon': true,
           'q-input': true,
           'app-tabs': true,
           'q-table-pagination': true,

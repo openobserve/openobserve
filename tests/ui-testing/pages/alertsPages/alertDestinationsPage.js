@@ -59,7 +59,7 @@ export class AlertDestinationsPage {
         this.backButton = 'button:has-text("Back")';
         this.successNotification = '.q-notification__message';
         this.errorMessage = '.q-field__messages, .error-message';
-        this.checkIcon = '.q-icon';
+        this.checkIcon = '.OIcon';
     }
 
     async navigateToDestinations(retryCount = 0) {
@@ -1006,7 +1006,7 @@ export class AlertDestinationsPage {
 
         // Try multiple ways to find the checkmark
         const checkSelectors = [
-            '.q-icon:has-text("check_circle")',
+            '.OIcon:has-text("check_circle")',
             'i:has-text("check_circle")',
             '[name="check_circle"]',
             '.check-icon'

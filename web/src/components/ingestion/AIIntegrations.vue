@@ -38,19 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:w-[250px] tw:pb-[0.625rem] tw:flex tw:flex-col">
       <div class="card-container tw:flex-1 el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
-          <q-input
+          <OInput
             data-test="ai-integrations-search-input"
             v-model="integrationFilter"
-            borderless
-            dense
             clearable
             class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
             :placeholder="t('common.search')"
           >
             <template #prepend>
-              <q-icon name="search" class="cursor-pointer" />
+              <OIcon name="search" size="sm" class="cursor-pointer" />
             </template>
-          </q-input>
+          </OInput>
           <div class="tw:overflow-y-auto tw:h-[calc(100vh-var(--navbar-height)-150px)]">
             <OTabs
               v-model="selectedIntegration"
@@ -90,10 +88,14 @@ import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 import OTab from '@/lib/navigation/Tabs/OTab.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
-  components: { OTabs, OTab },
+  components: { OTabs, OTab, OInput,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();

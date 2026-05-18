@@ -49,8 +49,8 @@ describe('FullViewContainer.vue', () => {
       global: {
         plugins: [currentStore, Quasar],
         stubs: {
-          'q-icon': {
-            template: '<div class="q-icon-stub" :class="$attrs.class" @click.stop="$emit(\'click\', $event)">{{ name }}</div>',
+          'OIcon': {
+            template: '<div class="OIcon-stub" :class="$attrs.class" @click.stop="$emit(\'click\', $event)">{{ name }}</div>',
             props: ['name', 'size']
           }
         }
@@ -83,13 +83,13 @@ describe('FullViewContainer.vue', () => {
 
     it('shows expand icon when showExpandIcon is true', () => {
       wrapper = createWrapper({ showExpandIcon: true });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.exists()).toBe(true);
     });
 
     it('hides expand icon when showExpandIcon is false', () => {
       wrapper = createWrapper({ showExpandIcon: false });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.exists()).toBe(false);
     });
 
@@ -106,7 +106,7 @@ describe('FullViewContainer.vue', () => {
         global: {
           plugins: [store, Quasar],
           stubs: {
-            'q-icon': true
+            'OIcon': true
           }
         }
       });
@@ -128,7 +128,7 @@ describe('FullViewContainer.vue', () => {
         global: {
           plugins: [store, Quasar],
           stubs: {
-            'q-icon': true
+            'OIcon': true
           }
         }
       });
@@ -190,13 +190,13 @@ describe('FullViewContainer.vue', () => {
 
     it('applies correct icon color for light theme', () => {
       wrapper = createWrapper({}, { theme: 'light' });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.classes()).toContain('tw:text-gray-500');
     });
 
     it('applies correct icon color for dark theme', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.classes()).toContain('tw:text-gray-100');
     });
   });
@@ -204,7 +204,7 @@ describe('FullViewContainer.vue', () => {
   describe('Expand/Collapse Functionality', () => {
     it('emits update:isExpanded when icon is clicked', async () => {
       wrapper = createWrapper({ isExpanded: false });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
 
       await icon.trigger('click');
 
@@ -233,7 +233,7 @@ describe('FullViewContainer.vue', () => {
 
     it('toggles from expanded to collapsed when clicked', async () => {
       wrapper = createWrapper({ isExpanded: true });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
 
       await icon.trigger('click');
 
@@ -242,14 +242,14 @@ describe('FullViewContainer.vue', () => {
 
     it('applies rotation transform when expanded', () => {
       wrapper = createWrapper({ isExpanded: true });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.classes()).toContain('tw:transform');
       expect(icon.classes()).toContain('tw:rotate-180');
     });
 
     it('does not apply rotation transform when collapsed', () => {
       wrapper = createWrapper({ isExpanded: false });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.classes()).not.toContain('tw:transform');
       expect(icon.classes()).not.toContain('tw:rotate-180');
     });
@@ -258,26 +258,26 @@ describe('FullViewContainer.vue', () => {
   describe('Icon Configuration', () => {
     it('uses correct icon name', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.text()).toBe('keyboard_arrow_up');
     });
 
     it('applies correct icon size', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       // The size prop is passed but may not be reflected as an attribute in the stub
       expect(icon.exists()).toBe(true);
     });
 
     it('applies cursor pointer class to icon', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.classes()).toContain('tw:cursor-pointer');
     });
 
     it('applies transition class to icon', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       expect(icon.classes()).toContain('tw:transition-all');
     });
   });
@@ -295,7 +295,7 @@ describe('FullViewContainer.vue', () => {
         global: {
           plugins: [store, Quasar],
           stubs: {
-            'q-icon': true
+            'OIcon': true
           }
         }
       });
@@ -316,7 +316,7 @@ describe('FullViewContainer.vue', () => {
         global: {
           plugins: [store, Quasar],
           stubs: {
-            'q-icon': true
+            'OIcon': true
           }
         }
       });
@@ -338,7 +338,7 @@ describe('FullViewContainer.vue', () => {
         global: {
           plugins: [store, Quasar],
           stubs: {
-            'q-icon': true
+            'OIcon': true
           }
         }
       });
@@ -379,7 +379,7 @@ describe('FullViewContainer.vue', () => {
   describe('Event Handling', () => {
     it('stops event propagation on icon click', async () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       
       const clickEvent = new Event('click');
       const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation');
@@ -392,7 +392,7 @@ describe('FullViewContainer.vue', () => {
 
     it('handles multiple rapid clicks correctly', async () => {
       wrapper = createWrapper({ isExpanded: false });
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       
       await icon.trigger('click');
       await icon.trigger('click');
@@ -420,7 +420,7 @@ describe('FullViewContainer.vue', () => {
         global: {
           plugins: [emptyStore, Quasar],
           stubs: {
-            'q-icon': true
+            'OIcon': true
           }
         }
       });
@@ -485,7 +485,7 @@ describe('FullViewContainer.vue', () => {
   describe('Accessibility', () => {
     it('provides clickable elements for keyboard navigation', () => {
       wrapper = createWrapper();
-      const icon = wrapper.find('.q-icon-stub');
+      const icon = wrapper.find('.OIcon-stub');
       const label = wrapper.find('.tw\\:text-\\[14px\\]');
 
       expect(icon.classes()).toContain('tw:cursor-pointer');

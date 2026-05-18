@@ -21,20 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
         <!-- Text search -->
         <div class="tw:flex tw:gap-3">
-          <q-input
+          <OInput
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
-            borderless
-            dense
-            flat
             clearable
             class="no-border tw:w-[220px]"
             data-test="built-in-model-pricing-search"
           >
             <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
+              <OIcon class="o2-search-input-icon" name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </div>
 
         <!-- Refresh -->
@@ -60,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
+      <OIcon name="error" size="50px" />
       <div class="q-mt-md text-negative">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
@@ -70,121 +67,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else class="q-mb-md q-px-md">
-      <q-table
-        :rows="filteredModels"
+      <OTable
+        :data="filteredModels"
         :columns="columns"
         row-key="name"
-        flat
-        dense
-        :pagination="{ rowsPerPage: 0 }"
-        hide-pagination
-        class="o2-quasar-table tw:h-[calc(100vh-120px)] o2-row-md o2-quasar-table-header-sticky"
+        pagination="none"
+        :bordered="false"
+        selection="multiple"
+        v-model:selected-ids="selectedIds"
+        class="tw:h-[calc(100vh-120px)]"
         data-test="built-in-model-pricing-table"
       >
-        <!-- Checkbox -->
-        <template #body-cell-select="props">
-          <q-td :props="props">
-            <q-checkbox
-              v-model="props.row.selected"
-              dense
-              size="xs"
-              :data-test="`built-in-model-pricing-checkbox-${props.rowIndex}`"
-            />
-          </q-td>
-        </template>
-
         <!-- Model name + description -->
-        <template #body-cell-name="props">
-          <q-td :props="props">
-            <div class="tw:font-semibold">{{ props.row.name }}</div>
-            <div
-              v-if="props.row.description"
-              class="text-caption text-grey-7"
-              style="max-width: 260px; white-space: normal; line-height: 1.3"
-            >
-              {{ props.row.description }}
-            </div>
-          </q-td>
+        <template #cell-name="{ row, value }">
+          <div class="tw:font-semibold">{{ value }}</div>
+          <div
+            v-if="row.description"
+            class="text-caption"
+            style="max-width: 260px; white-space: normal; line-height: 1.3; color: var(--o2-text-muted)"
+          >
+            {{ row.description }}
+          </div>
         </template>
 
         <!-- Pattern -->
-        <template #body-cell-pattern="props">
-          <q-td :props="props">
-            <code
-              class="text-caption"
-              style="word-break: break-all; white-space: normal"
-            >
-              {{ props.row.match_pattern || "—" }}
-            </code>
-          </q-td>
+        <template #cell-pattern="{ row, value }">
+          <code
+            class="text-caption"
+            style="word-break: break-all; white-space: normal"
+          >
+            {{ value || "—" }}
+          </code>
         </template>
 
         <!-- Tiered pricing — each tier on its own row -->
-        <template #body-cell-pricing="props">
-          <q-td :props="props">
-            <div v-if="!props.row.tiers?.length">—</div>
-            <div v-else>
-              <div
-                v-for="(tier, idx) in [...props.row.tiers].sort(
-                  (a: any, b: any) =>
-                    (a.condition ? 1 : 0) - (b.condition ? 1 : 0),
-                )"
-                :key="idx"
-                class="tier-row"
-                :class="{ 'tier-conditional': !!tier.condition }"
-              >
-                <div class="tier-name text-caption">
-                  <span v-if="tier.condition">
-                    {{ tier.name }}
-                    <span class="text-grey-6" style="font-weight: 400">
-                      ({{ tier.condition.usage_key }}
-                      {{ tier.condition.operator }}
-                      {{ tier.condition.value.toLocaleString() }})
-                    </span>
+        <template #cell-pricing="{ row }">
+          <div v-if="!row.tiers?.length">—</div>
+          <div v-else>
+            <div
+              v-for="(tier, idx) in [...row.tiers].sort(
+                (a: any, b: any) =>
+                  (a.condition ? 1 : 0) - (b.condition ? 1 : 0),
+              )"
+              :key="idx"
+              class="tier-row"
+              :class="{ 'tier-conditional': !!tier.condition }"
+            >
+              <div class="tier-name text-caption">
+                <span v-if="tier.condition">
+                  {{ tier.name }}
+                  <span style="font-weight: 400; color: var(--o2-text-muted)">
+                    ({{ tier.condition.usage_key }}
+                    {{ tier.condition.operator }}
+                    {{ tier.condition.value.toLocaleString() }})
                   </span>
-                  <span v-else>{{ tier.name }}</span>
-                </div>
-                <div class="tier-prices">
-                  <span
-                    v-for="[key, price] in sortedPriceEntries(tier.prices)"
-                    :key="key"
-                    class="price-chip"
-                  >
-                    {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
-                  </span>
-                </div>
+                </span>
+                <span v-else>{{ tier.name }}</span>
+              </div>
+              <div class="tier-prices">
+                <span
+                  v-for="[key, price] in sortedPriceEntries(tier.prices)"
+                  :key="key"
+                  class="price-chip"
+                >
+                  {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
+                </span>
               </div>
             </div>
-          </q-td>
+          </div>
         </template>
 
-        <template #no-data>
+        <template #empty>
           <div class="full-width column flex-center q-pa-xl">
-            <q-icon name="search_off" size="50px" color="grey-5" />
-            <div class="q-mt-md text-grey-6">
+            <OIcon name="search-off" size="50px" />
+            <div class="q-mt-md" style="color: var(--o2-text-muted)">
               {{ t("modelPricing.noModelsFound") }}
             </div>
           </div>
         </template>
 
-        <template #bottom>
+        <template #bottom="bottomProps">
           <div
-            class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 text-caption text-grey-7"
+            class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 text-caption"
+            style="color: var(--o2-text-muted)"
           >
             <span
-              >{{ filteredModels.length }} model{{
-                filteredModels.length !== 1 ? "s" : ""
+              >{{ bottomProps.totalRows }} model{{
+                bottomProps.totalRows !== 1 ? "s" : ""
               }}</span
             >
             <span
-              v-if="selectedCount > 0"
-              class="text-primary tw:font-semibold"
+              v-if="selectedIds.length > 0"
+              style="color: var(--o2-primary-color)"
+              class="tw:font-semibold"
             >
-              {{ selectedCount }} selected
+              {{ selectedIds.length }} selected
             </span>
           </div>
         </template>
-      </q-table>
+      </OTable>
     </div>
   </div>
 </template>
@@ -197,7 +178,10 @@ import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 
 interface ModelTier {
   name: string;
@@ -217,7 +201,9 @@ interface BuiltInModel {
 
 export default defineComponent({
   name: "BuiltInModelPricingTab",
-  components: { OButton, OSpinner },
+  components: { OButton, OSpinner, OInput, OTable,
+    OIcon,
+},
   emits: ["import-models"],
   setup(props, { emit }) {
     const { t } = useI18n();
@@ -228,35 +214,30 @@ export default defineComponent({
     const loading = ref(false);
     const error = ref("");
     const searchQuery = ref("");
-    const columns = computed(() => [
+    const columns = [
       {
-        name: "select",
-        label: "",
-        field: "selected",
-        align: "center" as const,
-        style: "width: 40px",
-      },
-      {
-        name: "name",
-        label: t("modelPricing.colModel"),
-        field: "name",
-        align: "left" as const,
+        id: "name",
+        header: t("modelPricing.colModel"),
+        accessorKey: "name",
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "pattern",
-        label: t("modelPricing.colPattern"),
-        field: "match_pattern",
-        align: "left" as const,
-        style: "max-width: 200px",
+        id: "pattern",
+        header: t("modelPricing.colPattern"),
+        accessorKey: "match_pattern",
+        sortable: false,
+        size: 200,
+        meta: { align: "left" },
       },
       {
-        name: "pricing",
-        label: t("modelPricing.colPricingSimple"),
-        field: "tiers",
-        align: "left" as const,
+        id: "pricing",
+        header: t("modelPricing.colPricingSimple"),
+        accessorKey: "tiers",
+        sortable: false,
+        meta: { align: "left" },
       },
-    ]);
+    ];
 
     const filteredModels = computed(() => {
       let result = models.value;
@@ -271,9 +252,9 @@ export default defineComponent({
       return result;
     });
 
-    const selectedCount = computed(
-      () => models.value.filter((m) => m.selected).length,
-    );
+    const selectedIds = ref<string[]>([]);
+
+    const selectedCount = computed(() => selectedIds.value.length);
 
     // Deterministic key order: input before output, then alphabetical
     const PRICE_KEY_ORDER: Record<string, number> = {
@@ -360,7 +341,7 @@ export default defineComponent({
     const refreshModels = () => fetchModels(true);
 
     const importSelectedModels = () => {
-      const selected = models.value.filter((m) => m.selected);
+      const selected = models.value.filter((m) => selectedIds.value.includes(m.name));
       if (selected.length === 0) {
         q.notify({
           message: "No models selected. Please select at least one model.",
@@ -393,6 +374,7 @@ export default defineComponent({
       searchQuery,
       columns,
       filteredModels,
+      selectedIds,
       selectedCount,
       sortedPriceEntries,
       fmtKey,

@@ -17,19 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-mt-lg">
     <div class="tags-title text-bold q-mb-sm q-ml-xs">{{ t("rum.events") }}</div>
-    <AppTable :columns="columns || []" :rows="error.events || []">
-      <template v-slot:error-type="slotProps: any">
-        <ErrorTypeIcons :column="slotProps.column.row" />
+    <OTable
+      :data="error.events || []"
+      :columns="columns || []"
+      row-key="index"
+      pagination="none"
+    >
+      <template #cell-type="{ row }">
+        <ErrorTypeIcons :column="row" />
       </template>
-      <template v-slot:description="slotProps: any">
-        <ErrorEventDescription :column="slotProps.column.row" />
+      <template #cell-description="{ row }">
+        <ErrorEventDescription :column="row" />
       </template>
-    </AppTable>
+    </OTable>
   </div>
 </template>
 
 <script setup lang="ts">
-import AppTable from "@/components/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { ref } from "vue";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
 import { date } from "quasar";
@@ -45,58 +51,42 @@ defineProps({
 
 const { t } = useI18n();
 
-const columns = ref([
+const columns = ref<OTableColumnDef[]>([
   {
-    name: "type",
-    label: t("rum.type"),
-    align: "left",
+    id: "type",
+    header: t("rum.type"),
+    accessorKey: "type",
+    cell: " ",
     sortable: true,
-    style: (row: any) =>
-      row["type"] === "error" ? "border-bottom: 1px solid red" : "",
-    classes: "error-type",
-    slot: true,
-    slotName: "error-type",
+    meta: { align: "left", cellClass: "error-type" },
   },
   {
-    name: "category",
-    field: (row: any) => getErrorCategory(row),
-    prop: (row: any) => getErrorCategory(row),
-    label: t("rum.category"),
-    align: "left",
+    id: "category",
+    header: t("rum.category"),
+    accessorFn: (row: any) => getErrorCategory(row),
     sortable: true,
-    style: (row: any) =>
-      row["type"] === "error" ? "border-bottom: 1px solid red" : "",
+    meta: { align: "left" },
   },
   {
-    name: "description",
-    label: t("rum.description"),
-    align: "left",
+    id: "description",
+    header: t("rum.description"),
+    accessorKey: "description",
+    cell: " ",
     sortable: true,
-    style: (row: any) =>
-      row["type"] === "error" ? "border-bottom: 1px solid red" : "",
-    classes: "description-column",
-    slot: true,
-    slotName: "description",
+    meta: { align: "left", cellClass: "description-column" },
   },
   {
-    name: "level",
-    field: (row: any) => (row["type"] === "error" ? "error" : "info"),
-    prop: (row: any) => (row["type"] === "error" ? "error" : "info"),
-    label: t("rum.level"),
-    align: "left",
-    style: (row: any) =>
-      row["type"] === "error" ? "color: red; border-bottom: 1px solid red" : "",
-    classes: "error-level",
+    id: "level",
+    header: t("rum.level"),
+    accessorFn: (row: any) => (row["type"] === "error" ? "error" : "info"),
+    meta: { align: "left", cellClass: "error-level" },
   },
   {
-    name: "timestamp",
-    field: (row: any) => getFormattedDate(row["_timestamp"] / 1000),
-    prop: (row: any) => getFormattedDate(row["_timestamp"] / 1000),
-    label: t("rum.timestamp"),
-    align: "left",
-    style: (row: any) =>
-      row["type"] === "error" ? "border-bottom: 1px solid red" : "",
+    id: "timestamp",
+    header: t("rum.timestamp"),
+    accessorFn: (row: any) => getFormattedDate(row["_timestamp"] / 1000),
     sortable: true,
+    meta: { align: "left" },
   },
 ]);
 

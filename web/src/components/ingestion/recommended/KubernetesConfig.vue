@@ -4,7 +4,7 @@
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
-        <q-icon name="rocket_launch" size="md" color="primary" />
+        <OIcon name="rocket-launch" size="md" />
         <div class="tw:flex-1">
           <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
           <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
@@ -12,26 +12,24 @@
           </p>
 
           <div class="tw:mb-3">
-            <q-input
+              <OInput
               v-model="clusterName"
               label="Cluster Name"
               placeholder="e.g., production, staging, dev"
-              filled
-              dense
               class="tw:max-w-md"
               data-test="kubernetes-cluster-name-input"
             >
               <template #prepend>
-                <q-icon name="dns" />
+                <OIcon name="dns" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
           <div v-if="config.isCloud != 'true'" class="tw:mb-3">
             <OTabs v-model="installType" dense>
               <OTab name="external" label="External Endpoint" />
               <OTab name="internal" label="Internal Endpoint">
-                <q-tooltip>Use this if OpenObserve is in the same cluster</q-tooltip>
+                <OTooltip content="Use this if OpenObserve is in the same cluster" side="top" />
               </OTab>
             </OTabs>
           </div>
@@ -39,7 +37,7 @@
           <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
 
           <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <q-icon name="info" size="xs" class="tw:mr-1" />
+            <OIcon name="info" size="xs" class="tw:mr-1" />
             This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
           </div>
         </div>
@@ -108,9 +106,7 @@
               name="internal"
               :label="t('ingestion.internal')"
             >
-              <q-tooltip>
-                {{ t("ingestion.internalLabel") }}
-              </q-tooltip>
+              <OTooltip :content="t('ingestion.internalLabel')" side="top" />
             </OTab>
           </OTabs>
           <q-separator />
@@ -206,6 +202,8 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
@@ -213,6 +211,7 @@ import { useStore } from "vuex";
 import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 

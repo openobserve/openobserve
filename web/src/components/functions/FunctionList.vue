@@ -26,17 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("function.header") }}
               </div>
               <div class="q-ml-auto" data-test="functions-list-search-input">
-                <q-input
+                <OInput
                   v-model="filterQuery"
-                  borderless
-                  dense
                   class="q-ml-auto no-border o2-search-input"
                   :placeholder="t('function.search')"
                 >
                   <template #prepend>
-                    <q-icon class="o2-search-input-icon" name="search" />
+                    <OIcon class="o2-search-input-icon" name="search" size="sm" />
                   </template>
-                </q-input>
+                </OInput>
               </div>
               <OButton
                 class="q-ml-sm"
@@ -51,75 +49,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
           <div class="card-container tw:h-[calc(100vh-127px)]">
-            <q-table
-              ref="qTable"
-              :rows="visibleRows"
+            <OTable
+              :data="visibleRows"
               :columns="columns"
               row-key="name"
-              :pagination="pagination"
-              :filter="filterQuery"
+              pagination="client"
+              :page-size="pageSize"
+              :page-size-options="pageSizeOptions"
               selection="multiple"
-              v-model:selected="selectedFunctions"
-              style="width: 100%"
+              v-model:selected-ids="selectedFunctionIds"
+              :show-global-filter="false"
+              :default-columns="false"
+              width="100%"
               :style="hasVisibleRows
                   ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
                   : 'width: 100%'"
-              class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             >
-              <template #no-data>
+              <template #empty>
                 <NoData />
               </template>
-              <template v-slot:body-cell-actions="props">
-                <q-td :props="props">
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    :title="t('function.updateTitle')"
-                    data-test="function-list-edit-function-btn"
-                    @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
-                  <OButton
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    :title="t('function.delete')"
-                    data-test="function-list-delete-function-btn"
-                    @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    :title="'Associated Pipelines'"
-                    @click="getAssociatedPipelines(props)"
-                  >
-                    <q-icon :name="outlinedAccountTree" size="14px" />
-                  </OButton>
-                </q-td>
-              </template>
 
-              <template v-slot:body-cell-function="props">
-                <q-td :props="props">
-                  <q-tooltip>
-                    <pre>{{ props.row.function }}</pre>
-                  </q-tooltip>
-                  <pre style="white-space: break-spaces">{{
-                    props.row.function
-                  }}</pre>
-                </q-td>
-              </template>
-
-              <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
+              <template #cell-actions="{ row }">
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('function.updateTitle')"
+                  data-test="function-list-edit-function-btn"
+                  @click="showAddUpdateFn({ row })"
+                  icon-left="edit"
+                />
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('function.delete')"
+                  data-test="function-list-delete-function-btn"
+                  @click="showDeleteDialogFn({ row })"
+                  icon-left="delete"
+                />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="'Associated Pipelines'"
+                  @click="getAssociatedPipelines({ row })"
+                >
+                  <OIcon name="account-tree" size="xs" />
+                </OButton>
               </template>
 
               <template #bottom="scope">
                 <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
                   <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
-                        {{ resultTotal }} {{ t('function.header') }}
-                      </div>
+                    {{ resultTotal }} {{ t('function.header') }}
+                  </div>
                   <OButton
                     v-if="selectedFunctions.length > 0"
                     data-test="function-list-delete-functions-btn"
@@ -127,48 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     class="tw:mr-2"
                     @click="openBulkDeleteDialog"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     Delete
                   </OButton>
-                  <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
                 </div>
-
               </template>
-
-              <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
-
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
-            </q-table>
+            </OTable>
           </div>
         </div>
       </div>
@@ -240,37 +186,39 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import QTablePagination from "../shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import {
-  outlinedDelete,
-  outlinedAccountTree,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { Pencil, Trash2 } from "lucide-vue-next";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 export default defineComponent({
   name: "functionList",
   components: {
-    QTablePagination,
+    OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
     ConfirmDialog,
     OButton,
+    OIcon,
     ODialog,
-    Pencil,
-    Trash2,
-  },
+    OInput,
+    OTooltip,
+    OCheckbox,
+    },
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -285,42 +233,39 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
-    const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
-    const selectedFunctions = ref<any[]>([]);
     const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
     const filterQuery = ref("");
     const { track } = useReo();
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 67,
+        meta: { align: "left" },
       },
       {
-        name: "name",
-        field: "name",
-        label: t("function.name"),
-        align: "left",
+        id: "name",
+        accessorKey: "name",
+        header: t("function.name"),
         sortable: true,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("function.actions"),
-        align: "center",
-        sortable: false,
-        classes:'actions-column'
+        id: "actions",
+        header: t("function.actions"),
+        isAction: true,
+        size: 150,
+        meta: { align: "center", cellClass: "actions-column" },
       },
-    ]);
+    ];
 
     const onPipelineSelect = (pipeline: any) => {
       const routeUrl = router.resolve({
@@ -399,31 +344,20 @@ export default defineComponent({
       getJSTransforms();
     }
 
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
     const resultTotal = ref<number>(0);
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
+    const pageSize = ref(20);
+    const pageSizeOptions = [20, 50, 100, 250, 500];
+
+    const selectedFunctionIds = ref<string[]>([]);
+    const selectedFunctions = computed({
+      get: () =>
+        (jsTransforms.value || []).filter((row: any) =>
+          selectedFunctionIds.value.includes(row.name),
+        ),
+      set: (val) => {
+        selectedFunctionIds.value = val.map((row: any) => row.name);
+      },
     });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
 
     const addTransform = () => {
       showAddJSTransformDialog.value = true;
@@ -719,7 +653,6 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       store,
       router,
       jsTransforms,
@@ -729,22 +662,16 @@ export default defineComponent({
       confirmDelete,
       selectedDelete,
       getJSTransforms,
-      pagination,
       resultTotal,
       refreshList,
-      perPageOptions,
-      selectedPerPage,
+      pageSize,
+      pageSizeOptions,
       addTransform,
       deleteFn,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
-      changePagination,
-      maxRecordToReturn,
       showAddJSTransformDialog,
-      changeMaxRecordToReturn,
-      outlinedDelete,
-      outlinedAccountTree,
       forceDeleteFn,
       confirmForceDelete,
       pipelineList,
@@ -764,6 +691,7 @@ export default defineComponent({
       bulkDeleteFunctions,
       confirmBulkDelete,
       selectedFunctions,
+      selectedFunctionIds,
     };
   },
   computed: {

@@ -137,7 +137,7 @@ function handleKeydown(e: KeyboardEvent): void {
     <template v-if="hasIcon">
       <slot name="icon">
         <span
-          class="material-icons tw:text-[1em] tw:leading-none tw:shrink-0"
+          class="material-icons-outlined tw:text-[1em] tw:leading-none tw:shrink-0"
           aria-hidden="true"
         >{{ icon }}</span>
       </slot>

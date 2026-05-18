@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:flex', 'tw:flex-col']"
   >
     <header class="o2-app-header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
@@ -38,13 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-language="selectedLanguage"
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
-        :filtered-organizations="filteredOrganizations"
-        :search-query="searchQuery"
-        :rows-per-page="rowsPerPage"
+        :organizations="orgOptions"
         :is-hovered="isHovered"
         :get-btn-logo="getBtnLogo"
         @update:selected-org="selectedOrg = $event"
-        @update:search-query="searchQuery = $event"
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
@@ -195,23 +192,6 @@ import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import {
-  outlinedHome,
-  outlinedSearch,
-  outlinedBarChart,
-  outlinedAccountTree,
-  outlinedDashboard,
-  outlinedWindow,
-  outlinedReportProblem,
-  outlinedFilterAlt,
-
-  outlinedSettings,
-  outlinedManageAccounts,
-  outlinedDescription,
-  outlinedCode,
-  outlinedDevices,
-  outlinedNotificationsActive,
-} from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
@@ -246,7 +226,7 @@ export default defineComponent({
     "q-toolbar": QToolbar,
     "router-view": RouterView,
     "q-avatar": QAvatar,
-    "q-icon": QIcon,
+    "OIcon": QIcon,
     "q-select": QSelect,
     SlackIcon,
     ManagementIcon,
@@ -338,24 +318,6 @@ export default defineComponent({
       autoSend: boolean;
       id: number;
     } | null>(null);
-    const rowsPerPage = ref(10);
-    const searchQuery = ref("");
-
-    const filteredOrganizations = computed(() => {
-      //we will return all organizations if searchQuery is empty
-      //else we will search based upon label or identifier that we get from the search query
-      //if anyone of the orgs matches either label or identifier then we will return that orgs
-      if (!searchQuery.value) return orgOptions.value;
-      const toBeSearched = searchQuery.value.toLowerCase().trim();
-      return orgOptions.value.filter((org: any) => {
-        const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
-        const identifierMatch = org.identifier
-          ?.toLowerCase()
-          .includes(toBeSearched);
-        return labelMatch || identifierMatch;
-      });
-    });
-
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
     )
@@ -391,62 +353,62 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: outlinedHome,
+        icon: "home",
         link: "/",
         exact: true,
         name: "home",
       },
       {
         title: t("menu.search"),
-        icon: outlinedSearch,
+        icon: "description",
         link: "/logs",
         name: "logs",
       },
       {
         title: t("menu.metrics"),
-        icon: outlinedBarChart,
+        icon: "bar-chart",
         link: "/metrics",
         name: "metrics",
       },
       {
         title: t("menu.traces"),
-        icon: outlinedAccountTree,
+        icon: "account-tree",
         link: "/traces",
         name: "traces",
       },
       {
         title: t("menu.rum"),
-        icon: outlinedDevices,
+        icon: "devices",
         link: "/rum",
         name: "rum",
       },
       {
         title: t("menu.dashboard"),
-        icon: outlinedDashboard,
+        icon: "dashboard",
         link: "/dashboards",
         name: "dashboards",
       },
       {
         title: t("menu.index"),
-        icon: outlinedWindow,
+        icon: "window",
         link: "/streams",
         name: "streams",
       },
       {
         title: t("menu.alerts"),
-        icon: outlinedReportProblem,
+        icon: "report-problem",
         link: "/alerts",
         name: "alertList",
       },
       {
         title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
+        icon: "filter-alt",
         link: "/ingestion",
         name: "ingestion",
       },
       {
         title: t("menu.iam"),
-        icon: outlinedManageAccounts,
+        icon: "manage-accounts",
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
@@ -536,7 +498,7 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible ? "calc(2.25rem + 1.688rem)" : "2.25rem";
+        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
         document.documentElement.style.setProperty(
           "--navbar-height",
           navbarHeight,
@@ -582,7 +544,7 @@ export default defineComponent({
         if (alertIndex !== -1 && !incidentExists) {
           linksList.value.splice(alertIndex + 1, 0, {
             title: t("menu.incidents"),
-            icon: outlinedNotificationsActive,
+            icon: "notifications-active",
             link: "/incidents",
             name: "incidentList",
           });
@@ -603,7 +565,7 @@ export default defineComponent({
         if (incidentIndex !== -1 && !actionExists) {
           linksList.value.splice(incidentIndex + 1, 0, {
             title: t("menu.actions"),
-            icon: outlinedCode,
+            icon: "code",
             link: "/actions",
             name: "actionScripts",
           });
@@ -642,7 +604,7 @@ export default defineComponent({
     } else {
       linksList.value.splice(7, 0, {
         title: t("menu.report"),
-        icon: outlinedDescription,
+        icon: "description",
         link: "/reports",
         name: "reports",
       });
@@ -1140,14 +1102,11 @@ export default defineComponent({
       prefetchRoute(routePath);
     };
 
-    //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
-    //to make sync with the user clicked org
-    //we dont need search query after selectedOrg has been changed so resetting it
+    // Sync the user-clicked org with the selected org
     watch(
       selectedOrg,
       (newVal) => {
         userClickedOrg.value = newVal;
-        searchQuery.value = "";
       },
       { immediate: true },
     );
@@ -1176,7 +1135,7 @@ export default defineComponent({
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
-      outlinedSettings,
+      "settings": "settings",
       closeSocket,
       splitterModel,
       toggleAIChat,
@@ -1189,9 +1148,6 @@ export default defineComponent({
       aiChatInputContext,
       aiChatAppendMode,
       userClickedOrg,
-      searchQuery,
-      filteredOrganizations,
-      rowsPerPage,
       verifyStreamExist,
       filterMenus,
       updateActionsMenu,

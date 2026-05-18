@@ -15,27 +15,23 @@
       :key="error"
       variant="ghost-warning"
       size="icon"
+      icon-left="warning"
       data-test="panel-error-data"
     >
-      <template #icon-left><q-icon :name="outlinedWarning" /></template>
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-        <div style="white-space: pre-wrap">
-          {{ error }}
-        </div>
-      </q-tooltip>
+      <OTooltip side="bottom" align="end" max-width="220px">
+        <template #content><div style="white-space: pre-wrap">{{ error }}</div></template>
+      </OTooltip>
     </OButton>
     <OButton
       v-if="maxQueryRangeWarning"
       variant="ghost-warning"
       size="icon"
+      icon-left="warning"
       data-test="panel-max-duration-warning"
     >
-      <template #icon-left><q-icon :name="outlinedWarning" /></template>
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-        <div style="white-space: pre-wrap">
-          {{ maxQueryRangeWarning }}
-        </div>
-      </q-tooltip>
+      <OTooltip side="bottom" align="end" max-width="220px">
+        <template #content><div style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
+      </OTooltip>
     </OButton>
     <OButton
       v-if="limitNumberOfSeriesWarningMessage"
@@ -44,13 +40,11 @@
       data-test="panel-limit-number-of-series-warning"
     >
       <template #icon-left
-        ><q-icon :name="symOutlinedDataInfoAlert"
+        ><OIcon :name="symOutlinedDataInfoAlert" size="sm"
       /></template>
-      <q-tooltip anchor="bottom right" self="top right">
-        <div style="white-space: pre-wrap">
-          {{ limitNumberOfSeriesWarningMessage }}
-        </div>
-      </q-tooltip>
+      <OTooltip side="bottom" align="end">
+        <template #content><div style="white-space: pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
+      </OTooltip>
     </OButton>
     <OButton
       v-if="isCachedDataDifferWithCurrentTimeRange"
@@ -59,14 +53,9 @@
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
     >
       <template #icon-left
-        ><q-icon :name="outlinedRunningWithErrors"
+        ><OIcon name="running-with-errors" size="sm"
       /></template>
-      <q-tooltip anchor="bottom right" self="top right">
-        <div style="white-space: pre-wrap">
-          The data shown is cached and is different from the selected time
-          range.
-        </div>
-      </q-tooltip>
+      <OTooltip side="bottom" align="end" content="The data shown is cached and is different from the selected time range." />
     </OButton>
     <OButton
       v-if="isPartialData && !isPanelLoading"
@@ -75,14 +64,9 @@
       data-test="panel-partial-data-warning"
     >
       <template #icon-left
-        ><q-icon :name="symOutlinedClockLoader20"
+        ><OIcon :name="symOutlinedClockLoader20" size="sm"
       /></template>
-      <q-tooltip anchor="bottom right" self="top right">
-        <div style="white-space: pre-wrap">
-          The data shown is incomplete because the loading was interrupted.
-          Refresh to load complete data.
-        </div>
-      </q-tooltip>
+      <OTooltip side="bottom" align="end" content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
     </OButton>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
@@ -92,9 +76,9 @@
     >
       <span class="lastRefreshedAtIcon">
         🕑
-        <q-tooltip anchor="bottom right" self="top right">
-          Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
-        </q-tooltip>
+        <OTooltip side="bottom" align="end">
+          <template #content>Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" /></template>
+        </OTooltip>
       </span>
       <RelativeTime
         :timestamp="lastTriggeredAt"
@@ -108,17 +92,15 @@
 import { defineComponent } from "vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  outlinedWarning,
-  outlinedRunningWithErrors,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   symOutlinedClockLoader20,
   symOutlinedDataInfoAlert,
 } from "@quasar/extras/material-symbols-outlined";
 export default defineComponent({
   name: "PanelErrorButtons",
-  components: { RelativeTime, OButton },
+  components: { RelativeTime, OButton, OIcon, OTooltip },
   props: {
     error: {
       type: String,
@@ -159,8 +141,7 @@ export default defineComponent({
   },
   setup() {
     return {
-      outlinedWarning,
-      outlinedRunningWithErrors,
+      outlinedRunningWithErrors: "running-with-errors",
       symOutlinedClockLoader20,
       symOutlinedDataInfoAlert,
     };

@@ -26,26 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="row invite-user"
         style="width: calc(100% - 110px); display: inline-flex"
       >
-        <q-input
+        <OInput
           v-model="userEmail"
-          borderless
-          filled
-          dense
           :placeholder="t('user.inviteByEmail')"
           style="width: calc(100% - 120px)"
           class="q-pr-sm"
         />
         <div class="flex justify-center">
-          <q-select
-            dense
-            filled
-            borderless
+          <OSelect
             v-model="selectedRole"
-            option-label="label"
-            option-value="value"
-            emit-value
-            map-options
             :options="options"
+            labelKey="label"
+            valueKey="value"
             style="width: 120px"
             class="q-pr-sm"
           />
@@ -68,6 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -79,7 +73,7 @@ import usersService from "@/services/users";
 
 export default defineComponent({
   name: "MemberInvitationPage",
-  components: { OButton },
+  components: { OButton, OInput, OSelect },
   props: {
     currentrole: {
       type: String,

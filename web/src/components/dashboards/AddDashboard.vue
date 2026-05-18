@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="q-px-md q-py-sm add-dashboard-form-card-section">
-      <q-form ref="addDashboardForm" @submit.stop="onSubmit.execute">
-        <q-input
+      <OForm ref="addDashboardForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
+        <OInput
           v-if="beingUpdated"
           v-model="dashboardData.id"
           :readonly="beingUpdated"
@@ -25,27 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.id')"
           data-test="dashboard-id"
         />
-        <q-input
-          v-model="dashboardData.name"
+        <OFormInput
+          name="name"
           :label="t('dashboard.name') + ' *'"
-          class="showLabelOnTop"
           data-test="add-dashboard-name"
-          stack-label
-          hide-bottom-space
-          borderless
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+          :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
         />
         <span>&nbsp;</span>
-        <q-input
-          v-model="dashboardData.description"
+        <OFormInput
+          name="description"
           :label="t('dashboard.typeDesc')"
-          borderless
-          hide-bottom-space
-          class="showLabelOnTop"
-          stack-label
-          dense
           data-test="add-dashboard-description"
         />
 
@@ -57,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @folder-selected="selectedFolder = $event"
         />
         <span>&nbsp;</span> 
-      </q-form>
+      </OForm>
   </div>
 </template>
 
@@ -74,6 +63,9 @@ import { getAllDashboards } from "@/utils/commons";
 import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 const defaultValue = () => {
   return {
@@ -126,11 +118,15 @@ export default defineComponent({
     }
 
     const onSubmit = useLoading(async () => {
-      await addDashboardForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
+      const valid = await addDashboardForm.value.validate();
+      if (!valid) return;
 
+      // Sync OForm-owned values back to local state
+      const formVals = addDashboardForm.value.form.state.values as { name: string; description: string };
+      dashboardData.value.name = formVals.name ?? dashboardData.value.name;
+      dashboardData.value.description = formVals.description ?? dashboardData.value.description;
+
+      {
         const dashboardId = dashboardData.value.id;
         delete dashboardData.value.id;
 
@@ -194,7 +190,7 @@ export default defineComponent({
         } catch (err: any) {
           showErrorNotification(err?.message ?? "Dashboard creation failed.");
         }
-      });
+      }
     });
 
     return {
@@ -222,7 +218,7 @@ export default defineComponent({
       });
     },
   },
-  components: { SelectFolderDropdown },
+  components: { SelectFolderDropdown, OForm, OFormInput, OInput },
 });
 </script>
 <style lang="scss">

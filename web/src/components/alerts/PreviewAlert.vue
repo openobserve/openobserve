@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2"
       >
-        <q-icon name="edit" size="40px" class="tw:opacity-20" />
+        <OIcon name="edit" size="40px" class="tw:opacity-20" />
         <span class="tw:text-sm tw:opacity-40">Write a query to see preview</span>
       </div>
       <PanelSchemaRenderer
@@ -72,6 +72,7 @@ import {
   b64DecodeUnicode,
   smartDecodeVrlFunction,
 } from "@/utils/zincutils";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {

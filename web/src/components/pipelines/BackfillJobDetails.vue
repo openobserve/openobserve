@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-subtitle1 tw-font-semibold">Error Details</div>
             <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
               <div class="flex items-start">
-                <q-icon name="error" color="negative" size="24px" class="q-mr-sm tw-mt-1" />
+                <OIcon name="error" size="md" class="q-mr-sm tw-mt-1" />
                 <div class="tw-flex-1">
                   <div class="text-caption text-grey-6 q-mb-xs">Error Message</div>
                   <div class="text-sm tw-text-red-800 tw-whitespace-pre-wrap tw-break-words">
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
     <div v-else class="flex flex-column items-center justify-center q-pa-lg">
-      <q-icon name="error_outline" size="64px" color="grey-5" />
+      <OIcon name="error-outline" size="64px" />
       <div class="text-h6 q-mt-md text-grey-7">Job not found</div>
     </div>
   </ODrawer>
@@ -211,8 +211,8 @@ import { ref, computed, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { X } from "lucide-vue-next";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";

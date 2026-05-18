@@ -28,35 +28,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit.execute()"
   >
   <div class="q-px-md q-py-sm" data-test="dashboard-folder-move-body">
-      <q-form
-        ref="moveFolderForm"
-        @submit.stop="onSubmit.execute()"
-        data-test="dashboard-folder-move-form"
-      >
-        <q-input
-          v-model="
+      <div class="tw:flex tw:flex-col tw:gap-3">
+        <OInput
+          :model-value="
             store.state.organizationData.folders.find(
               (item) => item.folderId === activeFolderId,
-            ).name
+            )?.name
           "
           :label="t('dashboard.currentFolderLabel')"
-          class="q-py-none showLabelOnTop"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
-          :disable="true"
+          disabled
+          readonly
           data-test="dashboard-folder-move-name"
         />
-        <span>&nbsp;</span>
 
         <!-- select folder or create new folder and select -->
         <SelectFolderDropdown
           @folder-selected="selectedFolder = $event"
           :activeFolderId="activeFolderId"
         />
-        <span>&nbsp;</span>
-      </q-form>
+      </div>
   </div>
   </ODrawer>
 </template>
@@ -71,10 +61,11 @@ import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown, ODrawer },
+  components: { SelectFolderDropdown, ODrawer, OInput },
   props: {
     activeFolderId: {
       type: String,
@@ -92,7 +83,6 @@ export default defineComponent({
   emits: ["updated", "close", "update:open"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const moveFolderForm: any = ref(null);
     //dropdown selected folder
     const selectedFolder = ref({
       label: store.state.organizationData.folders.find(
@@ -105,40 +95,32 @@ export default defineComponent({
       useNotifications();
 
     const onSubmit = useLoading(async () => {
-      await moveFolderForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
-        // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
+      // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
+      try {
+        await moveDashboardToAnotherFolder(
+          store,
+          props.dashboardIds,
+          props.activeFolderId,
+          selectedFolder.value.value,
+        );
 
-        try {
-          await moveDashboardToAnotherFolder(
-            store,
-            props.dashboardIds,
-            props.activeFolderId,
-            selectedFolder.value.value,
-          );
+        showPositiveNotification("Dashboard Moved successfully", {
+          timeout: 2000,
+        });
 
-          showPositiveNotification("Dashboard Moved successfully", {
+        emit("updated");
+      } catch (err: any) {
+        //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
+        if (err.status !== 403) {
+          showErrorNotification(err?.message ?? "Dashboard move failed.", {
             timeout: 2000,
           });
-
-          emit("updated");
-          moveFolderForm.value?.resetValidation();
-        } catch (err: any) {
-          //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
-          if (err.status !== 403) {
-            showErrorNotification(err?.message ?? "Dashboard move failed.", {
-              timeout: 2000,
-            });
-          }
         }
-      });
+      }
     });
 
     return {
       t,
-      moveFolderForm,
       store,
       getImageURL,
       selectedFolder,

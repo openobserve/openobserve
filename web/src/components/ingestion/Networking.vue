@@ -23,19 +23,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
-            <q-input
+            <OInput
               data-test="networking-list-search-input"
               v-model="tabsFilter"
-              borderless
-              dense
               clearable
               class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
               :placeholder="t('common.search')"
             >
               <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
+                <OIcon name="search" size="sm" class="cursor-pointer" />
               </template>
-            </q-input>
+            </OInput>
             <OTabs
               v-model="ingestTabType"
               orientation="vertical"
@@ -77,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -86,10 +85,13 @@ import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "NetworkingPage",
-  components: { OTabs, ORouteTab },
+  components: { OTabs, ORouteTab, OInput,
+    OIcon,
+},
   props: {
     currOrgIdentifier: {
       type: String,

@@ -26,10 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="justify-content: start"
     >
       <span class="q-table__bottom-item">{{ t("search.maxRecords") }}</span>
-      <q-input
+      <OInput
         v-model="maxRecords"
-        filled
-        dense
         class="max-records-input"
         @blur="changeMaxRecordToReturn"
       />
@@ -95,12 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="q-table__bottom-item">
           {{ t("search.recordsPerPage") }}
         </span>
-        <q-select
+        <OSelect
           v-model="scope.pagination.rowsPerPage"
           class="q-mr-md"
-          borderless
-          size="sm"
-          dense
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />
@@ -112,16 +107,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-sm"
           :disabled="scope.isFirstPage"
           @click="scope.prevPage"
+          icon-left="chevron-left"
         >
-          <template #icon-left><q-icon name="chevron_left" /></template>
         </OButton>
         <OButton
           variant="outline"
           size="icon-sm"
           :disabled="scope.isLastPage"
           @click="scope.nextPage"
+          icon-left="chevron-right"
         >
-          <template #icon-left><q-icon name="chevron_right" /></template>
         </OButton>
       </OButtonGroup>
     </div>
@@ -133,6 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";

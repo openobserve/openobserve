@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleBack"
               :data-test="`${testPrefix}-import-back-btn`"
             >
-              <q-icon name="arrow_back_ios_new" size="16px" />
+              <OIcon name="arrow-back-ios-new" size="sm" />
             </OButton>
             <div :class="titleClass" class="q-ml-md">{{ title }}</div>
           </div>
@@ -89,17 +89,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab === 'import_json_url'"
                 class="editor-container-url card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 tw:pb-2" @submit.prevent>
+                <div class="tw:mx-2 tw:pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
                     <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
                       <div style="width: 100%" class="q-pr-sm">
-                        <q-input
+                        <OInput
                           :data-test="`${testPrefix}-import-url-input`"
                           v-model="url"
                           :placeholder="t('dashboard.addURL')"
-                          borderless
-                          style="padding: 10px 0px;"
                         />
                       </div>
                     </div>
@@ -122,40 +120,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @focus="queryEditorPlaceholderFlag = false"
                     @blur="queryEditorPlaceholderFlag = true"
                   />
-                </q-form>
+                </div>
               </div>
-
-              <!-- File Upload Tab -->
               <div
                 v-if="activeTab === 'import_json_file'"
                 class="editor-container-json card-container tw:py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit.prevent>
+                <div class="tw:mx-2 q-mt-md tw:pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
                     <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
                       <div style="width: 100%" class="q-pr-sm">
-                        <q-file
+                        <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
-                          filled
                           bottom-slots
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
                         >
                           <template v-slot:prepend>
-                            <q-icon name="cloud_upload" @click.stop.prevent />
+                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                           </template>
                           <template v-slot:append>
-                            <q-icon
-                              name="close"
+                            <OIcon
+                              name="close" size="sm"
                               @click.stop.prevent="jsonFiles = null"
                               class="cursor-pointer"
                             />
                           </template>
                           <template v-slot:hint> .json files only </template>
-                        </q-file>
+                        </OFile>
                       </div>
                     </div>
                   </slot>
@@ -177,10 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @focus="queryEditorPlaceholderFlag = false"
                     @blur="queryEditorPlaceholderFlag = true"
                   />
-                </q-form>
+                </div>
               </div>
-
-              <!-- Slot for custom tabs (e.g., built-in patterns) -->
+              <!-- Slot for custom tab (e.g., built-in patterns) -->
               <slot name="custom-tab" :activeTab="activeTab" />
             </div>
           </template>
@@ -229,8 +223,10 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
-import { Upload, Link } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 
 export default defineComponent({
   name: "BaseImport",
@@ -240,7 +236,9 @@ export default defineComponent({
     ),
     AppTabs,
     OButton,
-  },
+    OIcon,
+    OFile,
+},
   props: {
     // Title for the import page
     title: {
@@ -254,12 +252,12 @@ export default defineComponent({
         {
           label: "File Upload / JSON",
           value: "import_json_file",
-          icon: Upload,
+          icon: "upload",
         },
         {
           label: "URL Import",
           value: "import_json_url",
-          icon: Link,
+          icon: "link",
         },
       ],
     },

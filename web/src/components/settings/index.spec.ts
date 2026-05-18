@@ -320,7 +320,7 @@ describe("SettingsIndex", () => {
       wrapper.vm.showManagementTabs = false;
       await nextTick();
 
-      // OButton renders the icon via a slot (q-icon inside #icon-left slot), not as an attribute.
+      // OButton renders the icon via a slot (OIcon inside #icon-left slot), not as an attribute.
       // Check the component state instead.
       expect(wrapper.vm.showManagementTabs).toBe(false);
       // Verify the button still exists with the correct title

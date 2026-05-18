@@ -1904,7 +1904,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
 
         // The Vue template has @click="showUrlJobsDialog" on two elements:
         // 1. <span class="cursor-pointer"> containing "Url" text (always present for URL tables)
-        // 2. <q-icon name="warning" class="cursor-pointer"> (only when job failed)
+        // 2. <OIcon name="warning" class="cursor-pointer"> (only when job failed)
         // The <td> cell itself does NOT have the @click handler, so we must click the span.
         const typeCell = row.locator('td').filter({ hasText: 'Url' });
         await typeCell.waitFor({ state: 'visible', timeout: 10000 });
@@ -1915,7 +1915,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
             await urlSpan.click();
         } else {
             // Fallback: try the icon (warning/check_circle) which also has @click
-            const statusIcon = typeCell.locator('i.cursor-pointer, .q-icon.cursor-pointer').first();
+            const statusIcon = typeCell.locator('i.cursor-pointer, .OIcon.cursor-pointer').first();
             if (await statusIcon.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await statusIcon.click();
             } else {

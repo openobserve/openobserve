@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-show-legends-copy-all"
         >
           <template #icon-left
-            ><q-icon :name="isAllCopied ? 'check' : 'content_copy'"
+            ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
           {{ isAllCopied ? "Copied" : "Copy all" }}
         </OButton>
@@ -73,12 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="copyLegend(legend.name, index)"
               >
                 <template #icon-left
-                  ><q-icon
-                    :name="isLegendCopied(index) ? 'check' : 'content_copy'"
+                  ><OIcon
+                    :name="isLegendCopied(index) ? 'check' : 'content-copy'" size="sm"
                 /></template>
-                <q-tooltip>{{
-                  isLegendCopied(index) ? "Copied!" : "Copy legend"
-                }}</q-tooltip>
+                <OTooltip :content="isLegendCopied(index) ? 'Copied!' : 'Copy legend'" />
               </OButton>
             </div>
           </div>
@@ -100,9 +98,11 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ShowLegendsPopup",
-  components: { OButton, ODialog },
+  components: { OButton, ODialog, OIcon, OTooltip },
   props: {
     open: {
       type: Boolean,

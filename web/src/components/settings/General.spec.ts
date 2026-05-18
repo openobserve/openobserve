@@ -241,7 +241,7 @@ const createWrapper = (props = {}, options = {}) => {
           },
         },
         QIcon: {
-          template: "<span data-test-stub='q-icon'></span>",
+          template: "<span data-test-stub='OIcon'></span>",
           props: ["name"],
         },
         QSpinnerHourglass: {

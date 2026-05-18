@@ -187,7 +187,7 @@ describe("QueryInspector", () => {
             emits: ["update:modelValue"],
           },
           QIcon: {
-            template: '<span data-test="q-icon" :class="name"><slot /></span>',
+            template: '<span data-test="OIcon" :class="name"><slot /></span>',
             props: ["name", "size"],
           },
         },

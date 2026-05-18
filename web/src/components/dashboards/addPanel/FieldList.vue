@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="col-auto tw:mx-[0.625rem]">
       <!-- stream type selection will be hidden for metrics page -->
-      <q-select
+      <OSelect
         v-if="dashboardPanelDataPageKey !== 'metrics'"
         v-model="
           dashboardPanelData.data.queries[
@@ -29,53 +29,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].fields.stream_type
         "
         :label="t('dashboard.selectStreamType')"
-        :options="data.streamType"
+        :options="streamTypeOptions"
         data-test="index-dropdown-stream_type"
-        input-debounce="0"
-        behavior="menu"
-        borderless
-        dense
-        class="q-mb-xs o2-custom-select-dashboard"
+        class="tw:mb-1"
         :readonly="dashboardPanelDataPageKey === 'logs'"
-        hide-bottom-space
-      ></q-select>
-      <q-select
+      />
+      <OSelect
         v-model="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream
         "
         :label="t('dashboard.selectIndex')"
-        :options="filteredStreams"
+        :options="filteredStreamsWithIcons"
         data-test="index-dropdown-stream"
-        input-debounce="0"
-        behavior="menu"
-        use-input
-        borderless
-        dense
-        hide-selected
-        fill-input
-        @filter="filterStreamFn"
         :loading="streamDataLoading.isLoading.value"
-        option-label="name"
-        option-value="name"
-        emit-value
-        class="o2-custom-select-dashboard"
-        :class="
-          selectedMetricTypeIcon &&
+        labelKey="name"
+        valueKey="name"
+        :iconKey="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type == 'metrics'
-            ? 'metric_icon_present'
-            : ''
+          ].fields.stream_type === 'metrics'
+            ? '_icon'
+            : undefined
         "
+        searchable
+        @search="onStreamSearch"
         :readonly="dashboardPanelDataPageKey === 'logs'"
         :title="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream
         "
-        hide-bottom-space
       >
         <template
           v-if="
@@ -83,58 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.layout.currentQueryIndex
             ].fields.stream_type == 'metrics' && selectedMetricTypeIcon
           "
-          v-slot:prepend
+          #icon-left
         >
-          <q-icon
-            style="margin-top: 24px"
-            size="chip"
+          <OIcon
+            size="xs"
             :name="metricsIconMapping[selectedMetricTypeIcon || '']"
           />
         </template>
-
-        <template
-          v-slot:option="scope"
-          v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream_type == 'metrics'
-          "
-        >
-          <q-item
-            :class="
-              store.state.theme === 'dark' &&
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream !== scope.opt.value
-                ? 'text-white'
-                : ''
-            "
-            v-bind="scope.itemProps"
-          >
-            <q-item-section avatar class="metric-explore-metric-icon">
-              <q-icon
-                size="chip"
-                :name="
-                  metricsIconMapping[scope.opt.metrics_meta.metric_type] || ''
-                "
-              />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label> {{ scope.opt.name }} </q-item-label>
-            </q-item-section>
-          </q-item>
-        </template>
-
-        <template #no-option>
-          <q-item>
-            <q-item-section
-              :class="store.state.theme === 'dark' ? 'text-white' : ''"
-            >
-              {{ t("search.noResult") }}
-            </q-item-section>
-          </q-item>
-        </template>
-      </q-select>
+      </OSelect>
     </div>
     <div class="column col index-table q-mt-xs">
       <q-table
@@ -213,9 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   @dragstart="onDragStart($event, props.row)"
                 >
-                  <q-icon
-                    name="drag_indicator"
-                    color="grey-13"
+                  <OIcon
+                    name="drag-indicator" size="sm"
                     :class="[
                       'q-mr-xs',
                       !hideAllFieldsSelection &&
@@ -233,14 +173,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-add-data-indicator"
                   />
 
-                  <q-icon
+                  <OIcon
                     :name="
                       props.row.type == 'Utf8'
-                        ? 'text_fields'
+                        ? 'text-fields'
                         : props.row.type == 'Boolean'
-                          ? 'toggle_off'
+                          ? 'toggle-off'
                           : 'tag'
-                    "
+                    " size="sm"
                     color="grey-6"
                     class="q-mr-xs"
                   />
@@ -537,22 +477,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tr>
         </template>
         <template #top-right>
-          <q-input
+          <OInput
             v-model="dashboardPanelData.meta.stream.filterField"
             data-test="index-field-search-input"
-            borderless
-            dense
             clearable
-            debounce="1"
+            :debounce="1"
             :loading="getStreamFields.isLoading.value"
             :placeholder="t('search.searchField')"
-            class="tw:mx-[0.625rem]"
-            hide-bottom-space
+            class="tw:mx-[0.625rem] tw:mb-2"
           >
-            <template #prepend>
-              <q-icon name="search" />
+            <template #icon-left>
+              <OIcon name="search" size="sm" />
             </template>
-          </q-input>
+          </OInput>
         </template>
       </q-table>
     </div>
@@ -579,10 +516,15 @@ import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "FieldList",
-  components: { OButton },
+  components: { OButton, OSelect, OInput,
+    OIcon,
+},
   props: ["editMode", "hideAllFieldsSelection"],
   setup(props, { emit }) {
     const dashboardPanelDataPageKey: any = inject(
@@ -620,7 +562,7 @@ export default defineComponent({
       // indexOptions: [],
       streamType: ["logs", "metrics", "traces"],
     });
-    const filteredStreams = ref([]);
+    const filteredStreams = ref<any[]>([]);
     const {
       dashboardPanelData,
       addXAxisItem,
@@ -703,6 +645,35 @@ export default defineComponent({
     onMounted(() => {
       loadStreamsListBasedOnType();
     });
+
+    const streamTypeOptions = computed(() =>
+      data.streamType.map((t: string) => ({ label: t, value: t })),
+    );
+
+    const onStreamSearch = (val: string) => {
+      filteredStreams.value =
+        dashboardPanelData.meta.stream.streamResults.filter((stream: any) => {
+          return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+        });
+    };
+
+    // Keep filteredStreams in sync with the full results list whenever it loads.
+    // The old q-select @filter callback fired with "" on open to seed the list;
+    // OSelect's @search only fires when the user types, so we sync here instead.
+    watch(
+      () => dashboardPanelData.meta.stream.streamResults,
+      (results) => {
+        filteredStreams.value = results ?? [];
+      },
+      { immediate: true },
+    );
+
+    const filteredStreamsWithIcons = computed(() =>
+      (filteredStreams.value as any[]).map((s) => ({
+        ...s,
+        _icon: s.metrics_meta ? metricsIconMapping[s.metrics_meta.metric_type] || undefined : undefined,
+      })),
+    );
 
     const getStreamFields = useLoading(
       async (fieldName: string, streamType: string) => {
@@ -1172,7 +1143,10 @@ export default defineComponent({
       getStreamFields,
       dashboardPanelData,
       filterStreamFn,
+      streamTypeOptions,
+      onStreamSearch,
       filteredStreams,
+      filteredStreamsWithIcons,
       isAddXAxisNotAllowed,
       isAddBreakdownNotAllowed,
       isAddYAxisNotAllowed,
@@ -1304,7 +1278,7 @@ export default defineComponent({
         opacity: 0;
         right: 0;
 
-        .q-icon {
+        .OIcon {
           cursor: pointer;
         }
 

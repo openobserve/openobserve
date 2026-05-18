@@ -90,24 +90,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="controls flex justify-between items-center">
         <div class="flex items-center">
           <div>
-            <q-icon
-              name="replay_10"
+            <OIcon
+              name="replay-10"
               size="1.5rem"
               class="q-mr-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
-            <q-icon
+            <OIcon
               :name="
                 playerState.isPlaying
-                  ? 'pause_circle_filled'
-                  : 'play_circle_filled'
+                  ? 'pause-circle-filled'
+                  : 'play-circle-filled'
               "
               size="2rem"
               class="cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="togglePlay"
             />
-            <q-icon
-              name="forward_10"
+            <OIcon
+              name="forward-10"
               size="1.5rem"
               class="q-ml-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
@@ -120,24 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="flex items-center">
-          <q-toggle
-            class="o2-toggle-button-xs q-mr-md"
+          <OSwitch
+            class="q-mr-md"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
-            size="xs"
             @update:model-value="toggleSkipInactive"
           />
-          <q-select
+          <OSelect
             class="speed-selector"
             v-model="playerState.speed"
             :options="speedOptions"
-            color="input-border"
-            bg-color="input-bg"
-            stack-label
-            outlined
-            filled
-            dense
-            size="xs"
             @update:model-value="setSpeed"
           />
         </div>
@@ -160,7 +152,9 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 const props = defineProps({
   events: {
     type: Array,

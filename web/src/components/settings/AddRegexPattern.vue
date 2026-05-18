@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           @click="toggleFullScreen"
         >
-          <q-icon
+          <OIcon
             name="fullscreen"
-            size="14px"
+            size="xs"
             :color="isFullScreen ? 'primary' : undefined"
           />
         </OButton>
@@ -67,36 +67,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:w-[100%] q-px-md'
         "
       >
-        <q-form
+        <OForm
           @submit="saveRegexPattern"
           class="tw:flex tw:flex-col tw:gap-4"
         >
           <div class="tw:flex tw:flex-col">
-            <q-input
-              v-bind:readonly="isEdit"
-              v-bind:disable="isEdit"
+            <OFormInput
+              :readonly="isEdit"
+              :disabled="isEdit"
               v-model="regexPatternInputs.name"
               :label="t('regex_patterns.name') + ' *'"
-              class="showLabelOnTop"
               data-test="add-regex-pattern-name-input"
-              stack-label
-              dense
-              borderless
-              :lazy-rules="true"
-              :hide-bottom-space="true"
-              :rules="[(val) => val !== '' || '* Name is required']"
+              :validators="[(val: string) => val === '' ? '* Name is required' : undefined]"
               placeholder="Eg. Internal Passwords"
             />
-            <q-input
-              v-bind:readonly="isEdit"
-              v-bind:disable="isEdit"
+            <OInput
+              :readonly="isEdit"
+              :disabled="isEdit"
               v-model="regexPatternInputs.description"
               :label="t('regex_patterns.description')"
-              class="q-pb-md showLabelOnTop"
-              stack-label
-              borderless
-              :hide-bottom-space="true"
-              dense
+              class="q-pb-md"
               data-test="add-regex-pattern-description-input"
               placeholder="Describe your pattern to help users understand"
             />
@@ -121,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Try O2 Assistant to write expressions
                   </span>
-                  <q-icon
+                  <OIcon
                     size="sm"
-                    name="arrow_right_alt"
+                    name="arrow-right-alt"
                     class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1"
                   />
                 </OButton>
@@ -148,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Write Pattern
                   </div>
                 </div>
-                <q-input
+                <OFormTextarea
                   data-test="add-regex-pattern-input"
                   v-model="regexPatternInputs.pattern"
                   class="regex-pattern-input"
@@ -157,16 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'dark-mode-regex-pattern-input'
                       : 'light-mode-regex-pattern-input'
                   "
-                  stack-label
-                  borderless
-                  dense
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  type="textarea"
                   placeholder="Eg. \d....\d "
-                  rows="5"
-                  :rules="[(val) => val !== '' || '* Pattern is required']"
-                  :hide-bottom-space="true"
+                  :rows="5"
+                  :validators="[(val: string) => val === '' ? '* Pattern is required' : undefined]"
                 />
               </div>
             </div>
@@ -204,25 +189,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="expandState.regexTestString"
                 class="regex-pattern-input"
               >
-                <q-input
+                <OTextarea
                   data-test="add-regex-test-string-input"
                   v-model="testString"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="regex-test-string-input"
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
                       : 'light-mode-regex-test-string-input'
                   "
-                  stack-label
-                  borderless
-                  dense
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  type="textarea"
                   placeholder="Eg. 1234567890"
-                  rows="5"
+                  :rows="5"
                 />
               </div>
             </div>
@@ -240,27 +219,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
-                <q-input
+                <OTextarea
                   v-if="outputString.length > 0"
-                  data-test="add-regex-test-string-input"
+                  data-test="add-regex-output-string-input"
                   v-model="outputString"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="regex-test-string-input"
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
                       : 'light-mode-regex-test-string-input'
                   "
-                  stack-label
-                  outlined
-                  filled
-                  dense
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  type="textarea"
                   placeholder="Output String"
-                  rows="5"
+                  :rows="5"
                 />
                 <div
                   v-else
@@ -272,9 +244,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div v-if="!testLoading && outputString.length === 0">
-                    <q-icon
-                      :name="outlinedLightbulb"
-                      size="24px"
+                    <OIcon
+                      name="lightbulb"
+                      size="md"
                       :class="
                         store.state.theme === 'dark'
                           ? 'tw:text-[#ffffff]'
@@ -303,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-        </q-form>
+        </OForm>
       </div>
       <div
         class="q-ml-sm"
@@ -349,11 +321,16 @@ import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
@@ -380,7 +357,8 @@ export default defineComponent({
     OButton,
     ODrawer,
     OSpinner,
-  },
+    OIcon,
+},
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -606,7 +584,7 @@ export default defineComponent({
       toggleFullScreen,
       outputString,
       testStringOutput,
-      outlinedLightbulb,
+      outlinedLightbulb: "lightbulb",
       testLoading,
       goToAILogo,
       inputContext,

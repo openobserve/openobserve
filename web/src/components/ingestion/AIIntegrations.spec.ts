@@ -36,7 +36,7 @@ describe("AIIntegrations", () => {
         plugins: [store, i18n],
         stubs: {
           "q-input": true,
-          "q-icon": true,
+          "OIcon": true,
           "router-view": true,
           "q-tabs": {
             template: '<div class="q-tabs-stub"><slot /></div>',

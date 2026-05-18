@@ -250,7 +250,7 @@ export default defineComponent({
     }
   }
 
-  .q-icon > img {
+  .OIcon > img {
     height: auto !important;
   }
 }

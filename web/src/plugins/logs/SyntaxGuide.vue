@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sqlmode ? 'sql-mode' : 'normal-mode',
     ]"
   >
-    <HelpCircle :size="14" />
+    <OIcon name="help" size="sm" />
     <span v-if="label" class="tw:ml-1">{{ label }}</span>
     <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
@@ -205,9 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
       </q-card>
     </q-menu>
-    <q-tooltip>
-      {{ t('search.syntaxGuideLabel') }}
-    </q-tooltip>
+    <OTooltip :content="t('search.syntaxGuideLabel')" />
   </OButton>
 </template>
 
@@ -216,8 +214,8 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { HelpCircle } from "lucide-vue-next";
-
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
   props: {
@@ -234,7 +232,9 @@ export default defineComponent({
       default: '',
     },
   },
-  components: { OButton, HelpCircle },
+  components: { OButton, OTooltip,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -263,7 +263,7 @@ export default defineComponent({
     justify-content: flex-start;
     width: 100%;
 
-    .q-icon {
+    .OIcon {
       font-size: 20px;
       width: 20px;
       display: flex;

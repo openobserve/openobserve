@@ -29,31 +29,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-card-section>
       <div class="flex justify-between items-center q-pa-none">
         <div class="flex items-center q-table__title">
-          <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
+          <OIcon name="bar-chart" size="sm" class="q-mr-sm" />
           <span class="text-h6">Example of custom charts</span>
         </div>
         <q-space />
-        <q-input
+        <OInput
           v-model="searchQuery"
-          dense
-          borderless
           placeholder="Search charts..."
-          style="min-width: 250px; border-radius: 4px; padding: 2px 8px"
           clearable
           @clear="searchQuery = ''"
         >
-          <template v-slot:prepend>
-            <q-icon name="search" />
+          <template #icon-left>
+            <OIcon name="search" size="sm" />
           </template>
-        </q-input>
+        </OInput>
         <OButton
           variant="ghost"
           size="icon"
           :title="t('dashboard.cancel')"
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </q-card-section>
@@ -108,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%"
           >
             <div class="text-center">
-              <q-icon name="search_off" size="4rem" color="grey-5" />
+              <OIcon name="search-off" size="4rem" />
               <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
               <div class="text-body2 text-grey-6 q-mt-sm">
                 Try searching with different keywords
@@ -192,13 +189,17 @@ import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
     CustomChartConfirmDialog,
     OButton,
-  },
+    OInput,
+    OIcon,
+},
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();

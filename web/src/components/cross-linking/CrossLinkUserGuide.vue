@@ -7,10 +7,8 @@
       @click="onUserGuideClick"
       data-test="cross-link-help-btn"
     >
-      <HelpCircle class="tw:size-4" />
-      <q-tooltip class="bg-grey-8" anchor="bottom middle" self="top middle">
-        {{ t("crossLinks.userGuide") }}
-      </q-tooltip>
+      <OIcon name="help" size="sm" class="tw:size-4" />
+      <OTooltip content="User Guide" side="bottom" align="center" />
     </OButton>
   </div>
   <div
@@ -88,11 +86,12 @@ import { ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { HelpCircle } from 'lucide-vue-next';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default {
   name: "CrossLinkUserGuide",
-  components: { OButton, HelpCircle },
+  components: { OButton, OTooltip },
   setup() {
     const store = useStore();
     const { t } = useI18n();

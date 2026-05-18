@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs"
           class="q-mr-sm"
           @click="onBackClicked"
+          icon-left="arrow-back-ios-new"
         >
-          <template #icon-left><q-icon name="arrow_back_ios_new" /></template>
         </OButton>
       </div>
       <div class="col">

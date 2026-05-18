@@ -135,7 +135,7 @@ describe("DashboardMapsQueryBuilder", () => {
           SanitizedHtmlRenderer: true,
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
           "q-btn-group": true,
           "q-btn": true,

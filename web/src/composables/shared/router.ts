@@ -77,7 +77,6 @@ const ImportPipeline = () => import("@/components/pipeline/ImportPipeline.vue");
 
 import useIngestionRoutes from "./useIngestionRoutes";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
-import config from "@/aws-exports";
 import useManagementRoutes from "./useManagementRoutes";
 import Login from "@/views/Login.vue";
 

@@ -28,39 +28,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="submit()"
     >
       <div class="tw:p-4">
-        <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
-          <q-input
-            v-model="folderData.name"
+        <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
+          <OFormInput
+            name="name"
             :label="t('dashboard.nameOfVariable') + '*'"
-            class="q-py-none showLabelOnTop"
             data-test="dashboard-folder-add-name"
-            stack-label
-            borderless
-            dense
-            :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-            :lazy-rules="true"
+            :validators="[(val: string | number | undefined) => !(val?.toString().trim()) ? t('dashboard.nameRequired') : undefined]"
           />
           <span>&nbsp;</span>
-          <q-input
-            v-model="folderData.description"
+          <OFormInput
+            name="description"
             :label="t('dashboard.typeDesc')"
-            color="input-border"
-            bg-color="input-bg"
             data-test="dashboard-folder-add-description"
-            class="q-py-md showLabelOnTop"
-            stack-label
-            borderless
-            dense
           />
-        </q-form>
+        </OForm>
       </div>
     </ODrawer>
   </template>
   
   <script lang="ts">
   import { defineComponent, ref } from "vue";
-  import OButton from '@/lib/core/Button/OButton.vue';
   import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+  import OForm from "@/lib/forms/Form/OForm.vue";
+  import OFormInput from "@/lib/forms/Input/OFormInput.vue";
   import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
@@ -79,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   export default defineComponent({
     name: "CommonAddFolder",
-    components: { ODrawer },
+    components: { ODrawer, OForm, OFormInput },
     props: {
       open: {
         type: Boolean,
@@ -125,7 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           if (!valid) {
             return false;
           }
-  
+
+          // Sync OForm-owned values back to local state
+          const formVals = addFolderForm.value.form.state.values as { name: string; description: string };
+          folderData.value.name = formVals.name ?? folderData.value.name;
+          folderData.value.description = formVals.description ?? folderData.value.description;
+
           try {
             //if edit mode
             if (props.editMode) {

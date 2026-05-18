@@ -24,23 +24,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="col-12 row">
           <div class="col-12 q-pb-sm text-caption">
-            <q-icon name="mail" size="1rem" class="q-pr-xs" />
+            <OIcon name="mail" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.user_email || "Unknown User" }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="schedule" size="1rem" class="q-pr-xs" />
+            <OIcon name="schedule" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.date }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="settings" size="1rem" class="q-pr-xs" />
+            <OIcon name="settings" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="language" size="1rem" class="q-pr-xs" />
+            <OIcon name="language" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.ip }}
           </div>
           <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="location_on" size="1rem" class="q-pr-xs" />
+            <OIcon name="location-on" size="1rem" class="q-pr-xs" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -51,52 +51,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex items-center justify-between col-12 q-pt-sm tw:px-[0.375rem]"
       >
         <div class="q-pr-xs tw:w-[60%]">
-          <q-input
+          <OInput
             v-model="searchEvent"
-            size="xs"
-            filled
-            borderless
-            dense
             clearable
-            debounce="1"
             :placeholder="t('rum.searchEvents')"
             @update:model-value="searchEvents"
           />
         </div>
         <div class="q-pl-xs event-type-selector tw:w-[40%] relative-position">
-          <q-select
+          <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
-            behavior="menu"
             multiple
-            filled
-            borderless
-            dense
-            emit-value
-            size="xs"
+            labelKey="label"
+            valueKey="value"
             data-test="player-events-filter-select"
             @update:model-value="searchEvents(searchEvent)"
-          >
-            <template
-              v-slot:option="{ itemProps, opt, selected, toggleOption }"
-            >
-              <q-item v-bind="itemProps">
-                <q-item-section side class="tw:pr-0!">
-                  <q-checkbox
-                    :model-value="selected"
-                    @update:model-value="toggleOption(opt)"
-                    class="tw:mr-0! tw:pr-0!"
-                    size="xs"
-                  />
-                </q-item-section>
-                <q-item-section class="tw:ml-0! tw-pl-0!">
-                  <q-item-label class="tw:ml-0! tw-pl-0!">{{
-                    opt.label
-                  }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
         </div>
       </div>
       <q-separator class="q-mt-sm" />
@@ -149,10 +120,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, watch } from "vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
-import { Navigation, Tag } from "lucide-vue-next";
+
 import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 
@@ -172,7 +146,7 @@ const tabs = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
-    icon: Navigation,
+    icon: "navigation",
     style: {
       width: "fit-content",
       padding: "0.5rem 0.625rem",
@@ -182,7 +156,7 @@ const tabs = [
   {
     label: t("rum.tags"),
     value: "tags",
-    icon: Tag,
+    icon: "label",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];

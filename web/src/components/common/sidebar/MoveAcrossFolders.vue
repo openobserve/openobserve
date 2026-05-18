@@ -31,29 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class=""
         :data-test="`${type}-folder-move-body`"
       >
-        <q-form
-          ref="moveFolderForm"
-          @submit.stop="onSubmit.execute()"
-          :data-test="`${type}-folder-move-form`"
-        >
-          <q-input
+          <OInput
             :model-value="store.state.organizationData.foldersByType?.[type]?.find((item: any) => item.folderId === activeFolderId)?.name ?? ''"
             :label="t('dashboard.currentFolderLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            :disable="true"
+            disabled
             :data-test="`${type}-folder-move-name`"
           />
           <span>&nbsp;</span>
 
           <!-- select folder or create new folder and select -->
           <SelectFolderDropDown :type="type" @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
-        </q-form>
       </q-card-section>
   </ODrawer>
   </template>
@@ -68,10 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import useNotifications from "@/composables/useNotifications";
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
   import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+  import OInput from "@/lib/forms/Input/OInput.vue";
 
   export default defineComponent({
     name: "MoveAcrossFolders",
-    components: { SelectFolderDropDown, ODrawer },
+    components: { SelectFolderDropDown, ODrawer, OInput },
     props: {
       activeFolderId: {
         type: String,
@@ -97,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     emits: ["updated", "close", "update:open"],
     setup(props, { emit }) {
       const store: any = useStore();
-      const moveFolderForm: any = ref(null);
       //dropdown selected folder
       const selectedFolder = ref({
         label:
@@ -111,12 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         useNotifications();
 
       const onSubmit = useLoading(async () => {
-        await moveFolderForm.value.validate().then(async (valid: any) => {
-          if (!valid) {
-            return false;
-          }
-
-          try {
+        try {
             const moduleIds = props.moduleId
             const data: Record<string, any> = {
               [getModuleName()]: moduleIds,
@@ -137,13 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             });
 
             emit("updated", props.activeFolderId, selectedFolder.value.value);
-            moveFolderForm.value.resetValidation();
           } catch (err: any) {
             showErrorNotification(err?.message ?? `${props.type} move failed.`, {
               timeout: 2000,
             });
           }
-        });
       });
       //this will be used to get the module name based on the type
       const getModuleName = () => {
@@ -161,7 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       return {
         t,
-        moveFolderForm,
         store,
         getImageURL,
         selectedFolder,

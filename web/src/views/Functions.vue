@@ -52,14 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="isCompactSidebar ? undefined : t('function.streamPipeline')"
                   :icon="isCompactSidebar ? 'lan' : undefined"
                 >
-                  <q-tooltip
+                  <OTooltip
                     v-if="isCompactSidebar"
-                    anchor="center right"
-                    self="center left"
-                    :offset="[8, 0]"
-                  >
-                    {{ t('function.streamPipeline') }}
-                  </q-tooltip>
+                    side="right"
+                    align="center"
+                    :sideOffset="8"
+                    :content="t('function.streamPipeline')"
+                  />
                 </ORouteTab>
                 <ORouteTab
                   data-test="function-stream-tab"
@@ -73,14 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="isCompactSidebar ? undefined : t('function.header')"
                   :icon="isCompactSidebar ? functionIcon : undefined"
                 >
-                  <q-tooltip
+                  <OTooltip
                     v-if="isCompactSidebar"
-                    anchor="center right"
-                    self="center left"
-                    :offset="[8, 0]"
-                  >
-                    {{ t('function.header') }}
-                  </q-tooltip>
+                    side="right"
+                    align="center"
+                    :sideOffset="8"
+                    :content="t('function.header')"
+                  />
                 </ORouteTab>
                 <ORouteTab
                   data-test="function-enrichment-table-tab"
@@ -94,14 +92,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="isCompactSidebar ? undefined : t('function.enrichmentTables')"
                   :icon="isCompactSidebar ? 'dataset' : undefined"
                 >
-                  <q-tooltip
+                  <OTooltip
                     v-if="isCompactSidebar"
-                    anchor="center right"
-                    self="center left"
-                    :offset="[8, 0]"
-                  >
-                    {{ t('function.enrichmentTables') }}
-                  </q-tooltip>
+                    side="right"
+                    align="center"
+                    :sideOffset="8"
+                    :content="t('function.enrichmentTables')"
+                  />
                 </ORouteTab>
                 <ORouteTab
                   v-if="config.isEnterprise == 'true'"
@@ -116,14 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="isCompactSidebar ? undefined : t('pipeline.evalTemplates')"
                   :icon="isCompactSidebar ? 'rule' : undefined"
                 >
-                  <q-tooltip
+                  <OTooltip
                     v-if="isCompactSidebar"
-                    anchor="center right"
-                    self="center left"
-                    :offset="[8, 0]"
-                  >
-                    {{ t('pipeline.evalTemplates') }}
-                  </q-tooltip>
+                    side="right"
+                    align="center"
+                    :sideOffset="8"
+                    :content="t('pipeline.evalTemplates')"
+                  />
                 </ORouteTab>
               </OTabs>
             </div>
@@ -138,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
             @click="collapseSidebar"
           >
-            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="xs" />
           </OButton>
         </template>
         <template v-slot:after>
@@ -161,7 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -171,7 +169,7 @@ import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
-  components: { OTabs, OTab, ORouteTab, OButton },
+  components: { OTabs, OTab, ORouteTab, OButton, OIcon, OTooltip },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();

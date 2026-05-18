@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="template-import-name-input"
                       :model-value="userSelectedTemplateNames[index] || ''"
                       @update:model-value="(val) => {
@@ -80,13 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         updateTemplateName(val, index);
                       }"
                       :label="'Template Name *'"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
                       tabindex="0"
                     />
                   </div>
@@ -100,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="template-import-body-input"
                       :model-value="userSelectedTemplateBodies[index] || ''"
                       @update:model-value="(val) => {
@@ -108,13 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         updateTemplateBody(val, index);
                       }"
                       :label="'Template Body *'"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
                       tabindex="0"
                     />
                   </div>
@@ -129,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-select
+                    <OSelect
                       data-test="template-import-type-input"
                       :model-value="userSelectedTemplateTypes[index] || ''"
                       @update:model-value="(val) => {
@@ -138,20 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }"
                       :options="destinationTypes"
                       :label="'Template Type *'"
-                      :popup-content-style="{
-                        textTransform: 'lowercase',
-                      }"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="q-py-sm showLabelOnTop no-case"
-                      filled
-                      stack-label
-                      dense
-                      use-input
-                      hide-selected
-                      fill-input
-                      :input-debounce="400"
-                      behavior="menu"
                     />
                   </div>
                 </span>
@@ -164,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
                   <div style="width: 300px">
-                    <q-input
+                    <OInput
                       data-test="template-import-title-input"
                       :model-value="userSelectedTemplateTitles[index] || ''"
                       @update:model-value="(val) => {
@@ -172,13 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         updateTemplateTitle(val, index);
                       }"
                       :label="'Template Title *'"
-                      color="input-border"
-                      bg-color="input-bg"
                       class="showLabelOnTop"
-                      stack-label
-                      outlined
-                      filled
-                      dense
                       tabindex="0"
                     />
                   </div>
@@ -232,6 +201,8 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import templateService from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
   validateTemplateBody,
   getTemplateValidationErrorMessage,
@@ -239,6 +210,7 @@ import {
 
 export default defineComponent({
   name: "ImportTemplate",
+  components: { OInput, OSelect },
   props: {
     destinations: {
       type: Array,

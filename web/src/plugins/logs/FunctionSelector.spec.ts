@@ -98,8 +98,8 @@ describe("FunctionSelector", () => {
             template: '<input class="q-input" v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
             props: ["modelValue", "dense", "filled", "borderless", "clearable", "debounce", "placeholder"],
           },
-          "q-icon": {
-            template: '<span class="q-icon" :name="name"></span>',
+          "OIcon": {
+            template: '<span class="OIcon" :name="name"></span>',
             props: ["name"],
           },
           "q-item": {

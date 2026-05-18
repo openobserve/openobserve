@@ -23,21 +23,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
       <div class="custom-usage-date-select">
-          <q-select
-            dense
-            borderless
+          <OSelect
             v-model="usageDate"
             :options="options"
-            emit-value
-            map-options
-            icon="schedule"
-            @update:model-value="(value: any) => selectUsageDate()"
+            labelKey="label"
+            valueKey="value"
+            @update:model-value="selectUsageDate"
             class="q-pa-none q-mx-none tw:h-[40px] q-mt-xs"
           >
           <template v-slot:prepend>
-            <q-icon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
+            <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
           </template>
-          </q-select>
+          </OSelect>
         </div>
         <div class="tw:flex tw:items-center ">
           <div class="app-tabs-container tw:h-[36px] ">
@@ -104,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
               @click="collapseSidebar"
             >
-              <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" />
+              <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="sm" />
             </OButton> -->
           </div>
         </div>
@@ -125,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSelect from '@/lib/forms/Select/OSelect.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
@@ -137,13 +135,16 @@ import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { HardDrive, Database } from "lucide-vue-next";
+
 import BillingService from "@/services/billings";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs },
+    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    OIcon,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -259,12 +260,12 @@ export default defineComponent({
     {
         label: 'Gb',
         value: "gb",
-        icon: HardDrive,
+        icon: "storage",
       },
       {
         label: 'Mb',
         value: "mb",
-        icon: Database,
+        icon: "database",
       }
     ]
 

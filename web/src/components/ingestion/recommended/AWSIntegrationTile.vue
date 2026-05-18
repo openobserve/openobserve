@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="docs-btn"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
-          <q-icon name="description" />
-          <q-tooltip>View Documentation</q-tooltip>
+          <OIcon name="description" size="sm" />
+          <OTooltip content="View Documentation" />
         </OButton>
       </div>
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <q-icon name="chevron_right" color="primary" />
+            <OIcon name="chevron-right" size="sm" />
           </q-item-section>
         </q-item>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item-label>
           </q-item-section>
           <q-item-section side>
-            <q-icon name="chevron_right" color="primary" />
+            <OIcon name="chevron-right" size="sm" />
           </q-item-section>
         </q-item>
       </q-list>
@@ -146,7 +146,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
@@ -167,7 +169,7 @@ import LinuxConfig from "./LinuxConfig.vue";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton, ODialog },
+  components: { OButton, ODialog, OIcon, OTooltip },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,

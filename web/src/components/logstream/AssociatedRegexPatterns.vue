@@ -21,9 +21,8 @@
             @click="$emit('closeDialog')"
             variant="ghost"
             size="icon-sm"
-          >
-            <X :size="14" />
-          </OButton>
+            icon-left="close"
+          />
         </div>
       </div>
       <q-separator />
@@ -35,21 +34,17 @@
             <div class="tw:flex tw:flex-col tw:px-2 tw:py-2">
 
                 <div>
-                    <q-input
+                    <OInput
                     data-test="associated-regex-patterns-search-input"
                     v-model="filterPattern"
                     data-cy="schema-index-field-search-input"
-                    filled
-                    borderless
-                    dense
-                    debounce="1"
                     placeholder="Search"
                     clearable
                 >
                   <template #prepend>
-                    <q-icon name="search" />
+                    <OIcon name="search" size="sm" />
                   </template>
-                </q-input>
+                </OInput>
                 </div>
                 <div style="height: calc(100vh - 130px); overflow-y: auto;">
                   <div
@@ -64,31 +59,29 @@
                     >
                       <q-card class="q-pa-none q-ma-none" style="height: 100%;">
                         <q-card-section class="q-pa-none q-ma-none" style="height: 100%;">
-                          <q-table
+                          <OTable
                             style="height: 100%; overflow-y: auto;"
                             data-test="associated-regex-patterns-applied-patterns-table"
-                            :rows="appliedPatterns"
+                            :data="filteredAppliedPatterns"
                             :columns="appliedFilterColumns"
-                            :visible-columns="['pattern_name']"
                             :class="store.state.theme === 'dark' ? 'dark-associated-regex-patterns-table' : 'light-associated-regex-patterns-table'"
-                            :rows-per-page-options="[0]"
-                            hide-header
-                            hide-bottom
-                            dense
-                            :filter="filterPattern"
-                            @filter-method="handleFilterMethod"
+                            pagination="none"
+                            :show-global-filter="false"
+                            row-key="pattern_id"
                           >
-                            <template v-slot:body="props">
-                              <q-tr :data-test="`associated-regex-patterns-applied-patterns-table-row-${props.row.pattern_id}`" class="tw:cursor-pointer " :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
-                                <q-td :data-test="`associated-regex-patterns-applied-patterns-table-cell-${props.row.pattern_id}`" class="tw:flex tw:justify-between tw:items-center" style="border-bottom: 0px; font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;" :props="props" key="pattern_name">
-                                  <span class="regex-pattern-name">
-                                    {{ props.row.pattern_name }}
-                                  </span>
-                                  <span><q-icon name="check" size="xs" color="primary" /></span>
-                                </q-td>
-                              </q-tr>
+                            <template #cell-pattern_name="{ row }">
+                              <div
+                                :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
+                                class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center"
+                                :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'selected-pattern-row' : ''"
+                                style="font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;"
+                                @click="handlePatternClick(row)"
+                              >
+                                <span class="regex-pattern-name">{{ row.pattern_name }}</span>
+                                <span><OIcon name="check" size="xs" /></span>
+                              </div>
                             </template>
-                          </q-table>
+                          </OTable>
 
                         </q-card-section>
                       </q-card>
@@ -107,32 +100,31 @@
                     >
                       <q-card class="q-pa-none q-ma-none" style="height: 100%;">
                         <q-card-section class="q-pa-none q-ma-none" style="height: 100%;">
-                          <q-table
+                          <OTable
                             style="height: 100%; overflow-y: auto;"
                             data-test="associated-regex-patterns-all-patterns-table"
                             :class="store.state.theme === 'dark' ? 'dark-associated-regex-patterns-table' : 'light-associated-regex-patterns-table'"
-                            :rows="allPatterns"
+                            :data="filteredAllPatterns"
                             :columns="filterColumns"
-                            :visible-columns="['pattern_name']"
-                            :rows-per-page-options="[0]"
-                            hide-header
-                            hide-bottom
-                            dense
-                            :filter="filterPattern"
-                            @:filter-method="handleFilterMethod"
+                            pagination="none"
+                            :show-global-filter="false"
+                            row-key="pattern_id"
                           >
-                          <template v-slot:body="props">
-                              <q-tr :data-test="`associated-regex-patterns-all-patterns-table-row-${props.row.pattern_id}`" style="padding: 8px 0px !important;"  class="tw:cursor-pointer" :class="[checkCurrentUserClickedPattern(props.row.pattern_name) && store.state.theme === 'dark' ? 'selected-pattern-row' : checkCurrentUserClickedPattern(props.row.pattern_name) ? 'selected-pattern-row' : '']" :props="props" @click="handlePatternClick(props.row)">
-                                <q-td :data-test="`associated-regex-patterns-all-patterns-table-cell-${props.row.pattern_id}`" class="tw:flex tw:justify-between tw:items-center " style="border-bottom: 0px;  font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px; " :props="props" key="pattern_name">
-                                 <span class="regex-pattern-name">{{ props.row.pattern_name }}</span> 
-                                  <span v-if="checkIfPatternIsApplied(props.row.pattern_id)">
-                                    <q-icon name="check" size="xs" color="primary" />
-                                  </span>
-                                </q-td>
-                              </q-tr>
-                            
-                            </template>   
-                          </q-table>
+                            <template #cell-pattern_name="{ row }">
+                              <div
+                                :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
+                                class="tw:cursor-pointer tw:flex tw:justify-between tw:items-center"
+                                :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'selected-pattern-row' : ''"
+                                style="font-size: 14px; font-weight: 600; padding-top: 20px; padding-bottom: 20px;"
+                                @click="handlePatternClick(row)"
+                              >
+                                <span class="regex-pattern-name">{{ row.pattern_name }}</span>
+                                <span v-if="checkIfPatternIsApplied(row.pattern_id)">
+                                  <OIcon name="check" size="xs" />
+                                </span>
+                              </div>
+                            </template>
+                          </OTable>
                         </q-card-section>
                       </q-card>
                     </q-expansion-item>
@@ -181,29 +173,31 @@
                     <span class="individual-section-title tw:text-[12px] tw:font-[700]">
                       When value matches
                     </span>
-                    <div class="tw:flex tw:flex-col tw:gap-0.5">
+                    <ORadioGroup v-model="policy">
+                  <div class="tw:flex tw:flex-col tw:gap-0.5">
                       <div class="tw:flex tw:items-center">
-                        <q-radio v-model="policy" val="Redact" data-test="associated-regex-patterns-redact-radio" size="xs" />
+                        <ORadio value="Redact" data-test="associated-regex-patterns-redact-radio" size="xs" />
                         <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                           <span class="tw:font-[600] tw:text-[12px]">Redact</span>
                           <span class="tw:font-[400] tw:text-[10px] tw:opacity-60">Replace with [REDACTED]</span>
                         </div>
                       </div>
                       <div class="tw:flex tw:items-center">
-                        <q-radio v-model="policy" val="DropField" data-test="associated-regex-patterns-drop-field-radio" size="xs" />
+                        <ORadio value="DropField" data-test="associated-regex-patterns-drop-field-radio" size="xs" />
                         <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                           <span class="tw:font-[600] tw:text-[12px]">Drop</span>
                           <span class="tw:font-[400] tw:text-[10px] tw:opacity-60">Drop the field completely</span>
                         </div>
                       </div>
                       <div class="tw:flex tw:items-center">
-                        <q-radio v-model="policy" val="Hash" data-test="associated-regex-patterns-hash-radio" size="xs" />
+                        <ORadio value="Hash" data-test="associated-regex-patterns-hash-radio" size="xs" />
                         <div class="tw:flex tw:items-center tw:gap-2 tw:ml-1">
                           <span class="tw:font-[600] tw:text-[12px]">Hash</span>
                           <span class="tw:font-[400] tw:text-[10px] tw:opacity-60">Replace with searchable hash</span>
                         </div>
                       </div>
                     </div>
+                  </ORadioGroup>
                   </div>
 
                   <q-separator vertical :class="store.state.theme === 'dark' ? 'tw:bg-[#3A3A3A]' : 'tw:bg-[#E5E7EB]'" />
@@ -214,12 +208,12 @@
                       Detect at
                     </span>
                     <div class="tw:flex tw:flex-col tw:gap-1.5">
-                      <q-checkbox size="xs" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
+                      <OCheckbox size="xs" v-model="apply_at" val="AtIngestion" data-test="associated-regex-patterns-ingestion-checkbox">
                         <span class="individual-section-sub-title tw:font-[600] tw:text-[12px]">Ingestion</span>
-                      </q-checkbox>
-                      <q-checkbox size="xs" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
+                      </OCheckbox>
+                      <OCheckbox size="xs" v-model="apply_at" val="AtSearch" data-test="associated-regex-patterns-query-checkbox">
                         <span class="individual-section-sub-title tw:font-[600] tw:text-[12px]">Query</span>
-                      </q-checkbox>
+                      </OCheckbox>
                     </div>
                   </div>
                 </div>
@@ -267,22 +261,15 @@
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                       />
                       <div v-if="expandState.regexTestString" class="regex-pattern-input tw:mt-2">
-                        <q-input
+                        <OInput
                           data-test="add-regex-test-string-input"
                           v-model="testString"
-                          color="input-border"
-                          bg-color="input-bg"
                           class="regex-test-string-input"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                          stack-label
-                          outlined
-                          filled
-                          dense
-                          tabindex="0"
-                          style="width: 100%; resize: none;"
                           type="textarea"
                           placeholder="Eg. 1234567890"
-                          rows="5"
+                          :rows="5"
+                          style="width: 100%;"
                         />
                       </div>
                     </div>
@@ -296,28 +283,21 @@
                         :labelClass="store.state.theme === 'dark' ? 'dark-test-string-container-label' : 'light-test-string-container-label'"
                       />
                       <div v-if="expandState.outputString" class="regex-pattern-input tw:mt-2">
-                        <q-input
+                        <OInput
                           v-if="outputString.length > 0"
                           data-test="add-regex-test-string-input"
                           v-model="outputString"
-                          color="input-border"
-                          bg-color="input-bg"
                           class="regex-test-string-input"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-test-string-input' : 'light-mode-regex-test-string-input'"
-                          stack-label
-                          outlined
-                          filled
-                          dense
-                          tabindex="0"
-                          style="width: 100%; resize: none;"
                           type="textarea"
                           placeholder="Output String"
-                          rows="5"
+                          :rows="5"
+                          style="width: 100%;"
                         />
                         <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
                           :class="store.state.theme === 'dark' ? 'dark-mode-regex-no-output' : 'light-mode-regex-no-output'">
                           <div v-if="!testLoading && outputString.length === 0">
-                            <q-icon :name="outlinedLightbulb" size="24px" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#A8A8A8]'" />
+                            <OIcon name="lightbulb" size="md" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#A8A8A8]'" />
                             <span class="tw:text-[12px] tw:font-[400] tw:text-center" :class="store.state.theme === 'dark' ? 'tw:text-[#ffffff]' : 'tw:text-[#4B5563]'">
                               Please click Test Input to see the results
                             </span>
@@ -342,8 +322,8 @@
                   size="sm-action"
                   class="q-mr-md"
                   @click="handleAddOrRemovePattern"
+                  :icon-left="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'"
                 >
-                  <component :is="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? Trash2 : Plus" :size="14" class="tw:mr-1" />
                   {{ checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'Remove Pattern' : 'Add Pattern' }}
                 </OButton>
                </div>
@@ -404,7 +384,7 @@
 
 <script lang="ts">
 
-import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch } from 'vue';
+import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, watch, computed } from 'vue';
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
@@ -412,11 +392,16 @@ import { debounce, useQuasar } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
 import ConfirmDialog from '../ConfirmDialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { X, Plus, Trash2 } from 'lucide-vue-next';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from '@/lib/forms/Input/OInput.vue';
+import ORadioGroup from '@/lib/forms/Radio/ORadioGroup.vue';
+import ORadio from '@/lib/forms/Radio/ORadio.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 export interface PatternAssociation {
     field: string;
@@ -431,11 +416,14 @@ export default defineComponent({
         FullViewContainer,
         ConfirmDialog,
         OButton,
-        X,
-        Plus,
-        Trash2,
         OSpinner,
-    },
+        OInput,
+        ORadioGroup,
+        ORadio,
+        OCheckbox,
+        OIcon,
+        OTable,
+},
     props: {
         data: {
             type: Array as PropType<PatternAssociation[]>,
@@ -451,17 +439,35 @@ export default defineComponent({
         const store = useStore();
         const filterPattern = ref("");
         const { t } = useI18n();
-          const appliedFilterColumns = ref<any[]>([
-            { name: "pattern_name", label: "Name", field: "pattern_name", align: "left" }
-          ]);
-          const filterColumns = ref<any[]>([
-            { name: "pattern_name", label: "Name", field: "pattern_name", align: "left" }
-          ]);
+          const appliedFilterColumns: OTableColumnDef[] = [
+            { id: "pattern_name", header: "", accessorKey: "pattern_name", meta: { align: "left" } },
+          ];
+          const filterColumns: OTableColumnDef[] = [
+            { id: "pattern_name", header: "", accessorKey: "pattern_name", meta: { align: "left" } },
+          ];
         const allPatterns = ref([]);
         const selectedPatterns = ref<any[]>([]);
         const listLoading = ref(false);
-        const resultTotal = ref(0);
         const appliedPatterns = ref(props.data ? props.data : []);
+
+        const filteredAppliedPatterns = computed(() => {
+          if (!filterPattern.value) return appliedPatterns.value;
+          const query = filterPattern.value.toLowerCase();
+          return (appliedPatterns.value as any[]).filter((row: any) =>
+            row?.pattern_name?.toLowerCase().includes(query),
+          );
+        });
+
+        const filteredAllPatterns = computed(() => {
+          if (!filterPattern.value) return allPatterns.value;
+          const query = filterPattern.value.toLowerCase();
+          return (allPatterns.value as any[]).filter((row: any) =>
+            row?.name?.toLowerCase().includes(query),
+          );
+        });
+
+        const resultTotal = computed(() => filteredAllPatterns.value.length);
+
         const allPatternsExpanded = ref(true);
         const appliedPatternsExpanded = ref(true);
         const appliedPatternsMap = ref(new Map());
@@ -529,7 +535,6 @@ export default defineComponent({
               policy: "",
               field: props.fieldName
             }));
-            resultTotal.value = store.state.organizationData.regexPatterns.length;
           }
           // Initialize the applied patterns map
           appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
@@ -639,7 +644,6 @@ export default defineComponent({
                 field: props.fieldName
               }));
               store.dispatch("setRegexPatterns", allPatterns.value);
-              resultTotal.value = allPatterns.value.length;
             } catch (error) {
               $q.notify({
                 message: error?.response?.data?.message || error?.data?.message || "Error fetching regex patterns",
@@ -665,11 +669,9 @@ export default defineComponent({
         //used filter method to filter the patterns based on the name
         const handleFilterMethod = (rows: any[], terms: string) => {
           const lowerTerm = terms.toLowerCase();
-          const filtered = rows.filter(row =>
+          return rows.filter(row =>
             row?.name?.toLowerCase().includes(lowerTerm)
           );
-          resultTotal.value = filtered.length;
-          return filtered;
         };
 
 
@@ -804,6 +806,8 @@ export default defineComponent({
             allPatternsExpanded,
             listLoading,
             resultTotal,
+            filteredAppliedPatterns,
+            filteredAllPatterns,
             getRegexPatterns,
             appliedPatterns,
             appliedPatternsExpanded,
@@ -829,7 +833,7 @@ export default defineComponent({
             testStringOutput,
             outputString,
             expandState,
-            outlinedLightbulb,
+            outlinedLightbulb: "lightbulb",
             resetInputValues,
             // Additional exposed methods for testing
             checkIfPatternIsAppliedAndUpdate,

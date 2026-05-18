@@ -66,9 +66,9 @@
           size="icon-xs"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"
+          icon-left="cancel"
         >
-          <template #icon-left><q-icon name="cancel" /></template>
-          <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+          <OTooltip :content="t('panel.cancel')" />
         </OButton>
         <OButton
           v-else
@@ -77,21 +77,17 @@
           @click="refreshData"
           :disabled="disable"
           data-test="dashboard-viewpanel-refresh-data-btn"
+          icon-left="refresh"
         >
-          <template #icon-left><q-icon name="refresh" /></template>
-          <q-tooltip>{{
-            isVariablesChanged
-              ? "Refresh"
-              : "Refresh to apply latest variable changes"
-          }}</q-tooltip>
+          <OTooltip :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'" />
         </OButton>
         <OButton
           variant="outline"
           size="icon-xs"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </div>
@@ -224,12 +220,13 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
 import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -251,7 +248,9 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
-  },
+    OIcon,
+    OTooltip,
+},
   props: {
     panelId: {
       type: String,
@@ -887,7 +886,7 @@ export default defineComponent({
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,
-      outlinedWarning,
+      "warning": "warning",
       symOutlinedDataInfoAlert,
       currentTabId,
       currentPanelId,

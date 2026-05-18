@@ -57,13 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="onRunQuery"
       >
         {{ t('search.runQuery') }}
-        <q-tooltip
+        <OTooltip
           v-if="!scheduledPipelineRef?.selectedStreamName"
-          anchor="bottom middle"
-          self="top middle"
-        >
-          {{ t('search.selectStreamFirst') }}
-        </q-tooltip>
+          :content="t('search.selectStreamFirst')"
+          side="bottom"
+        />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
@@ -72,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
         <template #icon-left>
-          <Maximize2 v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
-          <Minimize2 v-else class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="tw:size-3.5 tw:shrink-0" />
+          <OIcon name="close-fullscreen" size="sm" v-else class="tw:size-3.5 tw:shrink-0" />
         </template>
       </OButton>
     </template>
@@ -86,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
     >
     <div class="stream-routing-container q-px-md">
-      <q-form ref="queryFormRef">
+      <div>
         <div class="full-width">
           <scheduled-pipeline
             ref="scheduledPipelineRef"
@@ -122,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-mt-sm"
           />
         </div>
-      </q-form>
+      </div>
     </div>
     </div>
   </ODrawer>
@@ -154,7 +152,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
-import { Maximize2, Minimize2 } from "lucide-vue-next";
 import config from "@/aws-exports";
 import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
@@ -163,6 +160,8 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
@@ -289,8 +288,6 @@ const indexOptions = ref([]);
 const originalStreamFields: Ref<any[]> = ref([]);
 
 const isAggregationEnabled = ref(false);
-
-const queryFormRef = ref<any>(null);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
@@ -474,14 +471,6 @@ const saveQueryData = async () => {
   } catch (e) {
     return false; // Don't close dialog on SQL validation failure
   }
-
-  //this is not needed as we are using validateInputs in scheduledPipeline.vue
-
-  // queryFormRef.value.validate().then((valid: any) => {
-  //   if (!valid) {
-  //     return false;
-  //   }
-  // });
 
   const formData = streamRoute.value;
   if (typeof formData.trigger_condition.period === "string") {

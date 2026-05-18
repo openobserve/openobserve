@@ -258,7 +258,7 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
 
       // Verify the copy button changes to check icon
       const legendItem = pm.dashboardLegendsCopy.getLegendItem(0);
-      const copyBtnIcon = legendItem.locator('[data-test="dashboard-legend-copy-btn"] .q-icon');
+      const copyBtnIcon = legendItem.locator('[data-test="dashboard-legend-copy-btn"] .OIcon');
       await expect(copyBtnIcon).toHaveText(/check/, { timeout: 3000 });
 
       // Verify clipboard contains the legend text
@@ -507,7 +507,7 @@ test.describe("Dashboard Copy Legends and Table Cells", () => {
         }
         const copyBtn = cell.locator('.copy-btn');
         await copyBtn.waitFor({ state: 'visible', timeout: 2000 });
-        const iconText = await copyBtn.locator('.q-icon').textContent();
+        const iconText = await copyBtn.locator('.OIcon').textContent();
         expect(iconText).toContain("content_copy");
       }).toPass({ timeout: 10000, intervals: [1000, 1000, 1000, 1000] });
 

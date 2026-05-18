@@ -12,7 +12,7 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-    <q-form ref="addToDashboardForm" @submit.stop="onSubmit.execute" class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 q-px-md q-py-sm">
+    <div class="add-dashboard-form-card-section tw:flex tw:flex-col tw:gap-4 q-px-md q-py-sm">
       <!-- select folder or create new folder and select -->
       <select-folder-dropdown @folder-selected="updateActiveFolderId" />
 
@@ -30,19 +30,12 @@
         :dashboard-id="selectedDashboard"
         @tab-selected="updateActiveTabId"
       />
-      <q-input
+      <OInput
         v-model.trim="panelTitle"
         :label="t('dashboard.panelTitle') + '*'"
-        class="showLabelOnTop"
-        stack-label
-        hide-bottom-space
-        borderless
-        dense
-        :rules="[(val: any) => !!val.trim() || 'Panel Title required']"
-        :lazy-rules="true"
         data-test="metrics-new-dashboard-panel-title"
       />
-    </q-form>
+    </div>
   </ODrawer>
 </template>
 
@@ -58,6 +51,7 @@ import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.v
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
 import { useRouter } from "vue-router";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
@@ -69,6 +63,7 @@ export default defineComponent({
     SelectDashboardDropdown,
     SelectTabDropdown,
     ODrawer,
+    OInput,
   },
   props: {
     open: {

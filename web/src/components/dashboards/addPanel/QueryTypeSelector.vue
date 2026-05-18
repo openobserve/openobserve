@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-sql-query-type"
         >
-          <template #icon-left><Database class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="database" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.SQL") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-promql-query-type"
         >
-          <template #icon-left><ChartLine class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="show-chart" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.promQL") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-builder-query-type"
         >
-          <template #icon-left><Wrench class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="build" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.builder") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-custom-query-type"
         >
-          <template #icon-left><Code2 class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="code" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.custom") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -97,7 +97,7 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { Database, ChartLine, Wrench, Code2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -418,7 +418,7 @@ export default defineComponent({
       selectedButtonQueryType,
     };
   },
-  components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, Database, ChartLine, Wrench, Code2 },
+  components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, OIcon },
 });
 </script>
 

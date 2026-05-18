@@ -41,21 +41,19 @@
               <div class="text-subtitle1 q-mb-md">
                 {{ t("about.enter_license_key") }}
               </div>
-              <q-input
+              <OTextarea
                 data-test="no-license-key-input"
                 v-model="licenseKey"
-                outlined
-                type="textarea"
-                rows="8"
+                :rows="8"
                 :placeholder="t('about.paste_license_placeholder')"
                 style="height: 200px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
                 <div class="modern-info-banner">
-                  <q-icon
-                    name="check_circle"
+                  <OIcon
+                    name="check-circle"
                     class="text-green-6 q-mr-sm"
-                    size="20px"
+                    size="md"
                   />
                   <span class="text-body2">{{
                     t("about.license_auto_filled")
@@ -138,7 +136,7 @@
                           data-test="show-license-key-btn"
                           @click="showLicenseKeyModal = true"
                         >
-                          <q-icon name="visibility" size="14px" />
+                          <OIcon name="visibility" size="xs" />
                         </OButton>
                       </div>
                     </td>
@@ -189,21 +187,19 @@
               <div class="text-subtitle1 q-mb-sm">
                 {{ t("about.update_license_key") }}
               </div>
-              <q-input
+              <OTextarea
                 data-test="update-license-key-input"
                 v-model="licenseKey"
-                outlined
-                type="textarea"
-                rows="6"
+                :rows="6"
                 :placeholder="t('about.paste_new_license_placeholder')"
                 style="min-height: 150px"
               />
               <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
                 <div class="modern-info-banner">
-                  <q-icon
-                    name="check_circle"
+                  <OIcon
+                    name="check-circle"
                     class="text-green-6 q-mr-sm"
-                    size="20px"
+                    size="md"
                   />
                   <span class="text-body2">{{
                     t("about.license_auto_filled")
@@ -254,7 +250,7 @@
                 <div class="summary-text-compact text-body2">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-                    <q-icon name="info" size="18px" class="tw:flex-shrink-0" />
+                    <OIcon name="info" size="sm" class="tw:flex-shrink-0" />
                     <span
                       v-html="
                         DOMPurify.sanitize(
@@ -272,7 +268,7 @@
 
                   <!-- Line 2: Exceeded Status -->
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon
+                    <OIcon
                       v-if="
                         licenseData?.ingestion_exceeded &&
                         licenseData?.ingestion_exceeded >
@@ -282,7 +278,7 @@
                       size="18px"
                       class="text-negative tw:flex-shrink-0"
                     />
-                    <q-icon
+                    <OIcon
                       v-else-if="
                         licenseData?.ingestion_exceeded &&
                         licenseData?.ingestion_exceeded > 0
@@ -291,10 +287,10 @@
                       size="18px"
                       class="text-warning tw:flex-shrink-0"
                     />
-                    <q-icon
+                    <OIcon
                       v-else
-                      name="check_circle"
-                      size="18px"
+                      name="check-circle"
+                      size="sm"
                       class="text-positive tw:flex-shrink-0"
                     />
                     <span>
@@ -414,13 +410,11 @@
       <div class="text-body2 q-mb-md">
         {{ t('about.your_complete_license_key') }}
       </div>
-      <q-input
+      <OTextarea
         data-test="modal-license-key-display"
         v-model="licenseData.key"
-        outlined
         readonly
-        type="textarea"
-        rows="8"
+        :rows="8"
         style="font-family: monospace; font-size: 12px"
       />
     </ODialog>
@@ -442,8 +436,10 @@ import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -457,7 +453,9 @@ export default defineComponent({
     OButton,
     ODialog,
     OSpinner,
-  },
+    OIcon,
+    OTextarea,
+},
   setup() {
     const $q = useQuasar();
     const { t } = useI18n();

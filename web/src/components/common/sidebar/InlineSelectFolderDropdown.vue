@@ -16,17 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:items-center tw:gap-1">
-    <q-select
+    <OSelect
       :model-value="modelValue"
       :options="folderOptions"
+      labelKey="label"
+      valueKey="value"
       class="alert-v3-select folder-select"
-      dense
-      borderless
-      behavior="menu"
-      input-debounce="0"
-      emit-value
-      map-options
-      :disable="disable"
+      :disabled="disable"
       @update:model-value="$emit('update:modelValue', $event)"
     />
     <OButton
@@ -37,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title="Add Folder"
       @click="showDialog = true"
     >
-      <q-icon name="add" />
+      <OIcon name="add" size="sm" />
     </OButton>
     <AddFolder
       v-if="!disable"
@@ -56,10 +52,12 @@ import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "InlineSelectFolderDropdown",
-  components: { AddFolder, OButton },
+  components: { AddFolder, OButton, OIcon, OSelect },
   emits: ["update:modelValue"],
   props: {
     modelValue: {

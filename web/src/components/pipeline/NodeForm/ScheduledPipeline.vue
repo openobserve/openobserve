@@ -68,48 +68,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     <div style="flex-shrink: 0">
-                      <q-select
+                      <OSelect
                         v-model="selectedStreamType"
                         :options="streamTypes"
-                        option-label="label"
-                        option-value="value"
                         :label="t('alerts.streamType') + ' *'"
-                        :popup-content-style="{ textTransform: 'lowercase' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="no-case full-width q-mb-xs o2-custom-select-dashboard"
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        borderless
-                        input-debounce="300"
+                        class="no-case full-width q-mb-xs"
                         @update:model-value="getStreamList"
                       />
 
-                      <q-select
+                      <OSelect
                         v-model="selectedStreamName"
                         :options="filteredStreams"
-                        option-label="label"
-                        option-value="value"
+                        labelKey="label"
+                        valueKey="value"
                         :label="t('alerts.stream_name')"
-                        :popup-content-style="{ textTransform: 'lowercase' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="q-my-xs no-case full-width o2-custom-select-dashboard"
-                        stack-label
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        borderless
-                        input-debounce="300"
+                        class="q-my-xs no-case full-width"
                         @update:model-value="getStreamFields"
-                        @filter="filterStreams"
-                        @popup-show="getStreamList"
-                        map-options
-                        emit-value
+                        @open="getStreamList"
                       />
                     </div>
 
@@ -165,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div style="width: 130px">
                         {{ t("pipeline.trigger") }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -175,37 +150,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Based upon the condition of trigger the pipeline
-                              will get trigger <br />
-                              e.g. if the trigger value is >100 and the query
-                              returns a value of 101 then the pipeline will
-                              trigger.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Based upon the condition of trigger the
+                                pipeline will get trigger <br />
+                                e.g. if the trigger value is >100 and the query
+                                returns a value of 101 then the pipeline will
+                                trigger.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div class="flex justify-start items-center">
                         <div
                           data-test="scheduled-pipeline-promlq-condition-operator-select"
                         >
-                          <q-select
+                          <OSelect
                             v-model="promqlCondition.operator"
                             :options="triggerOperators"
-                            color="input-border"
-                            bg-color="input-bg"
                             class="no-case q-py-none q-mr-xs"
-                            filled
-                            borderless
-                            dense
-                            use-input
-                            hide-selected
-                            fill-input
                             style="width: 88px; border-right: none"
                             @update:model-value="updatePromqlCondition"
                           />
@@ -215,13 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 160px; margin-left: 0 !important"
                           class="silence-notification-input o2-input"
                         >
-                          <q-input
+                          <OInput
                             v-model="promqlCondition.value"
                             type="number"
-                            dense
-                            filled
-                            min="0"
-                            style="background: none"
+                            :min="0"
                             :placeholder="t('pipeline.value')"
                             @update:model-value="updatePromqlCondition"
                           />
@@ -238,13 +200,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("pipeline.aggregation") }}
                       </div>
-                      <q-toggle
+                      <OSwitch
                         data-test="scheduled-pipeline-aggregation-toggle"
                         v-model="_isAggregationEnabled"
-                        size="md"
-                        color="primary"
-                        class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
-                        :disable="tab === 'sql' || tab === 'promql'"
+                        :disabled="tab === 'sql' || tab === 'promql'"
                         @update:model-value="updateAggregation"
                       />
                     </div>
@@ -274,28 +233,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               data-test="scheduled-pipeline-group-by-column-select"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.group_by[index]"
                                 :options="filteredFields"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none q-mb-sm"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                emit-value
-                                hide-selected
+                                labelKey="label"
+                                valueKey="value"
                                 :placeholder="t('pipeline.selectColumn')"
-                                fill-input
-                                :input-debounce="400"
-                                @filter="filterFields"
-                                :rules="[
-                                  (val: any) =>
-                                    !!val || t('pipeline.fieldRequired'),
-                                ]"
+                                :error="!!groupByErrors[index]"
+                                :error-message="groupByErrors[index]"
                                 style="width: 200px"
-                                @update:model-value="updateTrigger"
+                                @update:model-value="
+                                  (val: any) => {
+                                    groupByErrors[index] = '';
+                                    updateTrigger();
+                                  }
+                                "
                               />
                             </div>
                             <OButton
@@ -305,11 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="q-mb-sm q-ml-xs q-mr-sm"
                               :title="t('alert_templates.delete')"
                               @click="deleteGroupByColumn(index)"
-                            >
-                              <template #icon-left>
-                                <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                              </template>
-                            </OButton>
+                              icon-left="delete"
+                            />
                           </div>
                         </template>
                         <OButton
@@ -319,11 +268,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="q-mb-sm q-ml-xs q-mr-sm"
                           :title="t('common.add')"
                           @click="addGroupByColumn()"
-                        >
-                          <template #icon-left>
-                            <Plus class="tw:size-3.5 tw:shrink-0" />
-                          </template>
-                        </OButton>
+                          icon-left="add"
+                        />
                       </div>
                     </div>
                     <div
@@ -337,8 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("alerts.threshold") + " *" }}
 
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -347,20 +293,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >The threshold above/below which the alert will
-                              trigger. <br />
-                              e.g. if the threshold is >100 and the query
-                              returns a value of 101 then the alert will
-                              trigger.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >The threshold above/below which the alert will
+                                trigger. <br />
+                                e.g. if the threshold is >100 and the query
+                                returns a value of 101 then the alert will
+                                trigger.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div
                         style="width: calc(100% - 190px)"
@@ -374,18 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-threshold-function-select"
                               class="threshould-input q-mr-xs o2-input"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.function"
                                 :options="aggFunctions"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
                                 style="width: 120px"
                                 @update:model-value="updateAggregation"
                               />
@@ -394,20 +329,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="threshould-input q-mr-xs o2-input"
                               data-test="scheduled-pipeline-threshold-column-select"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.having.column"
                                 :options="filteredNumericColumns"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                emit-value
-                                hide-selected
-                                fill-input
-                                @filter="filterNumericColumns"
+                                labelKey="label"
+                                valueKey="value"
                                 style="width: 250px"
                                 @update:model-value="updateAggregation"
                               />
@@ -416,18 +342,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-threshold-operator-select"
                               class="threshould-input q-mr-xs o2-input q-mt-sm"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="aggregationData.having.operator"
                                 :options="triggerOperators"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
                                 style="width: 120px"
                                 @update:model-value="updateAggregation"
                               />
@@ -438,13 +355,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 style="width: 250px; margin-left: 0 !important"
                                 class="silence-notification-input o2-input"
                               >
-                                <q-input
+                                <OInput
                                   v-model="aggregationData.having.value"
                                   type="number"
-                                  dense
-                                  filled
-                                  min="0"
-                                  style="background: none"
+                                  :min="0"
                                   :placeholder="t('pipeline.value')"
                                   @update:model-value="updateAggregation"
                                 />
@@ -472,22 +386,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="threshould-input"
                               data-test="scheduled-pipeline-threshold-operator-select"
                             >
-                              <q-select
+                              <OSelect
                                 v-model="triggerData.operator"
                                 :options="triggerOperators"
-                                color="input-border"
-                                bg-color="input-bg"
-                                class="showLabelOnTop no-case q-py-none"
-                                filled
-                                borderless
-                                dense
-                                use-input
-                                hide-selected
-                                fill-input
-                                :rules="[
-                                  (val: any) =>
-                                    !!val || t('pipeline.fieldRequired'),
-                                ]"
                                 style="
                                   width: 88px;
                                   border: 1px solid rgba(0, 0, 0, 0.05);
@@ -507,13 +408,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="silence-notification-input"
                                 data-test="scheduled-pipeline-threshold-value-input"
                               >
-                                <q-input
+                                <OInput
                                   v-model="triggerData.threshold"
                                   type="number"
-                                  dense
-                                  filled
-                                  min="1"
-                                  style="background: none"
+                                  :min="1"
                                   @update:model-value="updateTrigger"
                                 />
                               </div>
@@ -557,8 +455,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("alerts.crontitle") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -567,17 +465,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Configure the option to enable a cron
-                              expression.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Configure the option to enable a cron
+                                expression.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -588,14 +484,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="scheduled-pipeline-cron-input"
                             class="silence-notification-input"
                           >
-                            <q-toggle
+                            <OSwitch
                               data-test="scheduled-pipeline-cron-toggle-btn"
-                              size="md"
-                              color="primary"
-                              class="text-bold q-pl-0 o2-toggle-button-sm tw:h-[36px] tw:ml-1"
-                              v-model="triggerData.frequency_type"
-                              :true-value="'cron'"
-                              :false-value="'minutes'"
+                              v-model="isCronMode"
                             />
                           </div>
                         </div>
@@ -613,8 +504,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }"
                       >
                         {{ t("alerts.frequency") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -623,44 +514,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="auto"
-                          >
-                            <span
-                              style="font-size: 14px"
-                              v-if="triggerData.frequency_type == 'minutes'"
-                              >How often the task should be executed.<br />
-                              e.g., 2 minutes means that the task will run every
-                              2 minutes and will be processed based on the other
-                              parameters provided.</span
-                            >
-                            <span style="font-size: 14px" v-else>
-                              Pattern: * * * * * * means every second.
-                              <br />
-                              Format: [Second (optional) 0-59] [Minute 0-59]
-                              [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12]
-                              [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
-                              <br />
-                              Use '*' to represent any value, 'L' for the last
-                              day/weekday.
-                              <br />
-                              Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                              daily. It specifies second, minute, hour, day of
-                              month, month, and day of week, respectively.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                          <OTooltip side="right">
+                            <template #content>
+                              <span
+                                style="font-size: 14px"
+                                v-if="triggerData.frequency_type == 'minutes'"
+                                >How often the task should be executed.<br />
+                                e.g., 2 minutes means that the task will run
+                                every 2 minutes and will be processed based on
+                                the other parameters provided.</span
+                              >
+                              <span style="font-size: 14px" v-else>
+                                Pattern: * * * * * * means every second.
+                                <br />
+                                Format: [Second (optional) 0-59] [Minute 0-59]
+                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
+                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
+                                Sunday].
+                                <br />
+                                Use '*' to represent any value, 'L' for the last
+                                day/weekday.
+                                <br />
+                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
+                                daily. It specifies second, minute, hour, day of
+                                month, month, and day of week,
+                                respectively.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                         <template
                           v-if="
                             triggerData.frequency_type == 'cron' &&
                             showTimezoneWarning
                           "
                         >
-                          <q-icon
-                            :name="outlinedWarning"
-                            size="18px"
+                          <OIcon
+                            name="warning"
+                            size="sm"
                             class="cursor-pointer tw:ml-[8px]"
                             :class="
                               store.state.theme === 'dark'
@@ -668,16 +559,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'tw:text-orange-500'
                             "
                           >
-                            <q-tooltip
-                              anchor="center right"
-                              self="center left"
-                              max-width="auto"
-                              class="tw:text-[14px]"
-                            >
-                              Warning: The displayed timezone is approximate.
-                              Verify and select the correct timezone manually.
-                            </q-tooltip>
-                          </q-icon>
+                            <OTooltip
+                              side="right"
+                              content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                            />
+                          </OIcon>
                         </template>
                       </div>
                       <div style="max-height: 50px" class="q-mb-sm">
@@ -694,64 +580,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             "
                             class="silence-notification-input"
                           >
-                            <q-input
+                            <OInput
                               data-test="scheduled-pipeline-frequency-input-field"
                               v-if="triggerData.frequency_type == 'minutes'"
                               v-model="triggerData.frequency"
                               type="number"
-                              dense
-                              filled
                               :min="
                                 Math.ceil(
                                   store.state?.zoConfig
                                     ?.min_auto_refresh_interval / 60,
                                 ) || 1
                               "
-                              style="background: none"
                               @update:model-value="updateFrequency"
                             />
                             <div
                               v-else
                               class="tw:flex tw:items-center o2-input tw:gap-y-2"
                             >
-                              <q-input
+                              <OInput
                                 data-test="scheduled-pipeline-cron-input-field"
                                 v-model="triggerData.cron"
-                                dense
-                                filled
                                 :label="t('reports.cronExpression') + ' *'"
-                                style="background: none; width: 130px"
-                                class="showLabelOnTop"
-                                stack-label
-                                outlined
+                                style="width: 130px"
                                 @update:model-value="updateCron"
-                                required
                               />
-                              <q-select
+                              <OSelect
                                 data-test="add-report-schedule-start-timezone-select"
                                 v-model="triggerData.timezone"
                                 :options="filteredTimezone"
-                                @blur="
-                                  browserTimezone =
-                                    browserTimezone == ''
-                                      ? Intl.DateTimeFormat().resolvedOptions()
-                                          .timeZone
-                                      : browserTimezone
-                                "
-                                use-input
-                                @filter="timezoneFilterFn"
-                                input-debounce="0"
-                                dense
-                                filled
-                                emit-value
-                                fill-input
-                                hide-selected
-                                :title="triggerData.timezone"
                                 :label="t('logStream.timezone') + ' *'"
-                                :display-value="`Timezone: ${browserTimezone}`"
-                                class="timezone-select showLabelOnTop q-ml-sm"
-                                stack-label
-                                outlined
+                                :title="triggerData.timezone"
+                                class="timezone-select q-ml-sm"
                                 style="width: 200px"
                               />
                             </div>
@@ -799,8 +658,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("alerts.period") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -809,20 +668,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Period for which the query should run.<br />
-                              e.g. 10 minutes means that whenever the query will
-                              run it will use the last 10 minutes of data. If
-                              the query runs at 4:00 PM then it will use the
-                              data from 3:50 PM to 4:00 PM.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Period for which the query should run.<br />
+                                e.g. 10 minutes means that whenever the query
+                                will run it will use the last 10 minutes of
+                                data. If the query runs at 4:00 PM then it will
+                                use the data from 3:50 PM to 4:00 PM.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -837,17 +694,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 87px; margin-left: 0 !important"
                             class="silence-notification-input"
                           >
-                            <q-input
+                            <OInput
                               v-model="triggerData.period"
                               type="number"
-                              dense
-                              filled
-                              min="1"
-                              style="background: none"
-                              v-bind:readonly="
+                              :min="1"
+                              :readonly="
                                 triggerData.frequency_type == 'minutes'
                               "
-                              v-bind:disable="
+                              :disabled="
                                 triggerData.frequency_type == 'minutes'
                               "
                               @update:model-value="updateTrigger"
@@ -900,8 +754,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 130px"
                       >
                         {{ t("pipeline.delay") + " *" }}
-                        <q-icon
-                          :name="outlinedInfo"
+                        <OIcon
+                          name="info"
                           size="17px"
                           class="q-ml-xs cursor-pointer"
                           :class="
@@ -910,19 +764,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               : 'text-grey-7'
                           "
                         >
-                          <q-tooltip
-                            anchor="center right"
-                            self="center left"
-                            max-width="300px"
-                          >
-                            <span style="font-size: 14px"
-                              >Delay for which the pipeline is scheduled to
-                              run.<br />
-                              e.g. 10 minutes delay means that the pipeline will
-                              run 10 minutes after its scheduled time.</span
-                            >
-                          </q-tooltip>
-                        </q-icon>
+                          <OTooltip side="right" max-width="300px">
+                            <template #content>
+                              <span style="font-size: 14px"
+                                >Delay for which the pipeline is scheduled to
+                                run.<br />
+                                e.g. 10 minutes delay means that the pipeline
+                                will run 10 minutes after its scheduled
+                                time.</span
+                              >
+                            </template>
+                          </OTooltip>
+                        </OIcon>
                       </div>
                       <div style="min-height: 58px">
                         <div
@@ -937,13 +790,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             style="width: 87px; margin-left: 0 !important"
                             class="silence-notification-input"
                           >
-                            <q-input
+                            <OInput
                               v-model="delayCondition"
                               type="number"
-                              dense
-                              filled
-                              min="0"
-                              style="background: none"
+                              :min="0"
                               @update:model-value="updateDelay"
                             />
                           </div>
@@ -993,17 +843,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('search.openFields')
               "
               @click="collapseFieldList"
-            >
-              <template #icon-left>
-                  <q-icon
-                  :name="
-                    collapseFields
-                      ? 'chevron_right'
-                      : 'chevron_left'
-                  "
-                />
-              </template>
-            </OButton>
+              :icon-left="collapseFields ? 'chevron-right' : 'chevron-left'"
+            />
           </template>
           <template #after>
             <div class="full-width tw:flex tw:flex-col" style="height: 100%">
@@ -1087,8 +928,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
-size="md" />
+                      <OIcon
+                        name="info"
+                        size="md"
+                        class="tw:align-middle tw:mr-1"
+                      />
                       {{ t("search.noStreamSelectedMessage") }}
                     </h6>
                     <h6
@@ -1103,8 +947,7 @@ size="md" />
                       data-test="logs-search-no-stream-selected-text"
                       class="text-center col-10 q-mx-none"
                     >
-                      <q-icon name="info" color="primary"
-size="md" />
+                      <OIcon name="info" size="md" />
                       {{ t("search.applySearch") }}
                     </h6>
                   </div>
@@ -1133,10 +976,8 @@ size="md" />
                     size="sm-action"
                     @mousedown.prevent
                     @click="$emit('delete:node')"
+                    icon-left="delete"
                   >
-                    <template #icon-left>
-                      <Trash2 class="tw:size-4 tw:shrink-0" />
-                    </template>
                     {{ t("pipeline.deleteNode") }}
                   </OButton>
 
@@ -1147,7 +988,7 @@ size="md" />
                     @mousedown.prevent
                     @click="$emit('cancel:form')"
                   >
-                    {{ t('alerts.cancel') }}
+                    {{ t("alerts.cancel") }}
                   </OButton>
                   <OButton
                     data-test="stream-routing-query-save-btn"
@@ -1159,8 +1000,8 @@ size="md" />
                   >
                     {{
                       validatingSqlQuery
-                        ? t('pipeline.validating')
-                        : t('pipeline.validateAndClose')
+                        ? t("pipeline.validating")
+                        : t("pipeline.validateAndClose")
                     }}
                   </OButton>
                 </div>
@@ -1212,11 +1053,6 @@ import {
 } from "vue";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedDelete,
-  outlinedInfo,
-  outlinedWarning,
-} from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import {
   getImageURL,
@@ -1236,7 +1072,11 @@ import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Maximize2, Minimize2, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
@@ -1245,7 +1085,6 @@ import useLogs from "@/composables/useLogs";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { Code2, BarChart2 } from "lucide-vue-next";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
@@ -1415,12 +1254,12 @@ const tabOptions = computed(() => [
   {
     label: t("alerts.sql"),
     value: "sql",
-    icon: Code2,
+    icon: "code",
   },
   {
     label: t("alerts.promql"),
     value: "promql",
-    icon: BarChart2,
+    icon: "bar-chart",
     disabled: selectedStreamType.value !== "metrics",
     tooltipLabel:
       selectedStreamType.value !== "metrics"
@@ -1689,6 +1528,7 @@ const promqlCondition = ref(props.promql_condition);
 const aggregationData = ref(props.aggregation);
 
 const filteredFields = ref(props.columns);
+const groupByErrors = ref<Record<number, string>>({});
 
 const getNumericColumns = computed(() => {
   if (
@@ -1738,6 +1578,13 @@ const addField = () => {
 };
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
+
+const isCronMode = computed({
+  get: () => triggerData.value.frequency_type === "cron",
+  set: (val: boolean) => {
+    triggerData.value.frequency_type = val ? "cron" : "minutes";
+  },
+});
 
 const selectedFunction = ref("");
 
@@ -2564,7 +2411,7 @@ defineExpose({
     border-radius: 3px 3px 3px 3px;
     padding: 0px 5px;
 
-    .q-icon {
+    .OIcon {
       font-size: 15px;
       color: #ffffff;
     }

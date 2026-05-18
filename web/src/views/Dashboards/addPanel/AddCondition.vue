@@ -1,12 +1,8 @@
 <template>
   <div class="condition">
-    <q-select
+    <OSelect
       v-if="conditionIndex !== 0"
       v-model="condition.logicalOperator"
-      dense
-      options-dense
-      borderless
-      hide-bottom-space
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator"
@@ -17,9 +13,9 @@
         variant="primary"
         size="chip-12"
         :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
+        icon-right="arrow-drop-down"
       >
         {{ computedLabel(condition) }}
-        <template #icon-right><q-icon name="arrow_drop_down" /></template>
         <q-menu
           class="q-pa-md"
           @show="(e: any) => loadFilterItem(condition.column)"
@@ -36,10 +32,8 @@
               size="icon"
               @click="removeColumnName"
               :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+              icon-left="close"
             >
-              <template #icon-left
-                ><q-icon name="close" size="18px"
-              /></template>
             </OButton>
           </div>
           <div style="height: 100%">
@@ -62,10 +56,7 @@
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
                       <div class="flex column" style="height: 220px">
-                        <q-select
-                          dense
-                          borderless
-                          hide-bottom-space
+                        <OSelect
                           v-model="condition.operator"
                           :options="operators"
                           :label="t('common.operator')"
@@ -87,9 +78,7 @@
                       </div>
                     </OTabPanel>
                     <OTabPanel name="list">
-                      <q-select
-                        dense
-                        borderless
+                      <OSelect
                         v-model="condition.values"
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
@@ -127,19 +116,18 @@
                         >
                           <q-item v-bind="itemProps">
                             <q-item-section side>
-                              <q-checkbox
-                                dense
+                              <OCheckbox
                                 :model-value="selected"
                                 @update:model-value="toggleOption(opt)"
                                 data-test="dashboard-add-condition-list-item"
-                              ></q-checkbox>
+                              />
                             </q-item-section>
                             <q-item-section>
                               <SanitizedHtmlRenderer :html-content="opt" />
                             </q-item-section>
                           </q-item>
                         </template>
-                      </q-select>
+                      </OSelect>
                     </OTabPanel>
                   </OTabPanels>
                 </div>
@@ -153,8 +141,8 @@
         size="icon-chip"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
+        icon-left="close"
       >
-        <template #icon-left><q-icon name="close" /></template>
       </OButton>
     </OButtonGroup>
   </div>
@@ -167,6 +155,8 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
@@ -189,6 +179,8 @@ export default defineComponent({
     CommonAutoComplete,
     SanitizedHtmlRenderer,
     StreamFieldSelect,
+    OSelect,
+    OCheckbox,
   },
   props: [
     "condition",
@@ -261,7 +253,10 @@ export default defineComponent({
       "Is Not Null",
     ];
 
-    const filterOptions = ["AND", "OR"];
+    const filterOptions = [
+      { label: "AND", value: "AND" },
+      { label: "OR", value: "OR" },
+    ];
 
     const computedLabel = (condition: any) => {
       const builtCondition = buildCondition(condition, dashboardPanelData);

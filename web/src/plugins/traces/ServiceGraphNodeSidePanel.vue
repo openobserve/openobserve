@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-node-panel-view-related-btn"
             >
               View Related
-              <q-icon name="arrow_drop_down" size="1rem" />
+              <OIcon name="arrow-drop-down" size="1rem" />
             </OButton>
           </template>
           <ODropdownItem
@@ -81,14 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >
               <!-- Duration chip icon -->
-              <q-icon
+              <OIcon
                 v-if="chip.type === 'duration'"
                 name="schedule"
                 size="0.8rem"
                 class="tw:text-[var(--o2-latency-p95)]"
               />
               <!-- Error chip icon -->
-              <q-icon
+              <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
                 size="0.8rem"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`service-graph-filter-chip-remove-${chip.key}`"
                 @click="removeLocalRangeFilter(chip.key)"
               >
-                <q-icon name="close" size="0.65rem" />
+                <OIcon name="close" size="0.65rem" />
               </OButton>
             </div>
 
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="viewInTraces"
             >
               <template #icon-left>
-                <q-icon name="search" size="0.8rem" />
+                <OIcon name="search" size="0.8rem" />
               </template>
               View Traces
             </OButton>
@@ -192,8 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   data-test="service-graph-node-panel-workload-fields-btn"
                 >
-                  <q-icon name="tune" size="1.1rem" />
-                  <q-tooltip>{{ t("common.resources") }}</q-tooltip>
+                  <OIcon name="tune" size="1.1rem" />
+                  <OTooltip :content="t('common.resources')" />
                 </OButton>
               </template>
               <q-list
@@ -219,18 +219,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:px-[0.325rem]! tw:h-[30px]! tw:min-h-[30px]!"
                   >
                     <q-item-section side class="tw:pr-[0rem]!">
-                      <q-checkbox
+                      <OCheckbox
                         v-model="selectedWorkloadFields"
-                        :val="cfg.id"
+                        :value="cfg.id"
                         size="xs"
                       />
                     </q-item-section>
                     <q-item-section>
                       <q-item-label class="tw:text-xs">
                         {{ cfg.label }}
-                        <q-tooltip>
-                          {{ cfg.groupField }}
-                        </q-tooltip>
+                        <OTooltip :content="cfg.groupField" />
                       </q-item-label>
                     </q-item-section>
                   </q-item>
@@ -342,8 +340,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <q-icon name="search" size="0.8rem" />
-                        <q-tooltip>View in Traces</q-tooltip>
+                        <OIcon name="search" size="0.8rem" />
+                        <OTooltip content="View in Traces" />
                       </OButton>
                     </template>
                     <template #empty>
@@ -431,8 +429,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <q-icon name="search" size="0.8rem" />
-                        <q-tooltip>View in Traces</q-tooltip>
+                        <OIcon name="search" size="0.8rem" />
+                        <OTooltip content="View in Traces" />
                       </OButton>
                     </template>
                     <template #cell-errors="{ item }">
@@ -582,6 +580,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -621,6 +620,8 @@ import {
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -725,7 +726,10 @@ export default defineComponent({
     TenstackTable,
     RenderDashboardCharts,
     OSpinner,
-  },
+    OTooltip,
+    OCheckbox,
+    OIcon,
+},
   props: {
     selectedNode: {
       type: Object as PropType<any>,
@@ -1356,7 +1360,7 @@ export default defineComponent({
           status: "healthy",
           text: "Healthy",
           color: "positive",
-          icon: "check_circle",
+          icon: "check-circle",
         };
       }
     });
@@ -2469,7 +2473,7 @@ export default defineComponent({
           );
           border: 1px solid rgba(16, 185, 129, 0.15);
 
-          .q-icon {
+          .OIcon {
             color: #10b981;
           }
 
@@ -2495,7 +2499,7 @@ export default defineComponent({
           );
           border: 1px solid rgba(251, 191, 36, 0.15);
 
-          .q-icon {
+          .OIcon {
             color: #fbbf24;
           }
 
@@ -2521,7 +2525,7 @@ export default defineComponent({
           );
           border: 1px solid rgba(239, 68, 68, 0.15);
 
-          .q-icon {
+          .OIcon {
             color: #ef4444;
           }
 
@@ -2547,7 +2551,7 @@ export default defineComponent({
           );
           border: 1px solid rgba(107, 114, 128, 0.15);
 
-          .q-icon {
+          .OIcon {
             color: #6b7280;
           }
 
@@ -2673,7 +2677,7 @@ export default defineComponent({
           );
           border-color: rgba(16, 185, 129, 0.2);
 
-          .q-icon {
+          .OIcon {
             color: #059669;
           }
 
@@ -2699,7 +2703,7 @@ export default defineComponent({
           );
           border-color: rgba(217, 119, 6, 0.2);
 
-          .q-icon {
+          .OIcon {
             color: #d97706;
           }
 
@@ -2725,7 +2729,7 @@ export default defineComponent({
           );
           border-color: rgba(220, 38, 38, 0.2);
 
-          .q-icon {
+          .OIcon {
             color: #dc2626;
           }
 
@@ -2751,7 +2755,7 @@ export default defineComponent({
           );
           border-color: rgba(107, 114, 128, 0.2);
 
-          .q-icon {
+          .OIcon {
             color: #6b7280;
           }
 

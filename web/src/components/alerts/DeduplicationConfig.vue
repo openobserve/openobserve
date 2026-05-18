@@ -36,43 +36,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.fingerprintFields") }}
-                <q-icon
-                  :name="outlinedInfo"
+                <OIcon
+                  name="info"
                   size="17px"
                   class="q-ml-xs cursor-pointer"
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
                 >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    style="font-size: 12px;"
-                  >
-                    {{ t("alerts.deduplication.fingerprintFieldsTooltip") }}
-                  </q-tooltip>
-                </q-icon>
+                  <OTooltip
+                    side="right"
+                    align="center"
+                    :max-width="'300px'"
+                    :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
+                  />
+                </OIcon>
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
-              <q-select
+              <OSelect
                 v-model="localConfig.fingerprint_fields"
                 :options="availableFields"
-                color="input-border"
-                bg-color="input-bg"
                 class="showLabelOnTop no-case"
                 :class="store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'"
-                filled
-                dense
                 multiple
-                use-chips
-                use-input
-                input-debounce="0"
-                new-value-mode="add-unique"
-                emit-value
-                map-options
-                option-value="value"
-                option-label="label"
+                valueKey="value"
+                labelKey="label"
                 @update:model-value="emitUpdate"
               >
                 <template v-slot:hint>
@@ -80,37 +68,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)
                   </div>
                 </template>
-              </q-select>
+              </OSelect>
             </div>
 
             <!-- Time Window -->
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
                 {{ t("alerts.deduplication.timeWindow") }}
-                <q-icon
-                  :name="outlinedInfo"
+                <OIcon
+                  name="info"
                   size="17px"
                   class="q-ml-xs cursor-pointer"
                   :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
                 >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                    style="font-size: 12px;"
-                  >
-                    {{ t("alerts.deduplication.timeWindowTooltip") }}
-                  </q-tooltip>
-                </q-icon>
+                  <OTooltip
+                    side="right"
+                    align="center"
+                    :max-width="'300px'"
+                    :content="t('alerts.deduplication.timeWindowTooltip')"
+                  />
+                </OIcon>
               </div>
               <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
-              <q-input
+              <OInput
                 v-model.number="localConfig.time_window_minutes"
                 type="number"
-                dense
-                filled
                 min="1"
                 suffix="minutes"
                 :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
@@ -129,8 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import AlertsContainer from "./AlertsContainer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
 

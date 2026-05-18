@@ -59,18 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-show="tab === 'table'"
         class="col-auto flex justify-end align-center q-pr-md"
       >
-        <q-toggle
+        <OSwitch
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
-          class="o2-toggle-button-xs"
-          size="xs"
-          flat
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-xs-dark'
-              : 'o2-toggle-button-xs-light'
-          "
+          size="sm"
           @update:model-value="toggleWrapLogDetails"
         />
       </div>
@@ -116,21 +109,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="rowData.length == 0" class="q-pt-md tw:max-w-[350px]">
             No data available.
           </div>
-          <q-table
+          <OTable
             v-else
-            ref="qTable"
             data-test="log-detail-table"
-            :rows="tableRows"
+            :data="tableRows"
             :columns="tableColumns"
-            :row-key="(row) => 'field_' + row.field"
-            :rows-per-page-options="[0]"
-            class="q-table o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            row-key="_rowKey"
+            pagination="none"
+            class="o2-quasar-table o2-row-md o2-schema-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
-            dense
           >
-            <template v-slot:body-cell-field="props">
-              <q-td
-                :data-test="`log-detail-${props.row.field}-key`"
+            <template #cell-field="{ row, value }">
+              <div
+                :data-test="`log-detail-${value}-key`"
                 class="text-left"
                 :class="
                   store.state.theme == 'dark'
@@ -138,37 +129,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'tw:text-[#B71C1C]'
                 "
               >
-                {{ props.row.field }}
-              </q-td>
+                {{ value }}
+              </div>
             </template>
 
-            <template v-slot:body-cell-value="props">
-              <q-td
-                class="text-left"
-                :class="!shouldWrapValues ? 'ellipsis' : ''"
-              >
+            <template #cell-value="{ row }">
+              <div class="text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
                 <div class="tw:flex tw:items-start tw:gap-2">
-                  <ODropdown v-model:open="tableDropdownOpenMap[props.row.field]" side="bottom" align="start">
+                  <ODropdown v-model:open="tableDropdownOpenMap[row.field]" side="bottom" align="start">
                     <template #trigger>
                       <OButton
-                        :data-test="`log-details-include-exclude-field-btn-${props.row.field}`"
+                        :data-test="`log-details-include-exclude-field-btn-${row.field}`"
                         size="icon-xs"
                         variant="ghost"
                         class="log-json-field-dropdown-btn"
                         aria-label="Add icon"
                       >
-                        <q-icon :name="tableDropdownOpenMap[props.row.field] ? 'arrow_drop_up' : 'arrow_drop_down'" size="14px" />
+                        <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="14px" />
                       </OButton>
                     </template>
                     <ODropdownItem
                       v-if="
                         searchObj.data.stream.selectedStreamFields.some(
                           (item: any) =>
-                            item.name === props.row.field ? item.isSchemaField : '',
+                            item.name === row.field ? item.isSchemaField : '',
                         )
                       "
                       data-test="log-details-include-field-btn"
-                      @select="toggleIncludeSearchTerm(props.row.field, props.row.value, 'include')"
+                      @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
                     >
                       <template #icon-left><EqualIcon class="tw:size-4" /></template>
                       {{ t("common.includeSearchTerm") }}
@@ -177,47 +165,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="
                         searchObj.data.stream.selectedStreamFields.some(
                           (item: any) =>
-                            item.name === props.row.field ? item.isSchemaField : '',
+                            item.name === row.field ? item.isSchemaField : '',
                         )
                       "
                       data-test="log-details-exclude-field-btn"
-                      @select="toggleExcludeSearchTerm(props.row.field, props.row.value, 'exclude')"
+                      @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
                     >
                       <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
                       {{ t("common.excludeSearchTerm") }}
                     </ODropdownItem>
                     <ODropdownItem
-                      v-if="!searchObj.data.stream.selectedFields.includes(props.row.field.toString())"
+                      v-if="!searchObj.data.stream.selectedFields.includes(row.field.toString())"
                       data-test="log-details-include-field-btn"
-                      @select="addFieldToTable(props.row.field.toString())"
+                      @select="addFieldToTable(row.field.toString())"
+                      icon-left="visibility"
                     >
-                      <template #icon-left><q-icon name="visibility" size="16px" /></template>
                       {{ t("common.addFieldToTable") }}
                     </ODropdownItem>
                     <ODropdownItem
                       v-else
                       data-test="log-details-include-field-btn"
-                      @select="addFieldToTable(props.row.field.toString())"
+                      @select="addFieldToTable(row.field.toString())"
+                      icon-left="visibility-off"
                     >
-                      <template #icon-left><q-icon name="visibility_off" size="16px" /></template>
                       {{ t("common.removeFieldFromTable") }}
                     </ODropdownItem>
                     <!-- Cross-link options -->
-                    <template v-if="getCrossLinksForField(props.row.field).length > 0">
+                    <template v-if="getCrossLinksForField(row.field).length > 0">
                       <ODropdownSeparator />
                       <ODropdownItem
-                        v-for="crossLink in getCrossLinksForField(props.row.field)"
+                        v-for="crossLink in getCrossLinksForField(row.field)"
                         :key="crossLink.name"
                         :data-test="`log-details-cross-link-${crossLink.name}`"
                         @select.stop="openCrossLink(crossLink.resolvedUrl)"
+                        icon-left="open-in-new"
                       >
-                        <template #icon-left><q-icon name="open_in_new" size="16px" /></template>
                         {{ crossLink.name }}
                       </ODropdownItem>
                     </template>
                   </ODropdown>
                   <pre
-                    :data-test="`log-detail-${props.row.field}-value`"
+                    :data-test="`log-detail-${row.field}-value`"
                     class="table-pre tw:flex-1"
                     :class="
                       !shouldWrapValues
@@ -225,21 +213,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'tw:whitespace-pre-wrap'
                     "
                   ><ChunkedContent
-                      v-if="getContentSize(props.row.value) > 50000"
-                      :data="props.row.value"
-                      :field-key="`detail_${props.row.field}`"
+                      v-if="getContentSize(row.value) > 50000"
+                      :data="row.value"
+                      :field-key="`detail_${row.field}`"
                       :query-string="highlightQuery"
                       :simple-mode="false"
                     /><LogsHighLighting
                       v-else
-                      :data="props.row.value"
+                      :data="row.value"
                       :show-braces="false"
                       :query-string="highlightQuery"
                     /></pre>
                 </div>
-              </q-td>
+              </div>
             </template>
-          </q-table>
+          </OTable>
         </q-card-section>
       </OTabPanel>
 
@@ -356,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><q-icon name="navigate_before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+          ><OIcon name="navigate-before" size="14px" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -370,12 +358,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("common.noOfRecords") }}
           </div>
           <div class="tw:min-w-[70px]">
-            <q-select
+            <OSelect
               v-model="selectedRelativeValue"
               :options="recordSizeOptions"
-              dense
               class="select-noof-records"
-            ></q-select>
+            ></OSelect>
           </div>
           <div class="">
             <OButton
@@ -393,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<q-icon name="navigate_next" size="14px" class="tw:ml-1" /></OButton>
+          >{{ t('common.next') }}<OIcon name="navigate-next" size="14px" class="tw:ml-1" /></OButton>
         </div>
       </div>
     </q-card-section>
@@ -424,11 +411,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -438,7 +428,10 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSpinner },
+    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
+    OIcon,
+    OTable,
+  },
   emits: [
     "showPrevDetail",
     "showNextDetail",
@@ -578,34 +571,33 @@ export default defineComponent({
       // (tabs persist, data persists until navigation)
     });
 
-    // Table columns for q-table
+    // Table columns
     const tableColumns = [
       {
-        name: "field",
-        label: t("search.sourceName"),
-        field: "field",
-        align: "left" as const,
-        headerClasses: "tw:text-left!",
+        id: "field",
+        header: t("search.sourceName"),
+        accessorKey: "field",
+        sortable: false,
+        meta: { align: "left" as const },
       },
       {
-        name: "value",
-        label: t("search.sourceValue"),
-        field: "value",
-        align: "left" as const,
-        headerClasses: "tw:text-left!",
+        id: "value",
+        header: t("search.sourceValue"),
+        accessorKey: "value",
+        sortable: false,
+        meta: { align: "left" as const },
       },
     ];
 
-    // Transform rowData object into array of rows for q-table
+    // Transform rowData object into array of rows
     const tableRows = computed(() => {
       return Object.entries(rowData.value).map(([field, value]) => ({
+        _rowKey: "field_" + field,
         field,
         value,
       }));
     });
 
-    // Pagination settings for q-table (show all rows)
-    const tablePagination = ref({ rowsPerPage: 0 });
     let multiStreamFields: any = ref([]);
     let hasAggregationQuery: any = computed(() => {
       let parsedSQL = fnParsedSQL();
@@ -816,7 +808,6 @@ export default defineComponent({
       statusColor,
       tableColumns,
       tableRows,
-      tablePagination,
       serviceStreamsEnabled,
       config,
       getContentSize,

@@ -27,21 +27,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <FieldList></FieldList>
       </template>
       <template #after>
-        <AppTable
-          :columns="columns"
-          :rows="rows"
-          @event-emitted="handleTableEvents"
-        />
+        <OTable
+          :data="tableRows"
+          :columns="tableColumns"
+          row-key="id"
+          pagination="none"
+          virtual-scroll
+          dense
+          data-test="rum-sessions-list-table"
+          @row-click="handleRowClick"
+        >
+          <template #cell-action_play="{ row }">
+            <OIcon
+              name="play-circle-filled"
+              size="1.5rem"
+              class="cursor-pointer tw:text-[var(--o2-icon-color)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+            />
+          </template>
+        </OTable>
       </template>
     </q-splitter>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { date } from "quasar";
-import AppTable from "./AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
@@ -68,68 +82,60 @@ interface Session {
 const { t } = useI18n();
 
 const splitterModel = ref(250);
-const columns = ref([
+const tableColumns = [
   {
-    name: "action_play",
-    field: "",
-    label: "",
-    type: "action",
-    icon: "play_circle_filled",
-    style: { width: "3.5rem" },
+    id: "action_play",
+    header: "",
+    accessorKey: "action_play",
+    sortable: false,
+    size: 56,
+    meta: { align: "center" },
   },
   {
-    name: "timestamp",
-    field: (row: any) => row["timestamp"],
-    prop: (row: any) => row["timestamp"],
-    label: t("rum.timestamp"),
-    align: "left",
+    id: "timestamp",
+    header: t("rum.timestamp"),
+    accessorKey: "timestamp",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "type",
-    field: (row: any) => row["type"],
-    prop: (row: any) => row["type"],
-    label: t("rum.sessionType"),
-    align: "left",
+    id: "type",
+    header: t("rum.sessionType"),
+    accessorKey: "type",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "time_spent",
-    field: (row: any) => formatDuration(row["time_spent"] / 1000000),
-    label: t("rum.timeSpent"),
-    align: "left",
+    id: "time_spent",
+    header: t("rum.timeSpent"),
+    accessorFn: (row: any) => formatDuration(row["time_spent"] / 1000000),
     sortable: true,
-    sort: (a: any, b: any, rowA: Session, rowB: Session) => {
-      return parseInt(rowA.time_spent) - parseInt(rowB.time_spent);
-    },
+    meta: { align: "left" },
   },
   {
-    name: "error_count",
-    field: (row: any) => row["error_count"],
-    prop: (row: any) => row["error_count"],
-    label: t("rum.errorCount"),
-    align: "left",
+    id: "error_count",
+    header: t("rum.errorCount"),
+    accessorKey: "error_count",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "initial_view_name",
-    field: (row: any) => row["initial_view_name"],
-    prop: (row: any) => row["initial_view_name"],
-    label: t("rum.initialViewName"),
-    align: "left",
+    id: "initial_view_name",
+    header: t("rum.initialViewName"),
+    accessorKey: "initial_view_name",
     sortable: true,
+    meta: { align: "left" },
   },
-]);
+];
 
 const rows = ref<Session[]>([]);
+
+const tableRows = computed(() => rows.value);
+
 const router = useRouter();
 
-const handleTableEvents = (event: string, payload: any) => {
-  const eventMapping: { [key: string]: (payload: any) => void } = {
-    "cell-click": handleCellClick,
-  };
-
-  eventMapping[event](payload);
+const handleRowClick = (row: any) => {
+  handleCellClick({ row });
 };
 
 const handleCellClick = (payload: any) => {

@@ -7,19 +7,14 @@
   >
     <div class="q-pa-md filter-container">
       <q-card-section class="q-pa-none">
-        <q-select
+        <OSelect
           v-model="selectedOperator"
           :options="operators"
           :label="t('filter.operator')"
-          :popup-content-style="{ textTransform: 'capitalize' }"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          :rules="[(val: any) => !!val || 'Field is required!']"
+          class="q-py-sm"
+          :error="!!selectedOperatorError"
+          :error-message="selectedOperatorError"
+          @update:model-value="selectedOperatorError = ''"
         />
       </q-card-section>
       <q-card-section class="q-pa-none">
@@ -30,11 +25,9 @@
             <q-list dense>
               <q-item tag="label">
                 <q-item-section avatar>
-                  <q-checkbox
-                    size="xs"
-                    dense
+                  <OCheckbox
                     v-model="selectedValues"
-                    :val="value"
+                    :value="value"
                   />
                 </q-item-section>
                 <q-item-section>
@@ -55,9 +48,11 @@ import { defineComponent, onBeforeMount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 export default defineComponent({
   name: "FilterCreatorPopup",
-  components: { ODialog },
+  components: { ODialog, OSelect, OCheckbox },
   props: [
     "fieldName",
     "fieldValues",
@@ -69,6 +64,7 @@ export default defineComponent({
     const show = ref(true);
     const selectedValues = ref(props.defaultValues);
     const selectedOperator = ref(props.defaultOperator);
+    const selectedOperatorError = ref("");
     const { t } = useI18n();
 
     onBeforeMount(() => {});
@@ -79,6 +75,10 @@ export default defineComponent({
       selectedOperator: string;
     }
     const applyFilter = () => {
+      if (!selectedOperator.value) {
+        selectedOperatorError.value = "Field is required!";
+        return;
+      }
       emit("apply", {
         fieldName: props.fieldName,
         selectedValues: selectedValues.value,
@@ -90,6 +90,7 @@ export default defineComponent({
       show,
       selectedValues,
       selectedOperator,
+      selectedOperatorError,
       applyFilter,
     };
   },

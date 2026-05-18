@@ -179,7 +179,7 @@ const createWrapper = (props = {}, options = {}) => {
           emits: ['click'],
         },
         QIcon: {
-          template: '<i data-test-stub="q-icon"></i>',
+          template: '<i data-test-stub="OIcon"></i>',
         },
         QTooltip: {
           template: '<div data-test-stub="q-tooltip"><slot></slot></div>',

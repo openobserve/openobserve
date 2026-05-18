@@ -131,7 +131,7 @@ describe("DashboardSankeyChartBuilder", () => {
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
           DynamicFunctionPopUp: true,
-          "q-icon": true,
+          "OIcon": true,
           "q-tooltip": true,
           "q-btn-group": true,
           "q-btn": true,

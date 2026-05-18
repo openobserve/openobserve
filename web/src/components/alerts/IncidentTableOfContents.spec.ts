@@ -474,7 +474,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      // OButton renders q-icon as a Quasar icon span inside the button
+      // OButton renders OIcon as a Quasar icon span inside the button
       // When collapsed, expandedSections[item.id] is falsy → chevron_right
       expect(button.html()).toContain("chevron_right");
     });
@@ -484,7 +484,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      // OButton renders q-icon as a Quasar icon span inside the button
+      // OButton renders OIcon as a Quasar icon span inside the button
       // When expanded, expandedSections[item.id] is truthy → expand_more
       expect(button.html()).toContain("expand_more");
     });

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-    <q-form @submit="onSubmit" id="edit-backfill-form" class="tw:mx-5 tw:my-3">
+    <div id="edit-backfill-form" class="tw:mx-5 tw:my-3">
           <!-- Time Range Section -->
           <div>
             <div class="text-subtitle2 q-mb-sm">
@@ -62,19 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Size of each processing chunk in minutes. Default: 60
-                    </q-tooltip>
-                  </q-icon>
+                  <OIcon name="info-outline" size="sm">
+                    <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
+                  </OIcon>
                 </div>
-                <q-input
-                  v-model.number="formData.chunkPeriodMinutes"
+                <OInput
+                  v-model="formData.chunkPeriodMinutes"
                   type="number"
-                  outlined
-                  dense
                   placeholder="60"
-                  :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
+                  :error="!!chunkPeriodError"
+                  :error-message="chunkPeriodError"
+                  @update:model-value="chunkPeriodError = ''"
                   data-test="chunk-period-input"
                 />
               </div>
@@ -83,26 +81,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <div class="text-caption q-mb-xs">
                   Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Delay between processing chunks in seconds. Default: 5
-                    </q-tooltip>
-                  </q-icon>
+                  <OIcon name="info-outline" size="sm">
+                    <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
+                  </OIcon>
                 </div>
-                <q-input
-                  v-model.number="formData.delayBetweenChunks"
+                <OInput
+                  v-model="formData.delayBetweenChunks"
                   type="number"
-                  outlined
-                  dense
                   placeholder="5"
-                  :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
+                  :error="!!delayBetweenError"
+                  :error-message="delayBetweenError"
+                  @update:model-value="delayBetweenError = ''"
                   data-test="delay-between-chunks-input"
                 />
               </div>
 
               <!-- Delete Before Backfill -->
               <div>
-                <q-checkbox
+                <OCheckbox
                   v-model="formData.deleteBeforeBackfill"
                   label="Delete existing data before backfill"
                   data-test="delete-before-backfill-checkbox"
@@ -112,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
                 >
                   <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
+                    <OIcon name="warning" size="sm" class="q-mr-sm tw-mt-0.5" />
                     <div class="text-caption text-orange-800">
                       <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
                       <div class="tw-mb-2">
@@ -133,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error Message -->
       <div v-if="errorMessage" class="text-negative">
-        <q-icon name="error" class="q-mr-sm" />
+        <OIcon name="error" size="sm" class="q-mr-sm" />
         {{ errorMessage }}
       </div>
-    </q-form>
+    </div>
   </ODrawer>
 </template>
 
@@ -145,9 +141,12 @@ import { ref, computed, watch, nextTick } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { X } from "lucide-vue-next";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   modelValue: boolean;
@@ -173,6 +172,8 @@ const show = computed({
 const showAdvanced = ref(false);
 const loading = ref(false);
 const errorMessage = ref("");
+const chunkPeriodError = ref("");
+const delayBetweenError = ref("");
 const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 
 const formData = ref({
@@ -236,6 +237,22 @@ const onCancel = () => {
 
 const onSubmit = async () => {
   errorMessage.value = "";
+  chunkPeriodError.value = "";
+  delayBetweenError.value = "";
+
+  // Validate optional numeric range fields
+  let hasError = false;
+  if (formData.value.chunkPeriodMinutes !== null && formData.value.chunkPeriodMinutes !== undefined &&
+    (formData.value.chunkPeriodMinutes < 1 || formData.value.chunkPeriodMinutes > 1440)) {
+    chunkPeriodError.value = "Must be between 1 and 1440";
+    hasError = true;
+  }
+  if (formData.value.delayBetweenChunks !== null && formData.value.delayBetweenChunks !== undefined &&
+    (formData.value.delayBetweenChunks < 1 || formData.value.delayBetweenChunks > 3600)) {
+    delayBetweenError.value = "Must be between 1 and 3600";
+    hasError = true;
+  }
+  if (hasError) return;
 
   if (!props.job) {
     errorMessage.value = "No job selected";

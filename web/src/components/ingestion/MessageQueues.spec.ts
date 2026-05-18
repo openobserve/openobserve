@@ -111,7 +111,7 @@ describe("MessageQueues.vue", () => {
           "q-input": true,
           "q-tabs": true,
           "q-route-tab": true,
-          "q-icon": true,
+          "OIcon": true,
           "router-view": true,
         },
       },

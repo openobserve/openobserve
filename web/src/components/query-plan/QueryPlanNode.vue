@@ -53,11 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Metrics (for ANALYZE mode) -->
       <span v-if="isAnalyze && hasMetrics" class="metrics-inline">
         <span v-if="node.metrics.output_rows !== undefined" class="metric-badge">
-          <q-icon name="format_list_numbered" size="12px" />
+          <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
         </span>
         <span v-if="node.metrics.elapsed_compute" class="metric-badge">
-          <q-icon name="schedule" size="12px" />
+          <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
         </span>
       </span>
@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType, ref, computed } from "vue";
 import { OperatorNode } from "@/utils/queryPlanParser";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "QueryPlanNode",
