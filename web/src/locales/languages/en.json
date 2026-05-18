@@ -3325,7 +3325,9 @@
         "cost": "Cost",
         "spans": "Spans",
         "llmCalls": "LLM calls",
-        "toolCalls": "Tool calls"
+        "toolCalls": "Tool calls",
+        "otherCalls": "Other",
+        "otherCallsTooltip": "gen_ai spans with unrecognised operation names:"
       },
       "fullscreen": {
         "expandTurn": "View turn in full screen",

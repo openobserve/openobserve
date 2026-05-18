@@ -70,6 +70,10 @@ export interface TurnDetail {
   llmCalls: number;
   /** Number of tool execution spans (execute_tool). */
   toolCalls: number;
+  /** gen_ai spans with an unrecognised operation name — neither LLM nor execute_tool. */
+  otherCalls: number;
+  /** Distinct operation names that make up otherCalls — used in the tooltip. */
+  otherOps: string[];
 }
 
 /**
@@ -426,12 +430,15 @@ export function useSessions() {
     endTime: number,
   ): Promise<TurnDetail> {
     if (!streamName || !traceId || !startTime || !endTime) {
-      return { traceId, userMessage: null, assistantMessage: null, model: null, llmCalls: 0, toolCalls: 0 };
+      return { traceId, userMessage: null, assistantMessage: null, model: null, llmCalls: 0, toolCalls: 0, otherCalls: 0, otherOps: [] };
     }
     const safeId = traceId.replace(/'/g, "''");
 
-    // Pull only the spans likely to carry messages. Sort by start_time
-    // so the first hit is the earliest turn.
+    // Fetch all gen_ai spans for this trace in one query. The
+    // gen_ai_input_messages IS NOT NULL filter was previously applied here
+    // but that meant a second parallel COUNT query was needed for LLM/tool
+    // call badge counts. Removing the filter lets us compute the counts
+    // client-side from the same result set, halving the number of API calls.
     const sql = `
       SELECT
         gen_ai_input_messages,
@@ -443,37 +450,25 @@ export function useSessions() {
       FROM "${streamName}"
       WHERE trace_id = '${safeId}'
         AND gen_ai_operation_name IS NOT NULL
-        AND gen_ai_input_messages IS NOT NULL
       ORDER BY start_time ASC
       LIMIT 50
     `;
 
-    // Count LLM calls vs tool calls in parallel with the message fetch.
-    const countSql = `
-      SELECT
-        gen_ai_operation_name,
-        count(*) AS cnt
-      FROM "${streamName}"
-      WHERE trace_id = '${safeId}'
-        AND gen_ai_operation_name IS NOT NULL
-      GROUP BY gen_ai_operation_name
-    `;
-
     const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
 
-    const [hits, countHits] = await Promise.all([
-      executeQuery(sql, startTime, endTime),
-      executeQuery(countSql, startTime, endTime),
-    ]);
+    const hits = await executeQuery(sql, startTime, endTime);
 
     let llmCalls = 0;
     let toolCalls = 0;
-    for (const row of countHits || []) {
+    let otherCalls = 0;
+    const otherOpsSet = new Set<string>();
+    for (const row of hits || []) {
       const op = String(row.gen_ai_operation_name || "").toLowerCase();
-      const n = Number(row.cnt) || 0;
-      if (LLM_OPS.has(op)) llmCalls += n;
-      else if (op === "execute_tool") toolCalls += n;
+      if (LLM_OPS.has(op)) llmCalls += 1;
+      else if (op === "execute_tool") toolCalls += 1;
+      else { otherCalls += 1; otherOpsSet.add(op); }
     }
+    const otherOps = [...otherOpsSet].sort();
     // Lazy-import the message parser so this composable stays light
     // when only the list view is in use.
     const { messagesFromInput, messagesFromOutput, getModel } = await import(
@@ -531,7 +526,7 @@ export function useSessions() {
       }
     }
 
-    return { traceId, userMessage, assistantMessage, model, llmCalls, toolCalls };
+    return { traceId, userMessage, assistantMessage, model, llmCalls, toolCalls, otherCalls, otherOps };
   }
 
   /**

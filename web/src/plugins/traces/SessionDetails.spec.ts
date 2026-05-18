@@ -495,6 +495,225 @@ describe("SessionDetails — turn expand/collapse", () => {
   });
 });
 
+describe("SessionDetails — spans section (LLM / tool / other counts)", () => {
+  async function expandTurn(wrapper: any) {
+    const header = wrapper.find(".turn-header");
+    await header.trigger("click");
+    await flushPromises();
+  }
+
+  it("shows LLM calls row when llmCalls > 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 3,
+      toolCalls: 0,
+      otherCalls: 0,
+      otherOps: [],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    expect(wrapper.text()).toContain("traces.sessionDetail.stats.llmCalls");
+    expect(wrapper.text()).toContain("3");
+  });
+
+  it("hides LLM calls row when llmCalls is 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: null,
+      assistantMessage: null,
+      model: null,
+      llmCalls: 0,
+      toolCalls: 0,
+      otherCalls: 0,
+      otherOps: [],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    expect(wrapper.text()).not.toContain("traces.sessionDetail.stats.llmCalls");
+  });
+
+  it("shows tool calls row when toolCalls > 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 1,
+      toolCalls: 5,
+      otherCalls: 0,
+      otherOps: [],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    expect(wrapper.text()).toContain("traces.sessionDetail.stats.toolCalls");
+    expect(wrapper.text()).toContain("5");
+  });
+
+  it("hides tool calls row when toolCalls is 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: null,
+      assistantMessage: null,
+      model: null,
+      llmCalls: 0,
+      toolCalls: 0,
+      otherCalls: 0,
+      otherOps: [],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    expect(wrapper.text()).not.toContain("traces.sessionDetail.stats.toolCalls");
+  });
+
+  it("shows Other row when otherCalls > 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 2,
+      toolCalls: 1,
+      otherCalls: 4,
+      otherOps: ["agent", "pipeline"],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    expect(wrapper.text()).toContain("traces.sessionDetail.stats.otherCalls");
+    expect(wrapper.text()).toContain("4");
+  });
+
+  it("hides Other row when otherCalls is 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 2,
+      toolCalls: 1,
+      otherCalls: 0,
+      otherOps: [],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    expect(wrapper.text()).not.toContain("traces.sessionDetail.stats.otherCalls");
+  });
+
+  it("info icon is present on Other row when otherCalls > 0", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 1,
+      toolCalls: 0,
+      otherCalls: 3,
+      otherOps: ["agent"],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    const infoIcons = wrapper
+      .findAll(".q-icon-stub")
+      .filter((el: any) => el.attributes("data-name") === "info");
+    expect(infoIcons.length).toBeGreaterThan(0);
+  });
+
+  it("tooltip text includes operation names from otherOps", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 1,
+      toolCalls: 0,
+      otherCalls: 2,
+      otherOps: ["agent", "pipeline"],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    // QTooltip stub renders its slot content into the DOM
+    expect(wrapper.text()).toContain("agent, pipeline");
+  });
+
+  it("Total equals llmCalls + toolCalls + otherCalls", async () => {
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 11,
+      toolCalls: 6,
+      otherCalls: 5,
+      otherOps: ["agent"],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    // The spans stat-section is the one containing the "spans" label.
+    // Multiple stat-row--total elements exist (tokens has one too), so
+    // find the stat-section whose label key is "stats.spans" and check
+    // its total row.
+    const statSections = wrapper.findAll(".stat-section");
+    const spansSection = statSections.find((s: any) =>
+      s.text().includes("traces.sessionDetail.stats.spans"),
+    );
+    expect(spansSection).toBeTruthy();
+    // 11 + 6 + 5 = 22
+    const totalRow = spansSection!.find(".stat-row--total");
+    expect(totalRow.text()).toContain("22");
+  });
+
+  it("Total does not equal raw spanCount when there are non-gen_ai spans", async () => {
+    // spanCount=69 (all trace spans) but llm+tool=40 gen_ai spans only —
+    // verify the Spans Total shows 40, not 69.
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail(),
+      traces: [makeTrace({ traceId: "trace-xyz", spanCount: 69 })],
+    });
+    mockFetchTurnDetail.mockResolvedValue({
+      traceId: "trace-xyz",
+      userMessage: { role: "user", content: "Hi" },
+      assistantMessage: { role: "assistant", content: "Hello" },
+      model: "gpt-4",
+      llmCalls: 19,
+      toolCalls: 21,
+      otherCalls: 0,
+      otherOps: [],
+    });
+
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+
+    const statSections = wrapper.findAll(".stat-section");
+    const spansSection = statSections.find((s: any) =>
+      s.text().includes("traces.sessionDetail.stats.spans"),
+    );
+    expect(spansSection).toBeTruthy();
+    const totalRow = spansSection!.find(".stat-row--total");
+    expect(totalRow.text()).toContain("40");
+    expect(totalRow.text()).not.toContain("69");
+  });
+});
+
 describe("SessionDetails — navigation", () => {
   it("'open in trace explorer' button triggers router navigation", async () => {
     const wrapper = await mountComponent();

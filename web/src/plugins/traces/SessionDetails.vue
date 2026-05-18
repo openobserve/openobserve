@@ -452,9 +452,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span>{{ t('traces.sessionDetail.stats.toolCalls') }}</span>
                       <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.toolCalls }}</span>
                     </div>
+                    <div v-if="turnDetail(trace.traceId)?.otherCalls" class="stat-row">
+                      <span class="tw:flex tw:items-center tw:gap-[0.25rem]">
+                        {{ t('traces.sessionDetail.stats.otherCalls') }}
+                        <q-icon name="info" size="11px" class="tw:text-[var(--o2-text-muted)] tw:cursor-default">
+                          <q-tooltip max-width="220px">
+                            {{ t('traces.sessionDetail.stats.otherCallsTooltip') }}<br />
+                            <span class="tw:font-mono tw:text-[0.7rem]">{{ turnDetail(trace.traceId)!.otherOps.join(', ') }}</span>
+                          </q-tooltip>
+                        </q-icon>
+                      </span>
+                      <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.otherCalls }}</span>
+                    </div>
                     <div class="stat-row stat-row--total">
                       <span>{{ t('traces.sessionDetail.stats.total') }}</span>
-                      <span class="tw:tabular-nums">{{ trace.spanCount }}</span>
+                      <span class="tw:tabular-nums">{{
+                        (turnDetail(trace.traceId)?.llmCalls ?? 0) +
+                        (turnDetail(trace.traceId)?.toolCalls ?? 0) +
+                        (turnDetail(trace.traceId)?.otherCalls ?? 0)
+                      }}</span>
                     </div>
                   </div>
                 </div>
@@ -729,6 +745,10 @@ async function toggleTurn(traceId: string) {
       userMessage: null,
       assistantMessage: null,
       model: null,
+      llmCalls: 0,
+      toolCalls: 0,
+      otherCalls: 0,
+      otherOps: [],
     };
   } finally {
     turnDetailLoading[traceId] = false;
