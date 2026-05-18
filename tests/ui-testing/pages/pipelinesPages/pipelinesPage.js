@@ -2260,12 +2260,8 @@ export class PipelinesPage {
     async selectStreamName(streamName) {
         testLogger.info(`Selecting stream: ${streamName}`);
         await this.streamNameLabel.click();
-        // Clear any pre-existing value so the autocomplete dropdown opens fresh
-        await this.streamNameLabel.fill('');
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.streamNameLabel.fill(streamName);
-        // Use a substring match instead of exact since option labels may include
-        // additional info (size, type) after the stream name
         await this.page.getByRole("option", { name: streamName }).first().waitFor({ state: 'visible', timeout: 5000 });
         await this.page.getByRole("option", { name: streamName }).first().click();
         testLogger.info(`Stream '${streamName}' selected`);
@@ -2340,14 +2336,8 @@ export class PipelinesPage {
     async searchPipelineFieldList(searchText) {
         const searchInput = this.pipelineFieldSearchInput;
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        // Close any overlaying Quasar portal menu (e.g. #q-portal--menu--3)
-        // that would intercept the click on the search input
-        const portalMenu = this.page.locator('.q-menu');
-        if (await portalMenu.isVisible().catch(() => false)) {
-            await this.page.keyboard.press('Escape');
-            await portalMenu.waitFor({ state: 'hidden', timeout: 3000 });
-        }
-        await searchInput.click();
+        // Force click to bypass any overlaying Quasar portal menu
+        await searchInput.click({ force: true });
         await searchInput.fill(searchText);
         testLogger.info(`Field list searched for: "${searchText}"`);
     }
