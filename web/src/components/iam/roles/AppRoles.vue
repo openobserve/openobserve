@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <RoleTable
       data-test="iam-roles-table-section"
       :data="rows"
+      :global-filter="filterQuery"
       :selected-ids="selectedRoleNames"
       @update:selected-ids="onSelectionChange"
       @edit="editRole"
@@ -102,6 +103,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const { t } = useI18n();
 
 const { track } = useReo();
+
+const filterQuery = ref("");
 
 const showAddGroup = ref(false);
 

@@ -13,6 +13,7 @@ defineProps<{
   data: any[];
   loading?: boolean;
   selectedIds?: string[];
+  globalFilter?: string;
 }>();
 
 const emit = defineEmits<{
@@ -58,6 +59,7 @@ const columns: OTableColumnDef[] = [
     :columns="columns"
     :loading="loading"
     :selected-ids="selectedIds"
+    :global-filter="globalFilter"
     pagination="client"
     :page-size="20"
     sorting="client"
@@ -65,6 +67,7 @@ const columns: OTableColumnDef[] = [
     row-key="role_name"
     filter-mode="client"
     :default-columns="false"
+    :show-global-filter="false"
     @update:selected-ids="emit('update:selectedIds', $event)"
   >
     <!-- Row actions: edit + delete -->
