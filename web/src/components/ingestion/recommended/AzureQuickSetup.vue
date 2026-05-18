@@ -190,7 +190,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AzureQuickSetup",
-  components: { OButton,
+  components: { OSeparator, OButton,
     OIcon,
 },
   setup() {

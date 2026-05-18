@@ -736,6 +736,7 @@ export default defineComponent({
     PromQLBuilderOptions,
     OIcon,
     OTooltip,
+    OSeparator,
   },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],

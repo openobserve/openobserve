@@ -854,7 +854,7 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
     OIcon,
 },
 });

@@ -47,7 +47,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "DashboardHeader",
-  components: { OButton },
+  components: { OSeparator, OButton },
   props: {
     title: {
       type: String,

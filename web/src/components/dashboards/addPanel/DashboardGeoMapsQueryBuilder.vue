@@ -400,6 +400,7 @@ import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
+    OSeparator,
     OButtonGroup,
     OButton,
     DashboardFiltersOption,

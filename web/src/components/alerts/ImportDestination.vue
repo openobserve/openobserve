@@ -921,6 +921,7 @@ export default defineComponent({
     };
   },
   components: {
+    OSeparator,
     BaseImport,
     OInput,
     OSelect,

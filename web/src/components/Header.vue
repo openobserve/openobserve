@@ -475,6 +475,7 @@ import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    OSeparator,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OButton,

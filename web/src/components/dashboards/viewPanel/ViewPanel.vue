@@ -239,6 +239,7 @@ const PanelErrorButtons = defineAsyncComponent(() => {
 export default defineComponent({
   name: "ViewPanel",
   components: {
+    OSeparator,
     DateTimePickerDashboard,
     DashboardErrorsComponent,
     VariablesValueSelector,

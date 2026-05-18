@@ -103,7 +103,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { OTabs, OTab, OTabPanels, OTabPanel, OButton },
+  components: { OSeparator, OTabs, OTab, OTabPanels, OTabPanel, OButton },
   props: {
     modelValue: {
       type: Object,

@@ -1487,6 +1487,7 @@ function renderMarkdown(content: any) {
 export default defineComponent({
   name: "O2AIChat",
   components: {
+    OSeparator,
     OButton,
     ConfirmDialog,
     RichTextInput,

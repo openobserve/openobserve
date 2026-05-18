@@ -236,7 +236,7 @@ export default defineComponent({
       default: "",
     },
   },
-  components: { OButton, OTooltip, OIcon },
+  components: { OSeparator, OButton, OTooltip, OIcon },
   setup() {
     const { t } = useI18n();
     const store = useStore();

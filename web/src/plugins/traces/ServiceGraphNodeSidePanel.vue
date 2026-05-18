@@ -715,6 +715,7 @@ const envLabel = (envKey: string): string =>
 export default defineComponent({
   name: "ServiceGraphNodeSidePanel",
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,

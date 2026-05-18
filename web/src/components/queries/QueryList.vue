@@ -50,7 +50,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "QueryList",
-  components: { OButton, OTable },
+  components: { OSeparator, OButton, OTable },
   emits: ["save", "close"],
   props: {
     schemaData: Object,

@@ -88,7 +88,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSelect, OCheckbox },
+  components: { OSeparator, OSelect, OCheckbox },
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {

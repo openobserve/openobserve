@@ -51,7 +51,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
-  components: { OButton,
+  components: { OSeparator, OButton,
     OIcon,
 },
   props: {

@@ -243,7 +243,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "AddEnrichmentTable",
-  components: { OButton, OInput, OFile, OOptionGroup, OSwitch,
+  components: { OSeparator, OButton, OInput, OFile, OOptionGroup, OSwitch,
     OIcon,
 },
   props: {

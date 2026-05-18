@@ -211,6 +211,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "QueryPlanDialog",
   components: {
+    OSeparator,
     OTabs,
     OTab,
     OTabPanels,

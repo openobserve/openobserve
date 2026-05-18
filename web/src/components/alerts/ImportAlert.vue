@@ -323,6 +323,7 @@ import {
 export default defineComponent({
   name: "ImportAlert",
   components: {
+    OSeparator,
     BaseImport,
     SelectFolderDropDown,
     OInput,
