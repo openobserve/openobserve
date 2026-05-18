@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
                 icon-left="edit"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-circle-sm"
                 :title="t('common.edit')"
                 @click="goToEdit(row)"
               />
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`eval-template-list-${row.name}-delete-btn`"
                 icon-left="delete"
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-circle-sm"
                 :title="t('common.delete')"
                 @click="confirmDelete(row)"
               />

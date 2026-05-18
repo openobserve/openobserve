@@ -133,9 +133,8 @@ function handleClick() {
   <td
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
-      meta?.compactPadding ? 'tw:px-1 tw:py-0.5 tw:align-middle' : 'tw:px-2 tw:py-1 tw:align-middle',
+      meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle',
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
-      dense ? 'tw:py-0.5' : '',
       alignClass,
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
       isPinned && !isAction ? 'tw:bg-[var(--color-table-cell-bg)]' : '',

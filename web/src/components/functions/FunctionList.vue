@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-actions="{ row }">
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-circle-sm"
                   :title="t('function.updateTitle')"
                   data-test="function-list-edit-function-btn"
                   @click="showAddUpdateFn({ row })"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost-destructive"
-                  size="icon-sm"
+                  size="icon-circle-sm"
                   :title="t('function.delete')"
                   data-test="function-list-delete-function-btn"
                   @click="showDeleteDialogFn({ row })"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-circle-sm"
                   :title="'Associated Pipelines'"
                   @click="getAssociatedPipelines({ row })"
                 >

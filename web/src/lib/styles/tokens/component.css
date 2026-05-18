@@ -511,6 +511,9 @@
   --color-table-sort-icon-inactive: var(--color-text-disabled);
   --color-table-streaming-bar: var(--color-primary-500);
   --color-table-row-expanded-bg: var(--color-surface-subtle);
+  /* Row height tokens — change these to resize all OTable rows globally */
+  --table-row-height-dense: 2.25rem;   /* 36px */
+  --table-row-height-normal: 2.75rem;  /* 44px */
 }
 
 

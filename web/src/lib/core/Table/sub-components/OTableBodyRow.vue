@@ -99,7 +99,7 @@ function onDblclick(event: MouseEvent) {
         : '',
       rowClass,
     ]"
-    :style="rowStyle"
+    :style="{ height: 'var(--o2-table-row-height, 2.25rem)', ...rowStyle }"
     @click="onClick"
     @dblclick="onDblclick"
   >
