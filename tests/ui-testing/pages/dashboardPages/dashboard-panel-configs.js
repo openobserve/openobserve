@@ -360,8 +360,8 @@ export default class DashboardPanelConfigs {
     } else {
       // Pick first available column when column name is unknown — OSelect
       // (Reka Listbox) post-migration, q-select pre-migration.
-      await this.page.locator('[role="listbox"]:visible [role="option"], .q-menu [role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-      await this.page.locator('[role="listbox"]:visible [role="option"], .q-menu [role="option"]').first().click();
+      await this.page.locator('.q-menu [role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
+      await this.page.locator('.q-menu [role="option"]').first().click();
     }
 
     const unitSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0"]');

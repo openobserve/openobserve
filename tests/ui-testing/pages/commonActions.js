@@ -51,7 +51,7 @@ export class CommonActions {
     async scrollAndFindOption(optionName, optionType) {
         // Target the visible dropdown — OSelect (Reka Listbox) post-migration,
         // q-select (.q-menu) pre-migration.
-        const dropdown = this.page.locator('[role="listbox"]:visible, .q-menu:visible').first();
+        const dropdown = this.page.locator('.q-menu:visible').first();
         let optionFound = false;
         let maxScrolls = 50;
         let scrollAmount = 1000;

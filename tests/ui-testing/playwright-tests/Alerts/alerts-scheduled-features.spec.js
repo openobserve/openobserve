@@ -535,7 +535,7 @@ test.describe("Scheduled Alert Features", () => {
                 await thresholdOperator.click();
                 await page.waitForTimeout(500);
                 await page
-                    .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+                    .locator('.q-menu:visible .q-item')
                     .filter({ hasText: /^>=$/ })
                     .first()
                     .click();
@@ -671,7 +671,7 @@ test.describe("Scheduled Alert Features", () => {
         await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
         await groupBySelect.click();
         await page.waitForTimeout(500);
-        const groupByOption = page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item').first();
+        const groupByOption = page.locator('.q-menu:visible .q-item').first();
         await expect(groupByOption).toBeVisible({ timeout: 5000 });
         await groupByOption.click();
         await page.waitForTimeout(500);

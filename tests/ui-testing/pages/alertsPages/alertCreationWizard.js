@@ -118,8 +118,8 @@ export class AlertCreationWizard {
         let columnFound = false;
         // Condition column dropdown is OSelect (Reka Listbox) post-migration;
         // q-select (.q-menu .q-item) pre-migration.
-        const visibleMenu = this.page.locator('[role="listbox"]:visible, .q-menu:visible').first();
-        const menuItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        const visibleMenu = this.page.locator('.q-menu:visible').first();
+        const menuItems = this.page.locator('.q-menu:visible .q-item');
         await expect(menuItems.first()).toBeVisible({ timeout: 5000 });
 
         const columnItems = await menuItems.allTextContents();
@@ -162,7 +162,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(1000);
 
         // Destination dropdown is OSelect (Reka Listbox) post-migration; q-select pre.
-        const destMenuItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        const destMenuItems = this.page.locator('.q-menu:visible .q-item');
         await expect(destMenuItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFound = false;
@@ -237,7 +237,7 @@ export class AlertCreationWizard {
         const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first().locator('.q-select');
         await columnSelect.click();
         await this.page.waitForTimeout(500);
-        const visibleMenuDefaultsItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        const visibleMenuDefaultsItems = this.page.locator('.q-menu:visible .q-item');
         await expect(visibleMenuDefaultsItems.first()).toBeVisible({ timeout: 5000 });
         await visibleMenuDefaultsItems.first().click();
         await this.page.waitForTimeout(500);
@@ -267,7 +267,7 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuDefItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        const visibleDestMenuDefItems = this.page.locator('.q-menu:visible .q-item');
         await expect(visibleDestMenuDefItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFoundDef = false;
@@ -411,13 +411,13 @@ export class AlertCreationWizard {
         await this.page.keyboard.press('Enter');
         await this.page.waitForTimeout(1000);
         // Find the ">=" option in the visible dropdown.
-        const dropdownOption = this.page.locator('.q-menu:visible, [role="listbox"]:visible')
+        const dropdownOption = this.page.locator('.q-menu:visible')
             .getByText('>=', { exact: true }).first();
         try {
             await dropdownOption.click({ timeout: 5000 });
         } catch {
             testLogger.warn('q-menu/listbox text not found, trying broader selector');
-            await this.page.locator('[role="listbox"]:visible, .q-menu:visible, .o-select-dropdown:visible')
+            await this.page.locator('.q-menu:visible, .o-select-dropdown:visible')
                 .locator('text=">="').first()
                 .click({ timeout: 3000 });
         }
@@ -750,7 +750,7 @@ export class AlertCreationWizard {
             await thresholdOperator.click({ force: true });
         });
         // Wait for the dropdown menu to actually appear before selecting an option
-        await this.page.locator('[role="listbox"]:visible, .q-menu:visible').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await this.page.locator('.q-menu:visible').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         // Use role-based option selection (bypasses q-portal visibility issues)
         // Use a flag to track success so the fallback error isn't silently swallowed
         let operatorSelected = false;

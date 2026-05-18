@@ -988,7 +988,7 @@ export class PipelinesPage {
         // Click delete option in the menu — PipelinesList row context menu is now
         // an ODropdown ([role="menuitem"]); fall back to legacy .q-menu .q-item.
         await this.page
-            .locator('[role="menu"][data-state="open"] [role="menuitem"], .q-menu .q-item')
+            .locator('[role="menu"][data-state="open"] .q-menu .q-item')
             .filter({ hasText: 'Delete' })
             .first()
             .click();
@@ -1137,7 +1137,7 @@ export class PipelinesPage {
         // Click delete option in the menu — PipelinesList row context menu is now
         // an ODropdown ([role="menuitem"]); fall back to legacy .q-menu .q-item.
         await this.page
-            .locator('[role="menu"][data-state="open"] [role="menuitem"], .q-menu .q-item')
+            .locator('[role="menu"][data-state="open"] .q-menu .q-item')
             .filter({ hasText: 'Delete' })
             .first()
             .click();
@@ -2886,7 +2886,7 @@ export class PipelinesPage {
             await pipelineFilter.click();
             await this.page.waitForTimeout(500);
             // Select first available option
-            const option = this.page.locator('.q-item, [role="option"]').first();
+            const option = this.page.locator('.q-item').first();
             if (await option.isVisible().catch(() => false)) {
                 await option.click();
             }
@@ -2966,7 +2966,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [role="dialog"], [data-test*="error-dialog"]').first();
+        const dialog = this.page.locator('.q-dialog, [data-test*="error-dialog"]').first();
         return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3089,7 +3089,7 @@ export class PipelinesPage {
      * Select first option in dropdown
      */
     async selectFirstOption() {
-        const option = this.page.locator('.q-item, [role="option"], .q-menu .q-item').first();
+        const option = this.page.locator('.q-item, .q-menu .q-item').first();
         if (await option.isVisible().catch(() => false)) {
             await option.click();
             await this.page.waitForTimeout(300);

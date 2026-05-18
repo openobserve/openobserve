@@ -712,7 +712,7 @@ export class LogsPage {
 
                 // Stream picker is OSelect (Reka Listbox) post-migration; legacy
                 // q-select uses .q-menu.scroll / .q-virtual-scroll__content.
-                const dropdownMenu = this.page.locator('[role="listbox"]:visible, .q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
+                const dropdownMenu = this.page.locator('.q-menu.scroll, .q-menu .scroll, .q-virtual-scroll__content').first();
 
                 // Try to click the stream toggle div directly first
                 const streamToggleSelector = `[data-test="log-search-index-list-stream-toggle-${stream}"]`;
@@ -1544,7 +1544,7 @@ export class LogsPage {
         // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page.waitForTimeout(500);
         const option10 = this.page
-            .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+            .locator('.q-menu .q-item')
             .filter({ hasText: /^10$/ })
             .first();
         await option10.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});

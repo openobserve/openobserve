@@ -340,7 +340,7 @@ export class HomePage {
         // Match either ODropdown menuitem or Quasar q-item with the Language text
         // and the selected-lang-label child.
         return this.page
-            .locator('[role="menuitem"], .q-item')
+            .locator('.q-item')
             .filter({ hasText: 'Language' })
             .filter({ has: this.page.locator('.selected-lang-label') })
             .first();

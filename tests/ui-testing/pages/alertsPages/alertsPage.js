@@ -103,7 +103,7 @@ export class AlertsPage {
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
             advancedTabBtn: 'button:has-text("Advanced")',
-            visibleDropdownMenu: '[role="listbox"]:visible, [role="menu"]:visible',
+            visibleDropdownMenu: '[role="menu"]:visible',
 
             // Query Editor Dialog selectors
             // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
@@ -2306,7 +2306,7 @@ export class AlertsPage {
         const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
-        const anyStreamOption = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu .q-item').first();
+        const anyStreamOption = this.page.locator('.q-menu .q-item').first();
         if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await anyStreamOption.click();
             testLogger.info('Using first available metrics stream (fallback)');
@@ -2341,7 +2341,7 @@ export class AlertsPage {
                 return true;
             } else {
                 // Use first available logs stream from dropdown (OSelect post-migration)
-                const anyStreamOption = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu .q-item').first();
+                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
                 if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await anyStreamOption.click();
                     testLogger.info('Using first available logs stream');
@@ -3178,7 +3178,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
-        return this.page.locator('.q-menu .q-item, [role="listbox"] .q-item, .autocomplete-dropdown .q-item');
+        return this.page.locator('.q-menu .q-item .q-item, .autocomplete-dropdown .q-item');
     }
 
     /**
@@ -3217,7 +3217,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
         // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page
-            .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+            .locator('.q-menu:visible .q-item')
             .filter({ hasText: 'count' })
             .first()
             .click();
@@ -3236,7 +3236,7 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
         // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
         await this.page
-            .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+            .locator('.q-menu:visible .q-item')
             .filter({ hasText: 'total events' })
             .first()
             .click();
@@ -3257,7 +3257,7 @@ export class AlertsPage {
         await toggle.click();
         await this.page.waitForTimeout(500);
         await this.page
-            .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+            .locator('.q-menu:visible .q-item')
             .filter({ hasText: functionName })
             .first()
             .click();
@@ -3288,7 +3288,7 @@ export class AlertsPage {
         await fieldSelect.click();
         await this.page.waitForTimeout(500);
 
-        const menuItems = this.page.locator('.q-menu:visible .q-item, [role="listbox"]:visible [role="option"]');
+        const menuItems = this.page.locator('.q-menu:visible .q-item, ');
         const count = await menuItems.count();
         const fields = [];
         for (let i = 0; i < count; i++) {

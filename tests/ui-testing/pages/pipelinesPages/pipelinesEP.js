@@ -33,9 +33,9 @@ export class PipelinesEP {
         this.destinationStreamTypeInput = '[data-test="pipeline-import-destination-stream-type-input"]';
         // Stream picker is OSelect (Reka Listbox) post-migration; legacy q-select
         // uses .q-menu.scroll. Match both so the helper works during the migration.
-        this.quasarMenuScroll = '[role="listbox"]:visible, .q-menu.scroll';
-        this.quasarMenuItem = '[role="listbox"]:visible [role="option"], .q-menu .q-item';
-        this.quasarVirtualScrollContent = '[role="listbox"]:visible, .q-menu.scroll .q-virtual-scroll__content';
+        this.quasarMenuScroll = '.q-menu.scroll';
+        this.quasarMenuItem = '.q-menu .q-item';
+        this.quasarVirtualScrollContent = '.q-menu.scroll .q-virtual-scroll__content';
         this.notifyContainer = '#q-notify';
         this.monacoViewLines = '.view-lines';
     }

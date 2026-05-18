@@ -1513,7 +1513,7 @@ export class AlertDestinationsPage {
         // Try to scroll the dialog/page to reveal form fields below the type selector
         await this.page.evaluate(() => {
             // Scroll within dialog
-            const dialogs = document.querySelectorAll('.q-dialog__inner, .q-card, [role="dialog"]');
+            const dialogs = document.querySelectorAll('.q-dialog__inner, .q-card');
             dialogs.forEach(dialog => {
                 if (dialog.scrollHeight > dialog.clientHeight) {
                     dialog.scrollTop = 400;
@@ -1635,7 +1635,7 @@ export class AlertDestinationsPage {
 
         // Scroll down more to ensure webhook field is visible (it's below the type selector)
         await this.page.evaluate(() => {
-            const dialogs = document.querySelectorAll('.q-dialog__inner, .q-card, [role="dialog"]');
+            const dialogs = document.querySelectorAll('.q-dialog__inner, .q-card');
             dialogs.forEach(dialog => {
                 dialog.scrollTop = dialog.scrollHeight; // Scroll to bottom
             });
@@ -2133,7 +2133,7 @@ export class AlertDestinationsPage {
         // Find and click the option — OSelect (Reka Listbox role=option) post-migration,
         // q-select (.q-menu .q-item) pre-migration.
         const menuOption = this.page
-            .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+            .locator('.q-menu .q-item')
             .filter({ hasText: method.toUpperCase() });
         await menuOption.waitFor({ state: 'visible', timeout: 5000 });
         await menuOption.click();
@@ -2158,14 +2158,14 @@ export class AlertDestinationsPage {
         // Select template — OSelect post-migration, q-select pre-migration
         if (templateName) {
             const menuOption = this.page
-                .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+                .locator('.q-menu .q-item')
                 .filter({ hasText: templateName });
             await menuOption.waitFor({ state: 'visible', timeout: 5000 });
             await menuOption.click();
         } else {
             // Select first template
             const firstOption = this.page
-                .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+                .locator('.q-menu .q-item')
                 .first();
             await firstOption.waitFor({ state: 'visible', timeout: 5000 });
             await firstOption.click();

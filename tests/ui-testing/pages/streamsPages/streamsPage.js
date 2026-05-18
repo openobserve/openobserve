@@ -1017,7 +1017,7 @@ export class StreamsPage {
      * legacy q-select uses .q-item.
      */
     getFullTextSearchOption() {
-        return this.page.locator('[role="option"], .q-item').filter({ hasText: 'Full text search' });
+        return this.page.locator('.q-item').filter({ hasText: 'Full text search' });
     }
 
     /**
