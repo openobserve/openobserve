@@ -74,15 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
-      <q-stepper
+      <OStepper
         v-model="step"
-        vertical
-        color="primary"
+        orientation="vertical"
         animated
+        navigable
         class="q-mx-md q-pa-none tw:h-full"
-        header-nav
       >
-        <q-step
+        <OStep
           data-test="cipher-key-key-store-detils-step"
           :name="1"
           :title="
@@ -91,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             getTypeLabel(formData.key.store.type) +
             ')'
           "
-          icon="addition"
+          icon="edit"
           :done="step > 1"
         >
           <div>
@@ -124,40 +123,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="formData.key.store.type == 'akeyless'"
               v-model:formData="formData"
             />
+            <div class="tw:flex tw:gap-2 tw:mt-4">
+              <OButton
+                data-test="add-report-step1-continue-btn"
+                variant="primary"
+                size="sm-action"
+                @click="validateForm(2)"
+              >
+                Continue
+              </OButton>
+            </div>
           </div>
-          <q-stepper-navigation>
-            <OButton
-              data-test="add-report-step1-continue-btn"
-              variant="primary"
-              size="sm-action"
-              @click="validateForm(2)"
-            >
-              Continue
-            </OButton>
-          </q-stepper-navigation>
-        </q-step>
+        </OStep>
 
-        <q-step
+        <OStep
           data-test="cipher-key-encryption-mechanism-step"
           :name="2"
           :title="t('cipherKey.step2')"
-          icon="addition"
+          icon="add"
           :done="step > 2"
         >
           <add-encryption-mechanism v-model:formData="formData" />
-          <q-stepper-navigation class="q-pa-none">
+          <div class="tw:flex tw:gap-2 tw:mt-4">
             <OButton
               data-test="add-cipher-key-step2-back-btn"
               variant="outline"
               size="sm-action"
-              class="q-mb-sm"
               @click="step = 1"
             >
               {{ t('common.back') }}
             </OButton>
-          </q-stepper-navigation>
-        </q-step>
-      </q-stepper>
+          </div>
+        </OStep>
+      </OStepper>
       </div>
     </div>
     <div class="tw:mx-2">
@@ -212,6 +210,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();

@@ -153,19 +153,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
 
-            <q-stepper
+            <OStepper
               v-model="step"
-              vertical
-              color="primary"
+              orientation="vertical"
               animated
+              navigable
               class="q-mt-md"
-              header-nav
             >
-              <q-step
+              <OStep
                 data-test="add-report-select-dashboard-step"
                 :name="1"
                 title="Select Dashboard"
-                icon="dashboard"
+                icon="edit"
                 :done="step > 1"
               >
                 <template
@@ -517,19 +516,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </template>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-report-step1-continue-btn"
                     variant="primary"
                     size="sm-action"
-                    @click="step = 2"
+                    @click="step++"
                   >
                     Continue
                   </OButton>
-                </q-stepper-navigation>
-              </q-step>
+                </div>
+              </OStep>
 
-              <q-step
+              <OStep
                 data-test="add-report-select-schedule-step"
                 :name="2"
                 title="Schedule"
@@ -768,7 +767,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 160px"
                         >
                           <template v-slot:append>
-                            <OIcon name="event" size="sm" class="cursor-pointer">
+                            <OIcon
+                              name="event"
+                              size="sm"
+                              class="cursor-pointer"
+                            >
                               <q-popup-proxy
                                 cover
                                 transition-show="scale"
@@ -811,7 +814,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 160px"
                         >
                           <template v-slot:append>
-                            <OIcon name="access-time" size="sm" class="cursor-pointer">
+                            <OIcon
+                              name="access-time"
+                              size="sm"
+                              class="cursor-pointer"
+                            >
                               <q-popup-proxy
                                 cover
                                 transition-show="scale"
@@ -864,31 +871,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </div>
-
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-report-step2-back-btn"
                     variant="outline"
                     size="sm-action"
-                    class="q-ml-sm"
-                    @click="step = 1"
+                    @click="step--"
                   >
                     Back
                   </OButton>
                   <OButton
-                    v-if="!isCachedReport"
                     data-test="add-report-step2-continue-btn"
                     variant="primary"
                     size="sm-action"
-                    class="q-ml-sm"
-                    @click="step = 3"
+                    @click="step++"
                   >
                     Continue
                   </OButton>
-                </q-stepper-navigation>
-              </q-step>
+                </div>
+              </OStep>
 
-              <q-step
+              <OStep
                 v-if="!isCachedReport"
                 data-test="add-report-share-step"
                 :name="3"
@@ -983,19 +986,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OIcon>
                   </div>
                 </div>
-                <q-stepper-navigation>
+                <div class="tw:flex tw:gap-2 tw:mt-4">
                   <OButton
                     data-test="add-report-step3-back-btn"
                     variant="outline"
                     size="sm-action"
-                    class="q-ml-sm"
-                    @click="step = 2"
+                    @click="step--"
                   >
                     Back
                   </OButton>
-                </q-stepper-navigation>
-              </q-step>
-            </q-stepper>
+                </div>
+              </OStep>
+            </OStepper>
+
           </q-form>
         </div>
       </div>
@@ -1068,6 +1071,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getFoldersListByType } from "@/utils/commons";

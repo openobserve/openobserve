@@ -37,21 +37,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 q-px-md tw:overflow-auto">
     <div style="max-width: 720px;">
       <q-form ref="storageForm" @submit="submitStorage">
-        <q-stepper
+        <OStepper
           v-model="step"
           ref="stepper"
-          color="primary"
           animated
-          flat
-          class="modern-stepper"
+          :navigable="step > 1 && !isEditMode"
         >
           <!-- Step 1: Choose Provider -->
-          <q-step
+          <OStep
             :name="1"
             title="Choose Type"
             icon="cloud"
             :done="step > 1"
-            :header-nav="step > 1 && !isEditMode"
+            :navigable="step > 1 && !isEditMode"
           >
             <div class="text-body2 text-grey q-mb-md">
               {{ t("storage_settings.selectProviderDesc") }}
@@ -118,15 +116,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </q-step>
+          </OStep>
 
           <!-- Step 2: Connection Details -->
-          <q-step
+          <OStep
             :name="2"
             title="Connection"
-            icon="settings_ethernet"
+            icon="lan"
             :done="step > 2"
-            :header-nav="step > 2"
+            :navigable="step > 2"
           >
             <div class="q-gutter-sm">
               <!-- AwsCredentials Fields -->
@@ -357,8 +355,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
             </div>
-          </q-step>
-        </q-stepper>
+          </OStep>
+        </OStepper>
 
         <!-- Form buttons -->
         <div class="flex justify-start q-mb-md">
@@ -452,6 +450,8 @@ import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
 
 const props = defineProps<{
   action: "add" | "edit";
@@ -758,42 +758,6 @@ watch(selectedProvider, (newProvider) => {
 
 <style lang="scss">
 .storage-settings-editor {
-  .q-stepper {
-    background: transparent !important;
-  }
-
-  .modern-stepper {
-    box-shadow: none;
-
-    :deep(.q-stepper__header) {
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    :deep(.q-stepper__tab) {
-      padding: 16px 24px;
-    }
-
-    :deep(.q-stepper__tab--active) {
-      color: #1976d2;
-      font-weight: 600;
-    }
-
-    :deep(.q-stepper__tab--done) {
-      color: #4caf50;
-    }
-
-    :deep(.q-stepper__dot) {
-      width: 32px;
-      height: 32px;
-      font-size: 14px;
-      background: var(--o2-primary-btn-bg);
-    }
-
-    :deep(.q-stepper__step-inner) {
-      padding: 4px 0;
-    }
-  }
-
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0.275rem 0 0 !important;
   }
