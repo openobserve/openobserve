@@ -790,7 +790,8 @@
     "no_keep_current": "Hayır, güncel tut",
     "feature_correlation_management": "Korelasyon yönetimi",
     "feature_log_patterns": "Günlük kalıpları",
-    "environment_type": "Ortam Türü"
+    "environment_type": "Ortam Türü",
+    "license_allows_unlimited_ingestion": "Mevcut lisans sınırsız veri alımına izin verir."
   },
   "login": {
     "userid": "Kullanıcı Kimliği",

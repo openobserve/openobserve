@@ -790,7 +790,8 @@
     "no_keep_current": "Nein, auf dem Laufenden bleiben",
     "feature_correlation_management": "Korrelationsmanagement",
     "feature_log_patterns": "Muster protokollieren",
-    "environment_type": "Art der Umgebung"
+    "environment_type": "Art der Umgebung",
+    "license_allows_unlimited_ingestion": "Die aktuelle Lizenz ermöglicht eine unbegrenzte Datenaufnahme."
   },
   "login": {
     "userid": "Benutzer-ID",
