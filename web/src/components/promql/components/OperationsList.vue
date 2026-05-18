@@ -27,18 +27,22 @@
                   </template>
                   <OTooltip content="Drag to reorder" side="top" />
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
-                  :no-wrap="true"
-                  :data-test="`promql-operation-${index}`"
-                >
-                  {{ computedLabel(element) }}
-                  <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
-                  /></template>
-                  <q-menu class="q-pa-md">
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip"
+                      class="tw:!text-[12px]"
+                      :no-wrap="true"
+                      :data-test="`promql-operation-${index}`"
+                    >
+                      {{ computedLabel(element) }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div class="operations-list-dropdown tw:p-4">
                     <div style="width: 350px">
                       <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
@@ -91,8 +95,8 @@
                         </OSelect>
                       </template>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
@@ -172,6 +176,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
@@ -353,7 +358,7 @@ defineExpose({
   }
 }
 
-.q-menu {
+.operations-list-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
