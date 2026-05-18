@@ -112,6 +112,11 @@ export class PipelinesPage {
         this.exploreButton = page.getByRole('button', { name: 'Explore' });
         this.timestampColumnMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
         this.nameCell = page.getByRole('cell', { name: 'Name' });
+
+        // Pipeline field list selectors
+        this.pipelineFieldSearchInput = page.locator('[data-test="log-search-index-list-field-search-input"]');
+        this.pipelineFieldTable = page.locator('[data-test="log-search-index-list-fields-table"]');
+        this.pipelineFieldListWrapper = page.locator('.pipeline-field-list-wrapper');
         this.streamIcon = page.getByRole("img", { name: "Stream", exact: true });
         this.outputStreamIcon = page.getByRole("img", { name: "Output Stream" });
         this.containsOption = page.getByText("Contains", { exact: true });
@@ -2274,7 +2279,7 @@ export class PipelinesPage {
      * @returns {Promise<{scrollable: boolean, details: object}>}
      */
     async verifyPipelineFieldListScrollable() {
-        const wrapper = this.page.locator('.pipeline-field-list-wrapper');
+        const wrapper = this.pipelineFieldListWrapper;
         await wrapper.waitFor({ state: 'visible', timeout: 10000 });
 
         // Check the outer wrapper's overflow
@@ -2333,9 +2338,7 @@ export class PipelinesPage {
      * @param {string} searchText - Text to search for
      */
     async searchPipelineFieldList(searchText) {
-        const searchInput = this.page.locator(
-            '[data-test="log-search-index-list-field-search-input"]'
-        );
+        const searchInput = this.pipelineFieldSearchInput;
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
         // Close any overlaying Quasar portal menu (e.g. #q-portal--menu--3)
         // that would intercept the click on the search input
@@ -2354,16 +2357,12 @@ export class PipelinesPage {
      * @returns {Promise<number>}
      */
     async getPipelineFieldCount() {
-        const fieldTable = this.page.locator(
-            '[data-test="log-search-index-list-fields-table"]'
-        );
+        const fieldTable = this.pipelineFieldTable;
         await fieldTable.waitFor({ state: 'visible', timeout: 15000 });
 
         // Wait for at least one field label to appear, then count.
         // Zero-match queries are a valid state — timeout means count is 0, not an error.
-        const fieldLocator = this.page.locator(
-            '[data-test="log-search-index-list-fields-table"] .field_label'
-        );
+        const fieldLocator = this.pipelineFieldTable.locator('.field_label');
         const hasFields = await fieldLocator.first().waitFor({ state: 'visible', timeout: 10000 })
             .then(() => true)
             .catch(() => false);
@@ -2378,27 +2377,10 @@ export class PipelinesPage {
     }
 
     /**
-     * Verify the pipeline field list contains a specific field name.
-     * @param {string} fieldName - Field name to look for
-     * @returns {Promise<boolean>}
-     */
-    async verifyPipelineFieldVisible(fieldName) {
-        const field = this.page.locator(
-            `[data-test="log-search-index-list-fields-table"]`,
-            { hasText: fieldName }
-        );
-        const visible = await field.isVisible().catch(() => false);
-        testLogger.info(`Field "${fieldName}" visible: ${visible}`);
-        return visible;
-    }
-
-    /**
      * Clear the pipeline field list search input.
      */
     async clearPipelineFieldSearch() {
-        const searchInput = this.page.locator(
-            '[data-test="log-search-index-list-field-search-input"]'
-        );
+        const searchInput = this.pipelineFieldSearchInput;
         await searchInput.fill('');
         testLogger.info('Field list search cleared');
     }
