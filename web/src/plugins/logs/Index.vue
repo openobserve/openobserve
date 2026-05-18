@@ -1162,7 +1162,20 @@ export default defineComponent({
 
           searchObj.meta.showHistogram = isHistogramEnabled();
 
-          await restoreUrlQueryParams(dashboardPanelData);
+          // If the org in the URL doesn't match the currently selected org, the
+          // URL params are stale (race condition: router.push from updateOrganization
+          // hasn't finished when the new component mounts due to :key change).
+          // In that case skip URL param restoration so the old stream is not carried
+          // over to the new org.
+          const urlOrgId = router.currentRoute.value.query
+            .org_identifier as string;
+          const isOrgMismatch =
+            !!urlOrgId &&
+            urlOrgId !== store.state.selectedOrganization.identifier;
+
+          if (!isOrgMismatch) {
+            await restoreUrlQueryParams(dashboardPanelData);
+          }
 
           if (
             store.state.zoConfig?.auto_query_enabled &&
@@ -1337,6 +1350,7 @@ export default defineComponent({
     // Helper function for organization change
     function handleOrganizationChange() {
       searchObj.loading = true;
+      resetStreamData();
       loadLogsData();
     }
 
