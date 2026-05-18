@@ -19,6 +19,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default {
   props: {
     nodeTypes: Array,
@@ -66,7 +67,7 @@ export default {
               class="node-icon-img"
             />
             <OIcon v-else size="1.3em" :name="node.icon" />
-            <q-separator vertical class="node-separator" />
+            <OSeparator vertical class="node-separator" />
           </div>
           <div class="node-label tw:w-[70px]">{{ node.label }}</div>
           <div class="drag-dots">
@@ -80,7 +81,7 @@ export default {
       <div v-else>
         <div class="q-mb-xs text-subtitle1">
           <div>{{ node.label }}</div>
-          <q-separator />
+          <OSeparator />
         </div>
       </div>
     </div>

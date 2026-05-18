@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >{{ t("search.favoriteViews") }}</q-item-label
                           >
                         </q-item>
-                        <q-separator horizontal inset></q-separator>
+                        <OSeparator class="tw:mx-4" />
                       </template>
                       <template #cell-view_name="{ row, value }">
                         <div class="field_list q-pa-xs">
@@ -958,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -1059,7 +1059,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <q-separator class="tw:h-[1.875rem]! tw:w-[1px]" />
+                <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -1195,7 +1195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </OButton>
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
-              <q-separator
+              <OSeparator
                 v-if="
                   config.isEnterprise == 'true' ||
                   store.state.zoConfig.auto_query_enabled
@@ -1904,7 +1904,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >{{ t("search.favoriteViews") }}</q-item-label
                       ></q-item
                     >
-                    <q-separator horizontal inset></q-separator>
+                    <OSeparator class="tw:mx-4" />
                   </template>
                   <template #cell-view_name="{ row, value }">
                     <div class="field_list q-pa-xs">
@@ -2090,6 +2090,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const defaultValue: any = () => {
   return {

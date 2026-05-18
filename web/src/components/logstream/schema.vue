@@ -751,7 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Organization-level cross-links (read-only, hidden when empty) -->
                 <template v-if="orgCrossLinks.length > 0">
-                  <q-separator class="tw:my-4" />
+                  <OSeparator class="tw:my-4" />
                   <CrossLinkManager
                     :modelValue="orgCrossLinks"
                     :title="t('crossLinks.orgCrossLinks')"
@@ -961,6 +961,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const defaultValue: any = () => {
   return {

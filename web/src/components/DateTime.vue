@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("common.relative") }}
           </OButton>
-          <q-separator vertical inset />
+          <OSeparator vertical class="tw:my-2" />
           <OButton
             data-test="date-time-absolute-tab"
             class="tab-button"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("common.absolute") }}
           </OButton>
         </div>
-        <q-separator />
+        <OSeparator />
         <OTabPanels v-model="selectedType" animated>
           <OTabPanel v-if="!disableRelative" name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="notePara">* You can choose multiple date</div>
-              <q-separator v-if="!disableRelative" class="q-my-sm" />
+              <OSeparator v-if="!disableRelative" class="tw:my-2" />
 
               <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tbody>
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="timezone-select"
         />
         <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
-          <q-separator class="q-my-sm" />
+          <OSeparator class="tw:my-2" />
           <OButton
             data-test="date-time-apply-btn"
             variant="primary"
@@ -260,6 +260,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 // @ts-nocheck
 import {
   ref,

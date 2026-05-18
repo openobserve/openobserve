@@ -138,10 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                  <q-separator
-                    class="tw:mb-1 tw:mt-[3px]"
-                    size="2px"
-                  ></q-separator>
+                  <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
                   <!-- Search Input -->
                   <div class="flex folder-item q-py-xs tw:w-full tw:px-2">
                     <OInput
@@ -479,6 +476,7 @@ import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import NoData from "../../components/shared/grid/NoData.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";

@@ -29,6 +29,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
@@ -492,7 +493,7 @@ function getIcon(data, ioType) {
       </div>
 
       <!-- Separator -->
-      <q-separator vertical class="q-mr-sm" />
+      <OSeparator vertical class="tw:mr-2" />
 
       <!-- Label -->
       <div class="container">
@@ -582,7 +583,7 @@ function getIcon(data, ioType) {
       </div>
 
       <!-- Separator -->
-      <q-separator vertical class="q-mr-sm" />
+      <OSeparator vertical class="tw:mr-2" />
 
       <!-- Label -->
       <div class="container">
@@ -660,7 +661,7 @@ function getIcon(data, ioType) {
       </div>
 
       <!-- Separator -->
-      <q-separator vertical class="q-mr-sm" />
+      <OSeparator vertical class="tw:mr-2" />
 
       <!-- Label -->
       <div class="container">
@@ -725,7 +726,7 @@ function getIcon(data, ioType) {
       </div>
 
       <!-- Separator -->
-      <q-separator vertical class="q-mr-sm" />
+      <OSeparator vertical class="tw:mr-2" />
 
       <!-- Label -->
       <div class="container">
@@ -789,7 +790,7 @@ function getIcon(data, ioType) {
       </div>
 
       <!-- Separator -->
-      <q-separator vertical class="q-mr-sm" />
+      <OSeparator vertical class="tw:mr-2" />
 
       <!-- Label -->
       <div class="container">
@@ -853,7 +854,7 @@ function getIcon(data, ioType) {
       </div>
 
       <!-- Separator -->
-      <q-separator vertical class="q-mr-sm" />
+      <OSeparator vertical class="tw:mr-2" />
 
       <!-- Label -->
       <div class="container">

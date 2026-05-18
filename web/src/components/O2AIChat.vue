@@ -68,7 +68,7 @@
                         min-width: 200px;
                         width: 300px;
                         max-width: 300px;
-                        border: 1px solid var(--q-separator-color);
+                        border: 1px solid var(--color-separator);
                       "
                       padding
                     >
@@ -119,7 +119,7 @@
                     v-if="filteredChatHistory.length > 0"
                     class="clear-all-container"
                   >
-                    <q-separator />
+                    <OSeparator />
                     <OButton
                       variant="ghost"
                       class="clear-all-btn"
@@ -173,7 +173,7 @@
           </div>
         </div>
       </div>
-      <q-separator class="tw:bg-[#DBDBDB]" />
+      <OSeparator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
       <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
@@ -1349,6 +1349,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -5612,7 +5613,7 @@ export default defineComponent({
     display: flex;
     justify-content: space-between;
     align-items: end;
-    border-bottom: 1px solid var(--q-separator-color);
+    border-bottom: 1px solid var(--color-separator);
     flex-shrink: 0;
     background: var(--q-page-background);
     z-index: 2;
@@ -5657,7 +5658,7 @@ export default defineComponent({
     display: flex;
     align-items: center;
     flex-shrink: 0;
-    border-bottom: 1px solid var(--q-separator-color);
+    border-bottom: 1px solid var(--color-separator);
 
     &.light-mode {
       color: #1a202c;
@@ -6408,7 +6409,7 @@ export default defineComponent({
   z-index: 2;
   background: var(--q-page-background);
   padding: 8px;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   flex-shrink: 0;
 }
 
@@ -6435,7 +6436,7 @@ export default defineComponent({
 .clear-all-container {
   background: var(--q-page-background);
   padding: 8px;
-  border-top: 1px solid var(--q-separator-color);
+  border-top: 1px solid var(--color-separator);
   flex-shrink: 0;
 
   .clear-all-btn {

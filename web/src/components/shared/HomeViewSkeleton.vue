@@ -97,7 +97,7 @@
                 <SkeletonBox variant="text" width="100px" height="14px" class="q-mb-xs" />
                 <SkeletonBox variant="text" width="40px" height="20px" />
               </div>
-              <q-separator vertical />
+              <OSeparator vertical />
               <div class="column">
                 <SkeletonBox variant="text" width="80px" height="14px" class="q-mb-xs" />
                 <SkeletonBox variant="text" width="40px" height="20px" />
@@ -128,7 +128,7 @@
                 <SkeletonBox variant="text" width="120px" height="14px" class="q-mb-xs" />
                 <SkeletonBox variant="text" width="40px" height="20px" />
               </div>
-              <q-separator vertical />
+              <OSeparator vertical />
               <div class="column">
                 <SkeletonBox variant="text" width="100px" height="14px" class="q-mb-xs" />
                 <SkeletonBox variant="text" width="40px" height="20px" />
@@ -147,6 +147,7 @@
 <script setup lang="ts">
 import { useStore } from "vuex";
 import SkeletonBox from "./SkeletonBox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const store = useStore();
 </script>

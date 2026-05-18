@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="props.errors.errors.length" :data-test="`dashboard-error`">
-    <q-separator />
+    <OSeparator />
     <div>
       <div
         class="tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-2 tw:cursor-pointer expand-bar"
@@ -62,6 +62,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 export default defineComponent({
   name: "DashboardErrorsComponent",
   components: {

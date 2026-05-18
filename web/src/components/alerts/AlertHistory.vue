@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
 
             <!-- Time Information -->
             <div class="detail-section">
@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <q-separator class="q-my-sm" />
+            <OSeparator class="tw:my-2" />
 
             <!-- Alert Configuration -->
             <div class="detail-section">
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 selectedRow.retries > 0
               "
             >
-              <q-separator class="q-my-sm" />
+              <OSeparator class="tw:my-2" />
               <div class="detail-section">
                 <div class="row q-col-gutter-md">
                   <div v-if="selectedRow.evaluation_took_in_secs" class="col-4">
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Source Node (if available) -->
             <template v-if="selectedRow.source_node">
-              <q-separator class="q-my-sm" />
+              <OSeparator class="tw:my-2" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">Source Node</div>
                 <div class="text-body2 text-mono">
@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Error Details (if available) -->
             <template v-if="selectedRow.error">
-              <q-separator class="q-my-sm" />
+              <OSeparator class="tw:my-2" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
                   <OIcon
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Success Response (if available) -->
             <template v-if="selectedRow.success_response">
-              <q-separator class="q-my-sm" />
+              <OSeparator class="tw:my-2" />
               <div class="detail-section">
                 <div class="text-caption text-grey-7 q-mb-xs">
                   <OIcon
@@ -497,6 +497,7 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 const store = useStore();

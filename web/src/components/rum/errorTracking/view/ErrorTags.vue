@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="q-pl-xs"> {{ error.ip }} </span>
         </div>
       </div>
-      <q-separator vertical />
+      <OSeparator vertical />
       <div class="q-mx-lg items-center">
         <img
           :src="browserIcon"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="q-pl-xs"> {{ getBrowserVersion }} </span>
         </div>
       </div>
-      <q-separator vertical />
+      <OSeparator vertical />
       <div class="q-mx-lg items-center">
         <img
           :src="osIcon"
@@ -75,6 +75,7 @@ import windows from "@/assets/images/rum/windows.png";
 import mac from "@/assets/images/rum/mac.png";
 import linux from "@/assets/images/rum/linux.png";
 import { useI18n } from "vue-i18n";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const { t } = useI18n();
 

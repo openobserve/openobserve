@@ -8,7 +8,7 @@
             <div class="text-h6">Sample Logs (Click to See Correlation)</div>
           </q-card-section>
 
-          <q-separator />
+          <OSeparator />
 
           <q-card-section>
             <div class="log-viewer">
@@ -71,7 +71,7 @@
               <li>Click "View" to navigate (demo mode shows query)</li>
             </ol>
 
-            <q-separator class="q-my-md" />
+            <OSeparator class="tw:my-4" />
 
             <div class="text-subtitle2 q-mb-sm">Current Status:</div>
             <div>
@@ -144,6 +144,7 @@ import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 // Demo state
 const showCorrelation = ref(false);

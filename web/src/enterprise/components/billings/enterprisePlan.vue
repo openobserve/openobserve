@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </div>
 
-    <q-separator spaced />
+    <OSeparator class="tw:my-2" />
 
     <div class="q-px-md q-pt-sm tw:h-[550px]">
       <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
     <div class="o2-page-subtitle2 q-px-md q-pt-sm ">
       {{ t("billing.enterpriseNote") }}
@@ -81,6 +81,7 @@ import { siteURL } from "@/constants/config";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "enterprisePlan",

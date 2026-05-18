@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="tw:font-bold tw:text-sm">{{
                 t("settings.correlation.distinguishByLabel")
               }}</span>
-              <span class="tw:flex-1"><q-separator /></span>
+              <span class="tw:flex-1"><OSeparator /></span>
             </div>
             <div
               class="tw:text-xs tw:mb-3"
@@ -1051,10 +1051,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <q-separator
-                :class="store.state.theme === 'dark' ? 'tw:!bg-grey-8' : ''"
-                class="tw:mb-3 tw:shrink-0"
-              />
+              <OSeparator class="tw:mb-3 tw:shrink-0" />
 
               <!-- Card-level: all values with bars -->
               <template
@@ -1497,6 +1494,7 @@ import type {
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

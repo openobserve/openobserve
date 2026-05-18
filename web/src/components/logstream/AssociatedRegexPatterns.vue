@@ -25,7 +25,7 @@
           />
         </div>
       </div>
-      <q-separator />
+      <OSeparator />
       
       <!-- here we will have the main section -->
       <div class="tw:flex tw:w-full" >
@@ -87,7 +87,7 @@
                       </q-card>
                     </q-expansion-item>
                   </div>
-                  <q-separator class="tw:mt-2" />
+                  <OSeparator class="tw:mt-2" />
                   <div
                     class="pattern-list-wrapper"
                   >
@@ -133,7 +133,7 @@
 
             </div>
         </div>
-        <q-separator vertical />
+        <OSeparator vertical />
         <!-- here we will have the right side section -->
         <div class="tw:w-[75%] tw:flex tw:flex-col" style="height: calc(100vh - 59px);">
           <div class="tw:flex-1 tw:overflow-y-auto tw:pt-3">
@@ -151,7 +151,7 @@
                     </span>
                   </div>
 
-                  <q-separator :class="store.state.theme === 'dark' ? 'tw:bg-[#3A3A3A]' : 'tw:bg-[#E5E7EB]'" />
+                  <OSeparator />
 
                   <!-- pattern description section -->
                   <div class="tw:flex tw:flex-col tw:gap-1">
@@ -200,7 +200,7 @@
                   </ORadioGroup>
                   </div>
 
-                  <q-separator vertical :class="store.state.theme === 'dark' ? 'tw:bg-[#3A3A3A]' : 'tw:bg-[#E5E7EB]'" />
+                  <OSeparator vertical />
 
                   <!-- detect at section -->
                   <div class="tw:flex tw:flex-col tw:gap-1.5 tw:min-w-[120px]">
@@ -219,7 +219,7 @@
                 </div>
               </div>
 
-              <q-separator :class="store.state.theme === 'dark' ? 'tw:bg-[#444444]' : 'tw:bg-[#D1D5DB]'" />
+              <OSeparator class="tw:bg-separator-strong" />
 
               <!-- Test Pattern Card -->
               <div class="section-card tw:p-3 tw:rounded-lg tw:border" :class="store.state.theme === 'dark' ? 'tw:bg-[#2A2A2A] tw:border-[#3A3A3A]' : 'tw:bg-[#F9FAFB] tw:border-[#E5E7EB]'">
@@ -249,7 +249,7 @@
                     </div>
                   </div>
 
-                  <q-separator :class="store.state.theme === 'dark' ? 'tw:bg-[#3A3A3A]' : 'tw:bg-[#E5E7EB]'" />
+                  <OSeparator />
 
                   <div class="tw:flex tw:flex-col tw:gap-2">
                     <div class="regex-pattern-test-string-container">
@@ -350,7 +350,7 @@
               </div>
             </div>
           </div>
-          <q-separator />
+          <OSeparator />
           <div v-if="userClickedPattern" :class="store.state.theme === 'dark' ? 'dark-regex-patterns-footer' : 'light-regex-patterns-footer'" class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-2">
             <OButton
               @click="$emit('closeDialog')"
@@ -405,6 +405,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export interface PatternAssociation {
     field: string;

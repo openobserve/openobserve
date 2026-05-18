@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer Actions -->
     <div class="drawer-footer q-pa-md">
-      <q-separator class="q-mb-md" />
+      <OSeparator class="tw:mb-4" />
       <div class="row q-col-gutter-sm justify-end">
         <div class="col-auto">
           <OButton
@@ -335,6 +335,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface SemanticGroup {
   id: string;
@@ -561,7 +562,7 @@ const handleClose = () => {
 .section-header {
   font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .groups-list {

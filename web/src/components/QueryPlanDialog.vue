@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="code" size="md" class="q-mr-sm" />
                 <div class="text-subtitle1 text-weight-medium">SQL Query</div>
               </div>
-              <q-separator />
+              <OSeparator />
               <div
                 class="sql-query-content q-pa-md"
                 :class="
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('search.analyzeTooltip')" />
                 </OButton>
               </div>
-              <q-separator />
+              <OSeparator />
 
               <div v-if="loading" class="flex flex-center q-pa-xl full-height">
                 <div class="text-center">
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTab name="physical" :label="t('search.physicalPlan')" />
                   </OTabs>
 
-                  <q-separator />
+                  <OSeparator />
 
                   <OTabPanels v-model="activeTab" animated>
                     <OTabPanel name="logical">
@@ -208,6 +208,7 @@ import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "QueryPlanDialog",

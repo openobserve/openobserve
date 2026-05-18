@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           t("pipeline.export")
                         }}</q-item-section>
                       </q-item>
-                      <q-separator
+                      <OSeparator
                         v-if="
                           row.source.source_type === 'scheduled' &&
                           config.isEnterprise == 'true'
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </q-item-section>
                         <q-item-section>Create Backfill</q-item-section>
                       </q-item>
-                      <q-separator />
+                      <OSeparator />
                       <q-item
                         class="flex items-center"
                         clickable
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           t("pipeline.delete")
                         }}</q-item-section>
                       </q-item>
-                      <q-separator v-if="row.last_error" />
+                      <OSeparator v-if="row.last_error" />
                       <q-item
                         v-if="row.last_error"
                         class="flex items-center"
@@ -505,6 +505,7 @@ import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDia
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 import { filter, update } from "lodash-es";
 import { toast } from "@/lib/feedback/Toast/useToast";

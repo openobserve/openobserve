@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <q-separator vertical />
+      <OSeparator vertical />
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       handleCustomChartTemplateSelected
                     "
                   />
-                  <q-separator v-if="resolvedConfig.showQueryBuilder" />
+                  <OSeparator v-if="resolvedConfig.showQueryBuilder" />
 
                   <!-- Variables Selector (dashboard mode only) -->
                   <VariablesValueSelector
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <q-separator vertical />
+              <OSeparator vertical />
 
               <!-- Config Panel Sidebar -->
               <div
@@ -623,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <q-separator vertical />
+              <OSeparator vertical />
 
               <!-- Config Panel Sidebar for custom chart -->
               <div class="col-auto">
@@ -689,6 +689,7 @@ import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(

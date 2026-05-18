@@ -322,7 +322,7 @@ export default defineComponent({
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
 .home-ai-panel :deep(.chat-header),
-.home-ai-panel :deep(.chat-content-wrapper > .q-separator) {
+.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
   display: none;
 }
 

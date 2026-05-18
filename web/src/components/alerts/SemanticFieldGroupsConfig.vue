@@ -428,7 +428,7 @@ onMounted(async () => {
 }
 
 .section-header {
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   padding-bottom: 12px;
 }
 
@@ -448,7 +448,7 @@ onMounted(async () => {
 }
 
 .fingerprint-section {
-  border-top: 1px solid var(--q-separator-color);
+  border-top: 1px solid var(--color-separator);
   padding-top: 16px;
 }
 

@@ -597,7 +597,7 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
 .section-header {
   font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
+  border-bottom: 1px solid var(--color-separator);
   margin-bottom: 4px;
 }
 
