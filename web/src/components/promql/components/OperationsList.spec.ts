@@ -530,14 +530,16 @@ describe("OperationsList", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
-      expect(addButton.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      // QTooltip was replaced by OTooltip in the migration.
+      expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have drag handle tooltips", () => {
       wrapper = createWrapper();
 
       const dragHandle = wrapper.find(".drag-handle");
-      expect(dragHandle.findComponent({ name: "QTooltip" }).exists()).toBe(
+      // QTooltip was replaced by OTooltip in the migration.
+      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(
         true,
       );
     });

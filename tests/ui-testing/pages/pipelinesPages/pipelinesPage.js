@@ -985,8 +985,13 @@ export class PipelinesPage {
         await moreOptionsButton.waitFor({ state: "visible" });
         await moreOptionsButton.click();
         await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
+        // Click delete option in the menu — PipelinesList row context menu is now
+        // an ODropdown ([role="menuitem"]); fall back to legacy .q-menu .q-item.
+        await this.page
+            .locator('[role="menu"][data-state="open"] [role="menuitem"], .q-menu .q-item')
+            .filter({ hasText: 'Delete' })
+            .first()
+            .click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1129,8 +1134,13 @@ export class PipelinesPage {
         await moreOptionsButton.waitFor({ state: "visible" });
         await moreOptionsButton.click();
         await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
+        // Click delete option in the menu — PipelinesList row context menu is now
+        // an ODropdown ([role="menuitem"]); fall back to legacy .q-menu .q-item.
+        await this.page
+            .locator('[role="menu"][data-state="open"] [role="menuitem"], .q-menu .q-item')
+            .filter({ hasText: 'Delete' })
+            .first()
+            .click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }

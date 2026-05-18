@@ -16,35 +16,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div icon="info" class="justify-between date-time-container">
-    <OButton
-      :data-test="dataTestName"
-      id="date-time-button"
-      ref="datetimeBtn"
-      data-cy="date-time-button"
-      variant="outline"
-      class="date-time-button"
-      :class="{
-        [selectedType + 'type']: !disableRelative,
-        hideRelative: disableRelative,
-      }"
-      :disabled="disable"
-      icon-left="schedule"
+    <ODropdown
+      v-model:open="menuOpen"
+      side="bottom"
+      align="start"
+      @update:open="onMenuOpenChange"
     >
-      <span class="date-time-label">{{ getDisplayValue }}</span>
-      <template #icon-right
-        ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
-      /></template>
-      <q-menu
+      <template #trigger>
+        <OButton
+          :data-test="dataTestName"
+          id="date-time-button"
+          ref="datetimeBtn"
+          data-cy="date-time-button"
+          variant="outline"
+          class="date-time-button"
+          :class="{
+            [selectedType + 'type']: !disableRelative,
+            hideRelative: disableRelative,
+          }"
+          :disabled="disable"
+          icon-left="schedule"
+        >
+          <span class="date-time-label">{{ getDisplayValue }}</span>
+          <template #icon-right
+            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
+          /></template>
+        </OButton>
+      </template>
+      <div
         id="date-time-menu"
         class="date-time-dialog"
-        anchor="bottom left"
-        self="top left"
-        no-route-dismiss
-        :persistent="isTimezoneSelectOpen"
-        @before-show="onBeforeShow"
-        @before-hide="onBeforeHide"
-        @hide="onHide"
-        @show="onShow"
       >
         <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
           <OButton
@@ -239,14 +240,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="xs"
             class="element-box-shadow"
-            @click="saveDate(null)"
-            v-close-popup
+            @click="saveDate(null); menuOpen = false"
           >
             {{ t("common.apply") }}
           </OButton>
         </div>
-      </q-menu>
-    </OButton>
+      </div>
+    </ODropdown>
   </div>
 </template>
 
@@ -260,6 +260,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 // @ts-nocheck
 import {
   ref,
@@ -295,6 +296,7 @@ export default defineComponent({
     OSelect,
     OTime,
     ODateRangeCalendar,
+    ODropdown,
   },
   props: {
     defaultType: {
@@ -357,6 +359,16 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const $q = useQuasar();
+    const menuOpen = ref(false);
+    const onMenuOpenChange = (open) => {
+      if (open) {
+        onBeforeShow();
+        onShow();
+      } else {
+        onBeforeHide();
+        onHide();
+      }
+    };
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
@@ -1042,6 +1054,8 @@ export default defineComponent({
 
     return {
       t,
+      menuOpen,
+      onMenuOpenChange,
       datetimeBtn,
       getImageURL,
       onCustomPeriodSelect,

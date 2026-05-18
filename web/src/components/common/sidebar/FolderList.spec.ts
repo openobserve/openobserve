@@ -734,7 +734,11 @@ describe('FolderList.vue', () => {
     it('should render folder search input', () => {
       const searchInput = wrapper.find('[data-test="folder-search"]')
       expect(searchInput.exists()).toBe(true)
-      expect(searchInput.attributes('placeholder')).toBe('Search Folder')
+      // OInput places the placeholder on the inner <input>, not on the root
+      // element that carries data-test. Query the underlying native input.
+      const nativeInput = searchInput.find('input')
+      expect(nativeInput.exists()).toBe(true)
+      expect(nativeInput.attributes('placeholder')).toBe('Search Folder')
     })
 
     it('should render folder tabs', () => {
@@ -745,7 +749,11 @@ describe('FolderList.vue', () => {
     it('should render new folder button', () => {
       const newFolderBtn = wrapper.find('[data-test="dashboard-new-folder-btn"]')
       expect(newFolderBtn.exists()).toBe(true)
-      expect(newFolderBtn.text()).toBe('add')
+      // After OButton migration, the icon is rendered via <OIcon name="add">
+      // inside the button rather than as bare text. Verify the icon child.
+      const addIcon = newFolderBtn.findComponent({ name: 'OIcon' })
+      expect(addIcon.exists()).toBe(true)
+      expect(addIcon.props('name')).toBe('add')
     })
 
     it('should render AddFolder with v-model:open bound to showAddFolderDialog', async () => {

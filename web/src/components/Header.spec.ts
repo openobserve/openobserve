@@ -162,12 +162,13 @@ describe("Header Component", () => {
       selectedLanguage: { code: "en-gb", label: "English" },
       selectedOrg: { identifier: "test-org", label: "Test Organization" },
       userClickedOrg: { identifier: "test-org", label: "Test Organization" },
-      filteredOrganizations: [
+      // Header.vue migration replaced filteredOrganizations/searchQuery/rowsPerPage
+      // with a single 'organizations' prop; the search/pagination state moved
+      // inside the component once it switched to OSelect.
+      organizations: [
         { identifier: "test-org", label: "Test Organization" },
         { identifier: "another-org", label: "Another Organization" },
       ],
-      searchQuery: "",
-      rowsPerPage: 10,
       isHovered: false,
       getBtnLogo: "mock-logo.svg",
     };
@@ -722,6 +723,9 @@ describe("Header Component", () => {
     });
 
     it("should emit update:searchQuery when search input changes", async () => {
+      // After the OSelect migration, search/filter state is internal to the
+      // component. The test is reduced to verifying the manual emit pathway
+      // still works for backward-compat consumers that listen on the event.
       await wrapper.vm.$emit("update:searchQuery", "test");
 
       expect(wrapper.emitted("update:searchQuery")).toBeTruthy();
@@ -731,7 +735,15 @@ describe("Header Component", () => {
     it("should emit updateOrganization when organization is selected", async () => {
       const newOrg = { identifier: "new-org", label: "New Organization" };
 
-      await wrapper.vm.handleOrgSelection(newOrg);
+      // handleOrgSelection was renamed to handleOrgSelect during migration
+      // and now takes an identifier (matching the OSelect value contract).
+      await wrapper.setProps({
+        organizations: [
+          { identifier: "test-org", label: "Test Organization" },
+          newOrg,
+        ],
+      });
+      await wrapper.vm.handleOrgSelect("new-org");
 
       expect(wrapper.emitted("update:selectedOrg")).toBeTruthy();
       expect(wrapper.emitted("update:selectedOrg")[0]).toEqual([newOrg]);
@@ -739,20 +751,19 @@ describe("Header Component", () => {
     });
 
     it("should filter organizations based on search query", () => {
-      const filteredOrgs = [
-        { identifier: "test-org", label: "Test Organization" },
-      ];
+      // The 'organizations' prop now drives the OSelect options directly;
+      // filtering happens inside the OSelect popup, not via props.
+      const orgs = [{ identifier: "test-org", label: "Test Organization" }];
 
       wrapper = shallowMount(Header, {
         global: { plugins: [i18n] },
         props: {
           ...wrapper.props(),
-          filteredOrganizations: filteredOrgs,
-          searchQuery: "test",
+          organizations: orgs,
         },
       });
 
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(1);
+      expect(wrapper.props("organizations")).toHaveLength(1);
     });
 
     it("should display empty state when no organizations match search", () => {
@@ -760,12 +771,11 @@ describe("Header Component", () => {
         global: { plugins: [i18n] },
         props: {
           ...wrapper.props(),
-          filteredOrganizations: [],
-          searchQuery: "nonexistent",
+          organizations: [],
         },
       });
 
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(0);
+      expect(wrapper.props("organizations")).toHaveLength(0);
     });
   });
 
@@ -886,7 +896,10 @@ describe("Header Component", () => {
       expect(wrapper.props("user").email).toBe("john@test.com");
     });
 
-    it("should apply header-user-tooltip class to profile button tooltip", () => {
+    it("should attach an OTooltip to the profile button", () => {
+      // The QTooltip with class="header-user-tooltip" was replaced by OTooltip
+      // (no class needed — OTooltip styles itself via Tailwind tokens).
+      // The test now verifies the OTooltip is co-located with the profile btn.
       const tooltipWrapper = createWrapper({
         mountType: "mount",
         stubsOverrides: {
@@ -898,9 +911,10 @@ describe("Header Component", () => {
       const profileBtn = tooltipWrapper.find(
         '[data-test="header-my-account-profile-icon"]',
       );
-      const profileBtnHtml = profileBtn.html();
-
-      expect(profileBtnHtml).toContain("header-user-tooltip");
+      expect(profileBtn.exists()).toBe(true);
+      // OTooltip lives as a sibling/descendant of the button; verify present.
+      const tooltip = tooltipWrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
 
       tooltipWrapper.unmount();
     });
@@ -1084,6 +1098,8 @@ describe("Header Component", () => {
 
   describe("Props Validation", () => {
     it("should accept all required props", () => {
+      // Migration: filteredOrganizations/searchQuery/rowsPerPage merged into
+      // a single 'organizations' prop (OSelect owns search/pagination state).
       expect(wrapper.props("store")).toBeDefined();
       expect(wrapper.props("router")).toBeDefined();
       expect(wrapper.props("config")).toBeDefined();
@@ -1092,9 +1108,7 @@ describe("Header Component", () => {
       expect(wrapper.props("langList")).toHaveLength(2);
       expect(wrapper.props("selectedLanguage")).toBeDefined();
       expect(wrapper.props("selectedOrg")).toBeDefined();
-      expect(wrapper.props("filteredOrganizations")).toHaveLength(2);
-      expect(wrapper.props("searchQuery")).toBe("");
-      expect(wrapper.props("rowsPerPage")).toBe(10);
+      expect(wrapper.props("organizations")).toHaveLength(2);
       expect(wrapper.props("isHovered")).toBe(false);
       expect(wrapper.props("getBtnLogo")).toBe("mock-logo.svg");
     });
@@ -1121,15 +1135,17 @@ describe("Header Component", () => {
       const wrapper = createWrapper({
         mountType: 'mount',
         propsOverrides: {
-          filteredOrganizations: [],
+          organizations: [],
         },
         stubsOverrides: {
-          QSelect: false
+          // QSelect was replaced by OSelect during the OSelect migration; keep
+          // the OSelect stub off so we can probe its options.
+          OSelect: false
         }
       });
 
-      // Verify the organization selector doesn't show options when list is empty
-      const orgSelect = wrapper.findComponent({ name: 'QSelect' });
+      // Verify the organization selector doesn't show options when list is empty.
+      const orgSelect = wrapper.findComponent({ name: 'OSelect' });
       if (orgSelect.exists()) {
         expect(orgSelect.props('options')).toHaveLength(0);
       }

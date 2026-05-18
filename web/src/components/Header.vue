@@ -322,72 +322,26 @@ size="xs" class="warning" />{{
           </div>
           <ODropdownSeparator />
 
-          <!-- Language selector (TODO: migrate nested language sub-menu once ODropdownSub is available) -->
-          <q-item clickable data-test="menu-link-language-item" class="tw:rounded-md">
-            <q-item-section avatar>
-              <OIcon size="xs" name="language" class="padding-none" />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label class="tw:w-[180px]">{{
-                t("menu.language")
-              }}</q-item-label>
-            </q-item-section>
-            <q-item-section></q-item-section>
-            <q-item-section side>
-              <div class="q-gutter-xs">
-                <OIcon
-                  size="xs"
-                  :name="selectedLanguage.icon"
-                  class="padding-none"
-                />
-                <span
-                  class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
-                  >{{ selectedLanguage.label }}</span
-                >
-              </div>
-            </q-item-section>
-            <q-item-section side style="padding-left: 0px">
-              <OIcon
-                class="icon-ley-arrow-right"
-                name="keyboard-arrow-right" size="sm"
-              />
-            </q-item-section>
-
-            <!-- Language selection sub-menu — kept as q-menu (Workaround C)
-                 ODropdown's pointer-down-outside guard preserves the parent
-                 dropdown open while interacting with this nested .q-menu -->
-            <q-menu
-              auto-close
-              anchor="top end"
-              self="top start"
-              data-test="language-dropdown-item"
-              class="header-menu-bar"
+          <!-- Language selector — flattened group (Workaround A) -->
+          <ODropdownGroup :label="t('menu.language')">
+            <ODropdownItem
+              v-for="lang in langList"
+              :key="lang.code"
+              :data-test="`language-dropdown-item-${lang.code}`"
+              @select="changeLanguage(lang)"
             >
-              <q-list>
-                <q-item
-                  v-for="lang in langList"
-                  :key="lang.code"
-                  v-bind="lang"
-                  dense
-                  clickable
-                  @click="changeLanguage(lang)"
-                >
-                  <q-item-section avatar>
-                    <OIcon
-                      size="xs"
-                      :name="lang.icon"
-                      class="padding-none"
-                    />
-                  </q-item-section>
-                  <q-item-section
-                    :data-test="`language-dropdown-item-${lang.code}`"
-                  >
-                    <q-item-label>{{ lang.label }}</q-item-label>
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-          </q-item>
+              <template #icon-left>
+                <OIcon size="xs" :name="lang.icon" class="padding-none" />
+              </template>
+              {{ lang.label }}
+              <template
+                v-if="selectedLanguage.code === lang.code"
+                #icon-right
+              >
+                <OIcon size="xs" name="check" />
+              </template>
+            </ODropdownItem>
+          </ODropdownGroup>
           <ODropdownSeparator />
 
           <!-- Theme management -->
@@ -435,6 +389,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -449,6 +404,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
+    ODropdownGroup,
   },
   props: {
     // Store instance

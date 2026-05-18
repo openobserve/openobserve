@@ -2301,11 +2301,12 @@ export class AlertsPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Final fallback: try first available option
+        // Final fallback: try first available option (stream picker is OSelect
+        // post-migration, q-select pre-migration)
         const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
-        const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+        const anyStreamOption = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu .q-item').first();
         if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await anyStreamOption.click();
             testLogger.info('Using first available metrics stream (fallback)');
@@ -2339,8 +2340,8 @@ export class AlertsPage {
                 testLogger.info('Selected logs stream on retry', { stream: streamName });
                 return true;
             } else {
-                // Use first available logs stream from dropdown
-                const anyStreamOption = this.page.locator('.q-menu .q-item').first();
+                // Use first available logs stream from dropdown (OSelect post-migration)
+                const anyStreamOption = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu .q-item').first();
                 if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await anyStreamOption.click();
                     testLogger.info('Using first available logs stream');
@@ -3214,8 +3215,12 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        // Select 'count' from the dropdown to enable aggregation (count is field-based COUNT(field))
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'count' }).first().click();
+        // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
+        await this.page
+            .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+            .filter({ hasText: 'count' })
+            .first()
+            .click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Aggregation enabled via count function');
     }
@@ -3229,8 +3234,12 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        // Select 'total events' from the dropdown to disable aggregation (COUNT(*) mode)
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'total events' }).first().click();
+        // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
+        await this.page
+            .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+            .filter({ hasText: 'total events' })
+            .first()
+            .click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Aggregation disabled via total_events function');
     }
@@ -3247,7 +3256,11 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: functionName }).first().click();
+        await this.page
+            .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+            .filter({ hasText: functionName })
+            .first()
+            .click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Selected aggregation function', { functionName });
     }

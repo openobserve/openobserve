@@ -528,11 +528,17 @@ test.describe("Scheduled Alert Features", () => {
 
         if (rowVisible) {
             // Set threshold operator (2nd .alert-v3-select — 1st is the function dropdown)
+            // QueryConfig.vue operator dropdown is OSelect (Reka Listbox) post-migration;
+            // fall back to legacy q-select (.q-menu).
             const thresholdOperator = alertIfRow.locator('.alert-v3-select').nth(1);
             if (await thresholdOperator.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await thresholdOperator.click();
                 await page.waitForTimeout(500);
-                await page.locator('.q-menu:visible').getByText('>=', { exact: true }).click();
+                await page
+                    .locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item')
+                    .filter({ hasText: /^>=$/ })
+                    .first()
+                    .click();
                 await page.waitForTimeout(300);
                 testLogger.info('Set threshold operator to >=');
             }
@@ -659,14 +665,15 @@ test.describe("Scheduled Alert Features", () => {
         await addGroupByBtn.waitFor({ state: 'visible', timeout: 5000 });
         await addGroupByBtn.click();
         await page.waitForTimeout(800);
-        // Select first available group-by field
-        const groupBySelect = groupBySection.locator('.q-select').first();
+        // Select first available group-by field — QueryConfig.vue uses OSelect
+        // post-migration; .q-select is the legacy Quasar selector.
+        const groupBySelect = groupBySection.locator('[data-test*="select"], .q-select, .alert-v3-select').first();
         await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
         await groupBySelect.click();
         await page.waitForTimeout(500);
-        const groupByMenu = page.locator('.q-menu:visible');
-        await expect(groupByMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await groupByMenu.locator('.q-item').first().click();
+        const groupByOption = page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item').first();
+        await expect(groupByOption).toBeVisible({ timeout: 5000 });
+        await groupByOption.click();
         await page.waitForTimeout(500);
         testLogger.info('Added group-by field');
 

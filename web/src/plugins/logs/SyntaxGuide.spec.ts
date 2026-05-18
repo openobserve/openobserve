@@ -151,9 +151,10 @@ describe("SyntaxGuide.vue", () => {
   it("should have theme-dark class when store theme is dark", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    const menu = wrapper.findComponent({ name: "QMenu" });
-    expect(menu.exists()).toBe(true);
-    // Menu should have the theme class binding
+    // q-menu was replaced by ODropdown; verify the wrapper exists.
+    const dropdown = wrapper.findComponent({ name: "ODropdown" });
+    expect(dropdown.exists()).toBe(true);
+    // The theme class is bound on the content wrapper div inside the dropdown.
     const expectedClass = store.state.theme === "dark" ? "theme-dark" : "theme-light";
     expect(expectedClass).toBe("theme-dark");
   });
@@ -162,9 +163,8 @@ describe("SyntaxGuide.vue", () => {
   it("should have theme-light class when store theme is light", () => {
     store.state.theme = "light";
     wrapper = createWrapper();
-    const menu = wrapper.findComponent({ name: "QMenu" });
-    expect(menu.exists()).toBe(true);
-    // Menu should have the theme class binding
+    const dropdown = wrapper.findComponent({ name: "ODropdown" });
+    expect(dropdown.exists()).toBe(true);
     const expectedClass = store.state.theme === "dark" ? "theme-dark" : "theme-light";
     expect(expectedClass).toBe("theme-light");
   });
@@ -173,36 +173,37 @@ describe("SyntaxGuide.vue", () => {
   it("should render with sqlmode false", () => {
     wrapper = createWrapper({ sqlmode: false });
     expect(wrapper.props().sqlmode).toBe(false);
-    const menu = wrapper.findComponent({ name: "QMenu" });
-    expect(menu.exists()).toBe(true);
+    const dropdown = wrapper.findComponent({ name: "ODropdown" });
+    expect(dropdown.exists()).toBe(true);
   });
 
   // Test 15: Component renders with sqlmode true
   it("should render with sqlmode true", () => {
     wrapper = createWrapper({ sqlmode: true });
     expect(wrapper.props().sqlmode).toBe(true);
-    const menu = wrapper.findComponent({ name: "QMenu" });
-    expect(menu.exists()).toBe(true);
+    const dropdown = wrapper.findComponent({ name: "ODropdown" });
+    expect(dropdown.exists()).toBe(true);
   });
 
   // Test 16: Menu content structure exists
   it("should have menu with card components", () => {
     wrapper = createWrapper({ sqlmode: false });
-    const menu = wrapper.findComponent({ name: "QMenu" });
-    expect(menu.exists()).toBe(true);
-    // The menu component should be rendered
-    expect(wrapper.findComponent({ name: "QMenu" }).exists()).toBe(true);
+    // The migrated component drops q-card/q-card-section in favor of native
+    // divs inside the ODropdown default slot.
+    const dropdown = wrapper.findComponent({ name: "ODropdown" });
+    expect(dropdown.exists()).toBe(true);
   });
 
   // Test 17: Component structure includes required elements
   it("should include required template elements", () => {
     wrapper = createWrapper({ sqlmode: true });
     const button = wrapper.findComponent({ name: "OButton" });
-    const menu = wrapper.findComponent({ name: "QMenu" });
-    const tooltip = wrapper.findComponent({ name: "QTooltip" });
-    
+    const dropdown = wrapper.findComponent({ name: "ODropdown" });
+    // QTooltip is replaced by OTooltip in the migration.
+    const tooltip = wrapper.findComponent({ name: "OTooltip" });
+
     expect(button.exists()).toBe(true);
-    expect(menu.exists()).toBe(true);
+    expect(dropdown.exists()).toBe(true);
     expect(tooltip.exists()).toBe(true);
   });
 
@@ -222,7 +223,8 @@ describe("SyntaxGuide.vue", () => {
   // Test 19: Tooltip exists and uses translation key
   it("should have tooltip with translation", () => {
     wrapper = createWrapper();
-    const tooltip = wrapper.findComponent({ name: "QTooltip" });
+    // QTooltip was replaced by OTooltip in the migration.
+    const tooltip = wrapper.findComponent({ name: "OTooltip" });
     expect(tooltip.exists()).toBe(true);
     // Tooltip should use the translation function
     expect(wrapper.vm.t("search.syntaxGuideLabel")).toBe("Syntax Guide");
@@ -232,8 +234,8 @@ describe("SyntaxGuide.vue", () => {
   it("should have basic component structure", () => {
     wrapper = createWrapper();
     expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "QMenu" }).exists()).toBe(true);
-    expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
   });
 
   // Test 21: Component renders without errors in both modes

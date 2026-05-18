@@ -1,32 +1,27 @@
 ﻿<template>
-  <div>
-    <OButton
-      :style="{
-        width: changeStyle ? '170px' : '180px',
-        height: changeStyle ? '40px' : '',
-      }"
-      data-test="date-time-btn"
-      variant="outline"
-      class="date-time-button"
-      :class="changeStyle ? computedClass : ''"
-      :disabled="isFirstEntry"
-      @click="picker.showMenu = !picker.showMenu"
-    >
-      <template v-if="!changeStyle" #icon-left>
-        <OIcon name="schedule" size="sm" />
-      </template>
-      {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
-      <template #icon-right>
-        <OIcon name="arrow-drop-down" size="sm" />
-      </template>
-    </OButton>
-    <q-menu
-      v-if="picker.showMenu"
-      class="date-time-dialog"
-      anchor="bottom left"
-      self="top left"
-      no-route-dismiss
-    >
+  <ODropdown v-model:open="picker.showMenu" side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        :style="{
+          width: changeStyle ? '170px' : '180px',
+          height: changeStyle ? '40px' : '',
+        }"
+        data-test="date-time-btn"
+        variant="outline"
+        class="date-time-button"
+        :class="changeStyle ? computedClass : ''"
+        :disabled="isFirstEntry"
+      >
+        <template v-if="!changeStyle" #icon-left>
+          <OIcon name="schedule" size="sm" />
+        </template>
+        {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
+        <template #icon-right>
+          <OIcon name="arrow-drop-down" size="sm" />
+        </template>
+      </OButton>
+    </template>
+    <div class="date-time-dialog">
       <div class="tw:flex tw:justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
@@ -82,8 +77,8 @@
           </OTabPanel>
         </OTabPanels>
       </div>
-    </q-menu>
-  </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script setup>
@@ -94,6 +89,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { ref, reactive, watch, computed } from "vue";
 import { useStore } from "vuex";
 

@@ -116,20 +116,23 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(500);
 
         let columnFound = false;
-        const visibleMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        // Condition column dropdown is OSelect (Reka Listbox) post-migration;
+        // q-select (.q-menu .q-item) pre-migration.
+        const visibleMenu = this.page.locator('[role="listbox"]:visible, .q-menu:visible').first();
+        const menuItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        await expect(menuItems.first()).toBeVisible({ timeout: 5000 });
 
-        const columnItems = await visibleMenu.locator('.q-item').allTextContents();
+        const columnItems = await menuItems.allTextContents();
         testLogger.info('Available columns in dropdown', { columns: columnItems.slice(0, 10), requestedColumn: column });
 
-        const columnOption = visibleMenu.locator('.q-item').filter({ hasText: column }).first();
+        const columnOption = menuItems.filter({ hasText: column }).first();
         if (await columnOption.isVisible({ timeout: 2000 }).catch(() => false)) {
             await columnOption.click();
             columnFound = true;
         }
 
         if (!columnFound) {
-            await visibleMenu.locator('.q-item').first().click();
+            await menuItems.first().click();
             testLogger.info('Selected first available column (fallback)', { requestedColumn: column });
         }
         await this.page.waitForTimeout(500);
@@ -158,11 +161,12 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        // Destination dropdown is OSelect (Reka Listbox) post-migration; q-select pre.
+        const destMenuItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        await expect(destMenuItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFound = false;
-        const destOption = visibleDestMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOption = destMenuItems.filter({ hasText: destinationName }).first();
         if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOption.click();
             destFound = true;
@@ -172,7 +176,7 @@ export class AlertCreationWizard {
             try {
                 await this.commonActions.scrollAndFindOption(destinationName, 'template');
             } catch (scrollError) {
-                await visibleDestMenu.locator('.q-item').first().click();
+                await destMenuItems.first().click();
                 testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
             }
         }
@@ -233,9 +237,9 @@ export class AlertCreationWizard {
         const columnSelect = this.page.locator(this.locators.conditionColumnSelect).first().locator('.q-select');
         await columnSelect.click();
         await this.page.waitForTimeout(500);
-        const visibleMenuDefaults = this.page.locator('.q-menu:visible');
-        await expect(visibleMenuDefaults.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
-        await visibleMenuDefaults.locator('.q-item').first().click();
+        const visibleMenuDefaultsItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        await expect(visibleMenuDefaultsItems.first()).toBeVisible({ timeout: 5000 });
+        await visibleMenuDefaultsItems.first().click();
         await this.page.waitForTimeout(500);
 
         const operatorSelect = this.page.locator(this.locators.operatorSelect).first().locator('.q-select');
@@ -263,18 +267,18 @@ export class AlertCreationWizard {
         await destinationDropdown.click();
         await this.page.waitForTimeout(1000);
 
-        const visibleDestMenuDef = this.page.locator('.q-menu:visible');
-        await expect(visibleDestMenuDef.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        const visibleDestMenuDefItems = this.page.locator('[role="listbox"]:visible [role="option"], .q-menu:visible .q-item');
+        await expect(visibleDestMenuDefItems.first()).toBeVisible({ timeout: 5000 });
 
         let destFoundDef = false;
-        const destOptionDef = visibleDestMenuDef.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOptionDef = visibleDestMenuDefItems.filter({ hasText: destinationName }).first();
         if (await destOptionDef.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOptionDef.click();
             destFoundDef = true;
         }
 
         if (!destFoundDef) {
-            await visibleDestMenuDef.locator('.q-item').first().click();
+            await visibleDestMenuDefItems.first().click();
             testLogger.warn('Selected first available destination (fallback)', { requestedDestination: destinationName });
         }
         await this.page.keyboard.press('Escape');

@@ -343,7 +343,8 @@ describe("LabelFilterEditor", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      expect(addButton.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      // QTooltip was replaced by OTooltip in the migration.
+      expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });
 

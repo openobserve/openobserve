@@ -165,17 +165,18 @@ export class MetricsBuilderPage {
             return false;
         }
 
-        // Click to focus and open dropdown
+        // Click to focus and open dropdown — FieldList stream picker is OSelect
+        // (Reka Listbox) post-migration; fall back to .q-menu for legacy q-select.
         await input.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Clear and type to filter
         await input.clear();
         await input.fill(metricName);
         await this.page.waitForTimeout(1000);
 
-        // Select from dropdown options
-        const option = this.page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
+        const option = this.page.locator('[role="option"], .q-menu .q-item, .q-virtual-scroll__content .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
             await this.page.waitForTimeout(1500);
@@ -223,23 +224,26 @@ export class MetricsBuilderPage {
     }
 
     /**
-     * Open label filter menu at index
+     * Open label filter menu at index. LabelFilterEditor chip menu is now an
+     * ODropdown ([role="menu"][data-state="open"]) — fall back to legacy .q-menu.
      * @param {number} index - 0-based index
      */
     async openLabelFilterMenu(index) {
         const filterBtn = this.getLabelFilterButton(index);
         await filterBtn.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[role="menu"][data-state="open"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
     }
 
     /**
-     * Select a label name from the label filter dropdown
+     * Select a label name from the label filter dropdown. Inside the migrated
+     * ODropdown, the label picker is an OSelect (Reka Listbox) — options carry
+     * role="option". Fall back to legacy .q-menu .q-item for q-select.
      * @param {string} labelName
      */
     async selectLabel(labelName) {
         const labelDropdown = this.page.locator(this.labelSelect).last();
         await labelDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = labelDropdown.locator('input').first();
@@ -248,11 +252,11 @@ export class MetricsBuilderPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Select from dropdown options
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: labelName }).first();
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
+        const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: labelName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -265,13 +269,13 @@ export class MetricsBuilderPage {
     async selectOperator(operator) {
         const operatorDropdown = this.page.locator(this.operatorSelect).last();
         await operatorDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
-        // Select from dropdown options
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: operator }).first();
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
+        const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: operator }).first();
         if (await option.isVisible({ timeout: 3000 })) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -284,7 +288,7 @@ export class MetricsBuilderPage {
     async selectValue(value) {
         const valueDropdown = this.page.locator(this.valueSelect).last();
         await valueDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = valueDropdown.locator('input').first();
@@ -293,11 +297,11 @@ export class MetricsBuilderPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Select from dropdown options
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: value }).first();
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
+        const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: value }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;
@@ -354,9 +358,9 @@ export class MetricsBuilderPage {
         // Select value
         await this.selectValue(value);
 
-        // Close menu by pressing Escape
+        // Close menu by pressing Escape — LabelFilterEditor chip menu = ODropdown post-migration
         await this.page.keyboard.press('Escape');
-        await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        await this.page.locator('[role="menu"][data-state="open"], .q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // ===== Operations =====
@@ -474,10 +478,10 @@ export class MetricsBuilderPage {
      * @param {string} value
      */
     async setOperationParam(operationIndex, paramIndex, value) {
-        // Open operation menu
+        // Open operation menu — OperationsList chip menu is ODropdown post-migration
         const opBtn = this.page.locator(`[data-test="promql-operation-${operationIndex}"]`);
         await opBtn.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator('[role="menu"][data-state="open"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Find and fill the parameter input
         const paramInput = this.page.locator(`[data-test="promql-operation-param-${paramIndex}"]`).last();
@@ -537,13 +541,14 @@ export class MetricsBuilderPage {
         const qtSelect = this.page.locator(this.queryTypeSelect);
         if (await qtSelect.isVisible({ timeout: 3000 })) {
             await qtSelect.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+            // OSelect (Reka Listbox) post-migration, q-select pre-migration
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
             const label = queryType === 'range' ? 'Range' : 'Instant';
-            const option = this.page.locator(`.q-menu .q-item:has-text("${label}")`).first();
+            const option = this.page.locator(`[role="option"]:has-text("${label}"), .q-menu .q-item:has-text("${label}")`).first();
             if (await option.isVisible({ timeout: 3000 })) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -678,6 +683,9 @@ export class MetricsBuilderPage {
      * Check if label select dropdown has options loaded
      */
     async hasLabelOptions() {
+        // OSelect (Reka Listbox role=option) post-migration; q-select (.q-menu .q-item) pre.
+        const rekaCount = await this.page.locator('[role="listbox"]:visible [role="option"]').count();
+        if (rekaCount > 0) return true;
         const menu = this.page.locator('.q-menu:visible').filter({ has: this.page.locator('.q-item') });
         const count = await menu.first().locator('.q-item').count();
         return count > 0;
@@ -706,7 +714,8 @@ export class MetricsBuilderPage {
         if (!await selector.isVisible({ timeout: 5000 })) return false;
 
         await selector.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        // MetricSelector uses OSelect (Reka Listbox) — fall back to .q-menu legacy
+        await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
         // Type to filter
         const input = selector.locator('input').first();
@@ -715,8 +724,8 @@ export class MetricsBuilderPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Select from dropdown options
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: metricName }).first();
+        // Select from dropdown options (Reka Listbox role=option OR Quasar .q-item)
+        const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: metricName }).first();
         if (await option.isVisible({ timeout: 5000 })) {
             await option.click();
             await this.page.waitForTimeout(1500);
@@ -995,11 +1004,12 @@ export class MetricsBuilderPage {
         const folderDropdown = this.page.locator('[data-test="index-dropdown-stream_type"]');
         if (await folderDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
             await folderDropdown.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-            const option = this.page.locator('.q-menu .q-item').filter({ hasText: folderName }).first();
+            // SelectFolderDropDown is OSelect (Reka Listbox); fall back to legacy .q-menu.
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+            const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: folderName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1014,7 +1024,8 @@ export class MetricsBuilderPage {
         const dashDropdown = this.page.locator('[data-test="dashboard-dropdown-dashboard-selection"]');
         if (await dashDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
             await dashDropdown.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+            // SelectDashboardDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
 
             // Type to filter
             const input = dashDropdown.locator('input').first();
@@ -1023,10 +1034,10 @@ export class MetricsBuilderPage {
                 await this.page.waitForTimeout(1000);
             }
 
-            const option = this.page.locator('.q-menu .q-item').filter({ hasText: dashboardName }).first();
+            const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: dashboardName }).first();
             if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
                 await option.click();
-                await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
                 return true;
             }
         }
@@ -1062,11 +1073,12 @@ export class MetricsBuilderPage {
 
         // Now click the tab dropdown normally
         await tabDropdown.click();
-        await this.page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-        const option = this.page.locator('.q-menu .q-item').filter({ hasText: tabName }).first();
+        // SelectTabDropdown is OSelect (Reka Listbox); fall back to legacy .q-menu.
+        await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        const option = this.page.locator('[role="option"], .q-menu .q-item').filter({ hasText: tabName }).first();
         if (await option.isVisible({ timeout: 3000 }).catch(() => false)) {
             await option.click();
-            await this.page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+            await this.page.locator('[role="listbox"], .q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             return true;
         }
         return false;

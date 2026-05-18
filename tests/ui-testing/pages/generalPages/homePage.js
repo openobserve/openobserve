@@ -313,24 +313,37 @@ export class HomePage {
     // ===== LANGUAGE SELECTION METHODS =====
 
     /**
-     * Get locator for a specific language option by language code
-     * The data-test attribute is on q-item-section, so we need to find the parent clickable q-item
+     * Get locator for a specific language option by language code.
+     * After Header.vue migration the user profile menu is an ODropdown
+     * ([role="menuitem"]) but the language sub-menu was kept in-place (not
+     * supported by ODropdown nesting). The data-test attribute is preserved
+     * either on a q-item-section (Quasar) or directly on a menuitem (ODropdown),
+     * so target the element with data-test and walk up to its clickable ancestor.
      * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
      */
     getLanguageOption(langCode) {
-        // The data-test is on q-item-section, find the parent q-item that's clickable
-        return this.page.locator(`[data-test="language-dropdown-item-${langCode}"]`).locator('xpath=ancestor::div[contains(@class, "q-item")]').first();
+        // Try ODropdown menuitem first (post-migration), fall back to q-item ancestor.
+        return this.page
+            .locator(`[data-test="language-dropdown-item-${langCode}"]`)
+            .locator('xpath=ancestor-or-self::*[@role="menuitem" or contains(@class, "q-item")][1]')
+            .first();
     }
 
     /**
      * Get the language menu item row in the profile dropdown
-     * This is the row that shows "Language" with an arrow to open the submenu
+     * This is the row that shows "Language" with an arrow to open the submenu.
+     * After Header.vue migration the row may be an ODropdownItem ([role="menuitem"])
+     * or a legacy q-item (kept in place for the nested-submenu workaround).
      */
     getLanguageMenuItem() {
-        // Find the q-item that contains "Language" text
-        // This item has the language text and the selected-lang-label showing current language
-        return this.page.locator('.q-item').filter({ hasText: 'Language' }).filter({ has: this.page.locator('.selected-lang-label') }).first();
+        // Match either ODropdown menuitem or Quasar q-item with the Language text
+        // and the selected-lang-label child.
+        return this.page
+            .locator('[role="menuitem"], .q-item')
+            .filter({ hasText: 'Language' })
+            .filter({ has: this.page.locator('.selected-lang-label') })
+            .first();
     }
 
     /**

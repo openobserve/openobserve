@@ -808,8 +808,13 @@ export class AlertDestinationsPage {
         await this.page.waitForTimeout(500);
 
         // Click the option with matching text (capitalize first letter)
+        // Severity dropdown is OSelect (Reka Listbox) post-migration ([role="option"]);
+        // legacy q-select uses .q-item__label.
         const severityLabel = severity.charAt(0).toUpperCase() + severity.slice(1);
-        await this.page.locator(`.q-item__label:has-text("${severityLabel}")`).click();
+        await this.page
+            .locator(`[role="option"]:has-text("${severityLabel}"), .q-item__label:has-text("${severityLabel}")`)
+            .first()
+            .click();
         await this.page.waitForTimeout(500);
         testLogger.debug('Selected severity', { severity });
     }
@@ -2125,8 +2130,11 @@ export class AlertDestinationsPage {
         await select.click();
         await this.page.waitForTimeout(500);
 
-        // Find and click the option in the menu
-        const menuOption = this.page.locator('.q-menu .q-item').filter({ hasText: method.toUpperCase() });
+        // Find and click the option — OSelect (Reka Listbox role=option) post-migration,
+        // q-select (.q-menu .q-item) pre-migration.
+        const menuOption = this.page
+            .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+            .filter({ hasText: method.toUpperCase() });
         await menuOption.waitFor({ state: 'visible', timeout: 5000 });
         await menuOption.click();
 
@@ -2147,14 +2155,18 @@ export class AlertDestinationsPage {
         await select.click();
         await this.page.waitForTimeout(500);
 
-        // Select template - either specific name or first available
+        // Select template — OSelect post-migration, q-select pre-migration
         if (templateName) {
-            const menuOption = this.page.locator('.q-menu .q-item').filter({ hasText: templateName });
+            const menuOption = this.page
+                .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+                .filter({ hasText: templateName });
             await menuOption.waitFor({ state: 'visible', timeout: 5000 });
             await menuOption.click();
         } else {
             // Select first template
-            const firstOption = this.page.locator('.q-menu .q-item').first();
+            const firstOption = this.page
+                .locator('[role="listbox"]:visible [role="option"], .q-menu .q-item')
+                .first();
             await firstOption.waitFor({ state: 'visible', timeout: 5000 });
             await firstOption.click();
         }
