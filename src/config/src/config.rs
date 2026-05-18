@@ -3106,8 +3106,8 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
-        cfg.limit.inverted_index_result_cache_max_entry_size =
+    if cfg.limit.footer_cache_max_size == 0 {
+        cfg.limit.footer_cache_max_size =
             ((cfg.limit.mem_total as f64 * SIZE_IN_MB * 0.05) as usize).clamp(100, 1024);
     }
     Ok(())
