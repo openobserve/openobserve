@@ -207,7 +207,8 @@ export default defineComponent({
     OButton,
     OSelect,
     OIcon,
-},
+    OTooltip,
+  },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {

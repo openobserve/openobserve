@@ -500,6 +500,9 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);

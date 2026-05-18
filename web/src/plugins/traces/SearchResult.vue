@@ -79,19 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
-          <q-pagination
+          <OPagination
             :disable="searchObj.loading"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
-            :input="false"
-            direction-links
-            :boundary-numbers="false"
-            :max-pages="5"
-            :ellipses="false"
-            icon-first="skip_previous"
-            icon-last="skip_next"
-            icon-prev="fast_rewind"
-            icon-next="fast_forward"
             class="float-right paginator-section tw:mt-0!"
             data-test="traces-search-result-pagination"
             @update:model-value="changePage"
@@ -183,6 +174,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -191,6 +183,7 @@ export default defineComponent({
     OButton,
     OTooltip,
     OSelect,
+    OPagination,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),

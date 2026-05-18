@@ -73,8 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <q-slide-transition>
-        <div v-show="showDetails">
+      <div
+        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+        :class="showDetails ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+      >
+        <div class="tw:overflow-hidden tw:min-h-0">
+        <div>
           <q-separator />
           <q-card-section class="tw:pt-4">
             <div class="tw:text-sm details-section">
@@ -172,7 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-card-section>
         </div>
-      </q-slide-transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>

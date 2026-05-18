@@ -314,6 +314,25 @@
   --color-progress-bar-track: var(--color-grey-200);
   --color-progress-bar-label: var(--color-white);
 
+  /* Timeline (OTimeline, OTimelineItem) */
+  --color-timeline-line: var(--color-border-default);
+  --color-timeline-dot-primary: var(--color-primary-600);
+  --color-timeline-dot-success: var(--color-success-500);
+  --color-timeline-dot-destructive: var(--color-error-600);
+  --color-timeline-dot-info: var(--color-primary-500);
+  --color-timeline-dot-muted: var(--color-grey-400);
+  --color-timeline-dot-fg: var(--color-white);
+
+  /* Pagination (OPagination) */
+  --color-pagination-item-text: var(--color-text-secondary);
+  --color-pagination-item-hover-bg: var(--color-surface-subtle-hover);
+  --color-pagination-item-active-bg: var(--color-primary-600);
+  --color-pagination-item-active-text: var(--color-white);
+  --color-pagination-item-disabled-text: var(--color-text-disabled);
+  --color-pagination-nav-text: var(--color-text-secondary);
+  --color-pagination-nav-hover-bg: var(--color-surface-subtle-hover);
+  --color-pagination-nav-disabled-text: var(--color-text-disabled);
+
   /* Field semantic widths (OInput, OTextarea, OSelect) */
   /* xs  ~120px — zip codes, CVV, short numbers          */
   /* sm  ~200px — dates, narrow labels                   */
@@ -967,6 +986,25 @@
   --color-progress-bar-danger: var(--color-progress-bar-danger);
   --color-progress-bar-track: var(--color-progress-bar-track);
   --color-progress-bar-label: var(--color-progress-bar-label);
+
+  /* Timeline (OTimeline, OTimelineItem) */
+  --color-timeline-line: var(--color-timeline-line);
+  --color-timeline-dot-primary: var(--color-timeline-dot-primary);
+  --color-timeline-dot-success: var(--color-timeline-dot-success);
+  --color-timeline-dot-destructive: var(--color-timeline-dot-destructive);
+  --color-timeline-dot-info: var(--color-timeline-dot-info);
+  --color-timeline-dot-muted: var(--color-timeline-dot-muted);
+  --color-timeline-dot-fg: var(--color-timeline-dot-fg);
+
+  /* Pagination (OPagination) */
+  --color-pagination-item-text: var(--color-pagination-item-text);
+  --color-pagination-item-hover-bg: var(--color-pagination-item-hover-bg);
+  --color-pagination-item-active-bg: var(--color-pagination-item-active-bg);
+  --color-pagination-item-active-text: var(--color-pagination-item-active-text);
+  --color-pagination-item-disabled-text: var(--color-pagination-item-disabled-text);
+  --color-pagination-nav-text: var(--color-pagination-nav-text);
+  --color-pagination-nav-hover-bg: var(--color-pagination-nav-hover-bg);
+  --color-pagination-nav-disabled-text: var(--color-pagination-nav-disabled-text);
 
   /* OTable */
   --color-table-header-bg: var(--color-table-header-bg);

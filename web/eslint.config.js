@@ -154,6 +154,18 @@ export default [
           message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.'
         },
         // {
+        //   element: 'q-pagination',
+        //   message: 'Use <OPagination> from "@/lib/navigation/Pagination/OPagination.vue" instead of <q-pagination>.',
+        // },
+        // {
+        //   element: 'q-timeline',
+        //   message: 'Use <OTimeline> from "@/lib/data/Timeline/OTimeline.vue" instead of <q-timeline>.',
+        // },
+        // {
+        //   element: 'q-timeline-entry',
+        //   message: 'Use <OTimelineItem> from "@/lib/data/Timeline/OTimelineItem.vue" instead of <q-timeline-entry>.',
+        // },
+        // {
         //   element: 'q-spinner',
         //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
         // },
