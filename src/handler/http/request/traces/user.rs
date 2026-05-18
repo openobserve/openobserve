@@ -35,7 +35,7 @@ use crate::{
     handler::http::{
         extractors::Headers, request::search::error_utils::map_error_to_http_response,
     },
-    service::{search as SearchService, traces::otel::attributes::OtelAttributes},
+    service::search as SearchService,
 };
 
 /// GetLatestUsers
@@ -198,11 +198,25 @@ pub async fn get_latest_users(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // user_id may appear on the first span only or on all spans of a trace.
-    // _o2_llm_* fields may be on different spans than user_id.
+    // gen_ai_*/llm_* fields may be on different spans than user_id.
     // So we must: get user→trace_id mapping first, then query by trace_id
-    // (which captures ALL spans) to get accurate _o2_llm_* totals.
-    let user_id_col = OtelAttributes::USER_ID;
+    // (which captures ALL spans) to get accurate usage totals.
+    //
+    // Detect schema generation up front so both Phase 1 (user-id column) and
+    // Phase 2 (token/cost columns) pick consistent names.
     let stream_type = StreamType::Traces;
+    let has_gen_ai_fields = super::schema_compat::stream_has_gen_ai_fields(
+        org_id.as_str(),
+        stream_name.as_str(),
+        stream_type,
+    )
+    .await;
+    let llm_cols = if has_gen_ai_fields {
+        super::schema_compat::LlmColumns::current()
+    } else {
+        super::schema_compat::LlmColumns::legacy()
+    };
+    let user_id_col = llm_cols.user_id;
     let user_id_opt = Some(user_id.to_string());
 
     // Get paginated user list with trace_ids per user
@@ -292,16 +306,6 @@ pub async fn get_latest_users(
         .into_iter()
         .collect();
 
-    // Check whether the stream has the new gen_ai_* columns or only the old llm_* columns.
-    let has_gen_ai_fields = infra::schema::get_stream_schema_from_cache(
-        org_id.as_str(),
-        stream_name.as_str(),
-        StreamType::Traces,
-    )
-    .await
-    .map(|s| s.field_with_name("gen_ai_usage_input_tokens").is_ok())
-    .unwrap_or(false);
-
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
     // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
     // Trace IDs originate from ingested data and could contain injected SQL if not validated.
@@ -327,13 +331,14 @@ pub async fn get_latest_users(
             GROUP BY trace_id"
         )
     } else {
-        // Old o2_llm schema: fall back to llm_* columns
+        // Legacy `_o2_llm` schema (pre-PR #11626): tokens live under
+        // `llm_usage_tokens_total` and cost under `llm_usage_cost_total`.
         format!(
             "SELECT trace_id, \
             min(start_time) as trace_start_time, \
             max(end_time) as trace_end_time, \
-            sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
-            CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details \
+            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
+            sum(llm_usage_cost_total) as gen_ai_usage_cost_details \
             FROM \"{stream_name}\" \
             WHERE trace_id IN ('{trace_ids_sql}') \
             GROUP BY trace_id"

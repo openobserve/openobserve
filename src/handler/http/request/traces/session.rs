@@ -203,11 +203,25 @@ pub async fn get_latest_sessions(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
     // session_id may appear on the first span only or on all spans of a trace.
-    // gen_ai_* fields may be on different spans than session_id.
+    // gen_ai_*/llm_* fields may be on different spans than session_id.
     // So we must: get session→trace_id mapping first, then query by trace_id
-    // (which captures ALL spans) to get accurate gen_ai_* totals.
-    let session_id_col = "gen_ai_conversation_id";
+    // (which captures ALL spans) to get accurate usage totals.
+    //
+    // Detect schema generation up front so both Phase 1 (session-id column)
+    // and Phase 2 (token/cost columns) pick consistent names.
     let stream_type = StreamType::Traces;
+    let has_gen_ai_fields = super::schema_compat::stream_has_gen_ai_fields(
+        org_id.as_str(),
+        stream_name.as_str(),
+        stream_type,
+    )
+    .await;
+    let llm_cols = if has_gen_ai_fields {
+        super::schema_compat::LlmColumns::current()
+    } else {
+        super::schema_compat::LlmColumns::legacy()
+    };
+    let session_id_col = llm_cols.session_id;
     let user_id_opt = Some(user_id.to_string());
 
     // Phase 1: Get paginated session list with trace_ids per session
@@ -309,16 +323,6 @@ pub async fn get_latest_sessions(
             function_error: String::new(),
         });
     }
-    // Check whether the stream has the new gen_ai_* columns or only the old llm_* columns.
-    let has_gen_ai_fields = infra::schema::get_stream_schema_from_cache(
-        org_id.as_str(),
-        stream_name.as_str(),
-        StreamType::Traces,
-    )
-    .await
-    .map(|s| s.field_with_name("gen_ai_usage_input_tokens").is_ok())
-    .unwrap_or(false);
-
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
     // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
     // Trace IDs originate from ingested data and could contain injected SQL if not validated.
@@ -349,18 +353,21 @@ pub async fn get_latest_sessions(
             GROUP BY trace_id"
         )
     } else {
-        // Old o2_llm schema: fall back to llm_* columns
+        // Legacy `_o2_llm` schema (pre-PR #11626): columns live under `llm_*`
+        // names. user.id is stored as the flattened `llm_user_id` column,
+        // tokens/cost use the `llm_usage_tokens_*` / `llm_usage_cost_total`
+        // shape, and the messages column is `llm_input`.
         format!(
             "SELECT trace_id, \
-            max(user_id) as user_id,
+            max(llm_user_id) as user_id,
             min(start_time) as trace_start_time, \
             max(end_time) as trace_end_time, \
-            sum(llm_usage_input_tokens) as gen_ai_usage_details_input, \
-            sum(llm_usage_output_tokens) as gen_ai_usage_details_output, \
-            sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
-            CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
+            sum(llm_usage_tokens_input) as gen_ai_usage_details_input, \
+            sum(llm_usage_tokens_output) as gen_ai_usage_details_output, \
+            sum(llm_usage_tokens_total) as gen_ai_usage_details_total, \
+            sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
             sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-            CAST('' AS VARCHAR) as gen_ai_input_messages \
+            FIRST_VALUE(llm_input ORDER BY start_time ASC) FILTER (WHERE llm_input IS NOT NULL AND llm_input != '') as gen_ai_input_messages \
             FROM \"{stream_name}\" \
             WHERE trace_id IN ('{trace_ids_sql}') \
             GROUP BY trace_id"
@@ -607,6 +614,10 @@ impl SessionDetails {
         } else {
             0
         };
+        // HashSet → Vec produces non-deterministic order; sort so callers
+        // (and tests) see a stable result.
+        let mut user_ids: Vec<String> = user_ids.into_iter().collect();
+        user_ids.sort();
         SessionDetails {
             session_id,
             start_time,
@@ -618,7 +629,7 @@ impl SessionDetails {
             gen_ai_usage_total_tokens: usage_total,
             gen_ai_usage_cost: cost_total,
             error_count,
-            user_ids: user_ids.into_iter().collect(),
+            user_ids,
             first_user_message,
         }
     }
@@ -996,6 +1007,51 @@ mod tests {
         assert_eq!(session.trace_count, 2);
         assert_eq!(session.start_time, 1000);
         assert_eq!(session.end_time, 3000);
+        assert_eq!(session.user_ids, vec!["user-a", "user-b"]);
+    }
+
+    #[test]
+    fn test_from_trace_details_user_ids_sorted() {
+        // user_ids are collected into a HashSet; ensure the final Vec is sorted
+        // so output is deterministic regardless of hash iteration order.
+        let details: Vec<TraceDetail> = ["zeta", "alpha", "mike", "bravo"]
+            .iter()
+            .enumerate()
+            .map(|(i, uid)| TraceDetail {
+                start_time: 1000 + i as i64,
+                end_time: 2000 + i as i64,
+                user_id: Some((*uid).to_string()),
+                ..Default::default()
+            })
+            .collect();
+        let session =
+            SessionDetails::from_trace_details("sess-1".to_string(), details.len(), &details);
+        assert_eq!(session.user_ids, vec!["alpha", "bravo", "mike", "zeta"]);
+    }
+
+    #[test]
+    fn test_from_trace_details_user_ids_deduplicated() {
+        let details = vec![
+            TraceDetail {
+                start_time: 1000,
+                end_time: 2000,
+                user_id: Some("user-a".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 1500,
+                end_time: 3000,
+                user_id: Some("user-a".to_string()),
+                ..Default::default()
+            },
+            TraceDetail {
+                start_time: 2000,
+                end_time: 4000,
+                user_id: Some("user-b".to_string()),
+                ..Default::default()
+            },
+        ];
+        let session = SessionDetails::from_trace_details("sess-1".to_string(), 3, &details);
         assert_eq!(session.user_ids, vec!["user-a", "user-b"]);
     }
 
