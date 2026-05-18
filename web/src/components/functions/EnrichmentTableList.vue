@@ -376,7 +376,7 @@ export default defineComponent({
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "left" } },
-      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
+      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left", autoWidth: true } },
       { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },

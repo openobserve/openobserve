@@ -257,8 +257,7 @@ export default defineComponent({
         accessorKey: "name",
         header: t("function.name"),
         sortable: true,
-        size: 'auto',
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "actions",
