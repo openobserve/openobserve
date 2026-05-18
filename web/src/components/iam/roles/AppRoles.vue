@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
-    <div class="card-container tw:flex tw:flex-col tw:h-[calc(100vh-var(--navbar-height)-1.5rem)]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[56px] tw:shrink-0"
-        >
+    <div class="card-container tw:mb-[0.625rem]">
+      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
         <div
           data-test="iam-roles-section-title"
           class="q-table__title tw:font-[600]"
@@ -26,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.roles") }}
         </div>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
+
             <div data-test="iam-roles-search-input">
               <OInput
                 v-model="filterQuery"
@@ -43,23 +43,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm"
               @click="addRole"
+
             >
-              {{ t('iam.addRole') }}
-            </OButton>
+              <template #prepend>
+                <q-icon class="o2-search-input-icon" name="search" />
+              </template>
+            </OInput>
           </div>
+          <OButton
+            data-test="alert-list-add-alert-btn"
+            variant="primary"
+            size="sm"
+            @click="addRole"
+          >
+            {{ t('iam.addRole') }}
+          </OButton>
+        </div>
       </div>
-      <div class="tw:flex-1 tw:min-h-0">
-    <RoleTable
-      data-test="iam-roles-table-section"
-      :data="rows"
-      :selected-ids="selectedRoleNames"
-      @update:selected-ids="onSelectionChange"
-      @edit="editRole"
-      @delete="showConfirmDialog"
-      @bulk-delete="openBulkDeleteDialog"
-    />
-  </div>
-  </div>
+    </div>
+    <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
+      <RoleTable
+        data-test="iam-roles-table-section"
+        :data="rows"
+        :global-filter="filterQuery"
+        :selected-ids="selectedRoleNames"
+        @update:selected-ids="onSelectionChange"
+        @edit="editRole"
+        @delete="showConfirmDialog"
+        @bulk-delete="openBulkDeleteDialog"
+      />
+    </div>
   </div>
   <AddRole
     v-model:open="showAddGroup"
@@ -102,6 +115,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const { t } = useI18n();
 
 const { track } = useReo();
+
+const filterQuery = ref("");
 
 const showAddGroup = ref(false);
 

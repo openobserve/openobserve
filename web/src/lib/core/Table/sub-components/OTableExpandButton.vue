@@ -21,7 +21,7 @@ defineEmits<{
     @click.stop="$emit('toggle')"
   >
     <OIcon
-      :name="expanded ? 'expand_less' : 'expand_more'"
+      :name="expanded ? 'expand-less' : 'expand-more'"
       size="1rem"
     />
   </button>

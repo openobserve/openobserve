@@ -158,22 +158,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
         <div class="card-container tw:h-[calc(100vh-127px)]">
           <OTable
+            :key="activeTab"
             data-test="pipeline-list-table"
             :data="filteredPipelines"
             :columns="otableColumns"
             row-key="pipeline_id"
             :global-filter="filterQuery"
+            :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
             v-model:selected-ids="selectedPipelineIds"
-            :expansion="activeTab === 'realtime' ? 'none' : 'single'"
+            :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
+            :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
+            :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'tw:cursor-pointer' : ''"
             v-model:expanded-ids="expandedId"
+
             style="
               width: 100%;
               height: calc(100vh - var(--navbar-height) - 77px);
             "
             @row-click="handleRowClick"
+
           >
             <template #cell-actions="{ row }">
               <div class="tw:flex tw:items-center actions-container">
@@ -619,21 +625,11 @@ const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
 
-const otableColumns = computed(() => {
-  if (activeTab.value === "scheduled") {
-    return columns.value.filter((c: any) => c.id !== "#");
-  }
-  return columns.value;
-});
+const otableColumns = computed(() => columns.value);
 
 const updateActiveTab = () => {
+  expandedId.value = [];
   if (activeTab.value === "all") {
-    filteredPipelines.value = pipelines.value.map(
-      (pipeline: any, index: any) => ({
-        ...pipeline,
-        "#": index + 1,
-      }),
-    );
     columns.value = getColumnsForActiveTab(activeTab.value);
     filteredPipelines.value = pipelines.value;
     return;
@@ -643,7 +639,7 @@ const updateActiveTab = () => {
     .filter((pipeline: any) => pipeline.source.source_type === activeTab.value)
     .map((pipeline: any, index) => ({
       ...pipeline,
-      "#": index + 1,
+      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
     }));
 
   columns.value = getColumnsForActiveTab(activeTab.value);
@@ -697,17 +693,6 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     });
 };
 
-const handleRowClick = (row: any) => {
-  if (row.source?.source_type === "realtime") {
-    expandedId.value = [];
-    return;
-  }
-  if (expandedId.value.includes(row.pipeline_id)) {
-    expandedId.value = [];
-  } else {
-    expandedId.value = [row.pipeline_id];
-  }
-};
 
 const getColumnsForActiveTab = (tab: any) => {
   const hashColumn = {
@@ -723,6 +708,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
+    size: 'auto',
     meta: { align: "left" },
   };
   const streamNameColumn = {
@@ -872,7 +858,7 @@ const getPipelines = async () => {
       pipeline.edges = updatedEdges;
       return {
         ...pipeline,
-        "#": index + 1,
+        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       };
     });
   } catch (error) {

@@ -23,9 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :style="{ height: 'calc(100vh - var(--navbar-height))' }"
   >
     <!-- searchBar at top -->
-    <div class="tw:shrink-0 tw:px-[0.625rem] tw:pt-[0.325rem]">
-      <div class="card-container">
-        <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4">
+
+    <div class="tw:shrink-0 tw:px-[0.625rem] tw:pt-[0.625rem]">
+      <div class="card-container tw:mb-[0.625rem]">
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
+        >
+
           <div class="q-table__title">{{ t("dashboard.header") }}</div>
 
           <div
@@ -240,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: Table -->
       <div class="tw:flex-1 tw:min-w-0 tw:h-full">
         <div class="tw:h-full card-container">
+
           <!-- add dashboard table -->
           <OTable
             ref="oTableRef"
@@ -247,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :global-filter="filterQuery"
+            :show-global-filter="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
@@ -266,6 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="value && value.length > 30"
                   :content="value"
                   max-width="300px"
+
                 />
               </div>
             </template>

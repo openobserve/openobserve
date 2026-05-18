@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${row.name}-explore-btn`"
                     :title="t('logStream.explore')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="exploreEnrichmentTable(row)"
                     icon-left="search"
                   />
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
                     :title="t('logStream.schemaHeader')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="listSchema(row)"
                     icon-left="format-list-bulleted"
                   />
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed' || row.aggregateStatus === 'failed'"
                     :title="t('function.enrichmentTables')"
                     variant="ghost"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="showAddUpdateFn(row)"
                     icon-left="edit"
                   />
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     :title="t('function.delete')"
                     variant="ghost-destructive"
-                    size="icon-sm"
+                    size="icon-circle-sm"
                     @click="showDeleteDialogFn(row)"
                     icon-left="delete"
                   />
@@ -376,7 +376,7 @@ export default defineComponent({
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "left" } },
-      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
+      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left", autoWidth: true } },
       { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },

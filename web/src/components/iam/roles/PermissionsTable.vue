@@ -144,6 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
           </template>
+          <template #empty>
+            <NoData />
+          </template>
         </OTable>
       </div>
     </div>
@@ -157,6 +160,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   selectedPermissionsHash: {

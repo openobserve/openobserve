@@ -3,6 +3,7 @@
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
@@ -13,6 +14,7 @@ defineProps<{
   data: any[];
   loading?: boolean;
   selectedIds?: string[];
+  globalFilter?: string;
 }>();
 
 const emit = defineEmits<{
@@ -58,6 +60,7 @@ const columns: OTableColumnDef[] = [
     :columns="columns"
     :loading="loading"
     :selected-ids="selectedIds"
+    :global-filter="globalFilter"
     pagination="client"
     :page-size="20"
     sorting="client"
@@ -65,6 +68,7 @@ const columns: OTableColumnDef[] = [
     row-key="role_name"
     filter-mode="client"
     :default-columns="false"
+    :show-global-filter="false"
     @update:selected-ids="emit('update:selectedIds', $event)"
   >
     <!-- Row actions: edit + delete -->
@@ -89,6 +93,10 @@ const columns: OTableColumnDef[] = [
           <OIcon name="delete" size="sm" />
         </OButton>
       </div>
+    </template>
+
+    <template #empty>
+      <NoData />
     </template>
 
     <!-- Bottom: bulk action in pagination bar -->

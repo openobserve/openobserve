@@ -59,6 +59,12 @@ const alignClass = computed(() => {
   return "tw:text-left";
 });
 
+const slotAlignClass = computed(() => {
+  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full";
+  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full";
+  return "tw:flex tw:items-center tw:w-full";
+});
+
 const isAction = computed(() => meta.value?.isAction ?? false);
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -133,19 +139,18 @@ function handleClick() {
   <td
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
-      meta?.compactPadding ? 'tw:px-1 tw:py-0.5 tw:align-middle' : 'tw:px-2 tw:py-1 tw:align-middle',
+      meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle',
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
-      dense ? 'tw:py-0.5' : '',
       alignClass,
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
-      isPinned && !isAction ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
+      isPinned ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
       wrap ? 'tw:break-words tw:whitespace-normal' : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
     ]"
     :style="cellStyle"
     @click="handleClick"
   >
-    <slot v-if="$slots.default" />
+    <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
     <!-- Custom cell render via TanStack FlexRender -->
     <FlexRender
       v-else-if="cell.column.columnDef.cell"

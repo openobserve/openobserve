@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="id"
           :loading="isLoading"
           :global-filter="filterQuery"
+          :show-global-filter="false"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
@@ -97,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
                 icon-left="edit"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-circle-sm"
                 :title="t('common.edit')"
                 @click="goToEdit(row)"
               />
@@ -105,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`eval-template-list-${row.name}-delete-btn`"
                 icon-left="delete"
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-circle-sm"
                 :title="t('common.delete')"
                 @click="confirmDelete(row)"
               />
@@ -219,7 +220,7 @@ const columns = ref([
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "response_type",
