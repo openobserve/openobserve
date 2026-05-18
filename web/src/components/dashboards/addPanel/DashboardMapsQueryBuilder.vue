@@ -68,17 +68,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-name-item-${nameLabel}`"
-          >
-            {{ nameLabel }}
-            <template #icon-right
-              ><OIcon name="arrow-drop-down" size="sm"
-            /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-name-item-${nameLabel}`"
+              >
+                {{ nameLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div
@@ -114,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
@@ -191,17 +195,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
-          >
-            {{ valueLabel }}
-            <template #icon-right
-              ><OIcon name="arrow-drop-down" size="sm"
-            /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
+              >
+                {{ valueLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div
@@ -237,8 +245,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
@@ -297,12 +305,14 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
     OButtonGroup,
     OButton,
+    ODropdown,
     SortByBtnGrp,
     CommonAutoComplete,
     SanitizedHtmlRenderer,
@@ -645,12 +655,12 @@ export default defineComponent({
   padding: 0;
 }
 
-.q-menu {
+.dashboard-maps-query-builder-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }
