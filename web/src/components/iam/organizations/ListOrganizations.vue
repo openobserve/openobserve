@@ -125,6 +125,7 @@ export default defineComponent({
     AddUpdateOrganization,
     NoData,
     OButton,
+    OInput,
     OIcon,
     OTable,
 },
