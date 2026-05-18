@@ -61,15 +61,14 @@ impl BytesCache {
     }
 
     pub fn put(&self, key: String, value: Bytes) {
-        // NOTE: if key already exists, drop the second key and value
-        if self.readers.contains_key(&key) {
-            return;
-        }
-
         let value_len = (value.len() + key.len() * 2) as i64;
 
         {
             let mut w = self.cacher.lock();
+            // NOTE: if key already exists, drop the second key and value
+            if self.readers.contains_key(&key) {
+                return;
+            }
             w.push_back(key.clone());
             self.readers.insert(key, value);
         }
@@ -121,5 +120,92 @@ impl BytesCache {
         metrics::BYTES_CACHE_GC_TIME
             .with_label_values(&[&self.tag])
             .observe(elapsed);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_max_size_limit_evicts_oldest_entries() {
+        let cache = BytesCache::new(100, "test".to_string());
+
+        // Insert entries that exceed the max_bytes limit
+        // Each key is 5 chars, value is 90 bytes -> memory = 90 + 5*2 = 100
+        cache.put("key-1".to_string(), Bytes::from(vec![0u8; 90]));
+        // Total: 100, right at the limit — no eviction
+        assert!(cache.get("key-1").is_some());
+
+        // This pushes memory over the limit -> should evict key-1
+        cache.put("key-2".to_string(), Bytes::from(vec![1u8; 90]));
+        // key-1 should be evicted (oldest), key-2 should remain
+        assert!(
+            cache.get("key-1").is_none(),
+            "oldest entry should be evicted"
+        );
+        assert!(cache.get("key-2").is_some(), "newest entry should remain");
+    }
+
+    #[test]
+    fn test_max_size_limit_memory_stays_below_limit() {
+        let cache = BytesCache::new(200, "test".to_string());
+
+        // Insert many small entries until memory exceeds the limit
+        for i in 0..100 {
+            cache.put(format!("key-{i}"), Bytes::from(vec![0u8; 50]));
+        }
+
+        // After eviction, current memory should be <= max_bytes
+        let mem = cache.current_memory.load(Ordering::Relaxed);
+        assert!(mem <= 200, "memory {mem} should not exceed max_bytes 200");
+    }
+
+    #[test]
+    fn test_duplicate_key_does_not_increase_memory() {
+        let cache = BytesCache::new(500, "test".to_string());
+
+        cache.put("dup".to_string(), Bytes::from(vec![0u8; 100]));
+        let mem_after_first = cache.current_memory.load(Ordering::Relaxed);
+
+        // Inserting the same key again should be a no-op
+        cache.put("dup".to_string(), Bytes::from(vec![0u8; 100]));
+        let mem_after_second = cache.current_memory.load(Ordering::Relaxed);
+
+        assert_eq!(
+            mem_after_first, mem_after_second,
+            "duplicate key should not increase memory"
+        );
+    }
+
+    #[test]
+    fn test_eviction_stops_when_below_limit() {
+        let cache = BytesCache::new(300, "test".to_string());
+
+        // Insert enough entries to trigger eviction
+        for i in 0..10 {
+            cache.put(format!("k{i}"), Bytes::from(vec![0u8; 100]));
+        }
+
+        let remaining = cache.current_memory.load(Ordering::Relaxed);
+        assert!(
+            remaining <= 300,
+            "eviction should bring memory {remaining} within limit 300"
+        );
+
+        // The newest entries should still be present
+        assert!(cache.get("k9").is_some(), "newest entry should survive");
+    }
+
+    #[test]
+    fn test_zero_max_bytes_evicts_all() {
+        let cache = BytesCache::new(0, "test".to_string());
+
+        cache.put("key".to_string(), Bytes::from(vec![0u8; 10]));
+        assert!(
+            cache.get("key").is_none(),
+            "entry should be evicted immediately"
+        );
+        assert_eq!(cache.current_memory.load(Ordering::Relaxed), 0);
     }
 }
