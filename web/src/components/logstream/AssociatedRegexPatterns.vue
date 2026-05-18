@@ -520,7 +520,7 @@
                   <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">
                     applying regular expressions to your fields.
                   </span>
-              </div>
+              </OButton>
             </div>
           </div>
         </div>
@@ -573,6 +573,7 @@ import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
 import { debounce } from 'quasar';
 import store from '@/test/unit/helpers/store';
+import { useToast } from '@/lib/feedback/Toast/useToast';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
@@ -686,7 +687,7 @@ export default defineComponent({
       },
       300,
     );
-    const $q = useQuasar();
+    const { toast } = useToast();
     const userClickedPattern = ref<any>(null);
     const isPatternValid = ref(false);
     const testString = ref("");
@@ -717,8 +718,8 @@ export default defineComponent({
         );
         outputString.value = response.data.results[0];
       } catch (error) {
-        $q.notify({
-          color: "negative",
+        toast({
+          variant: "error",
           message: error.response?.data?.message || "Failed to test string",
           timeout: 4000,
         });
@@ -767,144 +768,31 @@ export default defineComponent({
       }
     });
 
-        const allPatternsExpanded = ref(true);
-        const appliedPatternsExpanded = ref(true);
-        const appliedPatternsMap = ref(new Map());
-        // Add a flag to track if patterns were added or removed
-        const hasPatternChanges = ref(false);
-        // Add a debounced emit function
-        const debouncedEmit = debounce((pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
-          emit("updateAppliedPattern", pattern, fieldName, patternId, attribute);
-        }, 300);
-        const userClickedPattern = ref<any>(null);
-        const isPatternValid = ref(false);
-        const testString = ref("");
-        const policy = ref("Redact");
-        const apply_at = ref<any>([]);
-        const appliedPatternsExpandedRef = ref<any>(null);
-        const allPatternsExpandedRef = ref<any>(null);
-        const isFormDirty = ref(false);
-        const queryEditorRef = ref<any>(null);
-        const testLoading = ref(false);
-        const showWarningDialogToRemovePattern = ref(false);
-        const outputString = ref("");
-        const expandState = ref({
-          regexTestString: true,
-          outputString: false
-        });
-
-        const testStringOutput = async () => {
-          try{
-            expandState.value.outputString = true;
-            outputString.value = "";
-            testLoading.value = true;
-            const response = await regexPatternsService.test(store.state.selectedOrganization.identifier, userClickedPattern.value.pattern, [testString.value], policy.value);
-            outputString.value = response.data.results[0];
-          } catch (error) {
-            toast({
-              message: error.response?.data?.message || "Failed to test string",
-              timeout: 4000,
-            });
-          }
-          finally{
-            testLoading.value = false;
-          }
-        }
-
+    watch(
+      () => userClickedPattern.value,
+      (newVal) => {
+        if (!newVal) return;
+        const appliedPattern = appliedPatternsMap.value.get(newVal.pattern_id);
         if (appliedPattern) {
-          // Use the applied pattern's settings
           let applied_at_value = appliedPattern.apply_at;
           if (applied_at_value == "Both") {
             apply_at.value = ["AtIngestion", "AtSearch"];
           } else {
             apply_at.value = applied_at_value ? [applied_at_value] : [];
           }
-          resetInputValues();
-        })
-        //this runs when users clicks on add / remove pattern button 
-        //to update the applied patterns list
-        watch(()=> props.data.length, (newVal) => {
-          isFormDirty.value = true;
-          appliedPatterns.value = [...props.data];
-          // Update our map when applied patterns change
-          //because we need to check further if the pattern is applied or not
-          appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
-        })
-        watch(()=> policy.value, (newVal) => {
-          if(checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)){
-            let updatedPattern = {
-              ...userClickedPattern.value,
-              policy: newVal,
-            }
-            // Use debounced emit for policy changes
-            debouncedEmit(updatedPattern, props.fieldName, userClickedPattern.value.pattern_id, "policy");
-          }
-        })
-        watch(()=> apply_at.value, (newVal) => {
-          if(checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)){
-            //here we need to handle if user deselects the apply_at value then we need to show a message to the user 
-            //that they are willing to remove the pattern from the field if yes we can do that otherwise we need to show the user 
-            //the previous value of apply_at only
-            if(newVal.length == 0){
-              showWarningToRemovePattern();
-            }
-            let apply_at_value = "";
-            if(newVal.length == 2){
-              apply_at_value = 'Both';
-            }
-            else{
-              apply_at_value = newVal[0];
-            }
-            let updatedPattern = {
-              ...userClickedPattern.value,
-              apply_at: apply_at_value
-            }
-            // Use debounced emit for apply_at changes
-            debouncedEmit(updatedPattern, props.fieldName, userClickedPattern.value.pattern_id, "apply_at");
-          }
-        })
-
-
-        const getRegexPatterns = async () => {
-            listLoading.value = true;
-            try{
-              const response = await regexPatternsService.list(store.state.selectedOrganization.identifier);
-              let counter = 1;
-              allPatterns.value = response.data.patterns.map((pattern: any) => ({
-                ...pattern,
-                "#": counter <= 9 ? `0${counter++}` : counter++,
-                created_at: convertUnixToQuasarFormat(pattern.created_at),
-                updated_at: convertUnixToQuasarFormat(pattern.updated_at),
-                pattern_name: pattern.name,
-                pattern_id: pattern.id,
-                field: props.fieldName
-              }));
-              store.dispatch("setRegexPatterns", allPatterns.value);
-            } catch (error) {
-              toast({
-                message: error?.response?.data?.message || error?.data?.message || "Error fetching regex patterns",
-              });
-            }
-            finally{
-              listLoading.value = false;
-            }
-          }
-        const checkIfPatternIsApplied = (patternId: string) => {
-          // Use Map for O(1) lookup instead of array search
-          return appliedPatternsMap.value.has(patternId);
+          policy.value = appliedPattern.policy || "Redact";
+        } else {
+          apply_at.value = [];
+          policy.value = "Redact";
         }
         resetInputValues();
       },
     );
-    //this runs when users clicks on add / remove pattern button
-    //to update the applied patterns list
     watch(
       () => props.data.length,
-      (newVal) => {
+      () => {
         isFormDirty.value = true;
         appliedPatterns.value = [...props.data];
-        // Update our map when applied patterns change
-        //because we need to check further if the pattern is applied or not
         appliedPatternsMap.value = new Map(
           props.data.map((p: any) => [p.pattern_id, p]),
         );
@@ -920,7 +808,6 @@ export default defineComponent({
             ...userClickedPattern.value,
             policy: newVal,
           };
-          // Use debounced emit for policy changes
           debouncedEmit(
             updatedPattern,
             props.fieldName,
@@ -936,54 +823,9 @@ export default defineComponent({
         if (
           checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
         ) {
-          //here we need to handle if user deselects the apply_at value then we need to show a message to the user
-          //that they are willing to remove the pattern from the field if yes we can do that otherwise we need to show the user
-          //the previous value of apply_at only
           if (newVal.length == 0) {
             showWarningToRemovePattern();
           }
-          else{
-            if(apply_at.value.length == 0){
-              toast({
-                message: "Please select detect at option",
-              });
-              return;
-            }
-            let apply_at_value = "";
-            //add pattern
-            if(apply_at.value.length == 2){
-              apply_at_value = 'Both';
-            }
-            else{
-              apply_at_value = apply_at.value[0];
-            }
-            const pattern = {
-              field: props.fieldName,
-              pattern_name: userClickedPattern.value.pattern_name,
-              pattern_id: userClickedPattern.value.pattern_id,
-              policy: policy.value,
-              apply_at: apply_at_value,
-              pattern: userClickedPattern.value.pattern,
-              description: userClickedPattern.value.description
-            }
-            emit("addPattern", pattern);
-            // Let the watcher handle updating appliedPatterns
-            appliedPatternsMap.value.set(pattern.pattern_id, pattern);
-            // Set flag when pattern is added
-            hasPatternChanges.value = true;
-            isFormDirty.value = true;
-          }
-          //this is for safety to close the warning dialog whenever user clicks on add or remove pattern button
-          showWarningDialogToRemovePattern.value = false;
-
-        }
-        //why this check because user might update the policy or apply_at value of already applied pattern 
-        //so we need to check if the policy or apply_at value is changed and if it is then we need to update the isFormDirty value
-        //so that the user can see the update changes button
-        //after this we need to add the logic to add this to add array
-        const checkIfPatternIsAppliedAndUpdate = (patternId: string) => {
-          // Use Map for O(1) lookup instead of array search
-          const applied_pattern = appliedPatternsMap.value.get(patternId);
           let apply_at_value = "";
           if (newVal.length == 2) {
             apply_at_value = "Both";
@@ -994,7 +836,6 @@ export default defineComponent({
             ...userClickedPattern.value,
             apply_at: apply_at_value,
           };
-          // Use debounced emit for apply_at changes
           debouncedEmit(
             updatedPattern,
             props.fieldName,
@@ -1023,13 +864,12 @@ export default defineComponent({
         }));
         store.dispatch("setRegexPatterns", allPatterns.value);
       } catch (error) {
-        $q.notify({
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message ||
             error?.data?.message ||
             "Error fetching regex patterns",
-          color: "negative",
-          icon: "error",
         });
       } finally {
         listLoading.value = false;
@@ -1080,10 +920,9 @@ export default defineComponent({
         isFormDirty.value = true;
       } else {
         if (apply_at.value.length == 0) {
-          $q.notify({
+          toast({
+            variant: "error",
             message: "Please select detect at option",
-            color: "negative",
-            icon: "error",
           });
           return;
         }
