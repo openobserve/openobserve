@@ -115,6 +115,26 @@
       </FieldRow>
     </template>
 
+    <!-- Loading skeleton -->
+    <template #loading>
+      <div
+        data-test="logs-fieldlist-loading-skeleton"
+        class="tw:flex tw:flex-col"
+      >
+        <div
+          v-for="i in 8"
+          :key="i"
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]"
+        >
+          <OSkeleton
+            type="rect"
+            class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
+          />
+          <OSkeleton type="text" class="tw:flex-1" />
+        </div>
+      </div>
+    </template>
+
     <!-- Empty state -->
     <template #empty>
       <div
@@ -159,6 +179,7 @@ import FieldListPagination from "./FieldListPagination.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 const { t } = useI18n();
 
