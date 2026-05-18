@@ -20,7 +20,7 @@ use config::{
     metrics,
     utils::json,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
@@ -529,7 +529,7 @@ struct SessionDetails {
     gen_ai_usage_total_tokens: i64,
     gen_ai_usage_cost: f64,
     error_count: i64,
-    users: Vec<String>,
+    user_ids: Vec<String>,
     first_user_message: Option<String>,
 }
 
@@ -542,7 +542,7 @@ impl SessionDetails {
         let mut usage_total: i64 = 0;
         let mut cost_total: f64 = 0.0;
         let mut error_count: i64 = 0;
-        let mut user_ids: Vec<String> = Vec::with_capacity(details.len());
+        let mut user_ids: HashSet<String> = HashSet::with_capacity(details.len());
         let mut first_user_message: Option<String> = None;
         let mut earliest_user_msg_time: i64 = 0;
         for detail in details {
@@ -558,7 +558,7 @@ impl SessionDetails {
             cost_total += detail.gen_ai_usage_cost;
             error_count += detail.error_count;
             if let Some(ref uid) = detail.user_id {
-                user_ids.push(uid.clone());
+                user_ids.insert(uid.clone());
             }
             if let Some(ref msg) = detail.first_user_message
                 && (first_user_message.is_none()
@@ -585,7 +585,7 @@ impl SessionDetails {
             gen_ai_usage_total_tokens: usage_total,
             gen_ai_usage_cost: cost_total,
             error_count,
-            users: user_ids,
+            user_ids: user_ids.into_iter().collect(),
             first_user_message,
         }
     }
@@ -914,7 +914,7 @@ mod tests {
         assert_eq!(session.gen_ai_usage_total_tokens, 0);
         assert_eq!(session.gen_ai_usage_cost, 0.0);
         assert_eq!(session.error_count, 0);
-        assert!(session.users.is_empty());
+        assert!(session.user_ids.is_empty());
         assert!(session.first_user_message.is_none());
     }
 
@@ -963,7 +963,7 @@ mod tests {
         assert_eq!(session.trace_count, 2);
         assert_eq!(session.start_time, 1000);
         assert_eq!(session.end_time, 3000);
-        assert_eq!(session.users, vec!["user-a", "user-b"]);
+        assert_eq!(session.user_ids, vec!["user-a", "user-b"]);
     }
 
     #[test]
@@ -983,7 +983,7 @@ mod tests {
             },
         ];
         let session = SessionDetails::from_trace_details("sess-1".to_string(), 2, &details);
-        assert_eq!(session.users, vec!["user-a"]);
+        assert_eq!(session.user_ids, vec!["user-a"]);
     }
 
     #[test]
