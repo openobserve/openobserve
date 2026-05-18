@@ -180,8 +180,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="kpi-cell">
-          <div class="kpi-label">Tokens</div>
-          <div class="kpi-value">{{ formatTokens(detail.tokens) }}</div>
+          <div class="kpi-label">Input Tokens</div>
+          <div class="kpi-value">{{ formatTokens(detail.inputTokens) }}</div>
+        </div>
+        <div class="kpi-cell">
+          <div class="kpi-label">Output Tokens</div>
+          <div class="kpi-value">{{ formatTokens(detail.outputTokens) }}</div>
         </div>
         <div class="kpi-cell">
           <div class="kpi-label">Cost</div>
@@ -207,7 +211,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(t, i) in filteredTraces"
           :key="t.traceId"
           class="turn-card"
-          :class="{ 'turn-card--error': t.status === 'error' }"
+          :class="{
+            'turn-card--error': t.status === 'error',
+            'turn-card--ok': t.status === 'ok',
+          }"
         >
           <!-- Row header (always visible, click to expand) -->
           <div
@@ -250,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="t.tokens"
               class="tw:text-[0.7rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
             >
-              {{ formatTokens(t.tokens) }}
+              {{ formatTokens(t.inputTokens) }} → {{ formatTokens(t.outputTokens) }} (Σ {{ formatTokens(t.tokens) }})
             </span>
             <span class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.25rem]">
               <span
@@ -342,19 +349,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="stat-section">
                   <div class="stat-label">Status</div>
                   <div
-                    class="stat-value"
-                    :class="
-                      t.status === 'error'
-                        ? 'tw:text-[var(--o2-status-error-text)]'
-                        : ''
-                    "
+                    class="stat-value tw:inline-flex tw:items-center tw:gap-1 tw:rounded tw:px-2 tw:py-0.5 tw:text-[0.75rem] tw:font-semibold"
+                    :class="statusBadgeClass(t.status)"
                   >
-                    <q-icon
-                      :name="t.status === 'error' ? 'close' : 'check'"
-                      size="14px"
-                      class="tw:mr-[0.25rem]"
+                    <span
+                      class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-full tw:flex-shrink-0"
+                      :class="statusDotClass(t.status)"
                     />
-                    {{ t.status }}
+                    {{ t.status.charAt(0).toUpperCase() + t.status.slice(1) }}
                   </div>
                 </div>
                 <div v-if="t.model" class="stat-section">
@@ -690,6 +692,15 @@ function statusBadgeClass(s: SessionTraceRow["status"]): string {
   }
 }
 
+function statusDotClass(s: SessionTraceRow["status"]): string {
+  switch (s) {
+    case "error":
+      return "tw:bg-[var(--o2-service-health-critical)]";
+    default:
+      return "tw:bg-[var(--o2-service-health-healthy,#16a34a)]";
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -700,7 +711,7 @@ onMounted(load);
 
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.5rem;
 
   @media (max-width: 900px) {
@@ -737,7 +748,21 @@ onMounted(load);
   transition: border-color 0.15s ease;
 
   &--error {
-    border-color: var(--o2-service-health-critical);
+    border-left: 3px solid var(--o2-service-health-critical);
+    background: color-mix(
+      in srgb,
+      var(--o2-service-health-critical) 4%,
+      var(--o2-card-bg)
+    );
+  }
+
+  &--ok {
+    border-left: 3px solid var(--o2-service-health-healthy, #16a34a);
+    background: color-mix(
+      in srgb,
+      var(--o2-service-health-healthy, #16a34a) 4%,
+      var(--o2-card-bg)
+    );
   }
 }
 

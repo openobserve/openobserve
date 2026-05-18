@@ -27,6 +27,8 @@ export interface SessionDetail {
   firstSeenMicros: number;
   durationNanos: number;
   turns: number;
+  inputTokens: number;
+  outputTokens: number;
   tokens: number;
   cost: number;
   errorCount: number;
@@ -291,6 +293,8 @@ export function useSessions() {
     // Roll the per-trace rows up into the session-level detail.
     let firstSeenNanos = Infinity;
     let lastSeenNanos = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
     let totalTokens = 0;
     let totalCost = 0;
     let totalErrors = 0;
@@ -302,6 +306,8 @@ export function useSessions() {
       const en = Number(r.end_time) || 0;
       if (sn && sn < firstSeenNanos) firstSeenNanos = sn;
       if (en > lastSeenNanos) lastSeenNanos = en;
+      totalInputTokens += t.inputTokens;
+      totalOutputTokens += t.outputTokens;
       totalTokens += t.tokens;
       totalCost += t.cost;
       totalErrors += t.errorCount;
@@ -317,6 +323,8 @@ export function useSessions() {
       durationNanos:
         lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
       turns: traces.length,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
       tokens: totalTokens,
       cost: totalCost,
       errorCount: totalErrors,

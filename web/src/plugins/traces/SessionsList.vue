@@ -204,9 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tokens -->
         <template #cell-tokens="{ item }">
-          <span class="tw:text-[0.75rem]">
-            {{ formatTokens(item.tokens) }}
-            <q-tooltip>{{ item.tokens.toLocaleString() }}</q-tooltip>
+          <span class="tw:text-[0.75rem] tw:tabular-nums">
+            {{ formatTokens(item.inputTokens) }} → {{ formatTokens(item.outputTokens) }} (Σ {{ formatTokens(item.tokens) }})
+            <q-tooltip>Input: {{ item.inputTokens.toLocaleString() }} · Output: {{ item.outputTokens.toLocaleString() }} · Total: {{ item.tokens.toLocaleString() }}</q-tooltip>
           </span>
         </template>
 
