@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="col-4 text-right q-pr-sm q-gutter-xs pagination-block">
-          <q-pagination
+          <OPagination
             v-if="
               searchObj.meta.resultGrid.showPagination &&
               searchObj.meta.logsVisualizeToggle === 'logs' &&
@@ -133,20 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ?.length) || 0,
               )
             "
-            :input="false"
-            direction-links
-            :boundary-numbers="false"
-            :max-pages="5"
-            :ellipses="false"
-            icon-first="skip_previous"
-            icon-last="skip_next"
-            icon-prev="fast_rewind"
-            icon-next="fast_forward"
             class="float-right paginator-section"
             @update:model-value="getPageData('pageChange')"
-            rowsPerPageLabel="Rows per page"
-            :rows-per-page-options="rowsPerPageOptions"
-            :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
             data-test="logs-search-result-pagination"
           />
           <OSelect
@@ -570,6 +558,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -581,6 +570,7 @@ export default defineComponent({
     OSpinner,
     OTooltip,
     OSelect,
+    OPagination,
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),

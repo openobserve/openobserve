@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ formatTimeWithSuffix(span.durationUs) }}
           </div>
         </div>
-        <q-resize-observer debounce="300" @resize="onResize" />
       </div>
     </div>
   </div>
@@ -96,6 +95,7 @@ import {
   computed,
   ref,
   onMounted,
+  onBeforeUnmount,
   nextTick,
   watch,
   onActivated,
@@ -149,6 +149,8 @@ export default defineComponent({
     const { searchObj } = useTraces();
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
+    let _resizeObserver: ResizeObserver | null = null;
+    let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onePixelPercent = ref(0);
     const defocusSpan = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return false;
@@ -201,6 +203,14 @@ export default defineComponent({
             inline: "nearest", // Keep horizontal alignment as close as possible
           });
         }
+      }
+
+      if (spanBlock.value) {
+        _resizeObserver = new ResizeObserver(() => {
+          if (_debounceTimer) clearTimeout(_debounceTimer);
+          _debounceTimer = setTimeout(() => onResize(), 300);
+        });
+        _resizeObserver.observe(spanBlock.value);
       }
     });
 
@@ -274,6 +284,11 @@ export default defineComponent({
     const onResize = () => {
       spanBlockWidth.value = spanBlock.value.clientWidth;
     };
+
+    onBeforeUnmount(() => {
+      if (_debounceTimer) clearTimeout(_debounceTimer);
+      _resizeObserver?.disconnect();
+    });
 
     const onSpanHover = () => {
       emit("hover");

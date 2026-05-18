@@ -244,7 +244,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OSpinner,
-},
+  },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
     handleMultiStreamSelection() {

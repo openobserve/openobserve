@@ -87,23 +87,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-slide-transition>
-          <div v-show="showServices" class="tw:mt-3">
-            <div class="row q-col-gutter-sm">
-              <div
-                v-for="service in QUICK_SETUP_SERVICES"
-                :key="service.flag"
-                class="col-6 col-sm-4 col-md-3"
-              >
-                <OCheckbox
-                  v-model="enabledServices"
-                  :value="service.flag"
-                  :label="service.label"
-                />
+        <div
+          class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+          :class="showServices ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+        >
+          <div class="tw:overflow-hidden tw:min-h-0">
+            <div class="tw:mt-3">
+              <div class="row q-col-gutter-sm">
+                <div
+                  v-for="service in QUICK_SETUP_SERVICES"
+                  :key="service.flag"
+                  class="col-6 col-sm-4 col-md-3"
+                >
+                  <OCheckbox
+                    v-model="enabledServices"
+                    :value="service.flag"
+                    :label="service.label"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </q-slide-transition>
+        </div>
       </div>
 
       <!-- Single Region: region picker -->
@@ -177,23 +182,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <q-slide-transition>
-            <div v-show="showTargetRegions" class="tw:mt-3">
-              <div class="row q-col-gutter-sm">
-                <div
-                  v-for="region in AWS_REGIONS"
-                  :key="region.value"
-                  class="col-12 col-sm-6 col-md-4"
-                >
-                  <OCheckbox
-                    v-model="targetRegions"
-                    :value="region.value"
-                    :label="`${region.label} (${region.value})`"
-                  />
+          <div
+            class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+            :class="showTargetRegions ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+          >
+            <div class="tw:overflow-hidden tw:min-h-0">
+              <div class="tw:mt-3">
+                <div class="row q-col-gutter-sm">
+                  <div
+                    v-for="region in AWS_REGIONS"
+                    :key="region.value"
+                    class="col-12 col-sm-6 col-md-4"
+                  >
+                    <OCheckbox
+                      v-model="targetRegions"
+                      :value="region.value"
+                      :label="`${region.label} (${region.value})`"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </q-slide-transition>
+          </div>
         </div>
 
         <div class="tw:mb-6">
@@ -275,8 +285,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- StackSets Parameter Helper -->
-      <q-slide-transition>
-        <div v-if="showParamHelper && deploymentMode === 'stackset'">
+      <div
+        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
+        :class="(showParamHelper && deploymentMode === 'stackset') ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+      >
+        <div class="tw:overflow-hidden tw:min-h-0">
+        <div>
           <OSeparator class="tw:mb-4" />
           <div class="param-helper">
             <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
@@ -331,7 +345,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
-      </q-slide-transition>
+        </div>
+      </div>
     </div>
   </div>
 </template>

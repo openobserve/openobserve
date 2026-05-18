@@ -227,7 +227,7 @@ export default defineComponent({
       store,
     };
   },
-  components: { OTooltip },
+  components: { OIcon , OTooltip },
 });
 </script>
 

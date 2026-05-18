@@ -170,6 +170,18 @@ export default [
         //   message: 'Use a native <img> element instead of <q-img>. q-img features (lazy load, aspect-ratio, spinner) are not used anywhere in this codebase.'
         // },
         // {
+        //   element: 'q-pagination',
+        //   message: 'Use <OPagination> from "@/lib/navigation/Pagination/OPagination.vue" instead of <q-pagination>.',
+        // },
+        // {
+        //   element: 'q-timeline',
+        //   message: 'Use <OTimeline> from "@/lib/data/Timeline/OTimeline.vue" instead of <q-timeline>.',
+        // },
+        // {
+        //   element: 'q-timeline-entry',
+        //   message: 'Use <OTimelineItem> from "@/lib/data/Timeline/OTimelineItem.vue" instead of <q-timeline-entry>.',
+        // },
+        // {
         //   element: 'q-spinner',
         //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
         // },
