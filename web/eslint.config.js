@@ -133,6 +133,18 @@ export default [
           element: 'q-btn-dropdown',
           message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.'
         },
+        // {
+        //   element: 'q-bar',
+        //   message: 'Use a plain <div> instead of <q-bar>.',
+        // },
+        // {
+        //   element: 'q-toolbar',
+        //   message: 'Use a plain <div> instead of <q-toolbar>.',
+        // },
+        // {
+        //   element: 'q-toolbar-title',
+        //   message: 'Remove <q-toolbar-title> — use a plain <div> or <span> for the title content.',
+        // },
         {
           element: 'q-icon',
           message: 'Use <OIcon> from "@/lib/core/Icon/OIcon.vue" instead of <q-icon>. To add a new icon update OIcon.icons.ts.'

@@ -210,7 +210,7 @@ import {
 
 export default defineComponent({
   name: "ImportTemplate",
-  components: { OInput, OSelect },
+  components: { OInput, OSelect, BaseImport },
   props: {
     destinations: {
       type: Array,
@@ -548,9 +548,7 @@ export default defineComponent({
       processJsonObject,
     };
   },
-  components: {
-    BaseImport,
-  },
+
 });
 </script>
 
