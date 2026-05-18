@@ -276,12 +276,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Expanded body -->
           <div v-if="isExpanded(trace.traceId)" class="turn-body">
-            <!-- Loading state for lazy-loaded turn detail -->
-            <div
-              v-if="turnDetailLoading[trace.traceId]"
-              class="tw:flex tw:items-center tw:justify-center tw:py-[1rem]"
-            >
-              <q-spinner color="primary" size="1.25rem" />
+            <!-- Skeleton while turn detail is loading -->
+            <div v-if="turnDetailLoading[trace.traceId]" class="turn-grid">
+              <!-- Messages skeleton -->
+              <div class="turn-messages">
+                <!-- User block skeleton -->
+                <div class="msg-block msg-block--user">
+                  <div class="msg-block__header">
+                    <q-skeleton type="rect" width="2.5rem" height="0.7rem" class="tw:rounded" />
+                  </div>
+                  <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem]">
+                    <q-skeleton type="rect" width="70%" height="0.65rem" class="tw:rounded" />
+                    <q-skeleton type="rect" width="45%" height="0.65rem" class="tw:rounded" />
+                  </div>
+                </div>
+                <!-- Assistant block skeleton -->
+                <div class="msg-block msg-block--assistant">
+                  <div class="msg-block__header">
+                    <q-skeleton type="rect" width="7rem" height="0.7rem" class="tw:rounded" />
+                  </div>
+                  <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem]">
+                    <q-skeleton type="rect" width="95%" height="0.65rem" class="tw:rounded" />
+                    <q-skeleton type="rect" width="88%" height="0.65rem" class="tw:rounded" />
+                    <q-skeleton type="rect" width="80%" height="0.65rem" class="tw:rounded" />
+                    <q-skeleton type="rect" width="60%" height="0.65rem" class="tw:rounded" />
+                  </div>
+                </div>
+              </div>
+              <!-- Stats skeleton -->
+              <div class="turn-stats">
+                <!-- Status -->
+                <div class="stat-section">
+                  <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
+                  <q-skeleton type="rect" width="100%" height="1.5rem" class="tw:rounded" />
+                </div>
+                <!-- Tokens -->
+                <div class="stat-section">
+                  <q-skeleton type="rect" width="3.5rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
+                  <div class="stat-rows">
+                    <div v-for="n in 3" :key="n" class="stat-row">
+                      <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded" />
+                      <q-skeleton type="rect" width="3.5rem" height="0.6rem" class="tw:rounded" />
+                    </div>
+                  </div>
+                </div>
+                <!-- Cost -->
+                <div class="stat-section">
+                  <q-skeleton type="rect" width="2.5rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
+                  <q-skeleton type="rect" width="4rem" height="0.75rem" class="tw:rounded" />
+                </div>
+                <!-- Spans -->
+                <div class="stat-section">
+                  <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
+                  <div class="stat-rows">
+                    <div class="stat-row">
+                      <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded" />
+                      <q-skeleton type="rect" width="2rem" height="0.6rem" class="tw:rounded" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div v-else class="turn-grid">

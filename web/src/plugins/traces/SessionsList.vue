@@ -177,8 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Session ID -->
         <template #cell-sessionId="{ item }">
           <span class="tw:font-mono tw:text-[0.75rem]">
-            {{ shortId(item.sessionId) }}
-            <q-tooltip>{{ item.sessionId }}</q-tooltip>
+            {{ item.sessionId }}
           </span>
         </template>
 
@@ -326,7 +325,7 @@ const tableColumns = computed(() => [
     id: "sessionId",
     header: t('traces.sessionsList.columns.sessionId'),
     accessorKey: "sessionId",
-    size: 200,
+    size: 320,
     enableSorting: false,
     meta: { slot: true, align: "left" },
   },
