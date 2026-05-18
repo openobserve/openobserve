@@ -382,8 +382,8 @@ import destinationService from "@/services/alert_destination";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
-import {
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
   detectConditionsVersion,
   convertV0ToV2,
   convertV1ToV2,

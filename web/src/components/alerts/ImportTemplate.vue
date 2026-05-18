@@ -202,8 +202,8 @@ import templateService from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import {
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
   validateTemplateBody,
   getTemplateValidationErrorMessage,
 } from "@/utils/templates/validation";

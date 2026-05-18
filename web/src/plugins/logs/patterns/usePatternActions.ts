@@ -18,8 +18,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
-import {
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
   extractConstantsFromPattern,
   escapeForMatchAll,
   buildPatternAlertData,

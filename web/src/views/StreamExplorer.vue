@@ -115,7 +115,7 @@ export default defineComponent({
       }
     });
 
-    function () {
+    function Notify() {
       return toast({
         variant: "success",
         message: "Waiting for response...",
@@ -138,7 +138,7 @@ export default defineComponent({
         isLoading.value.push(true);
         queryData.value.errorMsg = "";
 
-        const dismiss = ();
+        const dismiss = Notify();
 
         const queryReq = buildSearch();
 
