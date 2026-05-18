@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-      </form>
+      </q-form>
     </div>
     </div>
   </div>
