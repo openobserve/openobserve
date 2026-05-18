@@ -1807,6 +1807,12 @@ pub struct Limit {
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
     #[env_config(
+        name = "ZO_FOOTER_CACHE_MAX_SIZE",
+        default = 104857600, // bytes, default is 100MB
+        help = "Maximum memory size in bytes for the footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub footer_cache_max_size: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."

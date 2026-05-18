@@ -763,7 +763,7 @@ async fn search_tantivy_index(
         )
         .await?,
     );
-    let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+    let footer_cache = FooterCache::from_directory(puffin_dir.clone(), &ttv_file_name).await?;
     let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
     let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
 

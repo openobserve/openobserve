@@ -62,16 +62,16 @@ impl BytesCache {
 
     pub fn put(&self, key: String, value: Bytes) {
         let value_len = value.len() as i64;
-        let old_len = { self.readers.get(&key).map(|r| r.len() as i64) };
+        let old_len;
 
-        // Push to FIFO queue
+        // Serialize replacement with FIFO bookkeeping so concurrent puts for
+        // the same key cannot double-count memory or entries.
         {
             let mut w = self.cacher.lock();
+            old_len = self.readers.get(&key).map(|r| r.len() as i64);
             w.push_back(key.clone());
+            self.readers.insert(key, value);
         }
-
-        // Insert into cache
-        self.readers.insert(key, value);
 
         // Update memory tracking and metrics
         match old_len {
