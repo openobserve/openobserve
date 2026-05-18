@@ -786,10 +786,8 @@ describe("AlertSettings.vue", () => {
     });
 
     it("should have info tooltips", () => {
-      const infoIcons = wrapper.findAll(".OIcon");
-      const hasInfoIcon = infoIcons.some((icon) =>
-        icon.html().includes("info")
-      );
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      const hasInfoIcon = icons.some((i) => /^info/.test(i.props("name") ?? ""));
       expect(hasInfoIcon).toBe(true);
     });
 

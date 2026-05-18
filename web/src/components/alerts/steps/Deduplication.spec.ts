@@ -475,9 +475,9 @@ describe("Deduplication.vue", () => {
     });
 
     it("should render info icons", () => {
-      // OIcon components are rendered - check HTML contains info icon references
-      const html = wrapper.html();
-      expect(html).toContain("info");
+      // OIcon components render SVGs — check via component lookup
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => /^info/.test(i.props("name") ?? ""))).toBe(true);
     });
 
     it("should render hint text for fingerprint fields", () => {

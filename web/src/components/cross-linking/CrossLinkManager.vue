@@ -51,6 +51,7 @@
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 class="tw:max-w-[200px]"
+                :data-test="`cross-link-field-chip-${fIdx}`"
               >
                 <span class="tw:truncate text-caption" :title="field.name">{{ field.name }}</span>
               </OBadge>

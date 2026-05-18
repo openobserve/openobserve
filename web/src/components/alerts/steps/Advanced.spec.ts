@@ -534,8 +534,9 @@ describe("Advanced.vue", () => {
     });
 
     it("should have tooltips for info buttons", () => {
-      const html = wrapper.html();
-      expect(html).toContain("info_outline");
+      // OIcon SVG-based rendering — check for info-outline OIcon components
+      const icons = wrapper.findAllComponents({ name: "OIcon" });
+      expect(icons.some((i) => i.props("name") === "info-outline")).toBe(true);
     });
   });
 

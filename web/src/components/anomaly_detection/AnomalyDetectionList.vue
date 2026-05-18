@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #body-cell-status="props">
         <q-td :props="props">
-          <OBadge :variant="statusColor(props.row)">
+          <OBadge :variant="statusColor(props.row)" data-test="anomaly-detection-status-badge">
             {{ statusLabel(props.row) }}
             <OSpinner
               v-if="props.row.status === 'training'"
