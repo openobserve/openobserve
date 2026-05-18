@@ -309,6 +309,16 @@ pub async fn get_latest_sessions(
             function_error: String::new(),
         });
     }
+    // Check whether the stream has the new gen_ai_* columns or only the old llm_* columns.
+    let has_gen_ai_fields = infra::schema::get_stream_schema_from_cache(
+        org_id.as_str(),
+        stream_name.as_str(),
+        StreamType::Traces,
+    )
+    .await
+    .map(|s| s.field_with_name("gen_ai_usage_input_tokens").is_ok())
+    .unwrap_or(false);
+
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
     // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
     // Trace IDs originate from ingested data and could contain injected SQL if not validated.
@@ -322,21 +332,40 @@ pub async fn get_latest_sessions(
         .filter(|tid| !tid.is_empty())
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
-    let query_sql = format!(
-        "SELECT trace_id, \
-        max(user_id) as user_id,
-        min(start_time) as trace_start_time, \
-        max(end_time) as trace_end_time, \
-        sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
-        sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
-        sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
-        sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
-        FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
-        FROM \"{stream_name}\" \
-        WHERE trace_id IN ('{trace_ids_sql}') \
-        GROUP BY trace_id"
-    );
+    let query_sql = if has_gen_ai_fields {
+        format!(
+            "SELECT trace_id, \
+            max(user_id) as user_id,
+            min(start_time) as trace_start_time, \
+            max(end_time) as trace_end_time, \
+            sum(gen_ai_usage_input_tokens) as gen_ai_usage_details_input, \
+            sum(gen_ai_usage_output_tokens) as gen_ai_usage_details_output, \
+            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
+            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
+            FIRST_VALUE(gen_ai_input_messages ORDER BY start_time ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
+            FROM \"{stream_name}\" \
+            WHERE trace_id IN ('{trace_ids_sql}') \
+            GROUP BY trace_id"
+        )
+    } else {
+        // Old o2_llm schema: fall back to llm_* columns
+        format!(
+            "SELECT trace_id, \
+            max(user_id) as user_id,
+            min(start_time) as trace_start_time, \
+            max(end_time) as trace_end_time, \
+            CAST(0 AS BIGINT) as gen_ai_usage_details_input, \
+            CAST(0 AS BIGINT) as gen_ai_usage_details_output, \
+            sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
+            CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
+            sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) as error_count, \
+            CAST('' AS VARCHAR) as gen_ai_input_messages \
+            FROM \"{stream_name}\" \
+            WHERE trace_id IN ('{trace_ids_sql}') \
+            GROUP BY trace_id"
+        )
+    };
     req.query.sql = query_sql;
     req.query.from = 0;
     req.query.size = all_trace_ids.len() as i64;
@@ -508,7 +537,11 @@ fn extract_first_user_message(
         if let Some(text) = msg
             .get("parts")
             .and_then(|v| v.as_array())
-            .and_then(|parts| parts.iter().find_map(|p| p.get("text").and_then(|t| t.as_str())))
+            .and_then(|parts| {
+                parts
+                    .iter()
+                    .find_map(|p| p.get("text").and_then(|t| t.as_str()))
+            })
         {
             let trimmed: String = text.chars().take(max_len).collect();
             return Some(trimmed);

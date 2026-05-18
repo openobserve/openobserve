@@ -292,6 +292,16 @@ pub async fn get_latest_users(
         .into_iter()
         .collect();
 
+    // Check whether the stream has the new gen_ai_* columns or only the old llm_* columns.
+    let has_gen_ai_fields = infra::schema::get_stream_schema_from_cache(
+        org_id.as_str(),
+        stream_name.as_str(),
+        StreamType::Traces,
+    )
+    .await
+    .map(|s| s.field_with_name("gen_ai_usage_input_tokens").is_ok())
+    .unwrap_or(false);
+
     // Phase 2: Get per-trace details by querying with trace_id (captures ALL spans)
     // Sanitize trace IDs before interpolating into SQL: allow only hex chars and hyphens.
     // Trace IDs originate from ingested data and could contain injected SQL if not validated.
@@ -305,16 +315,30 @@ pub async fn get_latest_users(
         .filter(|tid| !tid.is_empty())
         .collect();
     let trace_ids_sql = sanitized_ids.join("','");
-    let query_sql = format!(
-        "SELECT trace_id, \
-        min(start_time) as trace_start_time, \
-        max(end_time) as trace_end_time, \
-        sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
-        sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
-        FROM \"{stream_name}\" \
-        WHERE trace_id IN ('{trace_ids_sql}') \
-        GROUP BY trace_id"
-    );
+    let query_sql = if has_gen_ai_fields {
+        format!(
+            "SELECT trace_id, \
+            min(start_time) as trace_start_time, \
+            max(end_time) as trace_end_time, \
+            sum(gen_ai_usage_total_tokens) as gen_ai_usage_details_total, \
+            sum(gen_ai_usage_cost) as gen_ai_usage_cost_details \
+            FROM \"{stream_name}\" \
+            WHERE trace_id IN ('{trace_ids_sql}') \
+            GROUP BY trace_id"
+        )
+    } else {
+        // Old o2_llm schema: fall back to llm_* columns
+        format!(
+            "SELECT trace_id, \
+            min(start_time) as trace_start_time, \
+            max(end_time) as trace_end_time, \
+            sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
+            CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details \
+            FROM \"{stream_name}\" \
+            WHERE trace_id IN ('{trace_ids_sql}') \
+            GROUP BY trace_id"
+        )
+    };
     req.query.sql = query_sql;
     req.query.from = 0;
     req.query.size = all_trace_ids.len() as i64;

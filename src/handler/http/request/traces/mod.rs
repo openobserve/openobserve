@@ -327,6 +327,18 @@ pub async fn get_latest_traces(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
+    let has_gen_ai_fields = if is_llm_stream {
+        infra::schema::get_stream_schema_from_cache(
+            org_id.as_str(),
+            stream_name.as_str(),
+            StreamType::Traces,
+        )
+        .await
+        .map(|s| s.field_with_name("gen_ai_usage_input_tokens").is_ok())
+        .unwrap_or(false)
+    } else {
+        false
+    };
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -351,7 +363,7 @@ pub async fn get_latest_traces(
     let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
-    let query_sql = if is_llm_stream {
+    let query_sql = if is_llm_stream && has_gen_ai_fields {
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -362,6 +374,19 @@ pub async fn get_latest_traces(
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
+            FROM \"{stream_name}\""
+        )
+    } else if is_llm_stream {
+        // Old o2_llm schema: fall back to llm_* columns
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            CAST(0 AS BIGINT) as gen_ai_usage_details_input, \
+            CAST(0 AS BIGINT) as gen_ai_usage_details_output, \
+            sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
+            CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
@@ -1000,6 +1025,18 @@ pub async fn get_latest_traces_stream(
     let is_llm_stream =
         infra::schema::get_is_llm_stream(org_id.as_str(), stream_name.as_str(), StreamType::Traces)
             .await;
+    let has_gen_ai_fields = if is_llm_stream {
+        infra::schema::get_stream_schema_from_cache(
+            org_id.as_str(),
+            stream_name.as_str(),
+            StreamType::Traces,
+        )
+        .await
+        .map(|s| s.field_with_name("gen_ai_usage_input_tokens").is_ok())
+        .unwrap_or(false)
+    } else {
+        false
+    };
     let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
         start_time = end_time - max_query_range * 3600 * 1_000_000;
@@ -1052,6 +1089,7 @@ pub async fn get_latest_traces_stream(
             sort_order.to_string(),
             sql_order_expr,
             is_llm_stream,
+            has_gen_ai_fields,
             use_cache,
             range_error,
             tx,
@@ -1115,6 +1153,7 @@ async fn process_latest_traces_stream(
     sort_order: String,
     sql_order_expr: String,
     is_llm_stream: bool,
+    has_gen_ai_fields: bool,
     use_cache: bool,
     range_error: String,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
@@ -1139,7 +1178,7 @@ async fn process_latest_traces_stream(
     };
 
     // Build the aggregation SQL (Query 1) — identical to get_latest_traces
-    let query_sql_base = if is_llm_stream {
+    let query_sql_base = if is_llm_stream && has_gen_ai_fields {
         format!(
             "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
             min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
@@ -1150,6 +1189,19 @@ async fn process_latest_traces_stream(
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             FIRST_VALUE(gen_ai_input_messages ORDER BY {TIMESTAMP_COL_NAME} ASC) FILTER (WHERE gen_ai_input_messages IS NOT NULL AND gen_ai_input_messages != '') as gen_ai_input_messages \
+            FROM \"{stream_name}\""
+        )
+    } else if is_llm_stream {
+        // Old o2_llm schema: fall back to llm_* columns
+        format!(
+            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+            (max(end_time) - min(start_time)) as zo_sql_duration, \
+            CAST(0 AS BIGINT) as gen_ai_usage_details_input, \
+            CAST(0 AS BIGINT) as gen_ai_usage_details_output, \
+            sum(llm_usage_total_tokens) as gen_ai_usage_details_total, \
+            CAST(0.0 AS DOUBLE) as gen_ai_usage_cost_details, \
+            FIRST_VALUE(llm_input ORDER BY {TIMESTAMP_COL_NAME} ASC) as gen_ai_input_messages \
             FROM \"{stream_name}\""
         )
     } else {
