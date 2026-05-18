@@ -1801,8 +1801,8 @@ pub struct Limit {
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
     #[env_config(
-        name = "ZO_FOOTER_CACHE_MAX_SIZE",
-        default = 104857600, // bytes, default is 100MB
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // bytes, default is 5% of total memory
         help = "Maximum memory size in bytes for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
     pub footer_cache_max_size: usize,
@@ -3104,6 +3104,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
+    }
+
+    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.limit.inverted_index_result_cache_max_entry_size =
+            ((cfg.limit.mem_total as f64 * SIZE_IN_MB * 0.05) as usize).clamp(100, 1024);
     }
     Ok(())
 }
