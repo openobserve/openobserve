@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw:flex tw:items-center">
             <OSelect
               v-model="config.alert_destination_ids"
-              :options="props.destinations"
+              :options="destinations"
               labelKey="name"
               valueKey="name"
               multiple
