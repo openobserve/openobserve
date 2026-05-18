@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
    
     <!-- Loading state -->
     <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
-      <q-spinner color="primary" size="2em" />
+      <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
     <!-- Cloud: storage not enabled -->
@@ -277,6 +277,7 @@ import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 

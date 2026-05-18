@@ -149,10 +149,7 @@ describe("SearchHistory Component", () => {
             }
           },
           AppTabs: true,
-          QueryEditor: true,
-          QSpinnerHourglass: {
-            template: '<div class="q-spinner-hourglass"></div>'
-          }
+          QueryEditor: true
         },
         mocks: {
           $q,

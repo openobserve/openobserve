@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="full-width"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_img"
               :src="
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="full-width"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_dark_img"
               :src="
                 `data:image; base64, ` +
@@ -381,6 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="loadingState"
     size="md"
     class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+    data-test="general-settings-loading-indicator"
   />
   <ODialog data-test="general-delete-image-dialog"
     v-model:open="confirmDeleteImage"

@@ -27,13 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <IndexList></IndexList>
       </template>
       <template #separator>
-        <q-avatar
-          color="primary"
-          text-color="white"
-          size="1.25rem"
-          icon="drag_indicator"
-          class="tw:top-[0.625rem]"
-        />
+        <div
+          data-test="errors-list-splitter-drag-grip"
+          class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:top-[0.625rem]"
+        >
+          <OIcon name="drag-indicator" size="xs" />
+        </div>
       </template>
       <template #after>
         <OTable
@@ -58,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
 import IndexList from "@/plugins/traces/IndexList.vue";

@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="loading"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[3rem]"
     >
-      <OSpinner size="lg" />
+      <OSpinner size="lg" data-test="pattern-list-loading-indicator" />
       <div
         class="q-mt-md text-body2"
         :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"

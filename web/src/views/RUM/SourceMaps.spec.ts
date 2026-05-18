@@ -117,10 +117,6 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
     "q-item-section": true,
     "q-item-label": true,
     "q-separator": true,
-    "q-spinner-hourglass": {
-      name: "QSpinnerHourglass",
-      template: '<div data-test-stub="q-spinner-hourglass" />',
-    },
     "OIcon": true,
     "q-table": {
       name: "QTable",
@@ -328,7 +324,7 @@ describe("SourceMaps.vue", () => {
       (wrapper.vm as any).isLoading = true;
       await nextTick();
 
-      expect(wrapper.find('[data-test-stub="q-spinner-hourglass"]').exists()).toBe(
+      expect(wrapper.find('[data-test="source-maps-loading-indicator"]').exists()).toBe(
         true,
       );
     });

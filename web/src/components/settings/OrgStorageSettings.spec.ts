@@ -111,7 +111,7 @@ describe("OrgStorageSettings", () => {
   it("shows loading spinner initially", () => {
     mockGetStorage.mockReturnValue(new Promise(() => {}));
     const wrapper = createWrapper();
-    expect(wrapper.findComponent({ name: "QSpinner" }).exists()).toBe(true);
+    expect(wrapper.find('[data-test="org-storage-settings-loading-indicator"]').exists()).toBe(true);
   });
 
   it("shows empty state when not configured", async () => {

@@ -89,7 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-pb-lg flex items-center justify-center text-center tw:h-full"
                 >
                   <div>
-                    <OSpinner size="md" class="tw:mx-auto tw:block" />
+                    <OSpinner
+                      size="md"
+                      class="tw:mx-auto tw:block"
+                      data-test="app-sessions-loading-indicator"
+                    />
                     <div class="text-center full-width">
                       {{ t("rum.loadingSessions") }}
                     </div>

@@ -290,7 +290,7 @@ describe("AssociateFunction Component", () => {
       await flushPromises();
       wrapper.vm.loading = true;
       await nextTick();
-      expect(wrapper.find(".q-spinner").exists()).toBe(true);
+      expect(wrapper.find('[data-test="associate-function-loading-indicator"]').exists()).toBe(true);
     });
 
     it("hides stream-routing-container when loading is true", async () => {

@@ -24,7 +24,7 @@ export default {
     nodeTypes: Array,
     hasInputType: Boolean,
   },
-  components: { OButton, OTooltip },
+  components: { OButton, OTooltip, OIcon },
   setup(props) {
     const { onDragStart, pipelineObj } = useDragAndDrop();
     return { node_types: props.nodeTypes, onDragStart, pipelineObj };
@@ -59,7 +59,13 @@ export default {
         </OTooltip>
         <div class="node-content">
           <div class="node-icon-section">
-            <OIcon size="1.3em" :name="node.icon" />
+            <img
+              v-if="typeof node.icon === 'string' && node.icon.startsWith('img:')"
+              :src="node.icon.slice(4)"
+              alt=""
+              class="node-icon-img"
+            />
+            <OIcon v-else size="1.3em" :name="node.icon" />
             <q-separator vertical class="node-separator" />
           </div>
           <div class="node-label tw:w-[70px]">{{ node.label }}</div>
@@ -133,6 +139,13 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.node-icon-img {
+  width: 1.3em;
+  height: 1.3em;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .node-separator {

@@ -137,7 +137,7 @@ export class RumPage {
         await this.page.waitForSelector(this.errorViewerContainer, { timeout: 10000 });
 
         // Wait for loading to complete
-        const loadingSpinner = this.page.locator('text=Loading').or(this.page.locator('.q-spinner'));
+        const loadingSpinner = this.page.locator('text=Loading').or(this.page.locator('[data-test="error-viewer-loading-indicator"]'));
         await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 

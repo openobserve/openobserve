@@ -161,10 +161,18 @@ export default [
           element: 'q-chip',
           message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.'
         },
-        // {
-        //   element: 'q-spinner',
-        //   message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
-        // },
+        {
+          element: 'q-avatar',
+          message: 'Use a plain <div class="tw:rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.'
+        },
+        {
+          element: 'q-img',
+          message: 'Use a native <img> element instead of <q-img>. q-img features (lazy load, aspect-ratio, spinner) are not used anywhere in this codebase.'
+        },
+        {
+          element: 'q-spinner',
+          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.'
+        },
         {
           element: 'q-spinner-hourglass',
           message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-hourglass>.'

@@ -158,7 +158,6 @@ describe("SearchSchedulersList Component", () => {
           },
           AppTabs: true,
           QueryEditor: true,
-          QSpinnerHourglass: true,
           ConfirmDialog: true,
           NoData: true
         },

@@ -109,11 +109,6 @@ describe("WebVitalsDashboard", () => {
             template: '<div class="OIcon"></div>',
             props: ["name", "size", "class"]
           },
-          "q-spinner-hourglass": {
-            name: "q-spinner-hourglass",
-            template: '<div class="q-spinner-hourglass"></div>',
-            props: ["color", "size", "style"]
-          },
           "RenderDashboardCharts": {
             name: "RenderDashboardCharts",
             template: '<div class="render-dashboard-charts-mock" data-test="render-dashboard-charts"><slot /></div>',

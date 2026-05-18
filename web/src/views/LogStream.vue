@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OToggleGroupItem value="logs" size="sm">
                   <template #icon-left
-                    ><OIcon name="description" size="xs" class="tw:shrink-0"
+                    ><OIcon name="search" size="xs" class="tw:shrink-0"
                   /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>

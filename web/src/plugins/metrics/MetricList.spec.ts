@@ -255,10 +255,6 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["icon", "size", "round", "title"],
           emits: ["click"],
         },
-        QInnerLoading: {
-          template: "<div data-test-stub='q-inner-loading' v-if='showing'></div>",
-          props: ["showing", "size", "label", "labelStyle"],
-        },
         EqualIcon: {
           template: "<div data-test-stub='equal-icon'></div>",
         },

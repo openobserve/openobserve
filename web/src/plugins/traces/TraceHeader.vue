@@ -33,15 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="trace-header-operation-name"
     >
       Operation Name
-      <q-avatar
-        color="primary"
-        text-color="white"
-        size="1.25rem"
-        icon="drag_indicator"
-        class="resize-btn"
+      <div
+        class="resize-btn bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
-      />
+      >
+        <OIcon name="drag-indicator" size="xs" />
+      </div>
     </div>
     <div
       class="flex justify-start items-center no-wrap row relative-position trace-header-right"
@@ -98,9 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "TraceNavbar",
+  components: { OIcon },
   props: {
     baseTracePosition: {
       type: Object,

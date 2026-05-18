@@ -109,10 +109,6 @@ describe("ErrorsList Component", () => {
               `,
               props: ["modelValue", "unit", "vertical"],
             },
-            "q-avatar": {
-              template: '<div data-test="avatar" />',
-              props: ["color", "text-color", "size", "icon", "style"],
-            },
           },
         },
       });
@@ -158,8 +154,8 @@ describe("ErrorsList Component", () => {
       expect(wrapper.find('[data-test="after-section"]').exists()).toBe(true);
     });
 
-    it("should render separator avatar", () => {
-      expect(wrapper.find('[data-test="avatar"]').exists()).toBe(true);
+    it("should render separator drag grip", () => {
+      expect(wrapper.find('[data-test="errors-list-splitter-drag-grip"]').exists()).toBe(true);
     });
   });
 

@@ -122,8 +122,7 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      // q-inner-loading has showing=true
-      const loading = wrapper.findComponent({ name: "QInnerLoading" });
+      const loading = wrapper.find('[data-test="field-values-panel-loading-indicator"]');
       expect(loading.exists()).toBe(true);
     });
 

@@ -336,9 +336,11 @@
                 style="font-size: 1.5rem; margin: auto auto"
                 :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
               >
-                <q-img
+                <img
+                  data-test="associated-regex-patterns-no-pattern-image"
                   :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
-                  style="width: 125px;"
+                  style="width: 125px"
+                  alt=""
                 />
                 <span class="no-pattern-applied-title" data-test="associated-regex-patterns-no-pattern-applied-title">No Patterns Applied Yet</span>
                   <span class="no-pattern-applied-subtitle" data-test="associated-regex-patterns-no-pattern-applied-subtitle">Browse the pattern library to begin </span> 

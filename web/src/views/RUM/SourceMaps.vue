@@ -84,7 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="isLoading">
         <div class="q-pa-lg flex items-center justify-center text-center">
           <div>
-            <OSpinner size="md" class="tw:mx-auto tw:block" />
+            <OSpinner
+              size="md"
+              class="tw:mx-auto tw:block"
+              data-test="source-maps-loading-indicator"
+            />
             <div class="text-center full-width q-mt-md">
               Loading source maps...
             </div>

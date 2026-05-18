@@ -549,14 +549,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div class="splitter-vertical splitter-enabled"></div>
-                      <q-avatar
-                        color="primary"
-                        text-color="white"
-                        size="20px"
-                        icon="drag_indicator"
+                      <div
+                        class="bg-primary text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
                         style="top: 10px; left: 3.5px"
                         data-test="panel-editor-custom-chart-drag-indicator"
-                      />
+                      >
+                        <OIcon name="drag-indicator" size="xs" />
+                      </div>
                     </template>
 
                     <!-- Chart Preview -->

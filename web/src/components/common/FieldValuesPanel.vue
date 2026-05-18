@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :showing="fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
           size="xs"
+          data-test="field-values-panel-loading-indicator"
         />
       </div>
 

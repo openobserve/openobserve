@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Loading State -->
     <div v-if="loading" class="tw:flex tw:justify-center tw:py-8">
-      <OSpinner size="sm" />
+      <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
     </div>
 
     <!-- Error State -->
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading state -->
             <template #loading>
               <div class="tw:flex tw:items-center tw:justify-center tw:pb-40">
-                <OSpinner size="lg" />
+                <OSpinner size="lg" data-test="discovered-services-table-loading-indicator" />
               </div>
             </template>
 

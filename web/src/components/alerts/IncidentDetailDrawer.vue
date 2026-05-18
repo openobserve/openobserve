@@ -1005,7 +1005,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'logs'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden tw:h-full">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:h-[70vh]">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
           </div>
 
           <!-- Error/No Data State -->
@@ -1055,7 +1055,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="activeTab === 'metrics'" class="tw-flex tw-flex-col tw-flex-1 tw-overflow-hidden">
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
             <div class="tw-text-base">Loading correlated metrics...</div>
           </div>
 
@@ -1113,7 +1113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Loading State -->
           <div v-if="correlationLoading" class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-flex-1 tw-h-full">
-            <OSpinner size="lg" class="tw:mb-4" />
+            <OSpinner size="lg" class="tw:mb-4" data-test="incident-telemetry-loading-indicator" />
             <div class="tw-text-base">Loading correlated traces...</div>
           </div>
 

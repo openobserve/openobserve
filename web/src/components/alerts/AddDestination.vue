@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="prebuilt-form"
             />
             <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
-              <OSpinner size="md" />
+              <OSpinner size="md" data-test="add-destination-loading-indicator" />
               <div class="q-mt-sm text-grey-7">Loading destination data...</div>
             </div>
 

@@ -162,7 +162,6 @@ describe('License.vue', () => {
         ],
         stubs: {
           LicensePeriod: true,
-          QCircularProgress: true,
           ODialog: ODialogStub,
         },
         mocks: {
