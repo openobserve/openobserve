@@ -30,9 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`logs-field-list-item-${field.name}`"
     >
       <div
-        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem]"
-        style="display: inline-block"
+        class="ellipsis tw:flex tw:items-center tw:flex-1 tw:min-w-0"
       >
+        <span class="tw:inline-block tw:w-4 tw:flex-shrink-0"></span>
         {{ field.name }}
       </div>
       <span class="float-right">
@@ -155,6 +155,8 @@ const isFieldSelected = computed(() =>
 }
 
 .field_label {
-  padding: 0.25rem 0;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  min-height: 27px;
 }
 </style>
