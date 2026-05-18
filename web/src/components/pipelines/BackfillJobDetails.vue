@@ -210,7 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -222,6 +221,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   modelValue: boolean;
@@ -237,7 +237,6 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
 
 const show = computed({
@@ -302,8 +301,8 @@ const confirmCancelJob = () => {
 
 const cancelJob = async () => {
   if (!job.value || !job.value.pipeline_id) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Job information not available. Please try again.",
       timeout: 3000,
     });
@@ -317,8 +316,8 @@ const cancelJob = async () => {
       job_id: job.value.job_id,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job canceled successfully",
       timeout: 3000,
     });
@@ -327,8 +326,8 @@ const cancelJob = async () => {
     loadJobDetails();
   } catch (error: any) {
     console.error("Error canceling backfill job:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.error || "Failed to cancel backfill job",
       timeout: 5000,
     });

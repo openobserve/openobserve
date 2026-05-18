@@ -541,7 +541,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -557,6 +556,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -576,7 +576,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
     const loading = ref(false);
@@ -812,8 +811,8 @@ export default defineComponent({
 
     const getData = (filterFlag: boolean = false) => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading data...",
       });
 
@@ -848,8 +847,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to fetch nodes. Please try again.",

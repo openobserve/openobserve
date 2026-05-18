@@ -16,14 +16,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "../../test/unit/helpers/install-quasar-plugin";
-import { Notify, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import ShareButton from "./ShareButton.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import shortURLService from "@/services/short_url";
 
 installQuasar({
-  plugins: { Notify },
+  plugins: {  },
 });
 
 // Mock copyToClipboard

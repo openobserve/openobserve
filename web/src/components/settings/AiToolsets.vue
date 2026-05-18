@@ -119,10 +119,10 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const KIND_VARIANTS: Record<string, string> = {
   mcp: "primary",
   cli: "success",
@@ -146,7 +146,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
@@ -200,8 +199,8 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     const getData = () => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: t("common.loading"),
       });
 
@@ -220,8 +219,8 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err?.status !== 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 err?.response?.data?.message ||
                 t("aiToolset.loadFailed"),
@@ -299,22 +298,21 @@ export default defineComponent({
       const row = confirmDelete.value.data;
       if (!row?.id) return;
 
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: t("common.pleaseWait"),
-        type: "warning",
       });
 
       aiToolsetsService
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
-          $q.notify({ type: "positive", message: t("aiToolset.deletedSuccessfully"), timeout: 2000 });
+          toast({ variant: "success", message: t("aiToolset.deletedSuccessfully"), timeout: 2000 });
           getData();
         })
         .catch((err) => {
           if (err?.status !== 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: err?.response?.data?.message || t("aiToolset.deleteFailed"),
               timeout: 3000,
             });

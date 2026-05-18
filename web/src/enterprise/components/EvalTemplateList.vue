@@ -175,7 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -186,6 +185,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Template {
   id: string;
@@ -201,7 +201,6 @@ interface Template {
 }
 
 const { t } = useI18n();
-const q = useQuasar();
 const store = useStore();
 const router = useRouter();
 // ── State ──────────────────────────────────────────────────────────────────────
@@ -290,8 +289,8 @@ const loadTemplates = async () => {
     }));
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
         timeout: 3000,
       });
@@ -324,21 +323,21 @@ const deleteTemplate = async () => {
   const template = deleteDialog.value.data;
   if (!template) return;
 
-  const dismiss = q.notify({ spinner: true, message: t("common.loading"), timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: t("common.loading"), timeout: 0 });
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
     await evalTemplateService.deleteTemplate(orgId, template.id);
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("evalTemplate.deleteSuccess"),
       timeout: 2000,
     });
     await loadTemplates();
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err?.response?.data?.message ||
           err?.message ||
@@ -362,7 +361,7 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeleteTemplates = async () => {
-  const dismiss = q.notify({ spinner: true, message: t("common.loading"), timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: t("common.loading"), timeout: 0 });
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -371,13 +370,13 @@ const bulkDeleteTemplates = async () => {
         evalTemplateService.deleteTemplate(orgId, item.id),
       ),
     );
-    q.notify({ type: "positive", message: t("evalTemplate.deleteSuccess"), timeout: 2000 });
+    toast({ variant: "success", message: t("evalTemplate.deleteSuccess"), timeout: 2000 });
     selectedItems.value = [];
     await loadTemplates();
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.deleteFailed"),
         timeout: 3000,
       });

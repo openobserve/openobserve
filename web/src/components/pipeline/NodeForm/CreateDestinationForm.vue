@@ -470,7 +470,6 @@ import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -482,6 +481,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<{
@@ -489,7 +489,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
 
@@ -1092,15 +1091,15 @@ const connectionNotes = computed(() => {
 
 const createDestination = () => {
   if (!isValidDestination.value) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
     return;
   }
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -1172,8 +1171,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -1195,8 +1194,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });

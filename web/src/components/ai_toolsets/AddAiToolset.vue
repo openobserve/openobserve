@@ -360,7 +360,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -371,6 +370,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { ToolsetKind } from "@/services/ai_toolsets";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -384,7 +384,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const formRef = ref<any>(null);
     const saving = ref(false);
     const nameError = ref('');
@@ -514,7 +513,7 @@ export default defineComponent({
           skillData.value.content = data.content || "";
         }
       } catch {
-        $q.notify({ type: "negative", message: "Failed to load toolset" });
+        toast({ variant: "error", message: "Failed to load toolset" });
       }
     };
 
@@ -607,8 +606,8 @@ export default defineComponent({
             description: form.value.description || undefined,
             data,
           });
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t("aiToolset.updatedSuccessfully"),
             timeout: 2000,
           });
@@ -619,8 +618,8 @@ export default defineComponent({
             description: form.value.description || undefined,
             data,
           });
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t("aiToolset.createdSuccessfully"),
             timeout: 2000,
           });
@@ -632,7 +631,7 @@ export default defineComponent({
           (isEditing.value
             ? t("aiToolset.updateFailed")
             : t("aiToolset.createFailed"));
-        $q.notify({ type: "negative", message: msg, timeout: 4000 });
+        toast({ variant: "error", message: msg, timeout: 4000 });
       } finally {
         saving.value = false;
       }

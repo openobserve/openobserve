@@ -378,7 +378,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -390,6 +389,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ProfileEvent {
   timestamp: string;
@@ -440,7 +440,6 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const $q = useQuasar();
 
     const loading = ref(false);
     const errorMessage = ref("");
@@ -754,7 +753,7 @@ export default defineComponent({
           copiedTraceId.value = false;
         }, 2000);
       }).catch(() => {
-        $q.notify({ type: 'negative', message: 'Failed to copy trace ID to clipboard' });
+        toast({ variant: "error", message: 'Failed to copy trace ID to clipboard' });
       });
     };
 
@@ -766,7 +765,7 @@ export default defineComponent({
           copiedSql.value = false;
         }, 2000);
       }).catch(() => {
-        $q.notify({ type: 'negative', message: 'Failed to copy SQL to clipboard' });
+        toast({ variant: "error", message: 'Failed to copy SQL to clipboard' });
       });
     };
 

@@ -194,7 +194,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -239,7 +238,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const $q = useQuasar();
     const { getSearchQueryPayload } = useSearchStream();
 
     const loading = ref(false);

@@ -16,13 +16,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Notify } from "quasar";
 import { nextTick } from "vue";
 import CorrelationDemo from "./CorrelationDemo.vue";
 import store from "@/test/unit/helpers/store";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
-installQuasar({ plugins: { Notify } });
+installQuasar({ plugins: {  } });
 
 // ---------------------------------------------------------------------------
 // Stub heavy child component

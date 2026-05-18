@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script lang="ts">
   import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick } from "vue";
   import { useStore } from "vuex";
-  import { useQuasar, date } from "quasar";
+  import { date } from "quasar";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
   import { convertBillingData } from "@/utils/billing/convertBillingData";
@@ -250,6 +250,7 @@ import router from "@/router";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
   
   let currentDate = new Date(); // Get the current date and time
   
@@ -268,7 +269,6 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
     },
     setup() {
       const { t } = useI18n();
-      const $q = useQuasar();
       const store = useStore();
       const router = useRouter();
       const dataLoading = ref(false);
@@ -301,8 +301,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
         getUsage();
       })
       const getUsage = () => {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while loading usage data...",
         });
         dataLoading.value = true;
@@ -336,8 +336,8 @@ import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRende
             dismiss();
           })
           .catch((e) => {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });

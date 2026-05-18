@@ -60,12 +60,12 @@ import { getImageURL } from "../../utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { getAllDashboards } from "@/utils/commons";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue = () => {
   return {
@@ -100,7 +100,6 @@ export default defineComponent({
     const dashboardData: any = ref(defaultValue());
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
-    const $q = useQuasar();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 
@@ -212,8 +211,8 @@ export default defineComponent({
   },
   methods: {
     onRejected(rejectedEntries: string | any[]) {
-      this.$q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },

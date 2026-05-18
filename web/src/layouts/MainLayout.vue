@@ -147,7 +147,6 @@ import {
   QBtnDropdown,
   QIcon,
   QSelect,
-  useQuasar,
 } from "quasar";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import Header from "../components/Header.vue";
@@ -198,6 +197,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -289,7 +289,6 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
@@ -672,8 +671,8 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message:
               "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
             timeout: 5000,

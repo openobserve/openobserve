@@ -187,7 +187,6 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -201,6 +200,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -216,7 +216,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
 
     const extendTrialDataRow = ref();
@@ -336,8 +335,8 @@ export default defineComponent({
 
     const getData = () => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading data...",
       });
 
@@ -382,8 +381,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to fetch organization data. Please try again.",
@@ -413,7 +412,7 @@ export default defineComponent({
 
       if (contractMode.value === "create") {
         if (!contractEndDate.value) {
-          $q.notify({ type: "negative", message: "End date is required." });
+          toast({ variant: "error", message: "End date is required." });
           return;
         }
         const payload = {
@@ -422,14 +421,14 @@ export default defineComponent({
         };
 
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Creating external contract...",
         });
         OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "External contract created successfully.",
             });
             contractPrompt.value = false;
@@ -440,8 +439,8 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to create external contract.",
@@ -450,7 +449,7 @@ export default defineComponent({
           });
       } else {
         if (!contractEndDate.value) {
-          $q.notify({ type: "negative", message: "New end date is required." });
+          toast({ variant: "error", message: "New end date is required." });
           return;
         }
         const payload = {
@@ -459,14 +458,14 @@ export default defineComponent({
         };
 
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Extending external contract...",
         });
         OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "External contract extended successfully.",
             });
             contractPrompt.value = false;
@@ -477,8 +476,8 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to extend external contract.",
@@ -497,14 +496,14 @@ export default defineComponent({
       }).onOk(() => {
         const metaOrg = store.state.selectedOrganization.identifier;
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Revoking external contract...",
         });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "External contract revoked successfully.",
             });
             getData();
@@ -514,8 +513,8 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to revoke external contract.",
@@ -533,15 +532,15 @@ export default defineComponent({
         persistent: true,
       }).onOk(() => {
         loading.value = true;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "enabling storage settings...",
         });
         orgStorageService
           .enable(row.identifier)
           .then(() => {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Storage settings enabled successfully.",
             });
             getData();
@@ -551,8 +550,8 @@ export default defineComponent({
           .catch((error) => {
             loading.value = false;
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to enable storage settings.",
@@ -569,8 +568,8 @@ export default defineComponent({
       };
 
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message:
           "Please wait while processing trial period extension request...",
       });
@@ -580,8 +579,8 @@ export default defineComponent({
       )
         .then((response) => {
           if (response.data) {
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: "Trial period extended successfully.",
             });
             extendTrialPrompt.value = false;
@@ -596,8 +595,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to extend trial period. Please try again.",

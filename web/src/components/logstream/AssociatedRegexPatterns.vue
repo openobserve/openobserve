@@ -390,7 +390,7 @@ import { defineComponent, nextTick, onMounted, onBeforeUnmount, PropType, ref, w
 import { useStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToQuasarFormat, getImageURL } from '@/utils/zincutils';
-import { debounce, useQuasar } from 'quasar';
+import { debounce } from 'quasar';
 import store from '@/test/unit/helpers/store';
 import { useI18n } from 'vue-i18n';
 import FullViewContainer from '../functions/FullViewContainer.vue';
@@ -404,6 +404,7 @@ import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export interface PatternAssociation {
     field: string;
@@ -479,7 +480,6 @@ export default defineComponent({
         const debouncedEmit = debounce((pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
           emit("updateAppliedPattern", pattern, fieldName, patternId, attribute);
         }, 300);
-        const $q = useQuasar();
         const userClickedPattern = ref<any>(null);
         const isPatternValid = ref(false);
         const testString = ref("");
@@ -505,8 +505,7 @@ export default defineComponent({
             const response = await regexPatternsService.test(store.state.selectedOrganization.identifier, userClickedPattern.value.pattern, [testString.value], policy.value);
             outputString.value = response.data.results[0];
           } catch (error) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: error.response?.data?.message || "Failed to test string",
               timeout: 4000,
             });
@@ -647,10 +646,8 @@ export default defineComponent({
               }));
               store.dispatch("setRegexPatterns", allPatterns.value);
             } catch (error) {
-              $q.notify({
+              toast({
                 message: error?.response?.data?.message || error?.data?.message || "Error fetching regex patterns",
-                color: "negative",
-                icon: "error",
               });
             }
             finally{
@@ -699,10 +696,8 @@ export default defineComponent({
           }
           else{
             if(apply_at.value.length == 0){
-              $q.notify({
+              toast({
                 message: "Please select detect at option",
-                color: "negative",
-                icon: "error",
               });
               return;
             }

@@ -1471,7 +1471,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import TagInput from "@/components/alerts/TagInput.vue";
@@ -1497,6 +1496,7 @@ import type {
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1521,7 +1521,6 @@ const props = defineProps<{
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 const store = useStore();
-const $q = useQuasar();
 const { t } = useI18n();
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -3296,8 +3295,8 @@ function applySuggestion() {
   }
   addingToEnv.value = "";
   suggestionDismissed.value = true;
-  $q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message:
       'Recommended configuration applied. Click "Save Configuration" to save.',
     timeout: 3000,
@@ -3500,8 +3499,8 @@ async function loadData() {
     }
   } catch (err: any) {
     console.error("Failed to load workload detection data:", err);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.correlation.loadRecommendationsFailed"),
       timeout: 3000,
     });
@@ -3548,8 +3547,8 @@ async function saveConfig() {
       }));
 
     if (sets.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: t(
           "settings.correlation.identityConfigNoSets",
           "Configure at least one identity set before saving.",
@@ -3560,8 +3559,8 @@ async function saveConfig() {
     }
 
     if (trackedAliasIds.value.length === 0) {
-      $q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: "Select at least one tracked alias group.",
         timeout: 3000,
       });
@@ -3597,14 +3596,14 @@ async function saveConfig() {
     // Sync baseline so isDirty resets to false
     currentIdentityConfig.value = payload;
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.correlation.identityConfigSaved"),
       timeout: 2000,
     });
   } catch (err: any) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err?.response?.data?.message ||
         err?.message ||

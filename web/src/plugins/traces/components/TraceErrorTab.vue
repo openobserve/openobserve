@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
@@ -251,6 +251,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
   span: object;
@@ -260,7 +261,6 @@ const props = defineProps<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const spanRef = computed(() => props.span);
 
@@ -573,18 +573,16 @@ function copyStackTrace(stacktrace: string) {
   navigator.clipboard
     .writeText(stacktrace)
     .then(() => {
-      $q.notify({
+      toast({
         message: t("traces.stacktraceCopied"),
-        color: "positive",
-        position: "top",
+        position: "top-center",
         timeout: 2000,
       });
     })
     .catch(() => {
-      $q.notify({
+      toast({
         message: t("traces.stacktraceCopyFailed"),
-        color: "negative",
-        position: "top",
+        position: "top-center",
         timeout: 2000,
       });
     });

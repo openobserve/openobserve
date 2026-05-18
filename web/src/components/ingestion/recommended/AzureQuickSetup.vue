@@ -182,10 +182,10 @@ import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AzureQuickSetup",
@@ -343,8 +343,8 @@ export default defineComponent({
           replaced: shouldReplace,
         });
 
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: shouldReplace
             ? "Microsoft O365 dashboard replaced successfully"
             : "Microsoft O365 dashboard added successfully to Microsoft folder",
@@ -352,8 +352,8 @@ export default defineComponent({
         });
       } catch (error) {
         console.error("Error adding dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to add dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
           timeout: 5000,
         });

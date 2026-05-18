@@ -171,7 +171,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -210,7 +209,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;

@@ -198,11 +198,11 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import templateService from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   validateTemplateBody,
   getTemplateValidationErrorMessage,
@@ -240,7 +240,6 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const q = useQuasar();
 
     const baseImportRef = ref<any>(null);
     const templateErrorsToDisplay = ref<templateErrors>([]);
@@ -332,10 +331,9 @@ export default defineComponent({
           ? parsedJson
           : [parsedJson];
       } catch (e: any) {
-        q.notify({
+        toast({
           message: e.message || "Invalid JSON format",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         // Reset BaseImport's importing flag on validation error
@@ -358,10 +356,9 @@ export default defineComponent({
 
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
-        q.notify({
+        toast({
           message: `Successfully imported template(s)`,
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
 
@@ -392,10 +389,9 @@ export default defineComponent({
         const hasCreatedTemplate = await createTemplate(jsonObj, index);
         return hasCreatedTemplate;
       } catch (e: any) {
-        q.notify({
+        toast({
           message: "Error importing Template please check the JSON",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return false;

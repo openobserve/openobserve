@@ -82,7 +82,6 @@
 <script setup lang="ts">
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";

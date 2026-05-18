@@ -153,7 +153,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import DateTime from "@/components/DateTime.vue";
 import config from "@/aws-exports";
-import { useQuasar } from "quasar";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -162,6 +161,7 @@ import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
 );
@@ -230,7 +230,6 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const router = useRouter();
 
@@ -618,8 +617,8 @@ const validateSqlQuery = async () => {
           const message = err?.response?.data?.message
             ? `Invalid SQL Query: ${err?.response?.data?.message}`
             : "Invalid SQL Query";
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `${message}`,
             timeout: 3000,
           });

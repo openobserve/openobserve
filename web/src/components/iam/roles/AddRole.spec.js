@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { installQuasar } from "@/test/unit/helpers";
 import i18n from "@/locales";
 import AddRole from "./AddRole.vue";
@@ -45,7 +45,7 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 }));
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // ODrawer stub: exposes the migrated props (open/width/title/...) and drives

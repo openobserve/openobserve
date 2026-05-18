@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify, Quasar, copyToClipboard } from "quasar";
+import { Dialog, Quasar, copyToClipboard } from "quasar";
 import { nextTick } from "vue";
 
 import DetailTable from "@/plugins/logs/DetailTable.vue";
@@ -107,7 +107,7 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 describe("DetailTable Component", () => {

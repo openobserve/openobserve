@@ -278,7 +278,7 @@ import {
   convertToUtcTimestamp,
   timestampToTimezoneDate,
 } from "../utils/zincutils";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -356,7 +356,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",

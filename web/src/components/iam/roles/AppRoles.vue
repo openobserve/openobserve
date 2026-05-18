@@ -93,9 +93,9 @@ import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 
@@ -111,7 +111,6 @@ const router = useRouter();
 
 const store = useStore();
 
-const q = useQuasar();
 
 const deleteConformDialog = ref({
   show: false,
@@ -178,19 +177,17 @@ const hideForm = () => {
 const deleteUserRole = (role: any) => {
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
-      q.notify({
+      toast({
         message: "Role deleted successfully!",
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
       setupRoles();
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
-        q.notify({
+        toast({
           message: "Error while deleting role!",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
         });
       }
     });
@@ -225,22 +222,19 @@ const bulkDeleteUserRoles = async () => {
     }
 
     if (successful.length > 0 && unsuccessful.length === 0) {
-      q.notify({
+      toast({
         message: `Successfully deleted ${successful.length} role(s)`,
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
-        color: "warning",
-        position: "bottom",
+        position: "bottom-center",
       });
     } else if (unsuccessful.length > 0) {
-      q.notify({
+      toast({
         message: `Failed to delete ${unsuccessful.length} role(s)`,
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
 
@@ -249,10 +243,9 @@ const bulkDeleteUserRoles = async () => {
     confirmBulkDelete.value = false;
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
+      toast({
         message: error.response?.data?.message || error?.message || "Error while deleting roles",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     }
     confirmBulkDelete.value = false;

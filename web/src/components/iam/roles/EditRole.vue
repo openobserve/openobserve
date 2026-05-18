@@ -280,7 +280,6 @@ import {
   getResourcePermission,
   getRoleUsers,
 } from "@/services/iam";
-import { useQuasar } from "quasar";
 import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
@@ -305,6 +304,7 @@ import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -324,7 +324,6 @@ const { permissionsState } = usePermissions();
 
 const router = useRouter();
 
-const q = useQuasar();
 
 const store = useStore();
 
@@ -461,12 +460,11 @@ const getRoleDetails = () => {
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
-      q.notify({
+      toast({
         message: error?.response?.status === 404
           ? "Role not found or has been deleted. Redirecting to roles list."
           : error?.message || "Failed to load role details. Redirecting to roles list.",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       router.push({
@@ -2211,8 +2209,8 @@ const saveRole = () => {
       payload.remove_users.length
     )
   ) {
-    q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `No updates detected.`,
       timeout: 3000,
     });
@@ -2228,8 +2226,8 @@ const saveRole = () => {
     .then(async (res) => {
       // combine permissionsHash and selectedPermissionsHash
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Updated role successfully!`,
         timeout: 3000,
       });
@@ -2269,8 +2267,8 @@ const saveRole = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Error while updating role!`,
           timeout: 3000,
         });

@@ -16,13 +16,13 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { createI18n } from "vue-i18n";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Create i18n instance

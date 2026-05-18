@@ -122,7 +122,6 @@
 import { computed, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -130,6 +129,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   fields: {
@@ -176,7 +176,6 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
@@ -409,7 +408,7 @@ const addSearchTerm = (term: string) => {
 
 const copyContentValue = (value: string) => {
   navigator.clipboard.writeText(value);
-  $q.notify({ type: "positive", message: "Value copied to clipboard" });
+  toast({ variant: "success", message: "Value copied to clipboard" });
 };
 </script>
 

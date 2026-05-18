@@ -18,7 +18,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import DomainManagement from "./DomainManagement.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import { nextTick } from "vue";
 import {
   mockDomainData,
@@ -29,7 +29,7 @@ import {
 } from "./DomainManagement.test-helpers";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Create a unique DOM node for this test file to avoid conflicts

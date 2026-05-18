@@ -143,13 +143,13 @@ import { cloneDeep } from "lodash-es";
 import FieldList from "@/components/common/sidebar/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
-import { useQuasar } from "quasar";
 import {
   applyFilterTerm,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -254,7 +254,6 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const q = useQuasar();
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -402,11 +401,10 @@ const getErrorLogs = () => {
       );
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message || "Error while fetching error events",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })

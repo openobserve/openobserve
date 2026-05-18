@@ -413,7 +413,6 @@ import { defineComponent, onActivated, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
@@ -432,6 +431,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -648,14 +648,14 @@ export default defineComponent({
         // Clear temporary theme colors from store since we're saving permanently
         store.commit("clearTempThemeColors");
 
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: t("settings.organizationSettingsUpdated"),
           timeout: 2000,
         });
       } catch (err: any) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err?.message || t("settings.somethingWentWrong"),
           timeout: 2000,
         });
@@ -693,8 +693,8 @@ export default defineComponent({
           )
           .then(async (res) => {
             if (res.status == 200) {
-              q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: t("settings.logoUpdatedSuccessfully", {
                   mode:
                     theme === "dark"
@@ -716,16 +716,16 @@ export default defineComponent({
               }
               files.value = null;
             } else {
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: t("settings.somethingWentWrong"),
                 timeout: 2000,
               });
             }
           })
           .catch((e) => {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e?.message || t("settings.errorUploadingImage"),
               timeout: 2000,
             });
@@ -734,14 +734,14 @@ export default defineComponent({
             loadingState.value = false;
           });
       } else if (config.isEnterprise != "true") {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.notAllowedAction"),
           timeout: 2000,
         });
       } else {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.selectFileToUpload"),
           timeout: 2000,
         });
@@ -763,8 +763,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.status == 200) {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: t("settings.logoDeletedSuccessfully", {
                 mode:
                   theme === "dark"
@@ -778,16 +778,16 @@ export default defineComponent({
               store.dispatch("setConfig", res.data);
             });
           } else {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res?.message || t("settings.errorDeletingImage"),
               timeout: 2000,
             });
           }
         })
         .catch(() => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("settings.somethingWentWrong"),
             timeout: 2000,
           });
@@ -895,8 +895,8 @@ export default defineComponent({
       applyThemeColors(color, currentMode, true);
 
       // Show notification
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("settings.themeColorsResetSuccess"),
         timeout: 2000,
       });
@@ -941,8 +941,8 @@ export default defineComponent({
 
       customText.value = sanitizeInput(customText.value);
       if (customText.value.length > 100) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.textMaxCharacters"),
           timeout: 2000,
         });
@@ -958,8 +958,8 @@ export default defineComponent({
         )
         .then(async (res: any) => {
           if (res.status == 200) {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: t("settings.logoTextUpdatedSuccessfully"),
               timeout: 2000,
             });
@@ -969,16 +969,16 @@ export default defineComponent({
             store.dispatch("setConfig", stateConfig);
             editingText.value = false;
           } else {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: res?.message || t("settings.errorUpdatingImage"),
               timeout: 2000,
             });
           }
         })
         .catch((err) => {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.message || t("settings.somethingWentWrong"),
             timeout: 2000,
           });
@@ -1016,10 +1016,10 @@ export default defineComponent({
       filesMaxTotalSize: ref(null),
       filesMaxNumber: ref(null),
       onRejected(rejectedEntries: string | any[]) {
-        // Notify plugin needs to be installed
+        //  plugin needs to be installed
         // https://quasar.dev/quasar-plugins/notify#Installation
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.filesValidationFailed", {
             count: rejectedEntries.length,
           }),

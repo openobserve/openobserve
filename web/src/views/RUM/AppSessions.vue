@@ -187,7 +187,7 @@ import { onBeforeRouteUpdate, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import useSession from "@/composables/useSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
@@ -201,6 +201,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Session {
   timestamp: string;
@@ -226,7 +227,6 @@ const props = defineProps({
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
-const q = useQuasar();
 
 const { sessionState } = useSession();
 const store = useStore();
@@ -532,10 +532,9 @@ const getSessions = () => {
     })
     .catch((err) => {
       rows.value = [];
-      q.notify({
+      toast({
         message: err.response?.data?.message || "Error while fetching sessions",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
       });
     })
     .finally(() => {
@@ -607,12 +606,11 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message ||
           "Error while fetching session replay data",
-        position: "bottom",
-        color: "negative",
+        position: "bottom-center",
         timeout: 4000,
       });
     })

@@ -21,13 +21,14 @@ import {
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import { getSpanColorHex } from "@/utils/traces/traceColors";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -191,7 +192,6 @@ export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
-  const $q = useQuasar();
 
   const { loadSemanticGroups } = useServiceCorrelation();
 
@@ -317,15 +317,15 @@ const useTraces = () => {
 
     copyToClipboard(shareURL)
       .then(() => {
-        $q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Link Copied Successfully!",
           timeout: 5000,
         });
       })
       .catch(() => {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while copy link.",
           timeout: 5000,
         });

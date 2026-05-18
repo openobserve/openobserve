@@ -283,7 +283,7 @@ import { useRouter } from "vue-router";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
@@ -300,6 +300,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -309,7 +310,6 @@ const { t } = useI18n();
 const router = useRouter();
 const { track } = useReo();
 const store = useStore();
-const q = useQuasar();
 
 // ── Folder state ──────────────────────────────────────────────────────────────
 const splitterModel = ref(200);
@@ -400,8 +400,8 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
   }
 
   isLoadingReports.value = true;
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while fetching reports...",
     timeout: 2000,
   });
@@ -445,8 +445,8 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     filterReports();
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.data?.message || "Error while fetching reports!",
         timeout: 3000,
       });
@@ -608,7 +608,7 @@ const editReport = (report: any) => {
 // Toggle enable/disable — uses report_id (v2)
 const toggleReportState = (report: any) => {
   const state = report.enabled ? "Stopping" : "Starting";
-  const dismiss = q.notify({ message: `${state} report "${report.name}"` });
+  const dismiss = toast({ message: `${state} report "${report.name}"` });
   reportsStateLoadingMap.value[report.report_id] = true;
 
   reports
@@ -623,16 +623,16 @@ const toggleReportState = (report: any) => {
       );
       invalidateFolderCache(activeFolderId.value);
       filterReports();
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `${!report.enabled ? "Started" : "Stopped"} report successfully.`,
         timeout: 2000,
       });
     })
     .catch((err) => {
       if (err?.response?.status !== 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err?.data?.message || "Error while updating report state!",
           timeout: 4000,
         });
@@ -653,7 +653,7 @@ const confirmDeleteReport = (report: any) => {
 
 const deleteReport = () => {
   const { report_id, name } = deleteDialog.value.data;
-  const dismiss = q.notify({ message: `Deleting report "${name}"` });
+  const dismiss = toast({ message: `Deleting report "${name}"` });
 
   reports
     .deleteReportById(store.state.selectedOrganization.identifier, report_id)
@@ -663,12 +663,12 @@ const deleteReport = () => {
       );
       invalidateFolderCache(activeFolderId.value);
       filterReports();
-      q.notify({ type: "positive", message: "Report deleted successfully.", timeout: 3000 });
+      toast({ variant: "success", message: "Report deleted successfully.", timeout: 3000 });
     })
     .catch((err: any) => {
       if (err?.response?.status !== 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err?.data?.message || "Error while deleting report!",
           timeout: 4000,
         });
@@ -681,10 +681,10 @@ const deleteReport = () => {
 const openBulkDeleteDialog = () => { confirmBulkDelete.value = true; };
 
 const bulkDeleteReports = async () => {
-  const dismiss = q.notify({ spinner: true, message: "Deleting reports...", timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: "Deleting reports...", timeout: 0 });
   try {
     if (!selectedReports.value.length) {
-      q.notify({ type: "negative", message: "No reports selected for deletion", timeout: 2000 });
+      toast({ variant: "error", message: "No reports selected for deletion", timeout: 2000 });
       dismiss();
       return;
     }
@@ -698,11 +698,11 @@ const bulkDeleteReports = async () => {
 
     const { successful = [], unsuccessful = [] } = response.data ?? {};
     if (unsuccessful.length && successful.length) {
-      q.notify({ type: "warning", message: `${successful.length} deleted, ${unsuccessful.length} failed`, timeout: 5000 });
+      toast({ variant: "warning", message: `${successful.length} deleted, ${unsuccessful.length} failed`, timeout: 5000 });
     } else if (unsuccessful.length) {
-      q.notify({ type: "negative", message: `Failed to delete ${unsuccessful.length} report(s)`, timeout: 3000 });
+      toast({ variant: "error", message: `Failed to delete ${unsuccessful.length} report(s)`, timeout: 3000 });
     } else {
-      q.notify({ type: "positive", message: `${successful.length} report(s) deleted successfully`, timeout: 2000 });
+      toast({ variant: "success", message: `${successful.length} report(s) deleted successfully`, timeout: 2000 });
     }
 
     const successfulIds = new Set(successful);
@@ -716,7 +716,7 @@ const bulkDeleteReports = async () => {
     dismiss();
     const msg = error.response?.data?.message || error?.message || "Error deleting reports.";
     if (error.response?.status !== 403) {
-      q.notify({ type: "negative", message: msg, timeout: 3000 });
+      toast({ variant: "error", message: msg, timeout: 3000 });
     }
   }
   confirmBulkDelete.value = false;

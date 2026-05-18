@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import IdentityAccessManagement from "@/views/IdentityAccessManagement.vue";
 import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
@@ -26,7 +26,7 @@ import { nextTick, ref, computed } from "vue";
 import config from "@/aws-exports";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock the useIsMetaOrg composable

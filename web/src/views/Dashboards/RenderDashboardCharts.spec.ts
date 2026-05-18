@@ -17,14 +17,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, shallowMount } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Stub ODialog so tests are deterministic (no Portal/Teleport) and so we

@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { flushPromises, shallowMount, mount } from "@vue/test-utils";
 import { defineComponent, ref, h } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import MainLayout from "@/layouts/MainLayout.vue";
@@ -82,7 +82,7 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 describe.skip("Main Layout Component", async () => {

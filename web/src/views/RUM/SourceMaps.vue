@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -217,10 +216,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 
 // Delete dialog state
 const deleteDialog = ref({
@@ -515,8 +514,8 @@ const deleteSourceMap = async () => {
       }
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: `Source maps deleted successfully for ${sourceMap.service} (${sourceMap.version}) in ${sourceMap.env}`,
     });
 
@@ -526,8 +525,8 @@ const deleteSourceMap = async () => {
     );
   } catch (error: any) {
     console.error("Error deleting source maps:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.message || error?.message || "Failed to delete source maps",
     });
   }

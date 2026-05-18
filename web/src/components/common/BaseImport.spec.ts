@@ -18,10 +18,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import BaseImport from "@/components/common/BaseImport.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import i18n from "@/locales";
 
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 // ─── Mock heavy dependencies ──────────────────────────────────────────────────
 

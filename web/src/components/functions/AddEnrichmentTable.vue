@@ -219,7 +219,6 @@ import { defineComponent, ref, computed } from "vue";
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -229,6 +228,7 @@ import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -266,7 +266,6 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const indexOptions = ref([]);
     const { t } = useI18n();
-    const q = useQuasar();
     const editorRef: any = ref(null);
     let editorobj: any = null;
     const isFetchingStreams = ref(false);
@@ -331,8 +330,8 @@ export default defineComponent({
         }
       }
 
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -391,8 +390,8 @@ export default defineComponent({
             emit("update:list");
 
             dismiss();
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: formData.value.updateMode === 'reload'
                 ? "Enrichment table reload started. Processing in background..."
                 : "Enrichment table job started. Processing in background...",
@@ -401,8 +400,8 @@ export default defineComponent({
           .catch((err) => {
             compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
             if(err.response?.status != 403){
-              q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message:
                   err.response?.data?.["message"] ||
                   "Enrichment Table creation failed",
@@ -440,16 +439,16 @@ export default defineComponent({
             emit("update:list");
 
             dismiss();
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: res.data.message,
             });
           })
           .catch((err) => {
             compilationErr.value = err.response?.data?.["message"] || err.message || "Unknown error";
             if(err.response?.status != 403){
-              q.notify({
-              type: "negative",
+              toast({
+              variant: "error",
               message:
                 JSON.stringify(err.response?.data?.["error"]) ||
                 "Enrichment Table creation failed",

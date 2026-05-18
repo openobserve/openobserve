@@ -230,7 +230,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -243,6 +242,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface PatternExample {
   Valid: string[];
@@ -267,7 +267,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const patterns = ref<BuiltInPattern[]>([]);
     const loading = ref(false);
@@ -345,12 +344,11 @@ export default defineComponent({
 
             // console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
 
-            q.notify({
+            toast({
               message: t("regex_patterns.patterns_loaded", {
                 count: patterns.value.length,
               }),
-              color: "positive",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
             loading.value = false;
@@ -372,12 +370,11 @@ export default defineComponent({
           selected: false,
         }));
 
-        q.notify({
+        toast({
           message: t("regex_patterns.patterns_loaded", {
             count: patterns.value.length,
           }),
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       } catch (e: any) {
@@ -385,10 +382,9 @@ export default defineComponent({
           e.response?.data?.message ||
           e.message ||
           t("regex_patterns.failed_to_load");
-        q.notify({
+        toast({
           message: error.value,
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 4000,
         });
       } finally {
@@ -421,10 +417,9 @@ export default defineComponent({
       const selected = selectedPatterns.value;
 
       if (selected.length === 0) {
-        q.notify({
+        toast({
           message: t("regex_patterns.no_patterns_selected"),
-          color: "warning",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;

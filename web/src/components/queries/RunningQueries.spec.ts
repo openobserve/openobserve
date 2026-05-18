@@ -16,7 +16,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify, QTable } from "quasar";
+import { Dialog, QTable } from "quasar";
 import RunningQueries from "@/components/queries/RunningQueries.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -36,7 +36,7 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
 }));
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 const node = document.createElement("div");

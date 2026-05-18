@@ -81,7 +81,7 @@ node.setAttribute("id", "app");
 document.body.appendChild(node);
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // ============================================================================
@@ -484,9 +484,9 @@ describe("ResourceDetailDrawer", () => {
 
     describe.skip("Session Events Action", () => {
       it("should show notification when View All Session Events is clicked", async () => {
-        // Spy on Notify.create BEFORE mounting the component
+        // Spy on .create BEFORE mounting the component
         const notifySpy = vi
-          .spyOn(quasar.Notify, "create")
+          .spyOn(quasar."create")
           .mockImplementation(() => () => {});
 
         // Mount a fresh wrapper with the spy already in place
@@ -564,7 +564,7 @@ describe("ResourceDetailDrawer", () => {
 
     it("should be keyboard accessible - view events button with Enter", async () => {
       const notifySpy = vi
-        .spyOn(quasar.Notify, "create")
+        .spyOn(quasar."create")
         .mockImplementation(() => () => {});
       const eventsBtn = findSessionEventsButton(wrapper);
 
@@ -578,7 +578,7 @@ describe("ResourceDetailDrawer", () => {
 
     it.skip("should be keyboard accessible - view events button with Space", async () => {
       const notifySpy = vi
-        .spyOn(quasar.Notify, "create")
+        .spyOn(quasar."create")
         .mockImplementation(() => () => {});
       const eventsBtn = findSessionEventsButton(wrapper);
 

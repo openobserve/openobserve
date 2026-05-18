@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import organizationsService from "@/services/organizations";
@@ -118,6 +118,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -132,7 +133,6 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
@@ -235,8 +235,8 @@ export default defineComponent({
     });
 
     const getOrganizations = () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading organizations...",
       });
       organizationsService.list(0, 1000000, "name", false, "").then((res) => {
@@ -426,14 +426,14 @@ export default defineComponent({
       }
       this.getOrganizations();
 
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
       });
     },
     joinOrganization() {
-      this.$q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Request completed successfully.",
         timeout: 5000,
       });
@@ -442,15 +442,15 @@ export default defineComponent({
     copyAPIKey() {
       copyToClipboard(this.organizationAPIKey)
         .then(() => {
-          this.$q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: "API Key Copied Successfully!",
             timeout: 5000,
           });
         })
         .catch(() => {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "Error while copy API Key.",
             timeout: 5000,
           });

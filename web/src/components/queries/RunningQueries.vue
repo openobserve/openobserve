@@ -167,7 +167,7 @@ import {
   toRaw,
   watch,
 } from "vue";
-import { useQuasar, type QTableProps, QTable } from "quasar";
+import { type QTableProps, QTable } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
@@ -182,6 +182,7 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "RunningQueries",
@@ -359,7 +360,6 @@ export default defineComponent({
     };
     const filterQuery = ref("");
 
-    const q = useQuasar();
 
     const localTimeToMicroseconds = () => {
       // Create a Date object representing the current local time
@@ -620,11 +620,10 @@ export default defineComponent({
     });
 
     const getRunningQueries = () => {
-      const dismiss = q.notify({
+      const dismiss = toast({
         message: "Fetching running queries...",
-        color: "primary",
-        position: "bottom",
-        spinner: true,
+        position: "bottom-center",
+        variant: "loading",
       });
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
@@ -645,12 +644,11 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          q.notify({
+          toast({
             message:
               error.response?.data?.message ||
               "Failed to fetch running queries",
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2500,
           });
         })
@@ -669,18 +667,16 @@ export default defineComponent({
 
           getRunningQueries();
 
-          q.notify({
+          toast({
             message: "Query cancelled",
-            color: "positive",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1500,
           });
         })
         .catch((error: any) => {
-          q.notify({
+          toast({
             message: error.response?.data?.message || "Failed to cancel query",
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 1500,
           });
         })

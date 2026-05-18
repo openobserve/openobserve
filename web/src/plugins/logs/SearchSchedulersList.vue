@@ -271,7 +271,7 @@ import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -283,6 +283,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -315,7 +316,6 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const $q = useQuasar();
     const route = useRoute();
     const store = useStore();
     const { t } = useI18n();
@@ -452,8 +452,8 @@ export default defineComponent({
           })
           .catch((e) => {
             if (e.response.status != 403) {
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: t('search_scheduler_job.fetch_failed'),
                 timeout: 5000,
               });
@@ -464,8 +464,8 @@ export default defineComponent({
           });
       } catch (error) {
         if (error.response.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t('search_scheduler_job.fetch_failed'),
             timeout: 5000,
           });
@@ -481,16 +481,16 @@ export default defineComponent({
           jobId: toBeCancelled.value.id,
         })
         .then((res) => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t('search_scheduler_job.job_cancelled_success'),
             timeout: 2000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_cancel_failed'),
               timeout: 2000,
@@ -508,16 +508,16 @@ export default defineComponent({
           jobId: row.id,
         })
         .then((res) => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t('search_scheduler_job.job_restarted_success'),
             timeout: 2000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_restart_failed'),
               timeout: 2000,
@@ -544,16 +544,16 @@ export default defineComponent({
         })
         .then((res) => {
           fetchSearchHistory();
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: t('search_scheduler_job.job_deleted_success'),
             timeout: 2000,
           });
         })
         .catch((e) => {
           if (e.response.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 e.response?.data?.message || t('search_scheduler_job.job_delete_failed'),
               timeout: 2000,
@@ -568,15 +568,15 @@ export default defineComponent({
       navigator.clipboard
         .writeText(text)
         .then(() => {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${type} ${t('search_scheduler_job.copy_success')}`,
             timeout: 5000,
           });
         })
         .catch(() => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t('search_scheduler_job.copy_error'),
             timeout: 5000,
           });
@@ -698,8 +698,8 @@ export default defineComponent({
         queryObject["fn_editor"] = "false";
       }
 
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t('search_scheduler_job.job_applied_success'),
         timeout: 2000,
       });

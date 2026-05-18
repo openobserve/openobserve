@@ -16,12 +16,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import Advanced, { type Variable } from "./Advanced.vue";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Mock getUUID

@@ -24,7 +24,7 @@ import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
 
 installQuasar({
-  plugins: [quasar.Notify],
+  plugins: [quasar.],
 });
 
 // ============================================================================

@@ -220,13 +220,13 @@ import {
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "BaseImport",
@@ -337,7 +337,6 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const q = useQuasar();
 
     // State
     const jsonStr = ref<any>("");
@@ -433,10 +432,9 @@ export default defineComponent({
                     : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
-                  q.notify({
+                  toast({
                     message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
+                    position: "bottom-center",
                     timeout: 2000,
                   });
                   resolve([]);
@@ -478,27 +476,24 @@ export default defineComponent({
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
-              q.notify({
+              toast({
                 message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
+                position: "bottom-center",
                 timeout: 2000,
               });
             }
           } catch (parseError) {
-            q.notify({
+            toast({
               message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
+              position: "bottom-center",
               timeout: 2000,
             });
           }
         }
       } catch (error) {
-        q.notify({
+        toast({
           message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       }

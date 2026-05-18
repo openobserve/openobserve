@@ -313,11 +313,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface SemanticGroup {
   id: string;
@@ -338,7 +338,6 @@ interface SemanticGroupDiff {
 }
 
 const router = useRouter();
-const q = useQuasar();
 const store = useStore();
 
 const jsonFile = ref<File | null>(null);
@@ -376,10 +375,9 @@ const loadFile = async (file: File | null) => {
     importedGroups.value = groups;
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     clearFile();
@@ -406,10 +404,9 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
     selectedModifications.value = response.data.modifications.map((m: SemanticGroupModification) => m.proposed.id);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   }
@@ -496,20 +493,18 @@ const applyChanges = async () => {
     const org = store.state.selectedOrganization.identifier;
     await alertsService.saveSemanticGroups(org, finalGroups);
 
-    q.notify({
+    toast({
       message: `Successfully applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
-      color: "positive",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
 
     // Go back
     handleBack();
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Failed to save changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   } finally {
@@ -540,10 +535,9 @@ const handleJsonUpdate = async (jsonArray: any[]) => {
     importedGroups.value = jsonArray;
     await previewDiff(jsonArray);
   } catch (error: any) {
-    q.notify({
+    toast({
       message: `Invalid JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   } finally {

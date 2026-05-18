@@ -95,7 +95,6 @@ import { ref, computed, onBeforeMount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -104,6 +103,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
@@ -117,7 +117,6 @@ function handleDrawerClose(v: boolean) {
     setTimeout(() => emit("cancel:hideform"), 300);
   }
 }
-const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
 
@@ -165,8 +164,8 @@ const getFormattedDestinations = computed(() => {
 });
 
 const getDestinations = () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading destinations...",
   });
   destinationService
@@ -183,8 +182,8 @@ const getDestinations = () => {
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling destinations.",
           timeout: 2000,
         });
@@ -202,10 +201,9 @@ const saveDestination = () => {
     org_id: store.state.selectedOrganization.identifier,
   };
   if (!selectedDestination.value) {
-    q.notify({
+    toast({
+      variant: "warning",
       message: "Please select External destination from the list",
-      color: "negative",
-      position: "bottom",
       timeout: 2000,
     });
     return;

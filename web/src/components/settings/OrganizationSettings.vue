@@ -90,12 +90,12 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 
@@ -109,7 +109,6 @@ const spanIdFieldName = ref(
   store.state?.organizationData?.organizationSettings?.span_id_field_name,
 );
 
-const q = useQuasar();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);
@@ -201,17 +200,15 @@ const saveOrgSettings = async () => {
 
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    q.notify({
+    toast({
       message: "Organization settings updated successfully",
-      color: "positive",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   } catch (e: any) {
-    q.notify({
+    toast({
       message: e?.message || "Error saving organization settings",
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
   }

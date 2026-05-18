@@ -92,7 +92,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import type { AzureIntegration } from "@/utils/azureIntegrations";
 import {
@@ -101,6 +100,7 @@ import {
 } from "@/utils/azureIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AzureIntegrationTile",
@@ -113,7 +113,6 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
-    const q = useQuasar();
     const router = useRouter();
 
     let endpoint: any = null;
@@ -127,8 +126,8 @@ export default defineComponent({
       if (!props.integration.armTemplate) return;
 
       if (!endpoint?.url) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Invalid ingestion endpoint. Please check configuration.",
           timeout: 3000,
         });
@@ -140,8 +139,8 @@ export default defineComponent({
       const passcode = store.state?.organizationData?.organizationPasscode;
 
       if (!organizationId || !email || !passcode) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Missing organization credentials. Please refresh the page.",
           timeout: 3000,
         });
@@ -164,8 +163,8 @@ export default defineComponent({
         integration_id: props.integration.id,
       });
 
-      q.notify({
-        type: "info",
+      toast({
+        variant: "info",
         message: `Opening Azure portal to deploy ${props.integration.displayName}`,
         timeout: 3000,
       });
@@ -199,8 +198,8 @@ export default defineComponent({
         router.push(`/dashboards?org_identifier=${organizationId}`);
       } catch (error) {
         console.error("Error navigating to dashboard:", error);
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error opening dashboard. Please try again.",
           timeout: 3000,
         });

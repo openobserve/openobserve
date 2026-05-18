@@ -198,7 +198,6 @@ import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -229,6 +228,7 @@ import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
 import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
@@ -288,7 +288,7 @@ const plotChart: any = ref({
         roam: false,
         label: {
           show: true,
-          position: "bottom",
+          position: "bottom-center",
         },
         draggable: true,
         edgeSymbol: ["arrow"],
@@ -431,7 +431,6 @@ const { getStreams } = useStreams();
 
 const nodeRows = ref<(string | null)[]>([]);
 
-const q = useQuasar();
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
@@ -646,10 +645,9 @@ const getPipeline = () => {
       );
 
       if (!_pipeline) {
-        q.notify({
+        toast({
           message: t("pipeline.pipelineNotFound"),
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
         router.replace({
@@ -687,10 +685,9 @@ const getPipeline = () => {
       pipelineObj.pipelineWithoutChange = JSON.parse(JSON.stringify(_pipeline));
     })
     .catch((error) => {
-      q.notify({
+      toast({
         message: error?.message || t("pipeline.failedToLoadPipeline"),
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       router.replace({
@@ -749,10 +746,9 @@ const savePipeline = async () => {
       pipelineNameInputRef.value.focus();
     }
 
-    q.notify({
+    toast({
       message: t("pipeline.pipelineNameRequired"),
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     return;
@@ -773,10 +769,9 @@ const savePipeline = async () => {
   );
 
   if (inputNodeIndex === -1) {
-    q.notify({
+    toast({
       message: t("pipeline.sourceNodeRequired"),
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
@@ -784,10 +779,9 @@ const savePipeline = async () => {
     }
     return;
   } else if (outputNodeIndex === -1) {
-    q.notify({
+    toast({
       message: t("pipeline.destinationNodeRequired"),
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
@@ -818,10 +812,9 @@ const savePipeline = async () => {
   pipelineObj.currentSelectedPipeline.org =
     store.state.selectedOrganization.identifier;
   if (findMissingEdges()) {
-    q.notify({
+    toast({
       message: t("pipeline.connectAllNodes"),
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 3000,
     });
     if(showJsonEditorDialog.value == true){
@@ -859,10 +852,9 @@ const validatePipeline = () => {
     outputNode?.data?.node_type === "stream" &&
     outputNode?.data?.stream_type === "enrichment_tables"
   ) {
-    q.notify({
+    toast({
       message: t("pipeline.enrichmentTablesScheduledOnly"),
-      color: "negative",
-      position: "bottom",
+      position: "bottom-center",
       timeout: 2000,
     });
     return false;
@@ -883,10 +875,10 @@ const onSubmitPipeline = async () => {
       return;
     }
   }
-  const dismiss = q.notify({
+  const dismiss = toast({
     message: t("pipeline.savingPipeline"),
-    position: "bottom",
-    spinner: true,
+    position: "bottom-center",
+    variant: "loading",
   });
 
   const saveOperation = pipelineObj.isEditPipeline
@@ -910,10 +902,9 @@ const onSubmitPipeline = async () => {
             org_identifier: store.state.selectedOrganization.identifier,
           },
       });
-      q.notify({
+      toast({
         message: t("pipeline.pipelineUpdated"),
-        color: "positive",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       }
@@ -925,19 +916,17 @@ const onSubmitPipeline = async () => {
             org_identifier: store.state.selectedOrganization.identifier,
           },
       });
-        q.notify({
+        toast({
           message: t("pipeline.pipelineSaved"),
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
       else if(pipelineObj.isEditPipeline && showJsonEditorDialog.value == true){
         showJsonEditorDialog.value = false;
-        q.notify({
+        toast({
           message: t("pipeline.pipelineUpdated"),
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -949,10 +938,9 @@ const onSubmitPipeline = async () => {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        q.notify({
+        toast({
           message: t("pipeline.pipelineSaved"),
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
       }
@@ -967,10 +955,9 @@ const onSubmitPipeline = async () => {
       if (
         error.response?.data?.message === "Invalid Pipeline: empty edges list"
       ) {
-        q.notify({
+        toast({
           message: t("pipeline.connectAllNodesShort"),
-          color: "negative",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 3000,
         });
         if(showJsonEditorDialog.value == true){
@@ -978,11 +965,10 @@ const onSubmitPipeline = async () => {
         }
       } else {
         if (error.response.status != 403) {
-          q.notify({
+          toast({
             message:
               error.response?.data?.message || t("pipeline.errorSavingPipeline"),
-            color: "negative",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 3000,
           });
           if(showJsonEditorDialog.value == true){

@@ -875,7 +875,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { cloneDeep } from "lodash-es";
-import { date, useQuasar, type QTableProps, copyToClipboard } from "quasar";
+import { date, type QTableProps, copyToClipboard } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -925,6 +925,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1495,7 +1496,7 @@ export default defineComponent({
       copyToClipboard(props.span?.span_id || "");
 
       q?.notify?.({
-        type: "positive",
+        variant: "success",
         message: "Span ID copied to clipboard",
         timeout: 2000,
       });
@@ -1508,7 +1509,7 @@ export default defineComponent({
       copyToClipboard(attributesText);
 
       q?.notify?.({
-        type: "positive",
+        variant: "success",
         message: "Attributes copied to clipboard",
         timeout: 2000,
       });
@@ -1813,26 +1814,26 @@ export default defineComponent({
         // Copy to clipboard
         copyToClipboard(textToCopy)
           .then(() => {
-            q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-              position: "top",
+              position: "top-center",
               timeout: 2000,
             });
           })
           .catch(() => {
-            q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Failed to copy to clipboard",
-              position: "top",
+              position: "top-center",
               timeout: 2000,
             });
           });
       } catch (error) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Failed to copy content",
-          position: "top",
+          position: "top-center",
           timeout: 2000,
         });
       }
@@ -1969,8 +1970,8 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log)).then(() =>
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: "Content Copied Successfully!",
           timeout: 1000,
         }),

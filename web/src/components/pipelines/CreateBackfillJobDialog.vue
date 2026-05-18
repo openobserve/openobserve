@@ -232,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -243,6 +242,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService from "../../services/backfill";
 import DateTime from "@/components/DateTime.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Props {
   modelValue: boolean;
@@ -259,7 +259,6 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
 
 const show = computed({
@@ -366,8 +365,8 @@ const onSubmit = async () => {
 
   // Validate time range
   if (formData.value.startTimeMicros <= 0 || formData.value.endTimeMicros <= 0) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please select a valid time range",
       timeout: 3000,
     });
@@ -375,8 +374,8 @@ const onSubmit = async () => {
   }
 
   if (formData.value.startTimeMicros >= formData.value.endTimeMicros) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Start time must be before end time",
       timeout: 3000,
     });
@@ -419,8 +418,8 @@ const createBackfillJobRequest = async () => {
       data: requestData,
     });
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Backfill job created successfully",
       timeout: 3000,
     });
@@ -435,8 +434,8 @@ const createBackfillJobRequest = async () => {
       error?.message ||
       "Failed to create backfill job";
 
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: errorMessage.value,
       timeout: 5000,
     });

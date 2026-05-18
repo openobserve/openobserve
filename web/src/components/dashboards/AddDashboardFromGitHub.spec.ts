@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import AddDashboardFromGitHub from "./AddDashboardFromGitHub.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -28,7 +27,7 @@ vi.mock("@/components/dashboards/AddFolder.vue", () => ({
 // Mock global fetch
 const mockFetch = vi.fn();
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 import dashboardsService from "@/services/dashboards";
 

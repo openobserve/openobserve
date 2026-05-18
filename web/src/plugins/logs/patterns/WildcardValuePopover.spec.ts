@@ -21,7 +21,7 @@ import WildcardValuePopover from "./WildcardValuePopover.vue";
 import i18n from "@/locales";
 
 installQuasar({
-  plugins: [quasar.Notify],
+  plugins: [quasar.],
 });
 
 describe("WildcardValuePopover", () => {

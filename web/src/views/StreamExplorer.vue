@@ -37,7 +37,6 @@ import { defineComponent, onBeforeMount, onMounted, ref, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import StreamDataTable from "@/components/logstream/explore/StreamDataTable.vue";
-import { useQuasar } from "quasar";
 import search from "@/services/search";
 import { logsErrorMessage } from "@/utils/common";
 import { useI18n } from "vue-i18n";
@@ -46,6 +45,7 @@ import type { IDateTime } from "@/ts/interfaces";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SearchBarInstance = InstanceType<typeof SearchBar>;
 
@@ -76,7 +76,6 @@ export default defineComponent({
       queryResults: {} as any,
       streamType: "",
     });
-    const q = useQuasar();
 
     const tableData = ref({
       rows: [],
@@ -117,38 +116,20 @@ export default defineComponent({
     });
 
     function Notify() {
-      return q.notify({
-        type: "positive",
+      return toast({
+        variant: "success",
         message: "Waiting for response...",
         timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
       });
     }
 
     function ErrorException(message: string) {
       isLoading.value.pop();
       // searchObj.data.errorMsg = message;
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: message,
         timeout: 10000,
-        actions: [
-          {
-            icon: "cancel",
-            color: "white",
-            handler: () => {
-              /* ... */
-            },
-          },
-        ],
       });
     }
 
@@ -202,7 +183,7 @@ export default defineComponent({
               queryData.value.errorMsg = t(customMessage);
             }
 
-            // $q.notify({
+            // toast({
             //   message: searchObj.data.errorMsg,
             //   color: "negative",
             // });

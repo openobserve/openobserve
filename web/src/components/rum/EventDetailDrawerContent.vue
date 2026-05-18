@@ -533,7 +533,7 @@ import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
@@ -546,6 +546,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({
   open: {
@@ -582,7 +583,6 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
 const { t } = useI18n();
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
@@ -601,15 +601,15 @@ const {
 const copyAttributesToClipboard = () => {
   copyToClipboard(JSON.stringify(props.rawEvent, null, 2))
     .then(() => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("common.copyToClipboard") + " - " + t("common.success"),
         timeout: 1500,
       });
     })
     .catch(() => {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Error while copying content.",
         timeout: 1500,
       });

@@ -74,7 +74,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
-import { useQuasar } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const defaultValue = () => {
   return {
@@ -117,7 +117,6 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
 
     const isValidOrgName = computed(() => {
       const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
@@ -160,8 +159,8 @@ export default defineComponent({
 
   methods: {
     onRejected(rejectedEntries: string | any[]) {
-      this.$q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
       });
     },
@@ -182,8 +181,8 @@ export default defineComponent({
         return;
       }
       this.nameError = '';
-      const dismiss = this.$q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -240,8 +239,8 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: JSON.stringify(
                 err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
               ),

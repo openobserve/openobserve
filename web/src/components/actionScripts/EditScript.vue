@@ -513,7 +513,6 @@ import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -526,6 +525,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineProps({
   report: {
@@ -573,7 +573,6 @@ const step = ref(1);
 
 const formData = ref(defaultActionScript);
 
-const q = useQuasar();
 
 const actionTypes = [
   {
@@ -845,8 +844,8 @@ const saveActionScript = async () => {
       ? actions.update
       : actions.create;
 
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
     timeout: 2000,
   });
@@ -855,8 +854,8 @@ const saveActionScript = async () => {
 
   updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Action ${
           isEditingActionScript.value ? "updated" : "saved"
         } successfully.`,
@@ -868,8 +867,8 @@ const saveActionScript = async () => {
     .catch((error) => {
       step.value = 3;
       if (error.response.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error?.response?.data?.message ||
             `Error while ${
@@ -1080,8 +1079,8 @@ const handleActionScript = async () => {
       })
       .catch((err) => {
         if (err.response.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err?.data?.message || "Error while fetching Action!",
             timeout: 4000,
           });
@@ -1122,8 +1121,8 @@ const getServiceAccounts = async () => {
     filteredServiceAccounts.value = [...serviceAccountsOptions];
   } catch (err: any) {
     if (err.response?.status != 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err.response?.data?.message ||
           "Error while fetching service accounts.",

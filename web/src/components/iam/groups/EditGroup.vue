@@ -96,8 +96,8 @@ import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -113,7 +113,6 @@ const router = useRouter();
 
 const { t } = useI18n();
 
-const q = useQuasar();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -163,10 +162,9 @@ const getGroupDetails = () => {
     })
     .catch((err) => {
       console.log(err);
-      q.notify({
+      toast({
         message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
-        color: "negative",
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
       router.push({
@@ -199,8 +197,8 @@ const saveGroupChanges = () => {
       payload.remove_roles.length
     )
   ) {
-    q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `No updates detected.`,
       timeout: 3000,
     });
@@ -214,8 +212,8 @@ const saveGroupChanges = () => {
     payload,
   })
     .then((res) => {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Updated group successfully!`,
         timeout: 3000,
       });
@@ -248,8 +246,8 @@ const saveGroupChanges = () => {
     })
     .catch((err) => {
       if(err.response.status != 403){
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while updating group!",
           timeout: 3000,
         });

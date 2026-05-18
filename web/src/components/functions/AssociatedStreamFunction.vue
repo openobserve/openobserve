@@ -197,7 +197,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import jsTransformService from "../../services/jstransform";
 
@@ -216,6 +215,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -226,7 +226,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const logStream = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -387,8 +386,8 @@ export default defineComponent({
       if (store.state.selectedOrganization != null) {
         previousOrgIdentifier.value =
           store.state.selectedOrganization.identifier;
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while loading streams...",
         });
 
@@ -432,8 +431,8 @@ export default defineComponent({
           })
           .catch((err) => {
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "Error while pulling stream.",
               timeout: 2000,
             });
@@ -479,8 +478,8 @@ export default defineComponent({
           filterFunctions.value = res.data?.list || [];
         })
         .catch((err) => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               JSON.stringify(err.response.data["error"]) ||
               "Function fetching failed",
@@ -542,8 +541,8 @@ export default defineComponent({
           });
         })
         .catch((err) => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               JSON.stringify(err.response.data["error"]) ||
               "Function creation failed",
@@ -601,16 +600,14 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Stream deleted successfully.",
             });
             getLogStream();
           }
         })
         .catch((err: any) => {
-          $q.notify({
-            color: "negative",
+          toast({
             message: "Error while deleting stream.",
           });
         });

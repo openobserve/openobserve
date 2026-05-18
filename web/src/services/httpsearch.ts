@@ -16,7 +16,7 @@
 import store from "../stores";
 import router from "../router";
 import axios from "axios";
-import { Notify } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const http = () => {
   const instance = axios.create({
@@ -33,26 +33,16 @@ const http = () => {
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
-            Notify.create({
+            toast({
               position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
               message: JSON.stringify(
                 error.response.data["error"] || "Bad Request"
               ),
             });
             break;
           case 401:
-            Notify.create({
+            toast({
               position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
               message: error.response.data["error"] || "Invalid credentials",
             });
             store.dispatch("logout");
@@ -61,24 +51,14 @@ const http = () => {
             window.location.reload();
             break;
           case 404:
-            Notify.create({
+            toast({
               position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
               message: error.response.data["error"] || "Not Found",
             });
             break;
           case 500:
-            Notify.create({
+            toast({
               position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
               message: JSON.stringify(
                 error.response.data["error"] || "Internal ServerError"
               ),

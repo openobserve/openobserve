@@ -17,12 +17,12 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import ImportPipeline from "@/components/pipeline/ImportPipeline.vue";
 
-installQuasar({ plugins: [Dialog, Notify] });
+installQuasar({ plugins: [Dialog] });
 
 // --------------------------------------------------------------------------
 // Module mocks

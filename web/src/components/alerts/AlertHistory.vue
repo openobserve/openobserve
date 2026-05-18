@@ -484,7 +484,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useQuasar, date } from "quasar";
+import { date } from "quasar";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -496,11 +496,11 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 
 // Data
 const loading = ref(false);
@@ -767,8 +767,8 @@ const fetchAlertHistory = async () => {
   } catch (error: any) {
     console.error("Error fetching alert history:", error);
     console.error("Error response:", error.response);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         error.response?.data?.message ||
         error.message ||

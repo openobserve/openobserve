@@ -36,7 +36,7 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // Mock clipboard API

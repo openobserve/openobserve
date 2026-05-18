@@ -270,7 +270,6 @@ import {
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -313,7 +312,6 @@ export default defineComponent({
   emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();

@@ -404,7 +404,6 @@ import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -412,6 +411,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useRateLimiter from "@/composables/useRateLimiter";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -433,7 +433,6 @@ export default defineComponent({
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
-    const $q = useQuasar();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
@@ -453,12 +452,10 @@ export default defineComponent({
       {
         label: "API Limits",
         value: "api-limits",
-        icon: "speed",
       },
       {
         label: "Role Limits",
         value: "role-limits",
-        icon: "shield",
       },
     ]);
 
@@ -466,17 +463,14 @@ export default defineComponent({
       {
         label: "Per Second",
         value: "second",
-        icon: "timer",
       },
       {
         label: "Per Minute",
         value: "minute",
-        icon: "access-time",
       },
       {
         label: "Per Hour",
         value: "hour",
-        icon: "hourglass-empty",
       },
     ]);
 
@@ -484,12 +478,10 @@ export default defineComponent({
       {
         label: "Table",
         value: "table",
-        icon: "table-chart",
       },
       {
         label: "JSON",
         value: "json",
-        icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
@@ -973,8 +965,8 @@ export default defineComponent({
           uploadError.value = "";
           uploadedRules.value = [];
           isBulkUpdate.value = false;
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
             timeout: 3000,
           });
@@ -998,8 +990,8 @@ export default defineComponent({
         }
         changedValues.value = {};
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error.response.data.message ||
             "Error while updating rate limits rule",
@@ -1047,8 +1039,8 @@ export default defineComponent({
         }
         // Here you would call your API to save the changes
         if (response.status === 200) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
             timeout: 3000,
           });
@@ -1073,8 +1065,8 @@ export default defineComponent({
         isSavingJson.value = false;
       } catch (error: any) {
         isSavingJson.value = false;
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message:
             error.response.data.message ||
             "Error while updating rate limits rule",
@@ -1125,8 +1117,8 @@ export default defineComponent({
     const uploadTemplate = async () => {
       const combinedJson = await convertUploadRulesToJson(uploadedRules.value);
       try {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while uploading rules...",
           timeout: 1000,
         });
@@ -1136,8 +1128,8 @@ export default defineComponent({
           combinedJson,
         );
         if (response.status === 200) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
             timeout: 3000,
           });
@@ -1171,10 +1163,9 @@ export default defineComponent({
                   : [parsedJson];
                 resolve(jsonArray);
               } catch (error) {
-                $q.notify({
+                toast({
                   message: `Error parsing JSON from file ${file.name}`,
-                  color: "negative",
-                  position: "bottom",
+                  position: "bottom-center",
                   timeout: 2000,
                 });
                 resolve([]);
@@ -1270,8 +1261,8 @@ export default defineComponent({
       Object.keys(changedValues).forEach((moduleName: any) => {
         Object.keys(changedValues[moduleName]).forEach((operation: any) => {
           if (changedValues[moduleName][operation] === "") {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: "some values are empty please check",
               timeout: 3000,
             });
@@ -1450,8 +1441,8 @@ export default defineComponent({
       let isChanged = Object.keys(changedValues.value).length > 0;
 
       if (isChanged) {
-        $q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: "Please save or cancel your changes before switching time units",
           timeout: 3000,
         });

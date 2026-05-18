@@ -150,7 +150,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { convertUnixToQuasarFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -166,6 +165,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -245,7 +245,6 @@ export default defineComponent({
 
     const resultTotal = ref(0);
 
-    const $q = useQuasar();
 
     const listLoading = ref(false);
 
@@ -321,10 +320,8 @@ export default defineComponent({
         store.dispatch("setRegexPatterns", regexPatterns.value);
         resultTotal.value = regexPatterns.value.length;
       } catch (error: any) {
-        $q.notify({
+        toast({
           message: error.data.message || "Error fetching regex patterns",
-          color: "negative",
-          icon: "error",
         });
       } finally {
         listLoading.value = false;
@@ -349,18 +346,16 @@ export default defineComponent({
           deleteDialog.value.data,
         );
         getRegexPatterns();
-        $q.notify({
+        toast({
           message: "Regex pattern deleted successfully.",
-          color: "positive",
           timeout: 1500,
         });
       } catch (error: any) {
-        $q.notify({
+        toast({
           message:
             error?.data?.message ||
             error?.response?.data?.message ||
             "Error deleting regex pattern",
-          color: "negative",
           timeout: 1500,
         });
       }
@@ -399,16 +394,12 @@ export default defineComponent({
         link.href = url;
         link.download = `${row.name || "regex_pattern"}.json`;
         link.click();
-        $q.notify({
+        toast({
           message: "Regex pattern exported successfully",
-          color: "positive",
-          icon: "check",
         });
       } catch (error: any) {
-        $q.notify({
+        toast({
           message: error.data.message || "Error exporting regex pattern",
-          color: "negative",
-          icon: "error",
         });
       } finally {
         if (url) {
@@ -450,21 +441,18 @@ export default defineComponent({
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
+          toast({
             message: `Successfully deleted ${successful.length} regex pattern(s)`,
-            color: "positive",
             timeout: 2000,
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
+          toast({
             message: `Deleted ${successful.length} regex pattern(s), but ${unsuccessful.length} failed`,
-            color: "warning",
             timeout: 3000,
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
+          toast({
             message: `Failed to delete ${unsuccessful.length} regex pattern(s)`,
-            color: "negative",
             timeout: 2000,
           });
         }
@@ -478,9 +466,8 @@ export default defineComponent({
           error?.message ||
           "Error while deleting regex patterns";
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
+          toast({
             message: errorMessage,
-            color: "negative",
             timeout: 2000,
           });
         }

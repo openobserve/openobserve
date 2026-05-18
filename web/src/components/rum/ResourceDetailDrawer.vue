@@ -170,12 +170,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { date, useQuasar } from "quasar";
+import { date } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 
 const props = defineProps({
@@ -191,7 +192,6 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 
-const q = useQuasar();
 const router = useRouter();
 const store = useStore();
 
@@ -280,8 +280,8 @@ const viewSessionEvents = () => {
   if (!props.resource?.session?.id) return;
 
   // TODO: Navigate to filtered session events view
-  q.notify({
-    type: "info",
+  toast({
+    variant: "info",
     message: "Session events view coming soon",
     timeout: 2000,
   });

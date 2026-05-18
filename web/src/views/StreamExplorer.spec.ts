@@ -2,7 +2,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import { createI18n } from "vue-i18n";
 import StreamExplorer from "./StreamExplorer.vue";
 import stream from "@/services/stream";
@@ -15,7 +14,7 @@ const i18n = createI18n({
   messages: { en: {} },
 });
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 // Mock services
 vi.mock("@/services/stream");

@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar, Notify } from "quasar";
+import { Quasar } from "quasar";
 import CorrelatedLogsTable from "./CorrelatedLogsTable.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -116,8 +116,7 @@ describe("CorrelatedLogsTable.vue", () => {
             Quasar,
             {
               plugins: {
-                Notify,
-              },
+                },
             },
           ],
           i18n,

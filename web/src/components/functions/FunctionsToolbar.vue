@@ -141,7 +141,6 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "../../aws-exports";

@@ -350,7 +350,7 @@ import {
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "quasar";
 import useNotifications from "@/composables/useNotifications";
 import reports from "@/services/reports";
 import destination from "@/services/alert_destination.js";

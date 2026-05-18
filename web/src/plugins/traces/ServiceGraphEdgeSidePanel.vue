@@ -230,7 +230,6 @@ import {
   type PropType,
 } from 'vue';
 import { useStore } from 'vuex';
-import { useQuasar } from 'quasar';
 import * as echarts from 'echarts';
 import serviceGraphService from '@/services/service_graph';
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -272,7 +271,6 @@ export default defineComponent({
   emits: ['close'],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
 
     const trendChartRef = ref<HTMLElement | null>(null);
     const trendLoading = ref(false);

@@ -267,7 +267,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import pipelineService from "@/services/pipelines";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -275,6 +274,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSlider from "@/lib/forms/Slider/OSlider.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "LlmEvaluationSettings",
@@ -296,7 +296,6 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const loading = ref(true);
     const enabled = ref(false);
@@ -375,8 +374,8 @@ export default defineComponent({
 
     const refreshTemplates = async () => {
       await fetchAvailableTemplates(true);
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.evalTemplatesRefreshed"),
         timeout: 1500,
       });
@@ -460,8 +459,8 @@ export default defineComponent({
       const streamName = props.streamName;
 
       if (!enabled.value) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: t("pipeline.llmEvaluationRemoveWarning"),
           timeout: 4000,
         });
@@ -578,8 +577,8 @@ export default defineComponent({
         );
       }
 
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("pipeline.llmEvaluationCreatedSuccess", { streamName }),
         timeout: 3000,
       });

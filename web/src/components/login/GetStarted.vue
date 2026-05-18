@@ -93,14 +93,13 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
 import { useStore } from 'vuex'
-import { useQuasar } from 'quasar'
   import billings from '@/services/billings'
+import { toast } from "@/lib/feedback/Toast/useToast";
 const hearAboutUs = ref('')
 const whereDoYouWork = ref('')
 const isAgree = ref(false)
 const store = useStore()
 const emit = defineEmits(['removeFirstTimeLogin'])
-const $q = useQuasar();
 const isSubmitting = ref(false);
 
 const validateForm = () => {
@@ -113,9 +112,8 @@ const onSubmit = async () => {
 
   isSubmitting.value = true
   if(!validateForm()) {
-    $q.notify({
+    toast({
       message: 'Please fill all the fields',
-      color: 'negative',
     })
     isSubmitting.value = false
     return
@@ -128,15 +126,13 @@ const onSubmit = async () => {
   if(res.status == 200) {
     localStorage.removeItem("isFirstTimeLogin");
     emit("removeFirstTimeLogin",false);
-    $q.notify({
+    toast({
       message: 'Thank you for your feedback',
-      color: 'positive',
     })
     isSubmitting.value = false
   } else {
-    $q.notify({
+    toast({
       message: 'Something went wrong',
-      color: 'negative',
     })
     isSubmitting.value = false
   }

@@ -49,13 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLocalOrganization, getPath } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageUser",
@@ -88,8 +88,8 @@ export default defineComponent({
         .process_subscription(s, action, invited_org_id)
         .then((res) => {
           this.status = "completed";
-          const dismiss = this.$q.notify({
-            type: "positive",
+          const dismiss = toast({
+            variant: "success",
             message: res.data.message,
           });
 
@@ -111,7 +111,6 @@ export default defineComponent({
   },
   setup() {
     const $store = useStore();
-    const $q = useQuasar();
     const $router = useRouter();
 
     return {

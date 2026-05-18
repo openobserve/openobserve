@@ -517,7 +517,6 @@ import { ref, computed, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
@@ -525,12 +524,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const q = useQuasar();
 
 const saving = ref(false);
 const existingModels = ref<any[]>([]);
@@ -625,7 +624,6 @@ function resetAddState(tierCount: number) {
 const usageTemplates = [
   {
     name: "OpenAI",
-    color: "#10a37f",
     keys: [
       "input",
       "output",
@@ -635,7 +633,6 @@ const usageTemplates = [
   },
   {
     name: "Anthropic",
-    color: "#d97706",
     keys: [
       "input",
       "output",
@@ -816,7 +813,7 @@ function goBack() {
 }
 
 function notifyWarn(message: string) {
-  q.notify({ type: "negative", message, position: "bottom", timeout: 4000 });
+  toast({ variant: "error", message, position: "bottom-center", timeout: 4000 });
 }
 
 /** Show error notification only for non-403 errors.
@@ -825,10 +822,10 @@ function notifyError(prefix: string, e: any) {
   if (e?.response?.status === 403) return;
   const msg =
     e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
-  q.notify({
-    type: "negative",
+  toast({
+    variant: "error",
     message: `${prefix}: ${msg}`,
-    position: "bottom",
+    position: "bottom-center",
     timeout: 5000,
   });
 }
@@ -911,17 +908,17 @@ async function save() {
     }
     if (patternConflicts.length > 0) {
       const winner = patternConflicts[0].name;
-      q.notify({
-        type: "warning",
+      toast({
+        variant: "warning",
         message: t("modelPricing.saveShadowedWarning", { winner }),
-        position: "bottom",
+        position: "bottom-center",
         timeout: 8000,
       });
     } else {
-      q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: t("modelPricing.modelPricingSaved"),
-        position: "bottom",
+        position: "bottom-center",
         timeout: 3000,
       });
     }

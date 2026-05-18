@@ -474,7 +474,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useQuasar, date, debounce } from "quasar";
+import { date, debounce } from "quasar";
 import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
@@ -501,6 +501,7 @@ import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -539,7 +540,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
@@ -645,8 +645,8 @@ export default defineComponent({
     watch(
       activeFolderId,
       async () => {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait while loading dashboards...",
         });
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
@@ -800,8 +800,8 @@ export default defineComponent({
       dashboardId: any,
       folderId = activeFolderId.value,
     ) => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -853,8 +853,8 @@ export default defineComponent({
     };
     const dashboardList = ref([]);
     const getDashboards = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading dashboards...",
       });
       try {
@@ -1058,8 +1058,8 @@ export default defineComponent({
 
     const debouncedSearch = debounce(async (query) => {
       if (!query) return;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while searching for dashboards...",
       });
       const results = await fetchSearchResults.execute(query);
@@ -1139,16 +1139,16 @@ export default defineComponent({
     };
 
     const bulkDeleteDashboards = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Deleting dashboards...",
         timeout: 0,
       });
 
       try {
         if (selectedIds.value.length === 0) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: "No dashboards selected for deletion",
             timeout: 2000,
           });
@@ -1177,30 +1177,30 @@ export default defineComponent({
 
           if (failCount > 0 && successCount > 0) {
             // Partial success
-            $q.notify({
-              type: "warning",
+            toast({
+              variant: "warning",
               message: `${successCount} dashboard(s) deleted successfully, ${failCount} failed`,
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: `Failed to delete ${failCount} dashboard(s)`,
               timeout: 3000,
             });
           } else {
             // All successful
-            $q.notify({
-              type: "positive",
+            toast({
+              variant: "success",
               message: `${successCount} dashboard(s) deleted successfully`,
               timeout: 2000,
             });
           }
         } else {
           // Fallback success message
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: `${selectedIds.value.length} dashboard(s) deleted successfully`,
             timeout: 2000,
           });
@@ -1219,8 +1219,8 @@ export default defineComponent({
           error?.message ||
           "Error deleting dashboards. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
             timeout: 3000,
           });

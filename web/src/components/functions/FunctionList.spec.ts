@@ -17,12 +17,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FunctionList from "./FunctionList.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-installQuasar({ plugins: [Notify] });
+installQuasar({ plugins: [] });
 
 const {
   mockJsTransformList,

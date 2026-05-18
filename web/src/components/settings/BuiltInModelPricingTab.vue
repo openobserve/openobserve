@@ -174,7 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import modelPricingService from "@/services/model_pricing";
 import { ModelPricingCache } from "@/utils/modelPricingCache";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -182,6 +181,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ModelTier {
   name: string;
@@ -208,7 +208,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const models = ref<BuiltInModel[]>([]);
     const loading = ref(false);
@@ -300,10 +299,9 @@ export default defineComponent({
             selected: false,
           }));
           loading.value = false;
-          q.notify({
+          toast({
             message: `${models.value.length} models loaded`,
-            color: "positive",
-            position: "bottom",
+            position: "bottom-center",
             timeout: 2000,
           });
           return;
@@ -318,19 +316,18 @@ export default defineComponent({
           ...m,
           selected: false,
         }));
-        q.notify({
+        toast({
           message: `${models.value.length} models loaded`,
-          color: "positive",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
       } catch (e: any) {
         error.value =
           e.response?.data?.message || e.message || "Failed to load models";
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: error.value,
-          position: "bottom",
+          position: "bottom-center",
           timeout: 4000,
         });
       } finally {
@@ -343,10 +340,9 @@ export default defineComponent({
     const importSelectedModels = () => {
       const selected = models.value.filter((m) => selectedIds.value.includes(m.name));
       if (selected.length === 0) {
-        q.notify({
+        toast({
           message: "No models selected. Please select at least one model.",
-          color: "warning",
-          position: "bottom",
+          position: "bottom-center",
           timeout: 2000,
         });
         return;

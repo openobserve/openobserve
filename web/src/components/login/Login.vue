@@ -165,7 +165,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 
 import { useI18n } from "vue-i18n";
@@ -186,6 +185,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageLogin",
@@ -194,7 +194,6 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const { t } = useI18n();
     const name = ref("");
     const password = ref("");
@@ -248,11 +247,8 @@ export default defineComponent({
 
     const onSignIn = () => {
       if (name.value == "" || password.value == "") {
-        $q.notify({
-          position: "top",
-          color: "warning",
-          textColor: "white",
-          icon: "warning",
+        toast({
+          position: "top-center",
           message: "Please input valid username or password.",
         });
       } else {
@@ -399,8 +395,7 @@ export default defineComponent({
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;
-                $q.notify({
-                  color: "negative",
+                toast({
                   message: res.data.message,
                 });
               }
@@ -408,8 +403,7 @@ export default defineComponent({
             .catch((e: Error) => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
-              $q.notify({
-                color: "negative",
+              toast({
                 message: "Invalid username or password",
                 timeout: 4000,
               });
@@ -417,8 +411,7 @@ export default defineComponent({
             });
         } catch (e) {
           submitting.value = false;
-          $q.notify({
-            color: "negative",
+          toast({
             message: "Please fill all the fields and try again.",
           });
           console.log(e);
@@ -448,7 +441,7 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      this.$q.notify(`Selected suggestion "${item.label}"`);
+      toast(`Selected suggestion "${item.label}"`);
     },
   },
 });

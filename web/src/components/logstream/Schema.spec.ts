@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
+import { Dialog } from "quasar";
 import LogStream from "@/components/logstream/schema.vue";
 import i18n from "@/locales";
 // @ts-ignore
@@ -24,7 +24,7 @@ import store from "@/test/unit/helpers/store";
 import StreamService from "@/services/stream";
 
 installQuasar({
-  plugins: [Dialog, Notify],
+  plugins: [Dialog],
 });
 
 // Lightweight stub for ODrawer so tests can render the slots schema.vue

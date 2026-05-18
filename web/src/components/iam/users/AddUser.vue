@@ -249,7 +249,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import userServiece from "@/services/users";
 import {
   getImageURL,
@@ -265,6 +264,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 const defaultValue: any = () => {
   return {
     org_member_id: "",
@@ -326,7 +326,6 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18n();
     const { track } = useReo();
-    const q = useQuasar();
     const formData: any = ref(defaultValue());
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -467,8 +466,8 @@ export default defineComponent({
       this.$router.push("/logout");
     },
     onSubmit() {
-      const dismiss = this.q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait...",
         timeout: 2000,
       });
@@ -501,8 +500,7 @@ export default defineComponent({
             }
           })
           .catch((err: any) => {
-            this.q.notify({
-              color: "negative",
+            toast({
               message: err.response.data.message,
               timeout: 2000,
             });
@@ -536,17 +534,16 @@ export default defineComponent({
             })
             .catch((err: any) => {
               if (err.response.data.code === 422) {
-                // this.q.notify({
+                // toast({
                 //   color: "positive",
-                //   type: 'positive',
+                //   variant: "success",
                 //   message: "User added successfully.",
                 // });
                 dismiss();
                 this.existingUser = false;
               } else {
               if (err.response?.status != 403 || err?.status != 403) {
-                this.q.notify({
-                  color: "negative",
+                toast({
                   message: err.response.data.message,
                   timeout: 2000,
                 });
@@ -568,8 +565,7 @@ export default defineComponent({
               this.$emit("update:open", false);
             })
             .catch((err: any) => {
-              this.q.notify({
-                color: "negative",
+              toast({
                 message: err.response.data.message,
                 timeout: 2000,
               });

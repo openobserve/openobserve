@@ -17,7 +17,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import GroupUsers from "@/components/iam/groups/GroupUsers.vue";
 import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -61,7 +60,7 @@ const enhancedStore = {
 };
 
 installQuasar({
-  plugins: [Notify],
+  plugins: [],
 });
 
 vi.mock("@/composables/iam/usePermissions", () => ({

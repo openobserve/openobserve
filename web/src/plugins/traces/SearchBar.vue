@@ -437,7 +437,6 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
@@ -466,6 +465,7 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import { isDatetimeChanged } from "./tracesSearchBar.utils";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -537,7 +537,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
@@ -659,10 +658,9 @@ export default defineComponent({
             if (streamFound == false) {
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
-              $q.notify({
+              toast({
                 message: "Stream not found",
-                color: "negative",
-                position: "top",
+                position: "top-center",
                 timeout: 2000,
               });
             }

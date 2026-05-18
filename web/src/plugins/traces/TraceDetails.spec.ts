@@ -50,7 +50,7 @@ vi.mock("@/composables/useNotifications", () => ({
 // Mock search service
 
 installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
+  plugins: [quasar.Dialog, quasar.],
 });
 
 // Mock clipboard API
