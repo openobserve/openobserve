@@ -68,7 +68,7 @@ export function useTableCore<TData>(
   });
   const rightPinnedIds = computed(() =>
     props.columns
-      .filter((c) => c.pinned === "right")
+      .filter((c) => c.pinned === "right" || c.isAction)
       .map((c) => c.id),
   );
   const leftPinnedIds = computed(() => {

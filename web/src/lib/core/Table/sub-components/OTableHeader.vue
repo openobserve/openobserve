@@ -72,6 +72,13 @@ function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
 }
 
+function headerAlignClass(header: any): string {
+  const align = (header.column.columnDef.meta as any)?.align;
+  if (align === 'center') return 'tw:text-center tw:justify-center';
+  if (align === 'right') return 'tw:text-right tw:justify-end';
+  return '';
+}
+
 function headerPaddingClass(header: any): string {
   return (header.column.columnDef.meta as any)?.compactPadding ? 'tw:px-1' : 'tw:px-2';
 }
@@ -304,7 +311,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             : {}),
         }"
       >
-        <div class="tw:flex tw:items-center tw:gap-1 tw:h-full">
+        <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full', headerAlignClass(header)]">
           <!-- Sortable header -->
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
@@ -344,7 +351,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           </div>
 
           <!-- Non-sortable header -->
-          <div v-else class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
+          <div v-else :class="['tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
@@ -429,7 +436,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             : {}),
         }"
       >
-        <div class="tw:flex tw:items-center tw:gap-1 tw:h-full">
+        <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full', headerAlignClass(header)]">
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
             class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden"
@@ -465,7 +472,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               />
             </template>
           </div>
-          <div v-else class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap">
+          <div v-else :class="['tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
