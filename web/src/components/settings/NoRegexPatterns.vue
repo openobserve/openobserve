@@ -19,9 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="full-width column flex-center q-gutter-sm q-mt-xs tw:h-full"
       style="font-size: 1.5rem"
     >
-      <q-img
+      <img
         :src="getImageURL('images/regex_pattern/no_data_regex_pattern.svg')"
         style="width: 125px; margin: 20vh auto 1rem"
+        alt=""
       />
       <span class="title-text">{{ t("regex_patterns.no_data") }}</span>
         <span class="subtitle-text">Import patterns from your Library or <span class="create-new-text" @click="createNewRegexPattern">Create New</span></span>

@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="full-width"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_img"
               :src="
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="full-width"
           >
-            <q-img
+            <img
               data-test="setting_ent_custom_logo_dark_img"
               :src="
                 `data:image; base64, ` +

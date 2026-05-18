@@ -204,11 +204,6 @@ const createWrapper = (props = {}, options = {}) => {
         QSeparator: {
           template: "<div data-test-stub='q-separator'></div>",
         },
-        QImg: {
-          template:
-            "<img data-test-stub='q-img' :src='src' :alt='alt' data-test='setting_ent_custom_logo_img' />",
-          props: ["src", "alt", "style", "class"],
-        },
         QFile: {
           template: `<input 
             type='file' 

@@ -47,10 +47,6 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QImg: {
-          template: "<img data-test-stub='q-img' :src='src' :style='style' />",
-          props: ["src", "style"],
-        },
         QBtn: {
           template: `<button
             data-test-stub='q-btn'

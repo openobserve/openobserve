@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex column justify-center q-pa-xs" style="font-size: 1.5rem">
-    <q-img
+    <img
       :src="getImageURL('images/common/clipboard_icon.svg')"
       style="width: 230px; margin: 5vh auto 2rem"
+      alt=""
     />
     <div class="flex justify-center q-mb-md">
       <span>Start by adding your first dashboard panel</span>

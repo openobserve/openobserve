@@ -143,7 +143,7 @@
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="getBtnLogo" />
+              <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
             Send to AI Chat
           </ODropdownItem>
@@ -153,7 +153,7 @@
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
-              <q-img height="14px" width="14px" :src="regexIcon" />
+              <img :src="regexIcon" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
           </ODropdownItem>
@@ -201,10 +201,11 @@
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
-          <q-img
+          <img
             :src="regexIconForContextMenu"
             class="q-mr-sm"
             style="width: 14px; height: 14px"
+            alt=""
           />
           Create regex pattern
         </div>
