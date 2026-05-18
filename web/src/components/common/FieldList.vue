@@ -109,13 +109,26 @@ defineEmits<{
 const ofieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 
 // ---------------------------------------------------------------------------
+// Normalize field objects — applyFieldGrouping() uses `label`/`name` for
+// group headers but OFieldList expects `isGroup`/`groupName`.
+// ---------------------------------------------------------------------------
+
+const annotatedFields = computed(() =>
+  (props.fields as any[]).map((row) => ({
+    ...row,
+    isGroup: row.isGroup ?? !!row.label,
+    groupName: row.groupName ?? (row.label ? row.name : undefined),
+  })),
+);
+
+// ---------------------------------------------------------------------------
 // Group expand/collapse state
 // ---------------------------------------------------------------------------
 
 const expandGroupRows = ref<Record<string, boolean>>({});
 
 watch(
-  () => props.fields,
+  annotatedFields,
   (list) => {
     for (const row of list) {
       if (row.isGroup && row.group && !(row.group in expandGroupRows.value)) {
@@ -136,7 +149,7 @@ function toggleGroup(group: string) {
 
 const groupFieldCount = computed(() => {
   const counts: Record<string, number> = {};
-  for (const row of props.fields) {
+  for (const row of annotatedFields.value) {
     if (!row.isGroup && row.group) {
       counts[row.group] = (counts[row.group] ?? 0) + 1;
     }
@@ -149,7 +162,7 @@ const groupFieldCount = computed(() => {
 // ---------------------------------------------------------------------------
 
 const visibleFields = computed(() =>
-  props.fields.filter((row) => {
+  annotatedFields.value.filter((row: any) => {
     if (row.isGroup) return true;
     const group = row.group;
     if (group && expandGroupRows.value[group] === false) return false;

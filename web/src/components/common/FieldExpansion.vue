@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`logs-field-list-item-${field.name}`"
         >
           <div class="ellipsis tw:flex tw:flex-1 tw:min-w-0">
-            <span v-if="field.dataType" class="field-type-container">
+            <span class="field-type-container">
               <OIcon
                 class="field-expand-icon"
                 :name="isExpanded ? 'expand-more' : 'chevron-right'"
@@ -248,6 +248,23 @@ defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
 <style scoped lang="scss">
+.field-type-container {
+  width: 1.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.field-expand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  color: var(--o2-text-muted);
+}
+
 :deep(.q-expansion-item__container) {
   border-radius: 0.375rem;
   overflow: hidden;

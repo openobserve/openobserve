@@ -182,7 +182,7 @@ const filteredFields = computed(() => {
       return props.fields.some(
         (f) =>
           !f.isGroup &&
-          f.stream === row.groupName &&
+          (f.group === row.group || f.stream === row.groupName) &&
           f.name.toLowerCase().includes(term),
       );
     }

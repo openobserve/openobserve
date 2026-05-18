@@ -736,11 +736,8 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -773,10 +770,7 @@ export default defineComponent({
     ODialog,
     OSpinner,
     OBadge,
-    OInput,
     OSelect,
-    OSwitch,
-    OTooltip,
     OTable,
   },
   emits: [

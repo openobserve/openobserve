@@ -25,7 +25,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { debounce } from "quasar";
+import { debounce, useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
@@ -199,6 +199,7 @@ export interface AlertFormEmit {
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
   const { t } = useI18n();
+  const q = useQuasar();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
