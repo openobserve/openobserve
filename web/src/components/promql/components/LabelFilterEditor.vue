@@ -11,15 +11,19 @@
           class="label-filter-item"
         >
           <OButtonGroup class="axis-field" radius="sm">
-            <OButton
-              variant="primary"
-              size="chip"
-              class="tw:!text-[12px]"
-              :data-test="`promql-label-filter-${index}`"
-            >
-              {{ computedLabel(label) }}
-              <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
-              <q-menu class="q-pa-md">
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip"
+                  class="tw:!text-[12px]"
+                  :data-test="`promql-label-filter-${index}`"
+                >
+                  {{ computedLabel(label) }}
+                  <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                </OButton>
+              </template>
+              <div class="label-filter-editor-dropdown tw:p-4">
                 <div style="width: 350px">
                   <!-- Label Selection -->
                   <OSelect
@@ -112,8 +116,8 @@
                     </template>
                   </OSelect>
                 </div>
-              </q-menu>
-            </OButton>
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
@@ -148,6 +152,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -364,7 +369,7 @@ const getOperatorHint = (op: string): string => {
   margin-left: 4px;
 }
 
-.q-menu {
+.label-filter-editor-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
