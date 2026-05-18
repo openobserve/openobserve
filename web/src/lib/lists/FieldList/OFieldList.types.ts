@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-
 export interface FieldItem {
   name: string;
   type?: string;
@@ -15,14 +13,12 @@ export interface OFieldListProps {
   search?: string;
   searchPlaceholder?: string;
   loading?: boolean;
+  currentPage?: number;
   pageSize?: number;
   pageSizeOptions?: number[];
-  virtualScroll?: boolean;
   rowKey?: string;
-  dense?: boolean;
   showSearch?: boolean;
   showPagination?: boolean;
-  expansion?: "none" | "single";
   expandedIds?: string[];
 }
 
@@ -55,12 +51,5 @@ export interface OFieldListSlots {
   "group-header"?: (props: { row: FieldItem; groupName: string }) => any;
   expansion?: (props: { row: FieldItem }) => any;
   empty?: (props: Record<string, never>) => any;
+  loading?: (props: Record<string, never>) => any;
 }
-
-export const OFieldListDefaultColumn: OTableColumnDef<FieldItem> = {
-  id: "name",
-  header: "",
-  accessorKey: "name",
-  cell: " ",
-  meta: { align: "left" },
-};

@@ -38,92 +38,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="index-table tw:h-[calc(100%-2.725rem)]!"
       data-test="log-search-index-list-fields-table"
     >
-        <OTable
-          :data="displayFieldRows"
-          :columns="fieldColumns"
-          row-key="name"
-          pagination="none"
-          :show-global-filter="false"
-          :row-class="rowClassFn"
-          @row-click="handleRowClick"
-          class="tw:w-full tw:h-full"
-        >
-          <template #cell-name="{ row }">
-            <!-- Group header row -->
-            <div
-              v-if="row.label === true"
-              class="field_list field-group-header tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
-              :class="store.state.theme === 'dark' ? 'text-grey-5' : 'bg-grey-3'"
-            >
-              <div class="tw:w-[calc(100%-1.25rem)] ellipsis">
-                {{ row.name }} ({{ groupFieldCount[row.group] ?? 0 }})
-              </div>
-              <OButton
-                variant="ghost"
-                size="icon-xs-sq"
-              >
-                <OIcon :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'" size="sm" />
-              </OButton>
-            </div>
-            <!-- Field row -->
-            <div
-              v-else
-              class="field_list tw:rounded"
-              :class="row.enableVisibility && searchObj.data.stream.selectedFields.includes(row.name) ? 'selected' : ''"
-            >
-              <FieldRow
-                :field="row"
+      <FieldList
+        :fields="normalizedFieldList"
+        :search="searchObj.data.stream.filterField"
+        :loading="searchObj.loadingStream"
+        :theme="store.state.theme"
+        @update:search="searchObj.data.stream.filterField = $event"
+      >
+        <template #field-row="{ row }">
+          <FieldRow
+            :field="row"
+            :selected-fields="searchObj.data.stream.selectedFields"
+            :timestamp-column="store.state.zoConfig.timestamp_column"
+            :theme="store.state.theme"
+            :show-quick-mode="false"
+            :show-visibility-toggle="row.enableVisibility"
+            @add-to-filter="addToFilter(`${row.name}=''`)"
+            @toggle-field="toggleField"
+          >
+            <template #expansion="{ field }">
+              <basic-values-filter
+                :row="field"
+                :active-include-values="activeIncludeFieldValues?.[field.name] ?? []"
+                :active-exclude-values="activeExcludeFieldValues?.[field.name] ?? []"
                 :selected-fields="searchObj.data.stream.selectedFields"
-                :timestamp-column="store.state.zoConfig.timestamp_column"
-                :theme="store.state.theme"
-                :show-quick-mode="false"
                 :show-visibility-toggle="row.enableVisibility"
-                @add-to-filter="addToFilter(`${row.name}=''`)"
                 @toggle-field="toggleField"
-              >
-                <template #expansion="{ field }">
-                  <basic-values-filter
-                    :row="field"
-                    :active-include-values="activeIncludeFieldValues?.[row.name] ?? []"
-                    :active-exclude-values="activeExcludeFieldValues?.[row.name] ?? []"
-                    :selected-fields="searchObj.data.stream.selectedFields"
-                    :show-visibility-toggle="row.enableVisibility"
-                    @toggle-field="toggleField"
-                  />
-                </template>
-              </FieldRow>
-            </div>
-          </template>
-          <template #top>
-            <OInput
-              v-show="searchObj.data.stream?.selectedStream?.value"
-              data-test="log-search-index-list-field-search-input"
-              v-model="searchObj.data.stream.filterField"
-              data-cy="index-field-search-input"
-              clearable
-              :debounce="1"
-              :placeholder="t('search.searchField')"
-              class="tw:p-0 tw:pb-[0.375rem]"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+              />
+            </template>
+          </FieldRow>
+        </template>
+
+        <template #loading>
+          <div
+            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
+          >
             <div
-              v-if="searchObj.loadingStream"
-              class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
+              class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
             >
-              <div
-                class="text-subtitle2 text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
-              >
-                <OSpinner size="sm" />
-                {{ t("traces.loadingStream") }}
-              </div>
+              <OSpinner size="sm" />
+              {{ t("traces.loadingStream") }}
             </div>
-          </template>
-        </OTable>
-      </div>
+          </div>
+        </template>
+      </FieldList>
     </div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -133,15 +93,14 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
-import { applyCollapseFilter } from "@/utils/fieldCategories";
 import BasicValuesFilter from "./fields-sidebar/BasicValuesFilter.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
+import FieldList from "@/components/common/FieldList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -153,7 +112,7 @@ export default defineComponent({
     OInput,
     OSpinner,
     OIcon,
-    OTable,
+    FieldList,
 },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {
@@ -216,34 +175,6 @@ export default defineComponent({
       });
     };
 
-    const filterFieldFn = (rows: any, terms: any) => {
-      if (!terms) return rows;
-
-      const term = terms.toLowerCase();
-      const labelByGroup: Record<string, any> = {};
-      for (const row of rows) {
-        if (row.label && row.group) labelByGroup[row.group] = row;
-      }
-
-      const seen = new Set<string>();
-      const seenGroups = new Set<string>();
-      const filtered: any[] = [];
-
-      for (const row of rows) {
-        if (row.label) continue;
-        if (row.name.toLowerCase().includes(term) && !seen.has(row.name)) {
-          seen.add(row.name);
-          const group = row.group;
-          if (group && labelByGroup[group] && !seenGroups.has(group)) {
-            seenGroups.add(group);
-            filtered.push(labelByGroup[group]);
-          }
-          filtered.push(row);
-        }
-      }
-
-      return filtered.length ? filtered : [{ name: "No matching fields found", label: true, group: "__none__" }];
-    };
 
     const addToFilter = (field: any) => {
       searchObj.data.stream.addToFilter = field;
@@ -284,67 +215,14 @@ export default defineComponent({
     const normalizedFieldList = computed(() =>
       (props.fieldList as any[]).map((f: any) => ({
         ...f,
+        isGroup: !!f.label,
+        groupName: f.label ? f.name : (f.group || f.name),
+        stream: f.group || f.name,
         isSchemaField: f.label === true ? false : true,
         enableVisibility: f.label === true ? false : !TRACES_LOCKED_FIELD_NAMES.has(f.name),
       })),
     );
 
-    // Per-group expand state — starts expanded for all groups
-    const expandGroupRows = ref<Record<string, boolean>>({});
-
-    watch(
-      normalizedFieldList,
-      (list) => {
-        for (const row of list) {
-          if (row.label === true && row.group && !(row.group in expandGroupRows.value)) {
-            expandGroupRows.value[row.group] = true;
-          }
-        }
-      },
-      { immediate: true },
-    );
-
-    const toggleGroup = (group: string) => {
-      expandGroupRows.value[group] = !expandGroupRows.value[group];
-    };
-
-    // Count of non-label fields per group key (for the header badge)
-    const groupFieldCount = computed(() => {
-      const counts: Record<string, number> = {};
-      for (const row of normalizedFieldList.value) {
-        if (row.label !== true && row.group) {
-          counts[row.group] = (counts[row.group] ?? 0) + 1;
-        }
-      }
-      return counts;
-    });
-
-    const visibleFieldRows = computed(() =>
-      applyCollapseFilter(
-        normalizedFieldList.value,
-        expandGroupRows.value,
-        searchObj.data.stream.filterField ?? "",
-      ),
-    );
-
-    const fieldColumns = [{ id: "name", header: "", accessorKey: "name" }];
-
-    const displayFieldRows = computed(() => {
-      const term = searchObj.data.stream.filterField;
-      if (!term) return visibleFieldRows.value;
-      return filterFieldFn(normalizedFieldList.value, term);
-    });
-
-    const rowClassFn = (row: any) => {
-      if (row.label === true) return "cursor-pointer text-bold";
-      return "";
-    };
-
-    const handleRowClick = (row: any, _event: MouseEvent) => {
-      if (row.label === true) {
-        toggleGroup(row.group);
-      }
-    };
 
     const isFieldEditable = (fieldName: string): boolean =>
       searchObj.meta.searchMode === "traces" &&
@@ -360,7 +238,6 @@ export default defineComponent({
       router,
       searchObj,
       streamOptions,
-      filterFieldFn,
       addToFilter,
       getImageURL,
       filterStreamFn,
@@ -374,14 +251,6 @@ export default defineComponent({
       isFieldEditable,
       toggleField,
       TRACES_LOCKED_FIELD_NAMES,
-      expandGroupRows,
-      toggleGroup,
-      visibleFieldRows,
-      displayFieldRows,
-      fieldColumns,
-      rowClassFn,
-      handleRowClick,
-      groupFieldCount,
     };
   },
 });
