@@ -178,7 +178,8 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<i64>;
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64>;
+    async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
+    -> Result<u64>;
     async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
@@ -200,6 +201,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: (String, String),
     ) -> Result<StreamStats>;
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
 }
 
 pub async fn health_check() -> Result<()> {
@@ -523,8 +525,8 @@ pub async fn get_pending_jobs_count() -> Result<stdHashMap<String, stdHashMap<St
 }
 
 #[inline]
-pub async fn set_job_pending(ids: &[i64]) -> Result<u64> {
-    CLIENT.set_job_pending(ids).await
+pub async fn set_job_pending(ids: &[i64], offsets: i64, stream: Option<&str>) -> Result<u64> {
+    CLIENT.set_job_pending(ids, offsets, stream).await
 }
 
 #[inline]
@@ -577,6 +579,11 @@ pub async fn query_dump_stats_by_date_range(
     CLIENT
         .query_dump_stats_by_date_range(org_id, stream_type, stream_name, date_range)
         .await
+}
+
+#[inline]
+pub async fn org_stats_by_account(org_id: &str, account: &str) -> Result<(i64, i64)> {
+    CLIENT.org_stats_by_account(org_id, account).await
 }
 
 pub async fn local_cache_gc() -> Result<()> {

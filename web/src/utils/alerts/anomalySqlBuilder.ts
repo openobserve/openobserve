@@ -18,6 +18,41 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 
+const percentileMap: Record<string, number> = {
+  p50: 0.5,
+  p75: 0.75,
+  p90: 0.9,
+  p95: 0.95,
+  p99: 0.99,
+};
+
+/**
+ * Converts a detection function name + field to the SQL expression for the
+ * histogram query. Percentile short-names (p50, p95, etc.) are expanded to
+ * `approx_percentile_cont(field, percentile)` matching the regular alert
+ * query builder behaviour.
+ */
+export const toDetectionFunctionSql = (
+  rawFn: string,
+  field: string,
+): string => {
+  // API may return already-wrapped forms like "p90(duration)" or "avg(size)"
+  const match = rawFn.match(/^(\w+)\((.+)\)$/);
+  if (match) {
+    const fnName = match[1].toLowerCase();
+    const fnField = match[2];
+    return percentileMap[fnName]
+      ? `approx_percentile_cont(${fnField}, ${percentileMap[fnName]})`
+      : rawFn;
+  }
+  const fnLower = rawFn.toLowerCase();
+  if (percentileMap[fnLower]) {
+    return `approx_percentile_cont(${field || "*"}, ${percentileMap[fnLower]})`;
+  }
+  if (fnLower === "count") return "count(*)";
+  return `${rawFn}(${field || "*"})`;
+};
+
 /**
  * Builds the SQL query for an anomaly detection config, including seasonality
  * columns (hour, dow) that match the SQL Preview shown during config setup.
@@ -41,14 +76,10 @@ export const buildAnomalyPreviewSql = (config: any): string => {
     config.histogram_interval ||
     `${config.histogram_interval_value ?? 5}${config.histogram_interval_unit ?? "m"}`;
   const rawFn = config.detection_function || "count";
-  // The API may return "count(*)" or "avg(field)" (with parens already),
-  // while the form stores "count" + separate field. Handle both.
-  const fnAlreadyWrapped = rawFn.includes("(");
-  const fn = fnAlreadyWrapped
-    ? rawFn
-    : rawFn === "count"
-      ? "count(*)"
-      : `${rawFn}(${config.detection_function_field || "*"})`;
+  const fn = toDetectionFunctionSql(
+    rawFn,
+    config.detection_function_field || "*",
+  );
 
   const filterLines = (config.filters || [])
     .filter(

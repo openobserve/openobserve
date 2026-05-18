@@ -39,45 +39,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
-            <OButton
-              variant="ghost"
-              size="sm"
-              class="q-ml-xs"
-              data-test="otg-management-extend-trial-btn"
-              @click.stop="toggleExtendTrialDialog(props.row)"
-            >
-              {{ t("settings.extendTrial") }}
-            </OButton>
-            <OButton
-              v-if="props.row.billing_provider === '-'"
-              variant="ghost"
-              size="sm"
-              class="q-ml-xs tw:text-emerald-600"
-              data-test="org-management-add-contract-btn"
-              @click.stop="toggleContractDialog(props.row, 'create')"
-            >
-              Add Contract
-            </OButton>
-            <OButton
-              v-if="props.row.billing_provider === 'no_op'"
-              variant="ghost"
-              size="sm"
-              class="q-ml-xs tw:text-emerald-600"
-              data-test="org-management-extend-contract-btn"
-              @click.stop="toggleContractDialog(props.row, 'extend')"
-            >
-              Extend Contract
-            </OButton>
-            <OButton
-              v-if="props.row.billing_provider === 'no_op'"
-              variant="ghost-destructive"
-              size="sm"
-              class="q-ml-xs"
-              data-test="org-management-revoke-contract-btn"
-              @click.stop="confirmRevokeContract(props.row)"
-            >
-              Revoke
-            </OButton>
+            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+              <OButton
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="otg-management-extend-trial-btn"
+                @click.stop="toggleExtendTrialDialog(props.row)"
+              >
+                <q-icon name="event" size="14px" />
+                <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="props.row.billing_provider === '-'"
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="org-management-add-contract-btn"
+                @click.stop="toggleContractDialog(props.row, 'create')"
+              >
+                <q-icon name="note_add" size="14px" />
+                <q-tooltip>Add Contract</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="props.row.billing_provider === 'no_op'"
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="org-management-extend-contract-btn"
+                @click.stop="toggleContractDialog(props.row, 'extend')"
+              >
+                <q-icon name="event" size="14px" />
+                <q-tooltip>Extend Contract</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="props.row.billing_provider === 'no_op'"
+                variant="ghost-destructive"
+                size="icon-xs-circle"
+                data-test="org-management-revoke-contract-btn"
+                @click.stop="confirmRevokeContract(props.row)"
+              >
+                <q-icon name="block" size="14px" />
+                <q-tooltip>Revoke</q-tooltip>
+              </OButton>
+              <OButton
+                v-if="!props.row.org_storage_enabled"
+                variant="ghost"
+                size="icon-xs-circle"
+                data-test="org-management-storage-enable-btn"
+                @click.stop="toggleOrgStorage(props.row)"
+              >
+                <q-icon name="cloud_upload" size="14px" />
+                <q-tooltip>Enable Storage</q-tooltip>
+              </OButton>
+              <OButton
+                v-else
+                variant="ghost"
+                size="icon-xs-circle"
+                disabled
+                class="text-positive"
+                data-test="org-management-storage-enabled-btn"
+              >
+                <q-icon name="cloud_done" size="14px" />
+                <q-tooltip>Storage Enabled</q-tooltip>
+              </OButton>
+            </div>
           </q-td>
         </template>
         <template #top="scope">
@@ -256,6 +279,7 @@ import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
+import orgStorageService from "@/services/org_storage";
 export default defineComponent({
   name: "PageAlerts",
   components: {
@@ -370,7 +394,8 @@ export default defineComponent({
         label: t("settings.actions"),
         align: "center",
         sortable: false,
-        style: "width: 280px",
+        classes: "actions-column",
+        style: "width: 220px",
       },
     ]);
     const perPageOptions: any = [
@@ -441,6 +466,7 @@ export default defineComponent({
               contract_end_date_display: formatMicrosToDate(
                 responseData[i].contract_end_date,
               ),
+              org_storage_enabled: responseData[i].org_storage_enabled || false,
             });
           }
 
@@ -596,6 +622,43 @@ export default defineComponent({
       });
     };
 
+    const toggleOrgStorage = (row: any) => {
+      $q.dialog({
+        title: "Enable Storage Settings",
+        message: `Are you sure you want to enable storage settings for "${row.name}"?`,
+        cancel: true,
+        persistent: true,
+      }).onOk(() => {
+        loading.value = true;
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "enabling storage settings...",
+        });
+        orgStorageService
+          .enable(row.identifier)
+          .then(() => {
+            $q.notify({
+              type: "positive",
+              message: "Storage settings enabled successfully.",
+            });
+            getData();
+            loading.value = false;
+            dismiss();
+          })
+          .catch((error) => {
+            loading.value = false;
+            dismiss();
+            $q.notify({
+              type: "negative",
+              message:
+                error.response?.data?.message ||
+                "Failed to enable storage settings.",
+              timeout: 5000,
+            });
+          });
+      });
+    };
+
     const updateTrialPeriod = (org_id: string, extended_week: number) => {
       const payload = {
         new_end_date: getTimestampInMicroseconds(extended_week),
@@ -667,6 +730,7 @@ export default defineComponent({
       toggleContractDialog,
       submitContract,
       confirmRevokeContract,
+      toggleOrgStorage,
       formatMicrosToDate,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {

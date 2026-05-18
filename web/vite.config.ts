@@ -191,15 +191,15 @@ export default defineConfig({
           }
 
           if (name.includes("editor.api")) {
-            return `assets/${name}.v1.js`;
+            return `assets/${name}.[hash].js`;
           }
 
           if (name.includes("monaco-editor")) {
-            return `assets/${name}.v1.js`;
+            return `assets/${name}.[hash].js`;
           }
 
           if (name.includes("moment")) {
-            return `assets/${name}.v1.js`;
+            return `assets/${name}.[hash].js`;
           }
 
           return `assets/${name}.[hash].js`;

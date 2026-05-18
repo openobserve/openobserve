@@ -815,8 +815,8 @@ const renderMarkdown = (content: string): string => {
 }
 
 .json-viewer-editor {
-  height: 300px;
-  max-height: 500px;
+  height: 100%;
+  max-height: 100%;
   min-height: 100px;
   width: 100%;
   border-radius: 4px;

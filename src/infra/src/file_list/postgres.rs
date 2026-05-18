@@ -1398,17 +1398,35 @@ SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
         Ok(ret)
     }
 
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64> {
+    async fn set_job_pending(
+        &self,
+        ids: &[i64],
+        offsets: i64,
+        stream: Option<&str>,
+    ) -> Result<u64> {
         let pool = CLIENT.clone();
-        let sql = if ids.is_empty() {
-            "UPDATE file_list_jobs SET status = $1;".to_string()
-        } else {
-            format!(
-                "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+        let mut conditions: Vec<String> = Vec::new();
+        if !ids.is_empty() {
+            conditions.push(format!(
+                "id IN ({})",
                 ids.iter()
                     .map(|id| id.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ));
+        }
+        if offsets > 0 {
+            conditions.push(format!("offsets >= {offsets}"));
+        }
+        if let Some(stream) = stream {
+            conditions.push(format!("stream = '{stream}'"));
+        }
+        let sql = if conditions.is_empty() {
+            "UPDATE file_list_jobs SET status = $1;".to_string()
+        } else {
+            format!(
+                "UPDATE file_list_jobs SET status = $1 WHERE {};",
+                conditions.join(" AND ")
             )
         };
         DB_QUERY_NUMS
@@ -1774,6 +1792,30 @@ GROUP BY stream;
             .with_label_values(&["stats_by_date_range", "file_list_dump_stats"])
             .observe(time);
         Ok(ret.map(|r| r.into()).unwrap_or_default())
+    }
+
+    // TODO: optimize with date from org_storage_settings
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = r#"SELECT 
+SUM(original_size)::BIGINT AS storage_size,
+SUM(index_size)::BIGINT AS index_size
+FROM file_list
+WHERE org = $1 AND account = $2;"#;
+        let pool = CLIENT_RO.clone();
+        DB_QUERY_NUMS
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .inc();
+        let start = std::time::Instant::now();
+        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        let time = start.elapsed().as_secs_f64();
+        DB_QUERY_TIME
+            .with_label_values(&["stats_by_org_account", "file_list"])
+            .observe(time);
+        Ok(ret.unwrap_or_default())
     }
 }
 
@@ -2204,7 +2246,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2223,7 +2265,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2241,7 +2283,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
 
     // 1. Ensure all columns exist
     sqlx::query(&format!(
-        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(32) DEFAULT '' NOT NULL"
+        "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS account VARCHAR(128) DEFAULT '' NOT NULL"
     ))
     .execute(&mut *tx)
     .await?;
@@ -2392,7 +2434,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2414,7 +2456,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2605,7 +2647,7 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
                         "[POSTGRES] Table {table} is a regular table and needs to be converted to a partitioned table. \
                         Since ZO_PG_PARTITION_MODE is set to 'manual', auto-migration is skipped. \
                         Please migrate the table manually and then restart the node. \
-                        Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+                        Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
                     );
                     loop {
                         log::warn!(
@@ -2646,7 +2688,7 @@ fn file_list_partition_ddl(table: &str) -> String {
         r#"
 CREATE TABLE {table} (
     id              BIGINT GENERATED ALWAYS AS IDENTITY,
-    account         VARCHAR(32) NOT NULL,
+    account         VARCHAR(128) NOT NULL,
     org             VARCHAR(100) NOT NULL,
     stream          VARCHAR(256) NOT NULL,
     date            VARCHAR(16) NOT NULL,
@@ -2736,7 +2778,7 @@ pub async fn create_table() -> Result<()> {
 CREATE TABLE IF NOT EXISTS file_list_deleted
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account    VARCHAR(32)  not null,
+    account    VARCHAR(128)  not null,
     org        VARCHAR(100) not null,
     stream     VARCHAR(256) not null,
     date       VARCHAR(16)  not null,
@@ -2806,7 +2848,7 @@ CREATE TABLE IF NOT EXISTS stream_stats
     add_column(
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column("file_list_jobs", "started_at", "BIGINT default 0 not null").await?;
@@ -2823,6 +2865,18 @@ CREATE TABLE IF NOT EXISTS stream_stats
     if cfg.common.meta_partition_mode == "auto" {
         apply_autovacuum_tuning(&pool).await?;
         apply_column_width_compat(&pool).await?;
+    }
+
+    // after introducing org_storage, the account can have value of org_id:default,
+    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    for table in &["file_list", "file_list_history", "file_list_deleted"] {
+        log::info!("[POSTGRES] updating account col to 128 for table {table}");
+        sqlx::query(&format!(
+            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
+        ))
+        .execute(&pool)
+        .await?;
+        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
     }
 
     Ok(())
@@ -3207,7 +3261,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3231,7 +3285,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_history (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,
@@ -3255,7 +3309,7 @@ mod tests {
             r#"
             CREATE TABLE IF NOT EXISTS file_list_deleted (
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                account VARCHAR(32) not null,
+                account VARCHAR(128) not null,
                 org VARCHAR(100) not null,
                 stream VARCHAR(256) not null,
                 date VARCHAR(16) not null,

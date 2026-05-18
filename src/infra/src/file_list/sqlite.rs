@@ -1106,18 +1106,36 @@ SELECT stream, max(id) as id, COUNT(*) AS num
         Ok(ret)
     }
 
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<u64> {
+    async fn set_job_pending(
+        &self,
+        ids: &[i64],
+        offsets: i64,
+        stream: Option<&str>,
+    ) -> Result<u64> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
-        let sql = if ids.is_empty() {
-            "UPDATE file_list_jobs SET status = $1;".to_string()
-        } else {
-            format!(
-                "UPDATE file_list_jobs SET status = $1 WHERE id IN ({});",
+        let mut conditions: Vec<String> = Vec::new();
+        if !ids.is_empty() {
+            conditions.push(format!(
+                "id IN ({})",
                 ids.iter()
                     .map(|id| id.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ));
+        }
+        if offsets > 0 {
+            conditions.push(format!("offsets >= {offsets}"));
+        }
+        if let Some(stream) = stream {
+            conditions.push(format!("stream = '{stream}'"));
+        }
+        let sql = if conditions.is_empty() {
+            "UPDATE file_list_jobs SET status = $1;".to_string()
+        } else {
+            format!(
+                "UPDATE file_list_jobs SET status = $1 WHERE {};",
+                conditions.join(" AND ")
             )
         };
         let ret = sqlx::query(&sql)
@@ -1424,6 +1442,21 @@ GROUP BY stream;
             .fetch_optional(&pool)
             .await?;
         Ok(ret.map(|r| r.into()).unwrap_or_default())
+    }
+
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
+        let sql = r#"SELECT 
+SUM(original_size) AS original_size,
+SUM(index_size) AS index_size
+FROM file_list
+WHERE org = $1 AND account = $2;"#;
+        let pool = CLIENT_RO.clone();
+        let ret: Option<(i64, i64)> = sqlx::query_as(sql)
+            .bind(org_id)
+            .bind(account)
+            .fetch_optional(&pool)
+            .await?;
+        Ok(ret.unwrap_or_default())
     }
 }
 
@@ -1782,21 +1815,21 @@ CREATE TABLE IF NOT EXISTS file_list_dump_stats
         &client,
         "file_list",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column(
         &client,
         "file_list_history",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
     add_column(
         &client,
         "file_list_deleted",
         "account",
-        "VARCHAR(32) default '' not null",
+        "VARCHAR(128) default '' not null",
     )
     .await?;
 
