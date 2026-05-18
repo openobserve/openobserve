@@ -215,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="check-circle" size="md" />
               <span v-if="row.dedup_count && row.dedup_count > 1" class="text-caption q-ml-xs">
                 ×{{ row.dedup_count }}
+              </span>
               <OTooltip>
                 <template #content>
                   Notification sent

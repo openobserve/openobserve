@@ -148,51 +148,6 @@ export default defineComponent({
       }
     };
 
-    const getReasonClasses = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return "tw:border-blue-500 tw:text-blue-500";
-        case "primary_match":
-          return "tw:border-purple-500 tw:text-purple-500";
-        case "secondary_match":
-          return "tw:border-orange-500 tw:text-orange-500";
-        case "alert_id":
-          return "tw:border-gray-500 tw:text-gray-500";
-        default:
-          return "tw:border-gray-500 tw:text-gray-500";
-      }
-    };
-
-    const getReasonClasses = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return "tw:border-blue-500 tw:text-blue-500";
-        case "primary_match":
-          return "tw:border-purple-500 tw:text-purple-500";
-        case "secondary_match":
-          return "tw:border-orange-500 tw:text-orange-500";
-        case "alert_id":
-          return "tw:border-gray-500 tw:text-gray-500";
-        default:
-          return "tw:border-gray-500 tw:text-gray-500";
-      }
-    };
-
-    const getReasonClasses = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return "tw:border-blue-500 tw:text-blue-500";
-        case "primary_match":
-          return "tw:border-purple-500 tw:text-purple-500";
-        case "secondary_match":
-          return "tw:border-orange-500 tw:text-orange-500";
-        case "alert_id":
-          return "tw:border-gray-500 tw:text-gray-500";
-        default:
-          return "tw:border-gray-500 tw:text-gray-500";
-      }
-    };
-
     const getReasonLabel = (reason: string) => {
       switch (reason) {
         case "service_discovery":
@@ -233,7 +188,6 @@ export default defineComponent({
       getReasonVariant,
       getReasonLabel,
       getReasonTooltip,
-      getReasonClasses,
       onRowClick,
     };
   },
