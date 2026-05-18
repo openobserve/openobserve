@@ -160,333 +160,300 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex-1 tw:min-w-0 tw:h-full">
         <div class="tw:h-full card-container">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
-              <q-table
-                v-model:selected="selectedAlerts"
-                :selected-rows-label="getSelectedString"
+              <OTable
+                v-model:selected-ids="selectedAlertIds"
                 selection="multiple"
                 data-test="alert-list-table"
-                ref="qTable"
-                :rows="filteredResults || []"
+                :data="filteredResults || []"
                 :columns="columns"
                 row-key="alert_id"
-                :pagination="pagination"
-                style="width: 100%; height: 100%"
+                pagination="client"
+                :page-size="pageSize"
+                :page-size-options="pageSizeOptions"
+                width="100%"
                 class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+                :show-global-filter="false"
+                :default-columns="false"
+                @row-click="triggerExpand"
               >
-                <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th auto-width>
-                      <OCheckbox
-                        v-model="props.selected"
-                        data-test="alert-list-select-all-checkbox"
-                        size="sm"
-                        class="o2-table-checkbox"
-                        @update:model-value="props.select"
-                      />
-                    </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      <span
-                        :style="col.name === 'name' ? 'padding-left: 21px' : ''"
-                        >{{ col.label }}</span
-                      >
-                    </q-th>
-                  </q-tr>
-                </template>
 
-                <template v-slot:body-selection="scope">
-                  <OCheckbox
-                    v-model="scope.selected"
-                    size="sm"
-                  />
-                </template>
-                <template v-slot:body="props">
-                  <q-tr
-                    :data-test="`stream-association-table-${props.row.trace_id}-row`"
-                    :props="props"
-                    style="cursor: pointer"
-                    @click="triggerExpand(props)"
+                <template #cell-name="{ row }">
+                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                    <OIcon
+                      v-if="row.is_real_time === 'anomaly'"
+                      name="query-stats"
+                      size="15px"
+                      class="tw:text-blue-600 tw:shrink-0"
+                    />
+                    <OIcon
+                      v-else-if="row.is_real_time"
+                      name="bolt"
+                      size="15px"
+                      class="tw:text-orange-500 tw:shrink-0"
+                    />
+                    <OIcon
+                      v-else
+                      name="schedule"
+                      size="15px"
+                      class="tw:text-grey-7 tw:shrink-0"
+                    />
+                    <span>{{ computedName(row.name) }}</span>
+                  </div>
+                  <q-tooltip
+                    v-if="row.name?.length > 30"
+                    class="alert-name-tooltip"
                   >
-                    <q-td>
-                      <OCheckbox
-                        v-model="props.selected"
-                        size="sm"
-                        class="o2-table-checkbox"
-                      />
-                    </q-td>
-
-                    <q-td v-for="col in columns" :key="col.name"
-:props="props">
-                      <template v-if="col.name === 'name'">
-                        <div class="tw:flex tw:items-center tw:gap-1.5">
-                          <OIcon
-                            v-if="props.row.is_real_time === 'anomaly'"
-                            name="query-stats"
-                            size="15px"
-                            class="tw:text-blue-600 tw:shrink-0"
-                          />
-                          <OIcon
-                            v-else-if="props.row.is_real_time"
-                            name="bolt"
-                            size="15px"
-                            class="tw:text-orange-500 tw:shrink-0"
-                          />
-                          <OIcon
-                            v-else
-                            name="schedule"
-                            size="15px"
-                            class="tw:text-grey-7 tw:shrink-0"
-                          />
-                          <span>{{ computedName(props.row[col.field]) }}</span>
-                        </div>
-                        <OTooltip
-                          v-if="props.row[col.field]?.length > 30"
-                          :content="props.row[col.field]"
-                          side="top"
-                        />
-                      </template>
-                      <template v-else-if="col.name === 'owner'">
-                        {{ computedOwner(props.row[col.field]) }}
-                        <OTooltip
-                          v-if="props.row[col.field]?.length > 15"
-                          :content="props.row[col.field]"
-                          side="top"
-                        />
-                      </template>
-                      <template
-                        v-else-if="
-                          col.name == 'last_triggered_at' ||
-                          col.name == 'last_satisfied_at' ||
-                          col.name == 'last_trained_at'
-                        "
-                      >
-                        <span v-if="props.row[col.field]">{{ props.row[col.field] }}</span>
-                        <span v-else class="tw:block">--</span>
-                      </template>
-                      <template v-else-if="col.name === 'status'">
-                        <template v-if="props.row.status && props.row.status !== '--'">
-                          <q-badge
-                            :color="
-                              props.row.status === 'failed'
-                                ? 'negative'
-                                : props.row.status === 'active'
-                                  ? 'positive'
-                                  : props.row.status === 'training'
-                                    ? 'warning'
-                                    : props.row.status === 'disabled'
-                                      ? 'grey'
-                                      : 'positive'
-                            "
-                            :label="props.row.status"
-                            style="text-transform: capitalize; cursor: default"
-                          >
-                            <OTooltip
-                              v-if="props.row.status === 'failed' && props.row.last_error"
-                              :content="props.row.last_error"
-                              side="top"
-                            />
-                          </q-badge>
-                        </template>
-                        <span v-else class="tw:block">--</span>
-                      </template>
-                      <template v-else-if="col.name === 'period'">
-                        {{
-                          props.row[col.field]
-                            ? props.row[col.field] >= 60
-                              ? props.row[col.field] % 60 === 0
-                                ? `${Math.floor(props.row[col.field] / 60)} Hours`
-                                : `${Math.floor(props.row[col.field] / 60)} Hours ${props.row[col.field] % 60} Mins`
-                              : `${props.row[col.field]} Mins`
-                            : "--"
-                        }}
-                      </template>
-                      <template v-else-if="col.name === 'frequency'">
-                        {{
-                          props.row[col.field]
-                            ? props.row[col.field] +
-                              (props.row?.frequency_type == "cron"
-                                ? ""
-                                : " Mins")
-                            : "--"
-                        }}
-                      </template>
-                      <template v-else-if="col.name === 'folder_name'">
-                        <div
-                          @click.stop="
-                            updateActiveFolderId(props.row[col.field].id)
-                          "
-                        >
-                          {{ props.row[col.field].name }}
-                        </div>
-                      </template>
-                      <template v-else-if="col.name == 'actions'">
-                        <div class="tw:flex tw:items-center actions-container">
-                          <div
-                            data-test="alert-list-loading-alert"
-                            v-if="alertStateLoadingMap[props.row.uuid]"
-                            style="
-                              display: inline-block;
-                              width: 33.14px;
-                              height: auto;
-                            "
-                            class="flex justify-center items-center q-ml-xs"
-                            :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-                          >
-                            <OSpinner size="xs" />
-                          </div>
-                          <OButton
-                            v-else
-                            :data-test="`alert-list-${props.row.name}-pause-start-alert`"
-                            class="q-ml-xs material-symbols-outlined"
-                            :variant="props.row.enabled ? 'ghost-destructive' : 'ghost'"
-                            size="icon-circle-sm"
-                            :title="
-                              props.row.enabled
-                                ? t('alerts.pause')
-                                : t('alerts.start')
-                            "
-                            @click.stop="toggleAlertState(props.row)"
-                          >
-                            <OIcon :name="props.row.enabled ? 'pause' : 'play-arrow'" size="sm" />
-                          </OButton>
-                          <OButton
-                            :data-test="`alert-list-${props.row.name}-update-alert`"
-                            variant="ghost"
-                            size="icon-circle-sm"
-                            :title="t('alerts.edit')"
-                            @click.stop="editAlert(props.row)"
-                          >
-                            <OIcon name="edit" size="sm" />
-                          </OButton>
-                          <OButton
-                            :title="t('alerts.clone')"
-                            variant="ghost"
-                            size="icon-circle-sm"
-                            @click.stop="duplicateAlert(props.row)"
-                            :data-test="`alert-list-${props.row.name}-clone-alert`"
-                          >
-                            <OIcon name="content-copy" size="sm" />
-                          </OButton>
-                          <span>
-                            <OButton
-                              variant="ghost"
-                              size="icon-circle-sm"
-                              @click.stop="openMenu($event, props.row)"
-                              :data-test="`alert-list-${props.row.name}-more-options`"
-                            >
-                              <OIcon name="more-vert" size="sm" />
-                              <q-menu>
-                                <q-list style="min-width: 100px">
-                                <q-item
-                                  class="flex items-center"
-                                  clickable
-                                  v-close-popup
-                                  @click="moveAlertToAnotherFolder(props.row)"
-                                >
-                                  <q-item-section dense avatar>
-                                    <OIcon name="drive-file-move" size="sm" />
-                                  </q-item-section>
-                                  <q-item-section>Move</q-item-section>
-                                </q-item>
-                                <q-separator />
-                                <q-item
-                                  class="flex items-center justify-center"
-                                  clickable
-                                  v-close-popup
-                                  @click="showDeleteDialogFn(props)"
-                                >
-                                  <q-item-section dense avatar>
-                                    <OIcon name="delete" size="sm" />
-                                  </q-item-section>
-                                  <q-item-section>{{
-                                    t("alerts.delete")
-                                  }}</q-item-section>
-                                </q-item>
-                                <q-separator />
-                                <q-item
-                                  class="flex items-center justify-center"
-                                  clickable
-                                  v-close-popup
-                                  @click="exportAlert(props.row)"
-                                >
-                                  <q-item-section dense avatar>
-                                    <OIcon size="sm" name="download" />
-                                  </q-item-section>
-                                  <q-item-section>Export</q-item-section>
-                                </q-item>
-                                <q-separator />
-                                <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
-                                <template v-if="props.row.type === 'anomaly'">
-                                  <q-item
-                                    class="flex items-center justify-center"
-                                    clickable
-                                    v-close-popup
-                                    :data-test="`alert-list-${props.row.name}-trigger-detection`"
-                                    @click="triggerAlert(props.row)"
-                                  >
-                                    <q-item-section dense avatar>
-                                      <OIcon
-                                        size="16px"
-                                        :name="symOutlinedSoundSampler"
-                                      />
-                                    </q-item-section>
-                                    <q-item-section
-                                      >Trigger Detection</q-item-section
-                                    >
-                                  </q-item>
-                                  <q-item
-                                    class="flex items-center justify-center"
-                                    clickable
-                                    v-close-popup
-                                    :data-test="`alert-list-${props.row.name}-retrain-anomaly`"
-                                    @click="retrainAnomaly(props.row)"
-                                  >
-                                    <q-item-section dense avatar>
-                                      <OIcon size="sm" name="replay" />
-                                    </q-item-section>
-                                    <q-item-section>Re-train</q-item-section>
-                                  </q-item>
-                                </template>
-                                <!-- Regular alerts: existing Trigger Alert item -->
-                                <q-item
-                                  v-else
-                                  class="flex items-center justify-center"
-                                  clickable
-                                  v-close-popup
-                                  :data-test="`alert-list-${props.row.name}-trigger-alert`"
-                                  @click="triggerAlert(props.row)"
-                                >
-                                  <q-item-section dense avatar>
-                                    <OIcon
-                                      size="16px"
-                                      :name="symOutlinedSoundSampler"
-                                    />
-                                  </q-item-section>
-                                  <q-item-section>{{
-                                    t("alerts.triggerAlert")
-                                  }}</q-item-section>
-                                </q-item>
-                              </q-list>
-                            </q-menu>
-                            </OButton>
-                          </span>
-                        </div>
-                      </template>
-                      <template v-else>
-                        {{ props.row[col.field] }}
-                      </template>
-                    </q-td>
-                  </q-tr>
+                    {{ row.name }}
+                  </q-tooltip>
                 </template>
-                <template #no-data>
+
+                <template #cell-owner="{ row }">
+                  {{ computedOwner(row.owner) }}
+                  <q-tooltip
+                    v-if="row.owner?.length > 15"
+                    class="alert-name-tooltip"
+                  >
+                    {{ row.owner }}
+                  </q-tooltip>
+                </template>
+
+                <template #cell-last_triggered_at="{ row }">
+                  <span v-if="row.last_triggered_at">{{ row.last_triggered_at }}</span>
+                  <span v-else class="tw:block">--</span>
+                </template>
+
+                <template #cell-last_satisfied_at="{ row }">
+                  <span v-if="row.last_satisfied_at">{{ row.last_satisfied_at }}</span>
+                  <span v-else class="tw:block">--</span>
+                </template>
+
+                <template #cell-last_trained_at="{ row }">
+                  <span v-if="row.last_trained_at">{{ row.last_trained_at }}</span>
+                  <span v-else class="tw:block">--</span>
+                </template>
+
+                <template #cell-status="{ row }">
+                  <template v-if="row.status && row.status !== '--'">
+                    <q-badge
+                      :color="
+                        row.status === 'failed'
+                          ? 'negative'
+                          : row.status === 'active'
+                            ? 'positive'
+                            : row.status === 'training'
+                              ? 'warning'
+                              : row.status === 'disabled'
+                                ? 'grey'
+                                : 'positive'
+                      "
+                      :label="row.status"
+                      style="text-transform: capitalize; cursor: default"
+                    >
+                      <q-tooltip
+                        v-if="
+                          row.status === 'failed' &&
+                          row.last_error
+                        "
+                        max-width="400px"
+                        anchor="top middle"
+                        self="bottom middle"
+                      >
+                        {{ row.last_error }}
+                      </q-tooltip>
+                    </q-badge>
+                  </template>
+                  <span v-else class="tw:block">--</span>
+                </template>
+
+                <template #cell-period="{ row }">
+                  {{
+                    row.period
+                      ? row.period >= 60
+                        ? row.period % 60 === 0
+                          ? `${Math.floor(row.period / 60)} Hours`
+                          : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
+                        : `${row.period} Mins`
+                      : "--"
+                  }}
+                </template>
+
+                <template #cell-frequency="{ row }">
+                  {{
+                    row.frequency
+                      ? row.frequency +
+                        (row.frequency_type == "cron"
+                          ? ""
+                          : " Mins")
+                      : "--"
+                  }}
+                </template>
+
+                <template #cell-folder_name="{ row }">
+                  <div
+                    @click.stop="
+                      updateActiveFolderId(row.folder_name.id)
+                    "
+                  >
+                    {{ row.folder_name.name }}
+                  </div>
+                </template>
+
+                <template #cell-actions="{ row }">
+                  <div class="tw:flex tw:items-center actions-container">
+                    <div
+                      data-test="alert-list-loading-alert"
+                      v-if="alertStateLoadingMap[row.uuid]"
+                      style="
+                        display: inline-block;
+                        width: 33.14px;
+                        height: auto;
+                      "
+                      class="flex justify-center items-center q-ml-xs"
+                      :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                    >
+                      <OSpinner size="xs" />
+                    </div>
+                    <OButton
+                      v-else
+                      :data-test="`alert-list-${row.name}-pause-start-alert`"
+                      class="q-ml-xs material-symbols-outlined"
+                      :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                      size="icon-circle-sm"
+                      :title="
+                        row.enabled
+                          ? t('alerts.pause')
+                          : t('alerts.start')
+                      "
+                      @click.stop="toggleAlertState(row)"
+                    >
+                      <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
+                    </OButton>
+                    <OButton
+                      :data-test="`alert-list-${row.name}-update-alert`"
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      :title="t('alerts.edit')"
+                      @click.stop="editAlert(row)"
+                    >
+                      <OIcon name="edit" size="sm" />
+                    </OButton>
+                    <OButton
+                      :title="t('alerts.clone')"
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      @click.stop="duplicateAlert(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert`"
+                    >
+                      <OIcon name="content-copy" size="sm" />
+                    </OButton>
+                    <span>
+                      <OButton
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        @click.stop="openMenu($event, row)"
+                        :data-test="`alert-list-${row.name}-more-options`"
+                      >
+                        <OIcon name="more-vert" size="sm" />
+                        <q-menu>
+                          <q-list style="min-width: 100px">
+                          <q-item
+                            class="flex items-center"
+                            clickable
+                            v-close-popup
+                            @click="moveAlertToAnotherFolder(row)"
+                          >
+                            <q-item-section dense avatar>
+                              <OIcon name="drive-file-move" size="sm" />
+                            </q-item-section>
+                            <q-item-section>Move</q-item-section>
+                          </q-item>
+                          <q-separator />
+                          <q-item
+                            class="flex items-center justify-center"
+                            clickable
+                            v-close-popup
+                            @click="showDeleteDialogFn({ row })"
+                          >
+                            <q-item-section dense avatar>
+                              <OIcon name="delete" size="sm" />
+                            </q-item-section>
+                            <q-item-section>{{
+                              t("alerts.delete")
+                            }}</q-item-section>
+                          </q-item>
+                          <q-separator />
+                          <q-item
+                            class="flex items-center justify-center"
+                            clickable
+                            v-close-popup
+                            @click="exportAlert(row)"
+                          >
+                            <q-item-section dense avatar>
+                              <OIcon size="sm" name="download" />
+                            </q-item-section>
+                            <q-item-section>Export</q-item-section>
+                          </q-item>
+                          <q-separator />
+                          <!-- Anomaly Detection: Trigger Detection + Re-train (always available) -->
+                          <template v-if="row.type === 'anomaly'">
+                            <q-item
+                              class="flex items-center justify-center"
+                              clickable
+                              v-close-popup
+                              :data-test="`alert-list-${row.name}-trigger-detection`"
+                              @click="triggerAlert(row)"
+                            >
+                              <q-item-section dense avatar>
+                                <OIcon
+                                  size="16px"
+                                  :name="symOutlinedSoundSampler"
+                                />
+                              </q-item-section>
+                              <q-item-section
+                                >Trigger Detection</q-item-section
+                              >
+                            </q-item>
+                            <q-item
+                              class="flex items-center justify-center"
+                              clickable
+                              v-close-popup
+                              :data-test="`alert-list-${row.name}-retrain-anomaly`"
+                              @click="retrainAnomaly(row)"
+                            >
+                              <q-item-section dense avatar>
+                                <OIcon size="sm" name="replay" />
+                              </q-item-section>
+                              <q-item-section>Re-train</q-item-section>
+                            </q-item>
+                          </template>
+                          <!-- Regular alerts: existing Trigger Alert item -->
+                          <q-item
+                            v-else
+                            class="flex items-center justify-center"
+                            clickable
+                            v-close-popup
+                            :data-test="`alert-list-${row.name}-trigger-alert`"
+                            @click="triggerAlert(row)"
+                          >
+                            <q-item-section dense avatar>
+                              <OIcon
+                                size="16px"
+                                :name="symOutlinedSoundSampler"
+                              />
+                            </q-item-section>
+                            <q-item-section>{{
+                              t("alerts.triggerAlert")
+                            }}</q-item-section>
+                          </q-item>
+                        </q-list>
+                      </q-menu>
+                      </OButton>
+                    </span>
+                  </div>
+                </template>
+
+                <template #empty>
                   <div
                     v-if="!templates.length || !destinations.length"
                     class="full-width flex column justify-center items-center text-center"
@@ -533,27 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </template>
 
-                <template v-slot:body-cell-function="props">
-                  <q-td :props="props">
-                    <OTooltip side="top">
-                      <template #trigger><pre style="white-space: break-spaces">{{ props.row.sql }}</pre></template>
-                      <pre>{{ props.row.sql }}</pre>
-                    </OTooltip>
-                  </q-td>
-                </template>
-
-                <!-- <template #top="scope">
-                  <QTablePagination
-                    :scope="scope"
-                    :pageTitle="t('alerts.header')"
-                    :position="'top'"
-                    :resultTotal="resultTotal"
-                    :perPageOptions="perPageOptions"
-                    @update:changeRecordPerPage="changePagination"
-                  />
-                </template> -->
-
-                <template #bottom="scope">
+                <template #bottom>
                   <div class="bottom-btn tw:h-[48px]">
                     <div
                       class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
@@ -616,16 +563,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon name="delete" size="sm" />
                       <span class="tw:ml-2">Delete</span>
                     </OButton>
-                    <QTablePagination
-                      :scope="scope"
-                      :position="'bottom'"
-                      :resultTotal="resultTotal"
-                      :perPageOptions="perPageOptions"
-                      @update:changeRecordPerPage="changePagination"
-                    />
                   </div>
                 </template>
-              </q-table>
+              </OTable>
         </div>
       </div>
     </div>
@@ -776,9 +716,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { QTable, date, useQuasar, type QTableProps, debounce } from "quasar";
+import { date, useQuasar, debounce } from "quasar";
 import { useI18n } from "vue-i18n";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
@@ -813,17 +752,13 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
 export default defineComponent({
   name: "AlertList",
   components: {
-    QTablePagination,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
@@ -842,10 +777,7 @@ export default defineComponent({
     OIcon,
     ODialog,
     OSpinner,
-    OInput,
-    OSelect,
-    OSwitch,
-    OTooltip,
+    OTable,
   },
   emits: [
     "update:changeRecordPerPage",
@@ -869,7 +801,6 @@ export default defineComponent({
         !!savedAlertListFilters.searchAcrossFolders,
     );
     const showAddAlertDialog: any = ref(false);
-    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -1123,114 +1054,122 @@ export default defineComponent({
       },
     ]);
 
-    const columns = computed(() => {
-      const baseColumns: any = [
+    const columns = computed<OTableColumnDef[]>(() => {
+      const baseColumns: OTableColumnDef[] = [
         {
-          name: "#",
-          label: "#",
-          field: "#",
-          align: "left",
-          style: "width: 67px",
+          id: "#",
+          header: "#",
+          accessorKey: "#",
+          size: 67,
+          meta: { align: "left" },
         },
         {
-          name: "name",
-          field: "name",
-          label: t("alerts.name"),
-          align: "left",
+          id: "name",
+          accessorKey: "name",
+          header: t("alerts.name"),
+          cell: " ",
           sortable: true,
+          meta: { align: "left" },
         },
         {
-          name: "owner",
-          field: "owner",
-          label: t("alerts.owner"),
-          align: "center",
+          id: "owner",
+          accessorKey: "owner",
+          header: t("alerts.owner"),
+          cell: " ",
           sortable: true,
-          style: "width: 150px",
+          size: 150,
+          meta: { align: "center" },
         },
         // "period" (Look back window) — all tabs except realTime
         ...(activeTab.value !== "realTime"
           ? [
               {
-                name: "period",
-                field: "period",
-                label: t("alerts.period"),
-                align: "center",
+                id: "period",
+                accessorKey: "period",
+                header: t("alerts.period"),
+                cell: " ",
                 sortable: true,
-                style: "width: 150px",
-              },
+                size: 150,
+                meta: { align: "center" },
+              } as OTableColumnDef,
             ]
           : []),
         // "frequency" (Check every) — all tabs except realTime
         ...(activeTab.value !== "realTime"
           ? [
               {
-                name: "frequency",
-                field: "frequency",
-                label: t("alerts.frequency"),
-                align: "left",
+                id: "frequency",
+                accessorKey: "frequency",
+                header: t("alerts.frequency"),
+                cell: " ",
                 sortable: true,
-                style: "width: 150px",
-              },
+                size: 150,
+                meta: { align: "left" },
+              } as OTableColumnDef,
             ]
           : []),
         {
-          name: "last_triggered_at",
-          field: "last_triggered_at",
-          label: t("alerts.lastTriggered"),
-          align: "left",
+          id: "last_triggered_at",
+          accessorKey: "last_triggered_at",
+          header: t("alerts.lastTriggered"),
+          cell: " ",
           sortable: true,
-          style: "width: 150px",
+          size: 150,
+          meta: { align: "left" },
         },
         {
-          name: "last_satisfied_at",
-          field: "last_satisfied_at",
-          label: t("alerts.lastSatisfied"),
-          align: "left",
+          id: "last_satisfied_at",
+          accessorKey: "last_satisfied_at",
+          header: t("alerts.lastSatisfied"),
+          cell: " ",
           sortable: true,
-          style: "width: 150px",
+          size: 150,
+          meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
         ...(activeTab.value === "anomalyDetection" || activeTab.value === "all"
           ? [
               {
-                name: "last_trained_at",
-                field: "last_trained_at",
-                label: "Last Trained At",
-                align: "left" as const,
+                id: "last_trained_at",
+                accessorKey: "last_trained_at",
+                header: "Last Trained At",
+                cell: " ",
                 sortable: true,
-                style: "width: 150px",
-              },
+                size: 150,
+                meta: { align: "left" },
+              } as OTableColumnDef,
               {
-                name: "status",
-                field: "status",
-                label: "Status",
-                align: "left" as const,
+                id: "status",
+                accessorKey: "status",
+                header: "Status",
+                cell: " ",
                 sortable: true,
-                style: "width: 120px",
-              },
+                size: 120,
+                meta: { align: "left" },
+              } as OTableColumnDef,
             ]
           : []),
         {
-          name: "actions",
-          field: "actions",
-          label: t("alerts.actions"),
-          align: "center",
+          id: "actions",
+          header: t("alerts.actions"),
+          isAction: true,
           sortable: false,
-          style: "width: 150px",
-          classes: "actions-column", //this is the class that we are adding to the actions column so that we can apply the styling to the actions column only
+          size: 150,
+          meta: { align: "center", cellClass: "actions-column" },
         },
       ];
 
       // insert folder_name column if applicable
       if (searchAcrossFolders.value && searchQuery.value !== "") {
         baseColumns.splice(2, 0, {
-          name: "folder_name",
-          field: "folder_name",
-          label: "Folder",
-          align: "center",
+          id: "folder_name",
+          accessorKey: "folder_name",
+          header: "Folder",
+          cell: " ",
           sortable: true,
-          style: "width: 150px",
-        });
+          size: 150,
+          meta: { align: "center" },
+        } as OTableColumnDef);
       }
 
       return baseColumns;
@@ -1238,7 +1177,18 @@ export default defineComponent({
 
     const destinations = ref([0]);
     const templates = ref([0]);
-    const selectedAlerts: Ref<any> = ref([]);
+    const selectedAlertIds = ref<string[]>([]);
+    const selectedAlerts = computed({
+      get: () =>
+        filteredResults.value.filter((row: any) =>
+          selectedAlertIds.value.includes(row.alert_id),
+        ),
+      set: (val) => {
+        if (val.length === 0) {
+          selectedAlertIds.value = [];
+        }
+      },
+    });
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
 
@@ -1697,29 +1647,11 @@ export default defineComponent({
           }),
         );
     };
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
+    const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
+    const pageSizeOptions = [20, 50, 100, 250, 500];
     const resultTotal = computed(function () {
       return filteredResults.value?.length;
     });
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(savedAlertListFilters.perPage || 20);
-    const pagination: any = ref({
-      rowsPerPage: savedAlertListFilters.perPage || 20,
-    });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
-    };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
 
     function convertUnixToQuasarFormat(unixMicroseconds: any) {
       if (!unixMicroseconds) return "";
@@ -2360,14 +2292,6 @@ export default defineComponent({
       allSelectedAlerts.value = false;
     };
 
-    const getSelectedString = () => {
-      return selectedAlerts.value.length === 0
-        ? ""
-        : `${selectedAlerts.value.length} record${
-            selectedAlerts.value.length > 1 ? "s" : ""
-          } selected`;
-    };
-
     const moveMultipleAlerts = () => {
       showMoveAlertDialog.value = true;
       selectedAlertToMove.value = selectedAlerts.value
@@ -2443,12 +2367,12 @@ export default defineComponent({
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
-    watch([searchQuery, filterQuery, searchAcrossFolders, selectedPerPage], () => {
+    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize], () => {
       store.commit("setAlertListFilters", {
         searchQuery: searchQuery.value || "",
         filterQuery: filterQuery.value || "",
         searchAcrossFolders: !!searchAcrossFolders.value,
-        perPage: selectedPerPage.value,
+        perPage: pageSize.value,
       });
     });
     watch(activeTab, async (newVal) => {
@@ -2794,7 +2718,6 @@ export default defineComponent({
 
     return {
       t,
-      qTable,
       store,
       router,
       columns,
@@ -2804,18 +2727,15 @@ export default defineComponent({
       selectedDelete,
       updateStreams,
       updateStreamName,
-      pagination,
       resultTotal,
       refreshList,
-      perPageOptions,
-      selectedPerPage,
+      pageSize,
+      pageSizeOptions,
       addAlert,
       isUpdated,
       showAddUpdateFn,
       showDeleteDialogFn,
       duplicateAlert,
-      changePagination,
-      maxRecordToReturn,
       showAddAlertDialog,
       showForm,
       toBeCloneAlertName,
@@ -2832,18 +2752,7 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       isSubmitting,
-      changeMaxRecordToReturn,
       filterQuery,
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
       getImageURL,
       activeTab,
       destinations,
@@ -2874,7 +2783,7 @@ export default defineComponent({
       activeFolderToMove,
       updateAcrossFolders,
       selectedAlerts,
-      getSelectedString,
+      selectedAlertIds,
       moveMultipleAlerts,
       dynamicQueryModel,
       searchAcrossFolders,

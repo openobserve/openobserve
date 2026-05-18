@@ -249,6 +249,16 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "showVisibilityToggle",
           ],
         },
+        OTable: {
+          template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
+            <div data-test="table-top"><slot name="top"></slot></div>
+            <div data-test="table-body">
+              <slot name="cell-name" v-for="row in data" :key="row.name" v-bind="{row: row}"></slot>
+            </div>
+          </div>`,
+          props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter", "rowClass"],
+          emits: ["row-click"],
+        },
       },
     },
   });
