@@ -2200,7 +2200,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2219,7 +2219,7 @@ async fn migrate_file_list_table(pool: &sqlx::Pool<Postgres>, table: &str) -> Re
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
@@ -2388,7 +2388,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} has {row_count} rows (limit: {FILE_LIST_MIGRATION_LIMIT}), \
             automatic migration is not supported for large tables. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2410,7 +2410,7 @@ async fn migrate_dump_stats_table(pool: &sqlx::Pool<Postgres>) -> Result<()> {
             "[POSTGRES] Table {table} contains data with future dates (max: {md}), \
             automatic migration is not supported. \
             Please migrate the table manually and then restart the node. \
-            Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+            Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
         );
         loop {
             log::warn!(
@@ -2601,7 +2601,7 @@ async fn handle_partitioned_tables(pool: &sqlx::Pool<Postgres>) -> Result<()> {
                         "[POSTGRES] Table {table} is a regular table and needs to be converted to a partitioned table. \
                         Since ZO_PG_PARTITION_MODE is set to 'manual', auto-migration is skipped. \
                         Please migrate the table manually and then restart the node. \
-                        Refer to: https://openobserve.ai/docs/migration-file-list-partition/"
+                        Refer to: https://openobserve.ai/docs/migration/migrate-file-list-partition/"
                     );
                     loop {
                         log::warn!(
