@@ -27,9 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`frustration-event-badge-${type}`"
     >
       {{ getBadgeLabel(type) }}
-        data-test="frustration-event-badge-tooltip"
-      >
-        {{ getTooltipText(type) }}
       <OTooltip
         side="top"
         align="center"

@@ -20,13 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="count > 0"
       :variant="badgeVariant"
       class="frustration-badge"
-      :title="tooltipText"
       :data-test="`frustration-badge-${severity}`"
     >
       {{ count }}
-        data-test="frustration-badge-tooltip"
-      >
-        {{ tooltipText }}
       <OTooltip
         side="top"
         align="center"
