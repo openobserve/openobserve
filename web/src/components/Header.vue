@@ -16,6 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:flex-nowrap tw:items-center tw:min-h-10 tw:w-full">
+    <!-- LEFT SIDE: Logo -->
+    <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
@@ -123,12 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         alt="OpenObserve"
       />
     </div>
+    </div><!-- end left side -->
 
-    <div class="tw:flex-1 tw:min-w-0" aria-hidden="true" />
-
+    <!-- RIGHT SIDE: Controls -->
+    <div class="tw:flex tw:items-center tw:justify-end tw:flex-1 tw:min-w-0">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
-      class="headerMenu float-left tw:mr-4"
+      class="headerMenu tw:flex tw:items-center tw:gap-1"
       v-if="store.state.organizationData.quotaThresholdMsg"
     >
       <div
@@ -153,12 +156,11 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu">
+    <div class="header-menu tw:flex tw:items-center tw:gap-1">
       <!-- UPGRADE TO ENTERPRISE BUTTON: Shows for non-enterprise users -->
       <OButton
         variant="primary"
         size="xs"
-        class="q-mx-xs"
         data-test="upgrade-to-enterprise-btn"
         @click="openEnterpriseDialog"
       >
@@ -205,7 +207,7 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select" class="q-mx-sm row">
+      <div data-test="navbar-organizations-select" class="row">
         <OButton
           variant="ghost"
           size="sm"
@@ -574,6 +576,7 @@ name="exit-to-app" class="padding-none" />
         </q-menu>
       </OButton>
     </div>
+    </div><!-- end right side -->
 
     <!-- Enterprise Upgrade Dialog -->
     <EnterpriseUpgradeDialog v-model="showEnterpriseDialog" />
