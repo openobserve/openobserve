@@ -11,7 +11,7 @@ test.describe.configure({ mode: "serial" });
 const authFile = path.join(__dirname, '../utils/auth/user.json');
 test.use({
   storageState: authFile,
-  contextOptions: {
+  launchOptions: {
     slowMo: 1000
   }
 });
