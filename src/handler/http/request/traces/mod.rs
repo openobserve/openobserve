@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{collections::HashMap as StdHashMap, sync::LazyLock};
+
 use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use config::{
     TIMESTAMP_COL_NAME,
@@ -30,7 +32,7 @@ use config::{
 };
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
@@ -74,6 +76,162 @@ pub(crate) struct TraceDetail {
     pub(crate) error_count: i64,
     pub(crate) user_id: Option<String>,
     pub(crate) first_user_message: Option<String>,
+}
+static SPAN_KIND_MAP: LazyLock<StdHashMap<&'static str, &'static str>> = LazyLock::new(|| {
+    let mut m = StdHashMap::new();
+    m.insert("0", "UNSPECIFIED");
+    m.insert("1", "INTERNAL");
+    m.insert("2", "SERVER");
+    m.insert("3", "CLIENT");
+    m.insert("4", "PRODUCER");
+    m.insert("5", "CONSUMER");
+    m
+});
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServiceDetectionRule {
+    pub attributes: Vec<String>,
+    #[serde(default)]
+    pub sub_attributes: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServiceDetectionConfig {
+    pub server_kinds: Vec<String>,
+    pub rules: Vec<ServiceDetectionRule>,
+}
+
+fn resolve_span_identity(
+    service_name: &str,
+    span_kind: Option<&str>,
+    attrs: &StdHashMap<String, String>,
+    config: &ServiceDetectionConfig,
+) -> String {
+    let effective_service = if service_name.is_empty() {
+        "unknown"
+    } else {
+        service_name
+    };
+
+    let Some(kind_str) = span_kind else {
+        return effective_service.to_string();
+    };
+
+    let mapped = SPAN_KIND_MAP.get(kind_str).copied().unwrap_or(kind_str);
+
+    if config
+        .server_kinds
+        .iter()
+        .any(|k| k == kind_str || k == mapped)
+    {
+        return effective_service.to_string();
+    }
+
+    for rule in &config.rules {
+        let mut base: Option<&str> = None;
+        for attr in &rule.attributes {
+            if let Some(v) = attrs.get(attr.as_str()) {
+                base = Some(v.as_str());
+                break;
+            }
+        }
+        let Some(base_val) = base else { continue };
+
+        if let Some(subs) = &rule.sub_attributes {
+            for sub in subs {
+                if let Some(v) = attrs.get(sub.as_str()) {
+                    return v.clone();
+                }
+            }
+        }
+
+        return base_val.to_string();
+    }
+
+    effective_service.to_string()
+}
+
+fn build_detection_sql_columns(config: &ServiceDetectionConfig) -> String {
+    let mut seen = std::collections::HashSet::new();
+    let mut col_exprs: Vec<String> = Vec::new();
+
+    let root_span_cond = "reference_parent_span_id IS NULL OR reference_parent_span_id = ''";
+
+    col_exprs.push(format!(
+        ", first_value(span_kind) FILTER (WHERE {root_span_cond}) AS root_span_kind"
+    ));
+
+    for rule in &config.rules {
+        let all_attrs = rule
+            .attributes
+            .iter()
+            .chain(rule.sub_attributes.iter().flatten());
+
+        for attr in all_attrs {
+            if !seen.insert(attr.clone()) {
+                continue;
+            }
+            let quoted = format!("\"{}\"", attr);
+            let alias = format!("root_{}", attr.replace('.', "_"));
+            col_exprs.push(format!(
+                ", max(CASE WHEN ({root_span_cond}) THEN {quoted} END) AS {alias}"
+            ));
+        }
+    }
+
+    col_exprs.join("")
+}
+
+fn build_attrs_row_from_q2a(
+    row: &serde_json::Map<String, serde_json::Value>,
+    config: &ServiceDetectionConfig,
+) -> StdHashMap<String, String> {
+    let mut attrs = StdHashMap::new();
+
+    for rule in &config.rules {
+        let all = rule
+            .attributes
+            .iter()
+            .chain(rule.sub_attributes.iter().flatten());
+        for attr in all {
+            let alias = format!("root_{}", attr.replace('.', "_"));
+            if let Some(serde_json::Value::String(v)) = row.get(&alias) {
+                attrs.insert(attr.clone(), v.clone());
+            }
+        }
+    }
+
+    attrs
+}
+
+async fn load_trace_service_detection(org_id: &str) -> Option<ServiceDetectionConfig> {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::common::config::O2_KEY_FIELDS_SETTING_KEY;
+
+        use crate::service::db::system_settings;
+
+        let setting = system_settings::get_resolved(Some(org_id), None, O2_KEY_FIELDS_SETTING_KEY)
+            .await
+            .ok()
+            .flatten()?;
+
+        let config: ServiceDetectionConfig = serde_json::from_value(
+            setting
+                .setting_value
+                .get("traces")?
+                .get("service_detection")?
+                .clone(),
+        )
+        .ok()?;
+
+        return Some(config);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        None
+    }
 }
 
 /// TracesIngest
@@ -1068,6 +1226,8 @@ pub async fn get_latest_traces_stream(
 
     let use_cache = get_use_cache_from_request(&query);
 
+    let service_detection = load_trace_service_detection(&org_id).await;
+
     let (tx, rx) = mpsc::channel::<Result<StreamResponses, infra::errors::Error>>(100);
 
     tokio::spawn(
@@ -1088,6 +1248,7 @@ pub async fn get_latest_traces_stream(
             has_gen_ai_fields,
             use_cache,
             range_error,
+            service_detection,
             tx,
         )
         .instrument(http_span),
@@ -1151,6 +1312,7 @@ async fn process_latest_traces_stream(
     has_gen_ai_fields: bool,
     use_cache: bool,
     range_error: String,
+    service_detection: Option<ServiceDetectionConfig>,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
 ) {
     let stream_type = StreamType::Traces;
@@ -1498,6 +1660,7 @@ async fn process_latest_traces_stream(
             &stream_name,
             &sender,
             &format!("partition [{p_start},{p_end}]"),
+            service_detection.as_ref(),
         )
         .await
         else {
@@ -1580,6 +1743,7 @@ async fn process_latest_traces_stream(
             &stream_name,
             &sender,
             "non-ts",
+            service_detection.as_ref(),
         )
         .await
         else {
@@ -1661,6 +1825,7 @@ async fn run_q2_for_traces(
     stream_name: &str,
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     log_ctx: &str,
+    service_detection: Option<&ServiceDetectionConfig>,
 ) -> Option<HashMap<String, TraceResponseItem>> {
     let mut q2_start = window_start;
     let mut q2_end = window_end;
@@ -1746,6 +1911,13 @@ async fn run_q2_for_traces(
     } else {
         "null"
     };
+    let detection_cols = if has_ref_parent_id {
+        service_detection
+            .map(build_detection_sql_columns)
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     let trace_ids_str = sanitized_ids.join("','");
     let detail_sql = format!(
@@ -1759,7 +1931,7 @@ async fn run_q2_for_traces(
             {root_svc_expr} AS root_service_name, \
             {root_op_expr} AS root_operation_name, \
             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
-            first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name \
+            first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name{detection_cols} \
          FROM \"{stream_name}\" WHERE trace_id IN ('{trace_ids_str}') GROUP BY trace_id"
     );
 
@@ -1833,7 +2005,7 @@ async fn run_q2_for_traces(
             .unwrap_or_default()
             .to_string();
 
-        let event_service_name = if !root_service_name.is_empty() {
+        let raw_service_name = if !root_service_name.is_empty() {
             root_service_name
         } else {
             first_service_name
@@ -1842,6 +2014,17 @@ async fn run_q2_for_traces(
             root_operation_name
         } else {
             first_operation_name
+        };
+        let event_service_name = if let Some(cfg) = service_detection {
+            if let Some(obj) = item.as_object() {
+                let span_kind = obj.get("root_span_kind").and_then(|v| v.as_str());
+                let attrs = build_attrs_row_from_q2a(obj, cfg);
+                resolve_span_identity(&raw_service_name, span_kind, &attrs, cfg)
+            } else {
+                raw_service_name
+            }
+        } else {
+            raw_service_name
         };
 
         if let Some(trace) = traces_data.get_mut(&tid) {
@@ -1994,5 +2177,100 @@ mod tests {
         assert_eq!(item.service_name, "my-service");
         assert_eq!(item.count, 42);
         assert_eq!(item.duration, 1000);
+    }
+}
+
+#[cfg(test)]
+mod service_detection_tests {
+    use super::*;
+
+    fn default_config() -> ServiceDetectionConfig {
+        ServiceDetectionConfig {
+            server_kinds: vec!["SERVER".into(), "INTERNAL".into(), "UNSPECIFIED".into()],
+            rules: vec![
+                ServiceDetectionRule {
+                    attributes: vec!["db_system".into(), "db.system".into()],
+                    sub_attributes: Some(vec!["db_name".into(), "db.name".into()]),
+                },
+                ServiceDetectionRule {
+                    attributes: vec!["messaging_system".into()],
+                    sub_attributes: Some(vec!["messaging_destination_name".into()]),
+                },
+            ],
+        }
+    }
+
+    fn attrs(pairs: &[(&str, &str)]) -> StdHashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn server_span_returns_service_name() {
+        let cfg = default_config();
+        let a = attrs(&[("db_system", "postgresql"), ("db_name", "orders")]);
+        assert_eq!(
+            resolve_span_identity("svc-a", Some("SERVER"), &a, &cfg),
+            "svc-a"
+        );
+    }
+
+    #[test]
+    fn client_db_returns_db_name() {
+        let cfg = default_config();
+        let a = attrs(&[("db_system", "postgresql"), ("db_name", "orders")]);
+        assert_eq!(
+            resolve_span_identity("svc-a", Some("CLIENT"), &a, &cfg),
+            "orders"
+        );
+    }
+
+    #[test]
+    fn client_db_no_sub_returns_db_system() {
+        let cfg = default_config();
+        let a = attrs(&[("db_system", "redis")]);
+        assert_eq!(
+            resolve_span_identity("svc-a", Some("CLIENT"), &a, &cfg),
+            "redis"
+        );
+    }
+
+    #[test]
+    fn numeric_kind_3_is_client() {
+        let cfg = default_config();
+        let a = attrs(&[("db_system", "postgresql"), ("db_name", "catalog")]);
+        assert_eq!(
+            resolve_span_identity("svc-a", Some("3"), &a, &cfg),
+            "catalog"
+        );
+    }
+
+    #[test]
+    fn no_matching_rule_falls_back_to_service_name() {
+        let cfg = default_config();
+        let a = attrs(&[]);
+        assert_eq!(
+            resolve_span_identity("svc-a", Some("CLIENT"), &a, &cfg),
+            "svc-a"
+        );
+    }
+
+    #[test]
+    fn empty_service_name_returns_unknown() {
+        let cfg = default_config();
+        let a = attrs(&[]);
+        assert_eq!(
+            resolve_span_identity("", Some("CLIENT"), &a, &cfg),
+            "unknown"
+        );
+    }
+
+    #[test]
+    fn none_span_kind_returns_service_name() {
+        let cfg = default_config();
+        let a = attrs(&[("db_system", "postgresql")]);
+        assert_eq!(resolve_span_identity("svc-a", None, &a, &cfg), "svc-a");
     }
 }
