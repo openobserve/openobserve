@@ -205,7 +205,7 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select" class="row">
+      <div data-test="navbar-organizations-select" class="tw:flex tw:items-center">
         <OSelect
           :options="selectOptions"
           :model-value="userClickedOrg?.identifier"
