@@ -160,7 +160,7 @@ describe("FieldExpansion.vue", () => {
         },
       });
 
-      expect(wrapper.find(".loading").exists()).toBe(true);
+      expect(wrapper.find('[data-test="field-values-panel-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Fetching values...");
     });
 
@@ -187,7 +187,7 @@ describe("FieldExpansion.vue", () => {
         },
       });
 
-      expect(wrapper.find(".loading").exists()).toBe(true);
+      expect(wrapper.find('[data-test="field-values-panel-loading-indicator"]').exists()).toBe(true);
     });
   });
 

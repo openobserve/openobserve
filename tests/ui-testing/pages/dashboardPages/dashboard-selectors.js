@@ -31,9 +31,9 @@ const QUASAR = {
   CHECKBOX_CHECKED: '.q-checkbox[aria-checked="true"]',
   CHECKBOX_UNCHECKED: '.q-checkbox[aria-checked="false"]',
 
-  // Loading indicators
-  SPINNER: '.q-spinner',
-  LINEAR_PROGRESS: '.q-linear-progress',
+  // Loading indicators (legacy — kept for backward compat; prefer specific data-test selectors)
+  SPINNER: '[data-test*="loading-indicator"]',
+  LINEAR_PROGRESS: '[data-test*="loading-indicator"]',
 
   // Chip/Badge components
   CHIP: '.q-chip',
@@ -180,7 +180,7 @@ function getDeleteVariableBtn(variableName) {
  * @returns {string} Selector string
  */
 function getVariableLoadingIndicator(variableName) {
-  return `[data-test="variable-selector-${variableName}"] .q-spinner, [data-test="variable-selector-${variableName}"] .q-linear-progress`;
+  return `[data-test="variable-selector-${variableName}"] [data-test*="loading-indicator"]`;
 }
 
 /**

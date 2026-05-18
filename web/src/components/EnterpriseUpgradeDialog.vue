@@ -49,10 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton
                   class="usage-indicator tw:rounded-full"
                   style="width: 40px; height: 40px;"
+                  data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
                   class="offer-badge-skeleton tw:rounded-3xl"
                   style="width: 200px; height: 44px;"
+                  data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
@@ -72,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSkeleton
                   class="chart-skeleton tw:rounded-lg"
                   style="height: 150px;"
+                  data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
               <!-- Loaded chart -->

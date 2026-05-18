@@ -83,7 +83,7 @@ export class TracesPage {
     this.latencyTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Duration")';
     this.errorsTab = '[data-test="traces-analysis-dashboard-drawer"] [role="tab"]:has-text("Errors")';
     // Analysis dashboard states — scope inside the drawer
-    this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] .q-spinner, [data-test="traces-analysis-dashboard-drawer"] .q-spinner-hourglass';
+    this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
     this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] .q-banner--top-padding';
     this.analysisDashboardRetryBtn = '[data-test="traces-analysis-dashboard-drawer"] button:has-text("Retry")';
 
@@ -482,7 +482,7 @@ export class TracesPage {
    */
   async waitForSearchComplete() {
     // Wait for loading to finish
-    const loadingIndicator = this.page.locator('[data-test*="loading"], .q-spinner').first();
+    const loadingIndicator = this.page.locator('[data-test*="loading"]').first();
     try {
       if (await loadingIndicator.isVisible({ timeout: 500 })) {
         await expect(loadingIndicator).not.toBeVisible({ timeout: 10000 });
@@ -702,7 +702,7 @@ export class TracesPage {
   async hasTraceResults() {
     // Wait for loading to complete
     try {
-      const loadingIndicator = this.page.locator('[data-test*="loading"], .q-spinner').first();
+      const loadingIndicator = this.page.locator('[data-test*="loading"]').first();
       if (await loadingIndicator.isVisible({ timeout: 500 })) {
         await loadingIndicator.waitFor({ state: 'hidden', timeout: 15000 });
       }
@@ -884,7 +884,7 @@ export class TracesPage {
       }
 
       // Check if still loading
-      const isLoading = await this.page.locator('[data-test*="loading"], .q-spinner').first().isVisible({ timeout: 500 });
+      const isLoading = await this.page.locator('[data-test*="loading"]').first().isVisible({ timeout: 500 });
       if (isLoading) {
       }
 

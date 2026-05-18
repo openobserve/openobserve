@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <OSpinner size="xs" />
+                <OSpinner size="xs" data-test="service-graph-operations-loading-indicator" />
                 <span>Loading operations...</span>
               </div>
 
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
                 style="color: var(--o2-text-secondary)"
               >
-                <OSpinner size="xs" />
+                <OSpinner size="xs" data-test="service-graph-resource-loading-indicator" />
                 <span>Loading {{ cfg.label.toLowerCase() }}...</span>
               </div>
               <template v-else>
