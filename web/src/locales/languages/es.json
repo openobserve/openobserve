@@ -2936,7 +2936,75 @@
     "copyStacktrace": "Copiar stacktrace",
     "noStacktraceAvailable": "No hay stacktrace disponible",
     "stacktraceCopied": "Stacktrace copiado al portapapeles",
-    "stacktraceCopyFailed": "No se pudo copiar stacktrace"
+    "stacktraceCopyFailed": "No se pudo copiar stacktrace",
+    "sessionsList": {
+      "noStreamsTooltip": "No hay transmisiones de LLM disponibles.",
+      "session": "sesión",
+      "sessions": "sesiones",
+      "countPill": "{count} de {total} {unit}",
+      "noStreamsFound": "No se han encontrado transmisiones de LLM",
+      "noStreamsDescription1": "Los grupos de sesiones se extienden por",
+      "noStreamsDescription2": "a través de flujos de rastreo marcados como flujos LLM. O no existe tal transmisión o aún no se ha ingerido ningún tramo.",
+      "failedToLoad": "No se pudieron cargar las sesiones",
+      "retry": "Reintentar",
+      "noSessionsFound": "No se encontró ninguna sesión",
+      "noSessionsDescription": "No se grabó ninguna sesión de LLM en este intervalo de tiempo en {stream}. Intenta ampliar el intervalo de tiempo o cambiar a una transmisión diferente.",
+      "loading": "Cargando sesiones...",
+      "tokenTooltip": "Entrada: {entrada} · Salida: {salida} · Total: {total}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Marca de tiempo",
+        "sessionId": "ID de sesión",
+        "turns": "Turnos",
+        "duration": "Duración",
+        "tokens": "Fichas",
+        "cost": "Coste",
+        "status": "Estado"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Volver a las sesiones",
+      "pageTitle": "Detalle de la sesión",
+      "failedToLoad": "No se pudo cargar la sesión",
+      "retry": "Reintentar",
+      "sessionNotFound": "No se encontró la sesión",
+      "noSpansFound": "No se han encontrado intervalos para {id} en el intervalo de tiempo actual.",
+      "searchPlaceholder": "Busque rastros en esta sesión...",
+      "turn": "giro",
+      "turns": "giros",
+      "turnsShown": "Se muestra {filtrado} de {total} {unidad}",
+      "userBadge": "Usuario",
+      "sessionPrefix": "sesión",
+      "copySessionId": "Copiar identificador de sesión",
+      "openInTraceExplorer": "Abrir en Trace Explorer",
+      "unknownUser": "Usuario desconocido",
+      "kpi": {
+        "turns": "Turnos",
+        "duration": "Duración",
+        "inputTokens": "Tokens de entrada",
+        "outputTokens": "Tokens de salida",
+        "cost": "Coste"
+      },
+      "conversation": "Conversación",
+      "turnLabel": "Turno",
+      "openTrace": "Traza abierta",
+      "noUserMessage": "No se capturó ningún mensaje de usuario para este turno.",
+      "noAssistantMessage": "No se capturó ninguna respuesta del asistente para este turno.",
+      "roles": {
+        "user": "Usuario",
+        "assistant": "Asistente"
+      },
+      "stats": {
+        "status": "Estado",
+        "model": "modelo",
+        "tokens": "Fichas",
+        "input": "Entrada",
+        "output": "Salida",
+        "total": "Total",
+        "cost": "Coste",
+        "spans": "Vanos"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",

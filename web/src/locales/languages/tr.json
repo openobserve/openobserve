@@ -2949,7 +2949,75 @@
     "copyStacktrace": "Stacktrace'i kopyala",
     "noStacktraceAvailable": "Yığın izleme mevcut değil",
     "stacktraceCopied": "Stacktrace panoya kopyalandı",
-    "stacktraceCopyFailed": "Stacktrace kopyalanamadı"
+    "stacktraceCopyFailed": "Stacktrace kopyalanamadı",
+    "sessionsList": {
+      "noStreamsTooltip": "LLM akışı mevcut değil.",
+      "session": "oturum, toplantı, celse",
+      "sessions": "oturumları",
+      "countPill": "{total} {unit} {count}",
+      "noStreamsFound": "LLM akışı bulunamadı",
+      "noStreamsDescription1": "Oturum grubu şunları kapsar:",
+      "noStreamsDescription2": "LLM akışları olarak işaretlenmiş izleme akışları arasında. Ya böyle bir akış yoktur ya da henüz hiçbir açıklık alınmamıştır.",
+      "failedToLoad": "Oturumlar yüklenemedi",
+      "retry": "Tekrar dene",
+      "noSessionsFound": "Oturum bulunamadı",
+      "noSessionsDescription": "{stream} üzerinde bu zaman aralığında hiçbir LLM oturumu kaydedilmedi. Zaman aralığını genişletmeyi veya farklı bir akışa geçmeyi deneyin.",
+      "loading": "Oturumlar yükleniyor...",
+      "tokenTooltip": "Giriş: {input} · Çıktı: {output} · Toplam: {toplam}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "Zaman damgası",
+        "sessionId": "Oturum Kimliği",
+        "turns": "Dönüyor",
+        "duration": "Süre",
+        "tokens": "Jetonlar",
+        "cost": "Maliyet",
+        "status": "Durum"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "Oturumlara Dön",
+      "pageTitle": "Oturum Detayı",
+      "failedToLoad": "Oturum yüklenemedi",
+      "retry": "Tekrar dene",
+      "sessionNotFound": "Oturum bulunamadı",
+      "noSpansFound": "Geçerli zaman aralığında {id} için hiçbir açıklık bulunamadı.",
+      "searchPlaceholder": "Bu oturumdaki izleri ara...",
+      "turn": "dönüş",
+      "turns": "sıralar",
+      "turnsShown": "{total} {unit} 'den {filtrelenmiş} gösterildi",
+      "userBadge": "Kullanıcı",
+      "sessionPrefix": "oturum, toplantı, celse",
+      "copySessionId": "Oturum kimliğini kopyala",
+      "openInTraceExplorer": "Trace explorer'da aç",
+      "unknownUser": "Bilinmeyen kullanıcı",
+      "kpi": {
+        "turns": "Dönüyor",
+        "duration": "Süre",
+        "inputTokens": "Giriş Belirteçleri",
+        "outputTokens": "Çıktı Belirteçleri",
+        "cost": "Maliyet"
+      },
+      "conversation": "Konuşma",
+      "turnLabel": "Döndür",
+      "openTrace": "İzini aç",
+      "noUserMessage": "Bu tur için kullanıcı mesajı alınmadı.",
+      "noAssistantMessage": "Bu tur için asistan yanıtı alınmadı.",
+      "roles": {
+        "user": "Kullanıcı",
+        "assistant": "asistan"
+      },
+      "stats": {
+        "status": "Durum",
+        "model": "Modeli",
+        "tokens": "Jetonlar",
+        "input": "Giriş",
+        "output": "Çıktı",
+        "total": "Toplam",
+        "cost": "Maliyet",
+        "spans": "Açıklıklar"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

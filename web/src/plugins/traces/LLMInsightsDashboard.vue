@@ -308,13 +308,13 @@ const kpiCards = computed<KpiCard[]>(() => {
   const traces = splitNumberWithUnit(kpi.value.traceCount);
   const p95 = splitDuration(kpi.value.p95DurationMicros);
   const errorRate =
-    kpi.value.requestCount > 0
-      ? (kpi.value.errorCount / kpi.value.requestCount) * 100
+    kpi.value.traceCount > 0
+      ? (kpi.value.errorCount / kpi.value.traceCount) * 100
       : 0;
 
   const errorRatePrev =
-    kpiPrev.value.requestCount > 0
-      ? (kpiPrev.value.errorCount / kpiPrev.value.requestCount) * 100
+    kpiPrev.value.traceCount > 0
+      ? (kpiPrev.value.errorCount / kpiPrev.value.traceCount) * 100
       : 0;
 
   // Cost comes straight from SUM(gen_ai_usage_cost) on the KPI summary.

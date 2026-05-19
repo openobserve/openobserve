@@ -2959,7 +2959,75 @@
     "copyStacktrace": "スタックトレースをコピー",
     "noStacktraceAvailable": "スタックトレースはありません",
     "stacktraceCopied": "スタックトレースをクリップボードにコピーしました",
-    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした"
+    "stacktraceCopyFailed": "スタックトレースをコピーできませんでした",
+    "sessionsList": {
+      "noStreamsTooltip": "LLM ストリームはありません。",
+      "session": "セッション",
+      "sessions": "セッション",
+      "countPill": "{合計} {単位} の {カウント}",
+      "noStreamsFound": "LLM ストリームが見つかりません",
+      "noStreamsDescription1": "セッションのグループスパン",
+      "noStreamsDescription2": "LLM ストリームとしてマークされたトレースストリーム全体該当するストリームが存在しないか、スパンがまだ取り込まれていないかのどちらかです。",
+      "failedToLoad": "セッションを読み込めませんでした",
+      "retry": "リトライ",
+      "noSessionsFound": "セッションが見つかりません",
+      "noSessionsDescription": "{stream} には、この時間範囲の LLM セッションは記録されていません。時間範囲を広げるか、別のストリームに切り替えてみてください。",
+      "loading": "セッションをロード中...",
+      "tokenTooltip": "入力:{入力} · 出力:{出力} · 合計:{合計}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "タイムスタンプ",
+        "sessionId": "セッション ID",
+        "turns": "ターン",
+        "duration": "所要時間",
+        "tokens": "トークン",
+        "cost": "費用",
+        "status": "ステータス"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "セッションに戻る",
+      "pageTitle": "セッション詳細",
+      "failedToLoad": "セッションを読み込めませんでした",
+      "retry": "リトライ",
+      "sessionNotFound": "セッションが見つかりません",
+      "noSpansFound": "現在の時間範囲では {id} のスパンが見つかりません。",
+      "searchPlaceholder": "このセッションのトレースを検索...",
+      "turn": "順番",
+      "turns": "ターン",
+      "turnsShown": "{total} {unit} の {フィルター済み} が表示されました",
+      "userBadge": "ユーザ",
+      "sessionPrefix": "セッション",
+      "copySessionId": "セッション ID をコピー",
+      "openInTraceExplorer": "トレースエクスプローラーで開く",
+      "unknownUser": "不明なユーザー",
+      "kpi": {
+        "turns": "ターン",
+        "duration": "所要時間",
+        "inputTokens": "入力トークン",
+        "outputTokens": "出力トークン",
+        "cost": "費用"
+      },
+      "conversation": "会話",
+      "turnLabel": "ターン",
+      "openTrace": "オープントレース",
+      "noUserMessage": "このターンのユーザーメッセージはキャプチャされませんでした。",
+      "noAssistantMessage": "このターンのアシスタントの応答はキャプチャされませんでした。",
+      "roles": {
+        "user": "ユーザ",
+        "assistant": "アシスタント"
+      },
+      "stats": {
+        "status": "ステータス",
+        "model": "モデル",
+        "tokens": "トークン",
+        "input": "入力",
+        "output": "出力",
+        "total": "合計",
+        "cost": "費用",
+        "spans": "スパン"
+      }
+    }
   },
   "actions": {
     "testAction": "アクションをテスト",

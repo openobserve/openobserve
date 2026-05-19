@@ -2942,7 +2942,75 @@
     "copyStacktrace": "复制堆栈跟踪",
     "noStacktraceAvailable": "没有可用的堆栈跟踪",
     "stacktraceCopied": "Stacktrace 已复制到剪贴板",
-    "stacktraceCopyFailed": "无法复制堆栈跟踪"
+    "stacktraceCopyFailed": "无法复制堆栈跟踪",
+    "sessionsList": {
+      "noStreamsTooltip": "没有 LLM 直播可用。",
+      "session": "会话",
+      "sessions": "会议",
+      "countPill": "{总计} {单位} 的 {数量}",
+      "noStreamsFound": "未找到 LLM 直播",
+      "noStreamsDescription1": "会话组跨度为",
+      "noStreamsDescription2": "跨越标记为 LLM 流的跟踪流。要么不存在这样的直播，要么尚未摄取任何跨度。",
+      "failedToLoad": "加载会话失败",
+      "retry": "重试",
+      "noSessionsFound": "未找到会话",
+      "noSessionsDescription": "在此时间范围内，{stream} 上未录制任何 LLM 会话。尝试扩大时间范围或切换到其他直播。",
+      "loading": "正在加载会话...",
+      "tokenTooltip": "输入：{输入} · 输出：{输出} · 总计：{总计}",
+      "durationNs": "ns",
+      "columns": {
+        "timestamp": "时间戳",
+        "sessionId": "会话 ID",
+        "turns": "回合",
+        "duration": "持续时间",
+        "tokens": "代币",
+        "cost": "成本",
+        "status": "状态"
+      }
+    },
+    "sessionDetail": {
+      "backToSessions": "返回会话",
+      "pageTitle": "会话详情",
+      "failedToLoad": "加载会话失败",
+      "retry": "重试",
+      "sessionNotFound": "未找到会话",
+      "noSpansFound": "在当前时间范围内未找到 {id} 的跨度。",
+      "searchPlaceholder": "在此会话中搜索痕迹...",
+      "turn": "转",
+      "turns": "转弯",
+      "turnsShown": "显示了 {总} {单位} 中的 {已过滤}",
+      "userBadge": "用户",
+      "sessionPrefix": "会话",
+      "copySessionId": "复制会话 ID",
+      "openInTraceExplorer": "在跟踪资源管理器中打开",
+      "unknownUser": "未知用户",
+      "kpi": {
+        "turns": "回合",
+        "duration": "持续时间",
+        "inputTokens": "输入代币",
+        "outputTokens": "输出代币",
+        "cost": "成本"
+      },
+      "conversation": "对话",
+      "turnLabel": "转",
+      "openTrace": "打开追踪",
+      "noUserMessage": "本回合未捕获任何用户消息。",
+      "noAssistantMessage": "本回合未捕获助手回应。",
+      "roles": {
+        "user": "用户",
+        "assistant": "助理"
+      },
+      "stats": {
+        "status": "状态",
+        "model": "模型",
+        "tokens": "代币",
+        "input": "输入",
+        "output": "输出",
+        "total": "总计",
+        "cost": "成本",
+        "spans": "跨度"
+      }
+    }
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
