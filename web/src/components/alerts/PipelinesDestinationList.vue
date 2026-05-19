@@ -15,12 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none"
-    style="height: calc(100vh - 88px); min-height: inherit"
-  >
-    <div v-if="!showDestinationEditor">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+    <div v-if="!showDestinationEditor" class="tw:flex tw:flex-col tw:h-full">
       <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
       >
         <div
           class="q-table__title tw:font-[600]"
@@ -48,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </div>
+      <div class="tw:flex-1 tw:min-h-0">
       <OTable
         data-test="alert-destinations-list-table"
         :data="visibleRows"
@@ -58,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="client"
         :page-size="20"
         :page-size-options="[5, 10, 20, 50, 100]"
+        :footer-title="t('pipeline_destinations.header')"
         sorting="client"
         :default-columns="false"
         :show-global-filter="false"
@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OTable>
+      </div>
     </div>
     <div v-else>
       <PipelineDestinationEditor
@@ -250,6 +251,7 @@ export default defineComponent({
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
+        size: 100,
         meta: { align: "center" },
       },
     ];

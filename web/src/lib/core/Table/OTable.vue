@@ -51,6 +51,8 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: "Search...",
   filterMode: "client",
   defaultColumns: true,
+  footerTitle: "",
+  showHeader: true,
 });
 
 const emit = defineEmits<OTableEmits<TData>>();
@@ -364,6 +366,7 @@ defineExpose({
       >
         <!-- ── Header ───────────────────────────────────────── -->
         <OTableHeader
+          v-if="props.showHeader"
           :header-groups="table.getHeaderGroups()"
           :table="table"
           :column-order="columnOrder"
@@ -571,6 +574,7 @@ defineExpose({
       :showing-to="pagination.showingTo.value"
       :is-first-page="pagination.isFirstPage.value"
       :is-last-page="pagination.isLastPage.value"
+      :title="props.footerTitle"
       @update:page-size="pagination.setPageSize"
       @first-page="pagination.firstPage"
       @prev-page="pagination.prevPage"

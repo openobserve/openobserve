@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div>
       <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="full-width tw:flex tw:justify-end tw:gap-3">
             <OInput
                 v-model="filterQuery"
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+                class="tw:h-[36px] tw:w-[200px]"
                 :placeholder="t('serviceAccounts.search')"
               >
-                <template #prepend>
-                  <OIcon class="o2-search-input-icon" name="search" size="sm" />
+                <template #icon-left>
+                  <OIcon name="search" size="sm" />
                 </template>
               </OInput>
               <OButton
@@ -52,13 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </div>
       <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
+        <div class="card-container" style="height: calc(100vh - var(--navbar-height) - 92px)">
           <OTable
             :data="serviceAccountsState.service_accounts_users"
             :columns="columns"
             row-key="email"
             pagination="client"
             :page-size="20"
+            :page-size-options="[20, 50, 100, 250, 500]"
+            :footer-title="t('serviceAccounts.header')"
             sorting="client"
             selection="multiple"
             :selected-ids="selectedAccountEmails"
@@ -127,12 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </template>
 
-            <template #bottom>
-              <span class="tw:text-xs tw:text-text-primary tw:font-medium">
-                {{ selectedAccounts.length }} {{ t('serviceAccounts.header') }}
-              </span>
+            <template v-if="selectedAccounts.length > 0" #bottom>
               <OButton
-                v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
                 variant="outline"
                 size="sm"

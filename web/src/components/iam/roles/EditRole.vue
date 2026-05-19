@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col full-height" data-test="edit-role-page">
+  <div class="tw:flex tw:flex-col tw:pb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 0.2rem);" data-test="edit-role-page">
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
@@ -112,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="`Search Permissions`"
                   @update:model-value="onResourceChange"
                 >
-                  <template #prepend>
-                    <OIcon name="search" size="sm" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
+                  <template #icon-left>
+                    <OIcon name="search" size="sm" />
                   </template>
                 </OInput>
               </div>
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end tw:w-full tw:flex-shrink-0"
+        class="flex justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
       <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">

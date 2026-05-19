@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
+        :footer-title="t('iam.basicUsers')"
         dense
       >
         <template #cell-select="{ row }">
@@ -234,7 +235,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.userName"),
       accessorKey: "email",
       sortable: true,
-      meta: { align: "left" },
+      meta: { align: "left" , autoWidth: true},
     },
   ];
 
