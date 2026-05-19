@@ -248,6 +248,7 @@ size="xs" class="warning" />{{
               :page-size="rowsPerPage"
               :page-size-options="[]"
               class="org-table"
+              row-class="tw:cursor-pointer"
               style="width: 470px; min-height: 420px; height: 420px"
               @row-click="(row) => handleOrgSelection(row)"
             >
@@ -514,7 +515,7 @@ size="xs" class="warning" />{{
 
 <script lang="ts">
 
-import { defineComponent, PropType, computed, ref } from "vue";
+import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -719,6 +720,16 @@ export default defineComponent({
     const searchQuery = ref("");
     const rowsPerPage = 10;
     const orgMenuOpen = ref(false);
+
+    watch(orgMenuOpen, async (isOpen) => {
+      if (isOpen) {
+        await nextTick();
+        const input = document.querySelector(
+          '[data-test="organization-search-input"] input',
+        ) as HTMLInputElement | null;
+        input?.focus();
+      }
+    });
 
     const filteredOrganizations = computed(() => {
       if (!searchQuery.value) return props.organizations;
