@@ -15,12 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none"
-    style="height: calc(100vh - 88px); min-height: inherit"
-  >
-    <div v-if="!showImportTemplate && !showTemplateEditor">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+    <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
       <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
       >
         <div class="q-table__title tw:font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
@@ -53,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </div>
+      <div class="tw:flex-1 tw:min-h-0">
       <OTable
         data-test="alert-templates-list-table"
         :data="visibleRows"
@@ -63,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="client"
         :page-size="20"
         :page-size-options="[5, 10, 20, 50, 100]"
+        :footer-title="t('alert_templates.header')"
         sorting="client"
         filter-mode="client"
         :default-columns="false"
@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </OTable>
+      </div>
     </div>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
       <AddTemplate
@@ -199,7 +200,7 @@ const columns: OTableColumnDef[] = [
     header: t("alert_templates.name"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "actions",
