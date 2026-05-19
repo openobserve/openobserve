@@ -858,6 +858,11 @@
     "roles": "Roles",
     "groups": "Groups",
     "customRole": "Custom Roles",
+    "authType": "Auth",
+    "authTypeSSO": "SSO",
+    "authTypeLocal": "Native",
+    "noCustomRolesHint": "No custom roles defined — create one in IAM → Roles",
+    "externalUserCustomRoleHint": "External users can only be modified via the source system",
     "description": "Description",
     "revoke_invite": "Revoke Invite"
   },
