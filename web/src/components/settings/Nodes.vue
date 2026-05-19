@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       :limits="[0, 250]"
       unit="px"
-      style="overflow: hidden; height: calc(100vh - 40px)"
+      style="overflow: hidden; height: calc(100vh - 64px)"
     >
       <template v-slot:before>
-        <div class="q-pt-sm tw:mt-4" style="height: calc(100vh - 80px)">
-          <div class="sticky-header q-px-sm">
+        <div class="q-pt-sm tw:mt-4 tw:flex tw:flex-col" style="height: calc(100vh - 64px)">
+          <div class="sticky-header q-px-sm tw:shrink-0">
             <span class="q-ma-none q-pa-sm" style="font-size: 18px">
               {{ t("nodes.filter_header") }}
               <OIcon name="filter-list" size="sm" />
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
 
-          <div class="tw:h-[calc(100vh-110px)] tw:overflow-y-auto">
+          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto">
             <div class="tw:flex tw:flex-col">
               <OCollapsible
                 v-if="
@@ -419,7 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="row full-width q-pt-sm flex items-center q-pl-md">
+        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
+        <div class="row full-width q-pt-sm flex items-center tw:shrink-0">
           <div
             class="col q-table__title items-start"
             data-test="cipher-keys-list-title"
@@ -443,6 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <OTable
+          class="tw:flex-1 tw:min-h-0"
           ref="qTable"
           data-test="nodes-main-table"
           :data="visibleRows"
@@ -451,6 +453,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('nodes.header')"
+          :row-class="(row) => `status-row status-${row.status?.toLowerCase()}`"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -460,9 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty><NoData /></template>
 
           <template #cell-id="{ row }">
-            <span :class="`status-${row.status.toLowerCase()}`">
-              {{ row.id }}
-            </span>
+            {{ row.id }}
           </template>
 
           <template #cell-name="{ row }">
@@ -514,6 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ row.percentage_memory_usage }}%
           </template>
         </OTable>
+        </div>
       </template>
     </q-splitter>
   </div>
@@ -596,13 +599,13 @@ export default defineComponent({
 
     const computedOTableColumns = computed(() => {
       const columns: OTableColumnDef[] = [
-        { id: "id", header: "#", accessorKey: "id", meta: { align: "center" } },
+        { id: "id", header: "#", accessorKey: "id", size: 67, meta: { align: "center" } },
         {
           id: "name",
           header: t("nodes.name"),
           accessorKey: "name",
           sortable: true,
-          meta: { align: "left" },
+          meta: { align: "left" , autoWidth: true },
         },
         {
           id: "region",
@@ -1148,15 +1151,35 @@ export default defineComponent({
   color: #000000;
 }
 
-.status-online {
+tr.status-row > td:first-child {
+  position: relative;
+}
+tr.status-row > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+}
+tr.status-online > td:first-child::before {
+  background: #00a76f;
+}
+tr.status-offline > td:first-child::before {
+  background: #ce2528;
+}
+tr.status-prepare > td:first-child::before {
+  background: #ffab00;
+}
+
+/* Legacy span-based status indicator (still used by status filter list) */
+span.status-online {
   border-left: #00a76f 5px solid !important;
 }
-
-.status-offline {
+span.status-offline {
   border-left: 5px solid #ce2528 !important;
 }
-
-.status-prepare {
+span.status-prepare {
   border-left: 5px solid #ffab00 !important;
 }
 
