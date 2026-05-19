@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Show existing URLs (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="col-12 q-py-md">
               <div class="text-grey-8 text-bold q-mb-sm" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
-              <q-card flat bordered class="q-pa-sm" style="background-color: #fafafa;">
+              <OCard class="tw:p-2" style="background-color: #fafafa;">
                 <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="q-mb-xs">
                   <div class="row items-center q-gutter-x-xs">
                     <div class="col-auto">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OSeparator v-if="Number(index) < formData.urlJobs.length - 1" class="tw:my-1" />
                 </div>
-              </q-card>
+              </OCard>
             </div>
 
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
@@ -230,6 +230,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -244,7 +245,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "AddEnrichmentTable",
   components: { OSeparator, OButton, OInput, OFile, OOptionGroup, OSwitch,
-    OIcon,
+    OIcon, OCard,
 },
   props: {
     modelValue: {

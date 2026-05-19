@@ -13,8 +13,8 @@
     >
       <div class="tw:col-span-1 tw:min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <q-card class="q-mb-md">
-            <q-card-section>
+          <OCard class="tw:mb-4">
+            <OCardSection role="body">
               <div class="text-h6">{{ t("about.no_license_found") }}</div>
               <div class="q-mt-sm text-body2">
                 {{ t("about.installation_id") }}:
@@ -33,11 +33,11 @@
               >
                 {{ t("about.get_license") }}
               </OButton>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
 
-          <q-card>
-            <q-card-section>
+          <OCard>
+            <OCardSection role="body">
               <div class="text-subtitle1 q-mb-md">
                 {{ t("about.enter_license_key") }}
               </div>
@@ -70,13 +70,13 @@
               >
                 {{ t("about.update_license") }}
               </OButton>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
 
         <div v-else>
-          <q-card>
-            <q-card-section>
+          <OCard>
+            <OCardSection role="body">
               <div class="text-h6 q-mb-md">{{ t("about.license_info") }}</div>
               <q-markup-table flat bordered dense class="compact-table">
                 <tbody>
@@ -179,11 +179,11 @@
                   {{ t("about.add_new_license_key") }}
                 </OButton>
               </div>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
 
-          <q-card v-show="showUpdateForm" class="q-mt-md">
-            <q-card-section>
+          <OCard v-show="showUpdateForm" class="tw:mt-4">
+            <OCardSection role="body">
               <div class="text-subtitle1 q-mb-sm">
                 {{ t("about.update_license_key") }}
               </div>
@@ -229,14 +229,14 @@
                   {{ t("about.update_license") }}
                 </OButton>
               </div>
-            </q-card-section>
-          </q-card>
+            </OCardSection>
+          </OCard>
         </div>
       </div>
 
       <div class="tw:col-span-1 tw:self-start">
-        <q-card class="futuristic-card">
-          <q-card-section class="tw:p-3">
+        <OCard class="futuristic-card">
+          <OCardSection class="tw:p-3">
             <div class="futuristic-header">
               <div class="header-glow"></div>
               <div class="text-h6 tw:relative tw:z-10">
@@ -397,8 +397,8 @@
                 </div>
               </div>
             </div>
-          </q-card-section>
-        </q-card>
+          </OCardSection>
+        </OCard>
       </div>
     </div>
 
@@ -448,6 +448,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -464,6 +466,8 @@ export default defineComponent({
     OIcon,
     OBadge,
     OTextarea,
+    OCard,
+    OCardSection,
 },
   setup() {
     const { t } = useI18n();

@@ -15,12 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
+  <OCard
     class="aws-integration-tile"
-    flat
-    bordered
   >
-    <q-card-section class="tw:pb-2">
+    <OCardSection class="tw:pb-2">
       <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
         <div class="tile-name tw:font-semibold tw:text-base">
           {{ integration.displayName }}
@@ -40,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tile-description tw:text-sm tw:text-gray-600 tw:mb-3">
         {{ integration.description }}
       </div>
-    </q-card-section>
+    </OCardSection>
 
-    <q-card-actions class="tw:px-4 tw:pb-4 tw:flex tw:flex-row tw:gap-2">
+    <OCardActions class="tw:pb-4">
       <!-- Add Source Button -->
       <OButton
         v-if="hasCloudFormation"
@@ -73,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`aws-${integration.id}-add-dashboard-btn`"
         >Add Dashboard</OButton
       >
-    </q-card-actions>
+    </OCardActions>
 
     <!-- Unified Integration Method Selection Dialog -->
     <ODialog data-test="aws-integration-tile-template-dialog" v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
@@ -140,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :currUserEmail="userEmail"
       />
     </ODialog>
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
@@ -149,6 +147,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OCardActions from "@/lib/core/Card/OCardActions.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import type {
@@ -170,7 +171,7 @@ import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "AWSIntegrationTile",
-  components: { OButton, ODialog, OIcon, OTooltip },
+  components: { OButton, ODialog, OIcon, OTooltip, OCard, OCardSection, OCardActions },
   props: {
     integration: {
       type: Object as PropType<AWSIntegration>,
@@ -665,15 +666,6 @@ export default defineComponent({
   .tile-description {
     line-height: 1.5;
     min-height: 3em;
-  }
-
-  .q-card__section,
-  .q-card__actions {
-    flex-grow: 0;
-  }
-
-  .q-card__actions {
-    margin-top: auto;
   }
 
   .docs-btn {

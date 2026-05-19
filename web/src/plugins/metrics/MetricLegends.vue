@@ -9,12 +9,12 @@
     <span>{{ t("search.legendLabel") }}</span>
 
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
-      <q-card flat>
-        <q-card-section class="metric-legends-title">
+      <OCard>
+        <OCardSection role="header" class="metric-legends-title">
           <div class="label">{{ t("search.legendLabel") }}</div>
-        </q-card-section>
+        </OCardSection>
         <OSeparator />
-        <q-card-section class="q-pt-none legends">
+        <OCardSection class="tw:pt-0 legends">
           <div class="legend-grid">
             <div
               class="legend-item"
@@ -25,8 +25,8 @@
               <span>{{ metric }}</span>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
+        </OCardSection>
+      </OCard>
     </q-menu>
   </OButton>
 </template>
@@ -36,12 +36,14 @@ import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "MetricLegends",
-  components: { OSeparator, OButton,
+  components: { OSeparator, OButton, OCard, OCardSection,
     OIcon,
 },
   setup() {

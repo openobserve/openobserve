@@ -558,9 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
-    <q-card
-      v-model="activeTab"
-      animated
+    <OCard
       class="correlation-content tw:flex-1"
       style="display: flex; flex-direction: column; overflow: auto"
     >
@@ -1021,7 +1019,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-card>
+    </OCard>
   </div>
 
   <!-- Metric Stream Selector Dialog -->
@@ -1121,7 +1119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'

@@ -32,11 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="row q-col-gutter-md">
             <div class="col-6">
-              <q-card
-                flat
+              <OCard
                 class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
               >
-                <q-card-section class="tw:p-[0.375rem]">
+                <OCardSection class="tw:p-[0.375rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -54,12 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedPattern.pattern.frequency.toLocaleString()
                     }}
                   </div>
-                </q-card-section>
-              </q-card>
+                </OCardSection>
+              </OCard>
             </div>
             <div class="col-6">
-              <q-card flat class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
-                <q-card-section class="tw:p-[0.375rem]">
+              <OCard class="tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
+                <OCardSection class="tw:p-[0.375rem]">
                   <div
                     class="text-caption"
                     :class="
@@ -75,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ selectedPattern.pattern.percentage.toFixed(2) }}%
                   </div>
-                </q-card-section>
-              </q-card>
+                </OCardSection>
+              </OCard>
             </div>
           </div>
           <div
@@ -282,6 +281,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";

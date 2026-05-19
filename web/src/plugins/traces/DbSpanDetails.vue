@@ -3,6 +3,8 @@
 import { computed, ref } from "vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 const performanceOpen = ref(false);
 
@@ -90,8 +92,8 @@ const metadataRows = computed(() =>
 
 <template>
   <div class="tw:flex tw:flex-col tw:h-full tw:overflow-auto tw:gap-3">
-    <q-card flat data-test="traces-db-span-details-metadata-grid">
-      <q-card-section class="tw:py-0! tw:px-0!">
+    <OCard data-test="traces-db-span-details-metadata-grid">
+      <OCardSection class="tw:py-0! tw:px-0!">
         <div class="tw:flex tw:flex-wrap tw:gap-2">
           <span
             v-for="row in metadataRows"
@@ -110,16 +112,14 @@ const metadataRows = computed(() =>
             <span class="tw:break-all">{{ row.value }}</span>
           </span>
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
-    <q-card
-      flat
-      bordered
+    <OCard
       class="tw:flex-1 tw:flex tw:flex-col"
       data-test="traces-db-span-details-query-editor"
     >
-      <q-card-section
+      <OCardSection
         class="tw:flex-1 tw:flex tw:flex-col tw:p-0 tw:min-h-[18.75rem] tw:p-[0.375rem]!"
       >
         <CodeQueryEditor
@@ -140,8 +140,8 @@ const metadataRows = computed(() =>
         >
           No query text recorded for this span.
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
     <OCollapsible
       v-if="hasPerformanceData"

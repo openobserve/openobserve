@@ -80,9 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       grow
     >
       <OTabPanel name="json">
-        <q-card-section
+        <OCardSection
           data-test="log-detail-json-content"
-          class="q-pa-none q-mb-lg q-pt-sm"
+          class="tw:p-0 tw:mb-6 tw:pt-2"
         >
           <json-preview
             :value="rowData"
@@ -99,11 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @closeTable="closeTable"
             @show-correlation="showCorrelation"
           />
-        </q-card-section>
+        </OCardSection>
       </OTabPanel>
       <OTabPanel name="table">
-        <q-card-section
-          class="tw:p-[0.675rem] q-mb-lg"
+        <OCardSection
+          class="tw:p-[0.675rem] tw:mb-6"
           data-test="log-detail-table-content"
         >
           <div v-if="rowData.length == 0" class="q-pt-md tw:max-w-[350px]">
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
-        </q-card-section>
+        </OCardSection>
       </OTabPanel>
 
       <!-- Correlated Logs Tab Panel (Custom Component) -->
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
-    <q-card-section v-if="tab === 'json' || tab === 'table'" class="q-pa-md q-pb-md tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
+    <OCardSection v-if="tab === 'json' || tab === 'table'" class="tw:p-4 tw:pb-4 tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
       <div class="row items-center no-wrap justify-between">
         <div class="col-1">
           <OButton
@@ -383,12 +383,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t('common.next') }}<OIcon name="navigate-next" size="14px" class="tw:ml-1" /></OButton>
         </div>
       </div>
-    </q-card-section>
+    </OCardSection>
   </div>
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
@@ -430,7 +431,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OSeparator,
+    OSeparator, OCardSection,
     OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
     OIcon,
     OTable,

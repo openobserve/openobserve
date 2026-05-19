@@ -1,11 +1,11 @@
 <template>
-  <q-card
-    class="column full-height no-wrap"
+  <OCard
+    class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap"
     style="min-width: 480px; max-width: 800px"
   >
     <!-- Header -->
     <div class="q-px-sm q-py-md">
-      <q-card-section class="q-pb-sm q-px-sm q-pt-none">
+      <OCardSection role="header">
         <div class="row items-center no-wrap">
           <div class="col">
             <div class="text-body1 text-bold" data-test="queryList-title-text">
@@ -22,7 +22,7 @@
             />
           </div>
         </div>
-      </q-card-section>
+      </OCardSection>
       <OSeparator />
     </div>
 
@@ -35,7 +35,7 @@
       dense
       data-test="queryList-table"
     />
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
@@ -46,11 +46,13 @@ import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTable from '@/lib/core/Table/OTable.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "QueryList",
-  components: { OSeparator, OButton, OTable },
+  components: { OSeparator, OButton, OTable, OCard, OCardSection },
   emits: ["save", "close"],
   props: {
     schemaData: Object,

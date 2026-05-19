@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Progress -->
           <div class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Progress</div>
-            <q-card flat bordered class="q-pa-md">
+            <OCard class="tw:p-4">
               <div class="flex items-center justify-between q-mb-sm">
                 <div class="tw-font-medium">Overall Progress</div>
                 <div class="text-h6">{{ job.progress_percent }}%</div>
@@ -99,13 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>{{ estimatedCompletion }}</div>
                 </div>
               </div>
-            </q-card>
+            </OCard>
           </div>
 
           <!-- Deletion Details (if applicable) -->
           <div v-if="job.delete_before_backfill || job.deletion_status" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Deletion Details</div>
-            <q-card flat bordered class="q-pa-md">
+            <OCard class="tw:p-4">
               <div class="tw-grid tw-grid-cols-2 tw-gap-4 text-sm">
                 <div>
                   <div class="text-caption text-grey-6">Status</div>
@@ -128,13 +128,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-caption text-grey-6">Error</div>
                 <div class="text-sm text-negative">{{ job.deletion_status.failed }}</div>
               </div>
-            </q-card>
+            </OCard>
           </div>
 
           <!-- Error Details (if present) -->
           <div v-if="job.error" class="tw-space-y-3">
             <div class="text-subtitle1 tw-font-semibold">Error Details</div>
-            <q-card flat bordered class="q-pa-md tw-bg-red-50 tw-border-red-200">
+            <OCard class="tw:p-4 tw-bg-red-50 tw-border-red-200">
               <div class="flex items-start">
                 <OIcon name="error" size="md" class="q-mr-sm tw-mt-1" />
                 <div class="tw-flex-1">
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-            </q-card>
+            </OCard>
           </div>
 
           <!-- Timeline -->
@@ -223,6 +223,7 @@ import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

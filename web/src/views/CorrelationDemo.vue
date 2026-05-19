@@ -3,14 +3,14 @@
     <div class="row q-col-gutter-md">
       <!-- Left: Simulated Log Viewer -->
       <div class="col-8">
-        <q-card>
-          <q-card-section>
+        <OCard>
+          <OCardSection role="header">
             <div class="text-h6">Sample Logs (Click to See Correlation)</div>
-          </q-card-section>
+          </OCardSection>
 
           <OSeparator />
 
-          <q-card-section>
+          <OCardSection role="body">
             <div class="log-viewer">
               <!-- Sample Log 1 -->
               <div class="log-line" @click="selectLog(sampleLog1)">
@@ -56,12 +56,12 @@
                 <OIcon name="link" size="sm" class="correlation-hint" />
               </div>
             </div>
-          </q-card-section>
-        </q-card>
+          </OCardSection>
+        </OCard>
 
         <!-- Instructions -->
-        <q-card class="q-mt-md">
-          <q-card-section>
+        <OCard class="tw:mt-4">
+          <OCardSection role="body">
             <div class="text-h6">How to Use</div>
             <ol class="q-ma-sm">
               <li>Click any log line above to see related telemetry</li>
@@ -86,8 +86,8 @@
               Note: This is a demo using simulated data. In production,
               correlation will use real service_streams data.
             </div>
-          </q-card-section>
-        </q-card>
+          </OCardSection>
+        </OCard>
       </div>
 
       <!-- Right: Correlation Panel -->
@@ -101,14 +101,14 @@
         />
 
         <!-- Fallback when panel is closed -->
-        <q-card v-if="!showCorrelation">
-          <q-card-section class="text-center q-pa-lg">
+        <OCard v-if="!showCorrelation">
+          <OCardSection class="tw:text-center tw:p-6">
             <OIcon name="info" size="lg" />
             <div class="text-grey-6 q-mt-md">
               Click a log line to see related telemetry
             </div>
-          </q-card-section>
-        </q-card>
+          </OCardSection>
+        </OCard>
       </div>
     </div>
 
@@ -140,6 +140,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 // Demo state
 const showCorrelation = ref(false);
