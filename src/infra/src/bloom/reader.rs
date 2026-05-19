@@ -206,14 +206,11 @@ impl BloomReader {
     /// splices them back in before calling `check`.
     ///
     /// **Caller obligations:**
-    /// - The blob slice at `offset..offset + bytes.len()` is zeroed
-    ///   (i.e. has not been read yet). Splicing over an already-
-    ///   materialized region is a no-op only if the bytes match; if
-    ///   they don't, downstream `check` on that range will return
-    ///   stale results.
-    /// - No prior `check` call has triggered SBBF decoding for a
-    ///   `(field, file_id)` whose body overlaps this range. The lazy
-    ///   `OnceLock<Sbbf>` would memoize a decode of the zeroed bytes
+    /// - The blob slice at `offset..offset + bytes.len()` is zeroed (i.e. has not been read yet).
+    ///   Splicing over an already- materialized region is a no-op only if the bytes match; if they
+    ///   don't, downstream `check` on that range will return stale results.
+    /// - No prior `check` call has triggered SBBF decoding for a `(field, file_id)` whose body
+    ///   overlaps this range. The lazy `OnceLock<Sbbf>` would memoize a decode of the zeroed bytes
     ///   and refuse to re-read after the splice.
     ///
     /// Panics if `offset + bytes.len()` exceeds the blob length —
@@ -426,13 +423,12 @@ mod tests {
     }
 
     /// Simulates the partial-read fetch path used by `bloom_pruner`:
-    ///   1. Allocate a blob the size of the full `.bf`, with only the
-    ///      header (5 bytes) and the trailing footer region filled in;
-    ///      the body region is left zeroed.
-    ///   2. `BloomReader::parse` succeeds (it only validates header
-    ///      magic, tail magic, and footer payload).
-    ///   3. `body_ranges_for` returns the absolute byte ranges that
-    ///      `check` will demand for the targets we care about.
+    ///   1. Allocate a blob the size of the full `.bf`, with only the header (5 bytes) and the
+    ///      trailing footer region filled in; the body region is left zeroed.
+    ///   2. `BloomReader::parse` succeeds (it only validates header magic, tail magic, and footer
+    ///      payload).
+    ///   3. `body_ranges_for` returns the absolute byte ranges that `check` will demand for the
+    ///      targets we care about.
     ///   4. Splice those ranges in.
     ///   5. `check` returns the correct membership.
     #[test]
@@ -460,7 +456,11 @@ mod tests {
         // Compute body ranges for the targets the pruner will check.
         // Some lie inside the suffix already (no fetch needed); others
         // are still zero in the blob.
-        let targets = [("trace_id", 101u64), ("trace_id", 102u64), ("user_id", 101u64)];
+        let targets = [
+            ("trace_id", 101u64),
+            ("trace_id", 102u64),
+            ("user_id", 101u64),
+        ];
         let ranges = r.body_ranges_for(targets);
         assert_eq!(ranges.len(), 3);
 
@@ -487,8 +487,8 @@ mod tests {
 
         // Mix of known and unknown — unknown fall away silently.
         let targets = [
-            ("trace_id", 101u64), // known
-            ("trace_id", 999u64), // unknown file_id
+            ("trace_id", 101u64),      // known
+            ("trace_id", 999u64),      // unknown file_id
             ("missing_field", 101u64), // unknown field
         ];
         let ranges = r.body_ranges_for(targets);

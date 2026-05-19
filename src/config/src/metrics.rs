@@ -593,8 +593,7 @@ pub static BLOOM_DUMPED_FILES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
             "bloom_dumped_files_total",
-            "Number of file_list rows archived to dump parquet, by bloom_ver=0 vs not."
-                .to_owned()
+            "Number of file_list rows archived to dump parquet, by bloom_ver=0 vs not.".to_owned()
                 + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)

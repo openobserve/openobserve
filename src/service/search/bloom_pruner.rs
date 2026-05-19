@@ -115,9 +115,8 @@ pub async fn prune(
         groups.entry((date, f.meta.bloom_ver)).or_default().push(i);
     }
 
-    // 3. Per-group fetch spec. Compute the (field, file_id) targets up
-    //    front so the async closure has everything it needs to do a
-    //    partial read.
+    // 3. Per-group fetch spec. Compute the (field, file_id) targets up front so the async closure
+    //    has everything it needs to do a partial read.
     struct GroupSpec {
         group: Group,
         account: String,
@@ -129,8 +128,7 @@ pub async fn prune(
         .map(|((date, ver), idxs)| {
             let path = bloom_path(org_id, stream_type, stream_name, &date, ver);
             let account = infra::storage::get_account(org_id, &path).unwrap_or_default();
-            let mut targets: Vec<(String, u64)> =
-                Vec::with_capacity(idxs.len() * predicates.len());
+            let mut targets: Vec<(String, u64)> = Vec::with_capacity(idxs.len() * predicates.len());
             for i in idxs {
                 let file_id = with_bloom[i].id as u64;
                 for pred in predicates {
@@ -146,9 +144,8 @@ pub async fn prune(
         })
         .collect();
 
-    // 4. Fetch per group, bounded. Each closure does the cache probe +
-    //    suffix probe + per-target body fetch inline so the worst-case
-    //    fanout is still capped by BLOOM_PREFETCH_CONCURRENCY.
+    // 4. Fetch per group, bounded. Each closure does the cache probe + suffix probe + per-target
+    //    body fetch inline so the worst-case fanout is still capped by BLOOM_PREFETCH_CONCURRENCY.
     let trace_id = trace_id.to_string();
     let fetched: Vec<(Group, String, Result<BloomReader, FetchError>)> = stream::iter(specs)
         .map(|spec| {
@@ -251,19 +248,17 @@ enum FetchError {
 /// the minimum bytes the given `targets` require.
 ///
 /// Path:
-/// 1. Cache probe for the full blob. If hit → parse full blob and return.
-///    (The cache already paid the cost; partial-read on a hit would be
-///    silly local IO.)
-/// 2. Cache miss → one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)` GET.
-///    Brings back the footer + tail of body, and `GetResult.meta.size`
-///    tells us the total file length (so no separate `head` request).
+/// 1. Cache probe for the full blob. If hit → parse full blob and return. (The cache already paid
+///    the cost; partial-read on a hit would be silly local IO.)
+/// 2. Cache miss → one `GetRange::Suffix(BLOOM_SUFFIX_PROBE_BYTES)` GET. Brings back the footer +
+///    tail of body, and `GetResult.meta.size` tells us the total file length (so no separate `head`
+///    request).
 /// 3. If the suffix covers the whole file (small `.bf`), parse it.
-/// 4. Otherwise: build a partial blob (header + zeros + suffix), parse
-///    the footer, compute body ranges for `targets`, drop ranges
-///    already inside the suffix, coalesce remaining ranges, fetch them
-///    via `get_range`, splice into the reader's blob.
-/// 5. Whether or not partial fetch ran, enqueue a background download
-///    of the full file. Subsequent queries take the cache-hit path.
+/// 4. Otherwise: build a partial blob (header + zeros + suffix), parse the footer, compute body
+///    ranges for `targets`, drop ranges already inside the suffix, coalesce remaining ranges, fetch
+///    them via `get_range`, splice into the reader's blob.
+/// 5. Whether or not partial fetch ran, enqueue a background download of the full file. Subsequent
+///    queries take the cache-hit path.
 async fn fetch_bloom_reader(
     trace_id: &str,
     account: &str,
@@ -271,8 +266,14 @@ async fn fetch_bloom_reader(
     targets: &[(String, u64)],
 ) -> Result<BloomReader, FetchError> {
     // Stage A: cache-only probe for the whole blob.
-    if let Ok(get_result) =
-        file_data::get_opts(account, path, GetOptions::default(), /* remote */ false).await
+    if let Ok(get_result) = file_data::get_opts(
+        account,
+        path,
+        GetOptions::default(),
+        // remote
+        false,
+    )
+    .await
     {
         let total = get_result.meta.size;
         let bytes = get_result
