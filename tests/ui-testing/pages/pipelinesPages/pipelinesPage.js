@@ -2301,22 +2301,24 @@ export class PipelinesPage {
         await this.streamNameLabel.fill('');
         await this.page.getByRole("option").first().waitFor({ state: 'visible', timeout: 5000 });
         await this.streamNameLabel.fill(streamName);
-        // Find and click the matching option inside waitForFunction to avoid
-        // race conditions: the option might re-render between the DOM check
-        // and the Playwright locator click.
+        // Wait for the option to appear after Quasar autocomplete filtering
         await this.page.waitForFunction(
-            (name) => {
-                const options = document.querySelectorAll('[role="option"]');
-                const match = Array.from(options).find(el => el.textContent.trim() === name);
-                if (match) {
-                    match.click();
-                    return true;
-                }
-                return false;
-            },
+            (name) => Array.from(document.querySelectorAll('[role="option"]')).some(el => el.textContent.trim() === name),
             streamName,
             { timeout: 8000 }
         );
+        // Click via Playwright locator to dispatch full mouse events (mousedown + mouseup + click)
+        // which Quasar's q-item component needs to trigger selection.
+        const options = this.page.getByRole("option");
+        const optCount = await options.count();
+        for (let i = 0; i < optCount; i++) {
+            const text = await options.nth(i).textContent();
+            if (text.trim() === streamName) {
+                await options.nth(i).click();
+                break;
+            }
+        }
+        await this.page.waitForTimeout(500);
         testLogger.info(`Stream '${streamName}' selected`);
     }
 
@@ -2356,12 +2358,14 @@ export class PipelinesPage {
             });
         }
 
-        // Scrollable if wrapper allows overflow, OR inner table scrolls
+        // Scrollable if CSS allows overflow AND content actually overflows
         const wrapperScrollable =
-            wrapperInfo.overflowY === 'auto' || wrapperInfo.overflowY === 'scroll';
+            (wrapperInfo.overflowY === 'auto' || wrapperInfo.overflowY === 'scroll') &&
+            wrapperInfo.scrollHeight > wrapperInfo.clientHeight;
         const tableScrollable =
             tableInfo &&
-            (tableInfo.overflowY === 'auto' || tableInfo.overflowY === 'scroll');
+            (tableInfo.overflowY === 'auto' || tableInfo.overflowY === 'scroll') &&
+            tableInfo.scrollHeight > tableInfo.clientHeight;
         const isScrollable = wrapperScrollable || tableScrollable;
 
         testLogger.info('Pipeline field list scroll check', {
@@ -2425,10 +2429,17 @@ export class PipelinesPage {
                 allLabels.add(lbl.textContent);
             });
 
-            // Scroll to bottom and collect
+            // Scroll to bottom and poll for stable row count
             const prevScrollTop = container.scrollTop;
             container.scrollTop = container.scrollHeight;
-            await new Promise(r => requestAnimationFrame(r));
+
+            let stableCount = -1;
+            for (let i = 0; i < 10; i++) {
+                await new Promise(r => requestAnimationFrame(r));
+                const currentLabels = container.querySelectorAll('.field_label');
+                if (currentLabels.length === stableCount) break;
+                stableCount = currentLabels.length;
+            }
 
             container.querySelectorAll('.field_label').forEach(lbl => {
                 allLabels.add(lbl.textContent);
