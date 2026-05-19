@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="col o2-card-wrapper">
+  <OCard class="col o2-card-wrapper">
     <div class="row items-center justify-between q-px-md q-py-sm">
       <div>
         <div class="o2-card-title q-pt-sm">{{ t("billing.proPlanLabel") }}</div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ btnSubscribe }}
       </OButton>
     </div>
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
@@ -158,10 +158,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "proPlan",
-  components: { OSeparator, OButton, OBadge, OIcon },
+  components: { OSeparator, OButton, OBadge, OIcon, OCard },
   props: [
     "planType",
     "billingProvider",

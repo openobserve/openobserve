@@ -80,11 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #empty>
-                <q-item>
-                  <q-item-section class="text-grey">
-                    No alerts found
-                  </q-item-section>
-                </q-item>
+                <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                  No alerts found
+                </div>
               </template>
             </OSelect>
             <OButton
@@ -169,9 +167,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="value ? 'check-circle' : 'schedule'"
               :color="value ? 'positive' : 'grey'"
               size="xs"
-            >
+             />
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
-            </OIcon>
           </template>
 
           <template #cell-is_silenced="{ value }">
@@ -179,9 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="value ? 'volume-off' : 'volume-up'"
               :color="value ? 'grey' : 'positive'"
               size="20px"
-            >
+             />
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
-            </OIcon>
           </template>
 
           <template #cell-duration="{ row }">

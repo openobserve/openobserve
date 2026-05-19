@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #before>
         <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
-          <FieldList
+          <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
               startTime: dateTime.startTime,
@@ -140,7 +140,7 @@ import searchService from "@/services/search";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import {
@@ -499,10 +499,6 @@ function updateUrlQueryParams() {
 
   .q-splitter__after {
     overflow: hidden;
-  }
-
-  .q-item__label span {
-    /* text-transform: capitalize; */
   }
 
   .index-table :hover::-webkit-scrollbar,

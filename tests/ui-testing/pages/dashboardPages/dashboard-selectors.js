@@ -103,13 +103,18 @@ const DASHBOARD = {
 };
 
 /**
- * Role-based selectors (ARIA)
+ * Selectors that previously relied on raw ARIA roles. Each OSelect now forwards
+ * its parent data-test to the popover (`*-popover`) and ListboxItems
+ * (`*-option`), so consumers should prefer the field-specific data-test where
+ * possible. These generic aliases match any OSelect's dropdown surface.
+ * TODO(data-test): tooltips (OTooltip / reka TooltipContent) still need a
+ * data-test on the root content; tracked in web/src/lib/overlay/Tooltip/OTooltip.vue.
  */
 const ROLES = {
-  OPTION: '[role="option"]',
-  ROLE_OPTION: '[role="option"]', // Alias for clarity
-  LISTBOX: '[role="listbox"]',
-  ROLE_LISTBOX: '[role="listbox"]', // Alias for clarity
+  OPTION: '[data-test$="-option"]',
+  ROLE_OPTION: '[data-test$="-option"]', // Alias for clarity
+  LISTBOX: '[data-test$="-popover"]',
+  ROLE_LISTBOX: '[data-test$="-popover"]', // Alias for clarity
   TOOLTIP: '[role="tooltip"]',
 };
 

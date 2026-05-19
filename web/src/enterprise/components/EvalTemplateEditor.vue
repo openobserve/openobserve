@@ -43,9 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.templateName") }} *</label>
-            <OIcon name="info" size="xs" class="field-info-icon">
-              <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
-            </OIcon>
+            <OIcon name="info" size="xs" class="field-info-icon" />
+            <OTooltip :content="t('evalTemplate.tooltipName')" side="top" />
           </div>
           <div class="o2-input" :class="{ 'field-error': errors.name }">
             <OInput
@@ -57,9 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("common.description") }}</label>
-            <OIcon name="info" size="xs" class="field-info-icon">
-              <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
-            </OIcon>
+            <OIcon name="info" size="xs" class="field-info-icon" />
+            <OTooltip :content="t('evalTemplate.tooltipDescription')" side="top" />
           </div>
           <div class="o2-input">
             <OInput v-model="form.description" />
@@ -72,9 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 0 0 200px; display: flex; flex-direction: column">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.responseType") }} *</label>
-            <OIcon name="info" size="xs" class="field-info-icon">
-              <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
-            </OIcon>
+            <OIcon name="info" size="xs" class="field-info-icon" />
+            <OTooltip :content="t('evalTemplate.tooltipResponseType')" side="top" />
           </div>
           <div class="o2-input" :class="{ 'field-error': errors.response_type }">
             <OSelect
@@ -89,9 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden">
           <div class="field-label-row">
             <label class="textarea-label">{{ t("evalTemplate.dimensions") }} *</label>
-            <OIcon name="info" size="xs" class="field-info-icon">
-              <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
-            </OIcon>
+            <OIcon name="info" size="xs" class="field-info-icon" />
+            <OTooltip :content="t('evalTemplate.tooltipDimensions')" side="top" />
           </div>
           <div :class="{ 'field-error': errors.dimensions }">
             <OSelect
@@ -112,9 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="display: flex; flex-direction: column; flex: 1; min-height: 0">
         <div class="field-label-row">
           <label class="textarea-label">{{ t("evalTemplate.promptTemplate") }} *</label>
-          <OIcon name="info" size="xs" class="field-info-icon">
-            <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
-          </OIcon>
+          <OIcon name="info" size="xs" class="field-info-icon" />
+          <OTooltip :content="t('evalTemplate.tooltipPromptTemplate')" side="top" />
         </div>
         <div class="textarea-border" :class="{ 'field-error': errors.content }" style="flex: 1; display: flex; flex-direction: column">
           <OTextarea

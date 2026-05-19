@@ -17,25 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit;">
+  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div>
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
       style="position: sticky; top: 0; z-index: 1000 ;"
       >
-          <div  class="q-table__title full-width tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
-          <div class="full-width tw:flex tw:justify-end tw:gap-3">
-
+          <div class="q-table__title tw:font-[600]" data-test="organizations-title-text">{{ t("organization.header") }}</div>
+          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
             <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:h-[36px] tw:w-[200px]"
               :placeholder="t('organization.search')"
             >
-              <template #prepend>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
-          
             <OButton
               variant="primary"
               size="sm"
@@ -44,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t('organization.add') }}
             </OButton>
-            </div>
+          </div>
         </div>
         </div>
     <div>
@@ -57,6 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :global-filter="filterQuery"
         pagination="client"
         :page-size="20"
+        :page-size-options="[20, 50, 100, 250, 500]"
+        :footer-title="t('organization.header')"
         sorting="client"
         filter-mode="client"
         :default-columns="false"
@@ -66,11 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <NoData />
         </template>
 
-        <template #bottom>
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
-            {{ organizations.length }} {{ t('organization.header') }}
-          </span>
-        </template>
 
         <template #cell-actions="{ row }">
           <OButton

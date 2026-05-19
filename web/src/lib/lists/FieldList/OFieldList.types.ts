@@ -20,6 +20,9 @@ export interface OFieldListProps {
   showSearch?: boolean;
   showPagination?: boolean;
   expandedIds?: string[];
+  draggable?: boolean;
+  dragEnabledFn?: (row: FieldItem, index: number) => boolean;
+  sortFn?: (a: FieldItem, b: FieldItem) => number;
 }
 
 export interface OFieldListEmits {
@@ -29,6 +32,8 @@ export interface OFieldListEmits {
   "row-click": [row: FieldItem, event: MouseEvent];
   "row-dblclick": [row: FieldItem, event: MouseEvent];
   "scroll-end": [scrollInfo: any];
+  "drag-start": [row: FieldItem, event: DragEvent];
+  "drag-end": [row: FieldItem, event: DragEvent];
 }
 
 export interface OFieldListSlots {
@@ -46,7 +51,12 @@ export interface OFieldListSlots {
     nextPage: () => void;
     lastPage: () => void;
   }) => any;
-  "field-row"?: (props: { row: FieldItem; index: number }) => any;
+  "field-row"?: (props: {
+    row: FieldItem;
+    index: number;
+    draggable: boolean;
+    isDragEnabled: boolean;
+  }) => any;
   "field-actions"?: (props: { row: FieldItem; index: number }) => any;
   "group-header"?: (props: { row: FieldItem; groupName: string }) => any;
   expansion?: (props: { row: FieldItem }) => any;

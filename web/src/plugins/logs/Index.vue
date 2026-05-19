@@ -195,9 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                           to configure a full text search field to the stream.
                         </div>
-                        <q-item-label>{{
+                        <span class="tw:text-sm">{{
                           searchObj.data.additionalErrorMsg
-                        }}</q-item-label>
+                        }}</span>
                       </h5>
                     </div>
                     <div

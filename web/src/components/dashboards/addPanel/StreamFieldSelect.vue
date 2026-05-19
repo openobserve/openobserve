@@ -16,28 +16,24 @@
         class="o2-custom-select-dashboard"
       >
         <template v-slot:option="scope">
-          <q-expansion-item
-            expand-separator
-            group="streamGroup"
-            :default-opened="scope.index === 0 ? true : false"
-            header-class="text-weight-bold"
+          <OCollapsible
+            :model-value="openStreamGroups[scope.index] !== undefined ? openStreamGroups[scope.index] : scope.index === 0"
+            @update:model-value="(v) => (openStreamGroups[scope.index] = v)"
             :label="scope.opt.label"
             :data-test="`stream-field-select-group-${scope.index}`"
           >
             <template v-for="child in scope.opt.children" :key="child.name">
-              <q-item
-                clickable
-                v-ripple
-                v-close-popup
+              <li
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
                 @click="selectField(child)"
                 :data-test="`stream-field-select-option-${child.name}`"
               >
-                <q-item-section>
-                  <q-item-label>{{ child.name }}</q-item-label>
-                </q-item-section>
-              </q-item>
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm">{{ child.name }}</span>
+                </div>
+              </li>
             </template>
-          </q-expansion-item>
+          </OCollapsible>
         </template>
       </OSelect>
     </div>
@@ -45,10 +41,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, PropType, inject } from "vue";
+import { defineComponent, ref, watch, PropType, inject, reactive } from "vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 export interface OptionChild {
   label: string;
@@ -76,7 +73,7 @@ export default defineComponent({
 
   emits: ["update:modelValue"],
 
-  components: { OSelect },
+  components: { OSelect, OCollapsible },
 
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
@@ -95,6 +92,7 @@ export default defineComponent({
     );
 
     const streamFieldSelect = ref<any>(null);
+    const openStreamGroups = reactive<Record<number, boolean>>({}); 
 
     async function loadStreamFields(streamName: string) {
       try {
@@ -239,6 +237,7 @@ export default defineComponent({
       filterFields,
       streamFieldSelect,
       updateInputValue,
+      openStreamGroups,
     };
   },
 });

@@ -1012,7 +1012,9 @@ export class StreamsPage {
     }
 
     /**
-     * Get full text search option from dropdown
+     * Get full text search option from dropdown.
+     * StreamFieldInputs uses OSelect post-migration (Reka Listbox role=option);
+     * legacy q-select uses .q-item.
      */
     getFullTextSearchOption() {
         return this.page.locator('.q-item').filter({ hasText: 'Full text search' });

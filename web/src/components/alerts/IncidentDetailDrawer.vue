@@ -2058,8 +2058,10 @@ export default defineComponent({
         if (isEditingTitle.value) {
           return;
         }
-        // Don't close if there are any open dialogs/menus (they should handle ESC first)
-        const hasOpenDialog = document.querySelector('.q-dialog, .q-menu');
+        // Don't close if there are any open dialogs/menus (they should handle ESC first).
+        const hasOpenDialog = document.querySelector(
+          '[role="dialog"][data-state="open"], [role="menu"][data-state="open"]'
+        );
         if (hasOpenDialog) {
           return;
         }

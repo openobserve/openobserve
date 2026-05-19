@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:overflow-hidden tw:min-h-0">
         <div>
           <OSeparator />
-          <q-card-section class="tw:pt-4">
+          <OCardSection class="tw:pt-4">
             <div class="tw:text-sm details-section">
               <h6
                 class="tw:text-base tw:font-semibold tw:m-0 tw:mb-3 details-title"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </q-card-section>
+          </OCardSection>
         </div>
         </div>
       </div>
@@ -187,6 +187,7 @@ import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import dashboardsService from "@/services/dashboards";
@@ -196,7 +197,7 @@ import { useQuasar } from "quasar";
 
 export default defineComponent({
   name: "AzureQuickSetup",
-  components: { OSeparator, OButton,
+  components: { OSeparator, OButton, OCardSection,
     OIcon,
 },
   setup() {

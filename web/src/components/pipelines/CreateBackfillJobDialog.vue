@@ -107,9 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="chunk-period-input"
                   >
                     <template #append>
-                      <OIcon name="info-outline" size="sm">
+                      <OIcon name="info-outline" size="sm" />
                         <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
-                      </OIcon>
                     </template>
                   </OInput>
                 </div>
@@ -136,9 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="delay-between-chunks-input"
                   >
                     <template #append>
-                      <OIcon name="info-outline" size="sm">
+                      <OIcon name="info-outline" size="sm" />
                         <OTooltip content="Default: 5 seconds" />
-                      </OIcon>
                     </template>
                   </OInput>
                 </div>

@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.latitude") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -68,17 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-latitude-item-${latitudeLabel}`"
-          >
-            {{ latitudeLabel }}
-            <template #icon-right
-              ><OIcon name="arrow-drop-down" size="sm"
-            /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-latitude-item-${latitudeLabel}`"
+              >
+                {{ latitudeLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
               <div
@@ -110,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
@@ -138,9 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.longitude") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="Hint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -186,17 +188,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-longitude-item-${longitudeLabel}`"
-          >
-            {{ longitudeLabel }}
-            <template #icon-right
-              ><OIcon name="arrow-drop-down" size="sm"
-            /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-longitude-item-${longitudeLabel}`"
+              >
+                {{ longitudeLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
               <div
@@ -228,8 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
@@ -256,9 +262,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div style="display: flex; flex-direction: row" class="q-pl-md">
       <div class="layout-name">
         {{ t("panel.weight") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs">
+        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
           <OTooltip :content="WeightHint" />
-        </OIcon>
       </div>
       <span class="layout-separator">:</span>
       <div
@@ -304,17 +309,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="drag-indicator" size="13px" />
             </template>
           </OButton>
-          <OButton
-            variant="primary"
-            size="chip-12"
-            :data-test="`dashboard-weight-item-${weightLabel}`"
-          >
-            {{ weightLabel }}
-            <template #icon-right
-              ><OIcon name="arrow-drop-down" size="sm"
-            /></template>
-            <q-menu
-              class="field-function-menu-popup"
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="primary"
+                size="chip-12"
+                :data-test="`dashboard-weight-item-${weightLabel}`"
+              >
+                {{ weightLabel }}
+                <template #icon-right
+                  ><OIcon name="arrow-drop-down" size="sm"
+                /></template>
+              </OButton>
+            </template>
+            <div
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
               <div
@@ -346,8 +355,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :chartType="dashboardPanelData.data.type"
                 />
               </div>
-            </q-menu>
-          </OButton>
+            </div>
+          </ODropdown>
           <OButton
             variant="outline"
             size="icon-chip"
@@ -385,7 +394,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -396,6 +405,7 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
@@ -403,6 +413,7 @@ export default defineComponent({
     OSeparator,
     OButtonGroup,
     OButton,
+    ODropdown,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
@@ -769,12 +780,12 @@ export default defineComponent({
   padding: 0;
 }
 
-.q-menu {
+.dashboard-geo-maps-query-builder-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }
@@ -921,31 +932,6 @@ export default defineComponent({
         }
       }
     }
-  }
-}
-
-.q-item {
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
   }
 }
 

@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Execution Plan Tree -->
-              <q-card flat bordered class="plan-card">
-                <q-card-section class="q-pa-none">
+              <OCard class="plan-card">
+                <OCardSection class="tw:p-0">
                   <div class="plan-scroll-area">
                     <QueryPlanTree
                       v-if="planTree"
@@ -130,13 +130,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("search.noAnalyzePlanFound") }}
                     </div>
                   </div>
-                </q-card-section>
-              </q-card>
+                </OCardSection>
+              </OCard>
             </div>
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
             <div v-else class="plan-container q-pa-md">
-              <q-card flat bordered class="plan-card">
+              <OCard class="plan-card">
                 <OTabs v-model="activeTab" dense class="text-grey" align="left">
                   <OTab name="logical" :label="t('search.logicalPlan')" />
                   <OTab name="physical" :label="t('search.physicalPlan')" />
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </OTabPanel>
                 </OTabPanels>
-              </q-card>
+              </OCard>
             </div>
           </div>
         </template>
@@ -207,6 +207,8 @@ import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "QueryPlanDialog",
@@ -223,6 +225,8 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OCard,
+    OCardSection,
   },
   props: {
     modelValue: {

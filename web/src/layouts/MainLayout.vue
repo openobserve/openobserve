@@ -198,6 +198,7 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {

@@ -375,11 +375,12 @@ describe("Group.vue", () => {
         const wrapper = createWrapper();
         wrapper.vm.showAddMenu = true;
         await nextTick();
-        
+
         const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
         if (addConditionItem.exists()) {
-          const qItem = addConditionItem.closest('.q-item');
-          await qItem.trigger('click');
+          // After q-item -> ODropdownItem migration, click on the data-test
+          // element directly (ODropdownItem's @select wires up to its click).
+          await addConditionItem.trigger('click');
           expect(wrapper.emitted('add-condition')).toBeTruthy();
         } else {
           // Fallback - directly call the method
@@ -405,11 +406,12 @@ describe("Group.vue", () => {
         const wrapper = createWrapper();
         wrapper.vm.showAddMenu = true;
         await nextTick();
-        
+
         const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
         if (addGroupItem.exists()) {
-          const qItem = addGroupItem.closest('.q-item');
-          await qItem.trigger('click');
+          // After q-item -> ODropdownItem migration, click on the data-test
+          // element directly (ODropdownItem's @select wires up to its click).
+          await addGroupItem.trigger('click');
           expect(wrapper.emitted('add-group')).toBeTruthy();
         } else {
           // Fallback - directly call the method

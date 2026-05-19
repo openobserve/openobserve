@@ -136,22 +136,21 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
         const currentModeText = await currentModeSpan.textContent().catch(() => 'unknown');
         testLogger.info(`Current table mode: "${currentModeText}"`);
 
-        // Click the dropdown to open options
-        // Use the :has selector to find the parent label.q-select that contains our element
-        const qSelectLabel = page.locator('label.q-select:has([data-test="dashboard-config-promql-table-mode"])').first();
+        // Click the dropdown to open options — OSelect trigger
+        const tableModeSelect = page.locator('[data-test="dashboard-config-promql-table-mode"]').first();
         testLogger.info('Clicking table mode dropdown');
-        await qSelectLabel.click();
+        await tableModeSelect.click();
         await page.waitForTimeout(1000);
 
-        // Wait for dropdown menu to appear
-        const dropdownMenu = page.locator('.q-menu').last();
+        // Wait for dropdown popover (OSelect SelectContent) to appear
+        const dropdownMenu = page.locator('[data-test="dashboard-config-promql-table-mode-popover"]');
         const isMenuVisible = await dropdownMenu.isVisible({ timeout: 3000 }).catch(() => false);
 
         if (isMenuVisible) {
           testLogger.info('Dropdown menu is visible');
 
           // Log all available options for debugging
-          const allOptions = await page.locator('.q-menu [role="option"]').allTextContents();
+          const allOptions = await page.locator('[data-test="dashboard-config-promql-table-mode-option"]').allTextContents();
           testLogger.info(`Available options in dropdown: ${JSON.stringify(allOptions)}`);
 
           // Select the appropriate mode option
@@ -159,7 +158,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
           testLogger.info(`Looking for mode option: "${modeLabel}"`);
 
           // Find and click the option (more specific selector)
-          const modeOption = page.locator('.q-menu [role="option"]')
+          const modeOption = page.locator('[data-test="dashboard-config-promql-table-mode-option"]')
             .filter({ hasText: new RegExp(`^${modeLabel}$`, 'i') })
             .first();
 
@@ -184,7 +183,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
             testLogger.error(`Could not find option "${modeLabel}" in dropdown`);
             // Try clicking any option that contains the first word
             const firstWord = modeLabel.split(' ')[0].toLowerCase();
-            const fallbackOption = page.locator('.q-menu [role="option"]')
+            const fallbackOption = page.locator('[data-test="dashboard-config-promql-table-mode-option"]')
               .filter({ hasText: new RegExp(firstWord, 'i') })
               .first();
             const fallbackVisible = await fallbackOption.isVisible({ timeout: 1000 }).catch(() => false);

@@ -456,7 +456,7 @@ export default class DashboardVariablesScoped {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        // Use .q-item with exact text match
+        // Use OSelect option (Reka Listbox role=option) post-migration with .q-item fallback
         const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
@@ -484,7 +484,7 @@ export default class DashboardVariablesScoped {
         // Convert tabId to label format (e.g., "tab1" -> "Tab1", "default" -> "Default")
         const tabLabel = tabId === 'default' ? 'Default' :
                         tabId.charAt(0).toUpperCase() + tabId.slice(1);
-        // Use .q-item with exact text match
+        // Use OSelect option (Reka Listbox role=option) post-migration with .q-item fallback
         const tabItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${tabLabel}$`) });
         await tabItem.waitFor({ state: "visible", timeout: 5000 });
         await tabItem.click();
@@ -502,12 +502,12 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
-        // Wait for dropdown items to load
+        // Wait for dropdown items to load (OSelect role=option or legacy .q-item)
         await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
 
         // Click each panel checkbox by panel name
         for (const panelName of assignedPanels) {
-          // Use .q-item with exact text match for panel name
+          // Use OSelect option (Reka Listbox) post-migration with .q-item fallback
           const panelItem = this.page.locator('.q-item').filter({ hasText: new RegExp(`^${panelName}$`) });
           await panelItem.waitFor({ state: "visible", timeout: 5000 });
           await panelItem.click();
@@ -710,8 +710,8 @@ export default class DashboardVariablesScoped {
     await autoComplete.clear();
     await autoComplete.fill(dependencyVariableName);
 
-    // Wait for dropdown options to appear
-    const dropdownAppeared = await this.page.waitForSelector('[role="listbox"]', {
+    // Wait for dropdown options to appear (CommonAutoComplete exposes data-test on each option)
+    const dropdownAppeared = await this.page.waitForSelector('[data-test="common-auto-complete-option"]', {
       state: "visible",
       timeout: 3000
     }).then(() => true).catch(() => false);
@@ -719,14 +719,12 @@ export default class DashboardVariablesScoped {
     if (dropdownAppeared) {
       // Try to find and click the option - the dropdown shows variable names
       try {
-        // Wait a bit for options to fully render
-        await this.page.waitForSelector(`[role="option"]:has-text("${dependencyVariableName}")`, {
-          state: "visible",
-          timeout: 2000
-        });
-
-        // Click the matching option
-        await this.page.getByRole("option", { name: dependencyVariableName, exact: true }).click();
+        // Click the matching option by text content within the data-test container
+        const option = this.page
+          .locator('[data-test="common-auto-complete-option"]', { hasText: dependencyVariableName })
+          .first();
+        await option.waitFor({ state: 'visible', timeout: 2000 });
+        await option.click();
 
         // Verify the value was set correctly with $ prefix
         const currentValue = await autoComplete.inputValue();
@@ -1106,7 +1104,7 @@ export default class DashboardVariablesScoped {
 
     // Wait for tooltip to appear and verify it contains "Deleted Tab" or "Deleted Panel"
     const expectedText = normalizedType === 'tab' ? 'Deleted Tab' : 'Deleted Panel';
-    const tooltip = this.page.locator('.q-tooltip, [role="tooltip"]').filter({ hasText: new RegExp(expectedText, 'i') });
+    const tooltip = this.page.locator('[data-test="o-tooltip-content"]').filter({ hasText: new RegExp(expectedText, 'i') });
     await expect(tooltip).toBeVisible({ timeout: 5000 });
   }
 
@@ -1159,39 +1157,31 @@ export default class DashboardVariablesScoped {
       throw new Error(`Failed to load variable values for ${variableName}: ${error.message}`);
     }
 
-    // Wait for dropdown menu to open and stabilize
-    const dropdownMenu = this.page.locator('.q-menu').first();
+    // Wait for dropdown menu to open and stabilize — OSelect popover exposes
+    // data-test `${parentDataTest}-popover`. The selector forwards
+    // `variable-selector-<name>-inner` to OSelect, so the popover/options carry
+    // a `variable-selector-<name>-inner-*` prefix.
+    const selectorDataTest = `variable-selector-${variableName}-inner`;
+    const dropdownMenu = this.page.locator(`[data-test="${selectorDataTest}-popover"]`).first();
     await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for options to be present in the dropdown
-    await this.page.waitForFunction(
-      () => {
-        const options = document.querySelectorAll('[role="option"]');
-        return options.length > 0;
-      },
-      { timeout: 10000 }
-    );
+    const optionLocator = this.page.locator(`[data-test="${selectorDataTest}-option"]`);
+    await optionLocator.first().waitFor({ state: "visible", timeout: 10000 });
 
     // Add a small stabilization delay to ensure options are fully rendered
     await this.page.waitForTimeout(500);
 
     // Get the text of the target option before clicking
-    const targetOptionText = await this.page.evaluate((index) => {
-      const options = document.querySelectorAll('[role="option"]');
-      return options.length > index ? options[index].textContent.trim() : null;
-    }, optionIndex);
+    const targetOption = optionLocator.nth(optionIndex);
+    const targetOptionText = await targetOption.textContent().then((t) => (t ? t.trim() : null)).catch(() => null);
 
     if (!targetOptionText) {
       throw new Error(`Could not find option at index ${optionIndex} in dropdown for variable: ${variableName}`);
     }
 
-    // Click the target option using evaluate to avoid detachment issues
-    await this.page.evaluate((index) => {
-      const options = document.querySelectorAll('[role="option"]');
-      if (options.length > index) {
-        options[index].click();
-      }
-    }, optionIndex);
+    // Click the target option
+    await targetOption.click();
 
     // Wait for dropdown to close
     await dropdownMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
@@ -1303,6 +1293,7 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
+        // OSelect (Reka Listbox role=option) post-migration with .q-item fallback
         await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
@@ -1479,6 +1470,7 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
+        // OSelect (Reka Listbox role=option) post-migration with .q-item fallback
         await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {
@@ -1617,6 +1609,7 @@ export default class DashboardVariablesScoped {
         await panelsSelect.click();
         await this.page.waitForTimeout(1000);
 
+        // OSelect (Reka Listbox role=option) post-migration with .q-item fallback
         await this.page.waitForSelector('.q-item', { state: "visible", timeout: 5000 });
 
         for (const panelName of assignedPanels) {

@@ -132,6 +132,8 @@ export interface OTableProps<TData = any> {
   /** Show built-in global filter search bar (default: true) */
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
+  /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
+  footerTitle?: string;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -176,6 +178,7 @@ export interface OTableProps<TData = any> {
   bordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
+  showHeader?: boolean;
   /** Wrap cell content */
   wrap?: boolean;
   /** Fixed table width (CSS value) */

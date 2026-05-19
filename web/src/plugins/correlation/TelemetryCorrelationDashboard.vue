@@ -239,16 +239,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OButton>
                           </div>
                         </div>
-                        <q-item
+                        <div
                           v-for="stream in group.streams"
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
-                          dense
-                          clickable
-                          class="dimension-list-item tw:border-none!"
+                          data-test="telemetry-correlation-metric-stream-item"
+                          class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
                           @click="toggleMetricStream(stream)"
                         >
-                          <q-item-section side>
+                          <div class="tw:flex tw:items-center tw:shrink-0">
                             <OCheckbox
                               :model-value="
                                 selectedMetricStreams.some(
@@ -258,14 +257,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="toggleMetricStream(stream)"
                               size="xs"
                             />
-                          </q-item-section>
-                          <q-item-section>
-                            <q-item-label
-                              class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
-                              >{{ stream.stream_name }}</q-item-label
+                          </div>
+                          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                            <span
+                              class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                              >{{ stream.stream_name }}</span
                             >
-                          </q-item-section>
-                        </q-item>
+                          </div>
+                        </div>
                       </template>
                     </template>
                   </template>
@@ -558,9 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
-    <q-card
-      v-model="activeTab"
-      animated
+    <OCard
       class="correlation-content tw:flex-1"
       style="display: flex; flex-direction: column; overflow: auto"
     >
@@ -714,16 +711,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OButton>
                         </div>
                       </div>
-                      <q-item
+                      <div
                         v-for="stream in group.streams"
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
-                        dense
-                        clickable
-                        class="dimension-list-item tw:border-none!"
+                        data-test="telemetry-correlation-metric-stream-item"
+                        class="dimension-list-item tw:border-none! tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
                         @click="toggleMetricStream(stream)"
                       >
-                        <q-item-section side>
+                        <div class="tw:flex tw:items-center tw:shrink-0">
                           <OCheckbox
                             :model-value="
                               selectedMetricStreams.some(
@@ -733,14 +729,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @update:model-value="toggleMetricStream(stream)"
                             size="xs"
                           />
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label
-                            class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]!"
-                            >{{ stream.stream_name }}</q-item-label
+                        </div>
+                        <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                          <span
+                            class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm"
+                            >{{ stream.stream_name }}</span
                           >
-                        </q-item-section>
-                      </q-item>
+                        </div>
+                      </div>
                     </template>
                   </template>
                 </template>
@@ -1021,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-card>
+    </OCard>
   </div>
 
   <!-- Metric Stream Selector Dialog -->
@@ -1087,13 +1083,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Metric items -->
-            <q-item
+            <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              dense
-              class="metric-list-item"
+              class="metric-list-item tw:flex tw:items-center tw:gap-2"
             >
-              <q-item-section side>
+              <div class="tw:flex tw:items-center tw:shrink-0">
                 <OCheckbox
                   :model-value="
                     selectedMetricStreams.some(
@@ -1103,11 +1098,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="toggleMetricStream(stream)"
                   size="xs"
                 />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="metric-label">{{ stream.stream_name }}</q-item-label>
-              </q-item-section>
-            </q-item>
+              </div>
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="metric-label">{{ stream.stream_name }}</span>
+              </div>
+            </div>
           </template>
         </template>
       </template>
@@ -1121,7 +1116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'

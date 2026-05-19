@@ -11,15 +11,22 @@
           class="label-filter-item"
         >
           <OButtonGroup class="axis-field" radius="sm">
-            <OButton
-              variant="primary"
-              size="chip"
-              class="tw:!text-[12px]"
-              :data-test="`promql-label-filter-${index}`"
-            >
-              {{ computedLabel(label) }}
-              <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
-              <q-menu class="q-pa-md">
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip"
+                  class="tw:!text-[12px]"
+                  :data-test="`promql-label-filter-${index}`"
+                >
+                  {{ computedLabel(label) }}
+                  <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                </OButton>
+              </template>
+              <div
+                class="label-filter-editor-dropdown tw:p-4"
+                :data-test="`promql-label-filter-${index}-menu`"
+              >
                 <div style="width: 350px">
                   <!-- Label Selection -->
                   <OSelect
@@ -38,15 +45,15 @@
                     data-test="promql-label-select"
                   >
                     <template v-slot:no-option>
-                      <q-item>
-                        <q-item-section class="text-grey">
+                      <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+                        <div class="text-grey tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           {{
                             loadingLabels
                               ? "Loading labels..."
                               : "No labels found"
                           }}
-                        </q-item-section>
-                      </q-item>
+                        </div>
+                      </li>
                     </template>
                   </OSelect>
 
@@ -83,37 +90,39 @@
                     data-test="promql-value-select"
                   >
                     <template v-slot:no-option>
-                      <q-item>
-                        <q-item-section class="text-grey">
+                      <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+                        <div class="text-grey tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                           {{
                             !label.label
                               ? "Select a label first"
                               : "No values found"
                           }}
-                        </q-item-section>
-                      </q-item>
+                        </div>
+                      </li>
                     </template>
                     <template v-slot:option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section>
-                          <q-item-label>{{ scope.opt.label }}</q-item-label>
-                          <q-item-label
+                      <div
+                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                        @click="scope.toggleOption(scope.opt)"
+                      >
+                        <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                          <span class="tw:text-sm">{{ scope.opt.label }}</span>
+                          <span
                             v-if="scope.opt.isVariable"
-                            caption
-                            class="text-grey-7"
+                            class="tw:block tw:text-xs tw:text-muted-foreground text-grey-7"
                           >
                             Variable
-                          </q-item-label>
-                        </q-item-section>
-                      </q-item>
+                          </span>
+                        </div>
+                      </div>
                     </template>
                     <template v-slot:hint>
                       {{ getOperatorHint(label.op) }}
                     </template>
                   </OSelect>
                 </div>
-              </q-menu>
-            </OButton>
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
@@ -148,6 +157,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { QueryBuilderLabelFilter } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -364,7 +374,7 @@ const getOperatorHint = (op: string): string => {
   margin-left: 4px;
 }
 
-.q-menu {
+.label-filter-editor-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;

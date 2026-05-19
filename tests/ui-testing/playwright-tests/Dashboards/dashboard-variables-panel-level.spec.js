@@ -613,7 +613,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await option.click();
 
     // Wait for dropdown to close
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Trigger panel refresh
     await page.locator(SELECTORS.PANEL_REFRESH_BTN).first().click();

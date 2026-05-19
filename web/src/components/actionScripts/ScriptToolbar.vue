@@ -44,9 +44,8 @@
             size="md"
             class="q-ml-xs cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
-          >
+           />
             <OTooltip side="right" :content="String(isValidMethodName())" />
-          </OIcon>
         </div>
       </div>
     </div>
@@ -88,6 +87,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useQuasar } from "quasar";
 
 const { t } = useI18n();
 

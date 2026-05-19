@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height no-wrap searchdetaildialog">
-    <q-card-section class="q-pa-md q-pb-md">
+  <OCard class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap searchdetaildialog">
+    <OCardSection role="header">
       <div class="row items-center no-wrap">
         <div class="col">
           <div class="text-body1 text-bold text-dark">
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton variant="ghost" size="icon" v-close-popup icon-left="cancel" />
         </div>
       </div>
-    </q-card-section>
+    </OCardSection>
     <OSeparator />
     <OTabs v-model="tab" dense class="text-grey" align="justify">
       <OTab name="table" :label="t('common.table')" />
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OTabPanels v-model="tab" animated>
       <OTabPanel name="table">
-        <q-card-section class="q-pa-none q-mb-lg">
+        <OCardSection class="tw:p-0 tw:mb-6">
           <div
             v-if="rowData.length == 0"
             class="q-pt-md"
@@ -47,32 +47,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             No data available.
           </div>
           <div v-else class="indexDetailsContainer">
-            <q-list
-              separator
+            <ul
               style="height: calc(100vh - 220px); width: 70vw"
-              class="q-px-none q-py-none"
+              class="detail-list q-px-none q-py-none tw:flex tw:flex-col tw:divide-y tw:divide-border"
             >
-              <q-item class="list-head">
-                <q-item-section class="text-bold col-3">
+              <li class="detail-item list-head tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+                <div class="detail-section text-bold col-3 tw:break-all">
                   {{ t("search.sourceName") }}
-                </q-item-section>
-                <q-item-section class="text-bold col-9">
+                </div>
+                <div class="detail-section text-bold col-9 tw:break-all">
                   {{ t("search.sourceValue") }}
-                </q-item-section>
-              </q-item>
+                </div>
+              </li>
 
-              <q-item
+              <li
                 v-for="(key, value) in rowData"
                 :key="value"
-                class="list-item"
+                class="detail-item list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
               >
-                <q-item-section class="col-3">{{ value }}</q-item-section>
-                <q-item-section class="col-9">{{ key }}</q-item-section>
-              </q-item>
-              <q-item></q-item>
-            </q-list>
+                <div class="detail-section col-3 tw:break-all">{{ value }}</div>
+                <div class="detail-section col-9 tw:break-all">{{ key }}</div>
+              </li>
+              <li class="detail-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"></li>
+            </ul>
           </div>
-        </q-card-section>
+        </OCardSection>
       </OTabPanel>
 
       <OTabPanel name="json">
@@ -81,11 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </pre>
       </OTabPanel>
     </OTabPanels>
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
@@ -103,7 +104,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SearchDetail",
-  components: { OSeparator, OTabs, OTab, OTabPanels, OTabPanel, OButton },
+  components: { OSeparator, OTabs, OTab, OTabPanels, OTabPanel, OButton, OCard, OCardSection },
   props: {
     modelValue: {
       type: Object,
@@ -131,10 +132,10 @@ export default defineComponent({
 .searchdetaildialog {
   width: 74vw;
 }
-.q-item__section {
+.detail-section {
   word-break: break-all;
 }
-.indexDetailsContainer .q-list .q-item {
+.indexDetailsContainer .detail-list .detail-item {
   height: auto;
 }
 </style>

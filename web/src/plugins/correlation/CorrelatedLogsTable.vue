@@ -67,61 +67,56 @@ class="tw:mr-1" />
               </template>
               <div class="column-visibility-list tw:min-w-[220px] tw:max-h-[320px] tw:overflow-y-auto">
                 <!-- Select All / Deselect All -->
-                <q-item
-                  dense
-                  clickable
-                  @click="toggleSelectAll"
+                <ODropdownItem
                   class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                   data-test="select-all-columns"
+                  @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
                 >
-                  <q-item-section avatar>
-                    <OCheckbox
-                      :model-value="areAllColumnsSelected"
-                      :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
-                      @update:model-value="toggleSelectAll"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="tw:font-semibold">
-                      {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
+                  <template #icon-left>
+                    <span @click.stop>
+                      <OCheckbox
+                        :model-value="areAllColumnsSelected"
+                        :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
+                        @update:model-value="toggleSelectAll"
+                      />
+                    </span>
+                  </template>
+                  <span class="tw:font-semibold">
+                    {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                  </span>
+                </ODropdownItem>
 
                 <!-- Draggable Column Items -->
-                <q-item
+                <ODropdownItem
                   v-for="(field, index) in orderedFields"
                   :key="field"
-                  dense
-                  clickable
-                  @click="toggleColumnVisibility(field)"
-                  :disable="field === '_timestamp'"
+                  :disabled="field === '_timestamp'"
                   draggable="true"
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="{ 'dragging': draggedIndex === index }"
+                  :class="['column-item', { 'dragging': draggedIndex === index }]"
                   :data-test="`column-item-${field}`"
-                  class="column-item"
+                  @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
                 >
-                  <q-item-section avatar>
-                    <OCheckbox
-                      :model-value="visibleColumns.has(field)"
-                      @update:model-value="toggleColumnVisibility(field)"
-                      :disabled="field === '_timestamp'"
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ field }}</q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
+                  <template #icon-left>
+                    <span @click.stop>
+                      <OCheckbox
+                        :model-value="visibleColumns.has(field)"
+                        @update:model-value="toggleColumnVisibility(field)"
+                        :disabled="field === '_timestamp'"
+                      />
+                    </span>
+                  </template>
+                  <span class="tw:flex-1">{{ field }}</span>
+                  <template #icon-right>
                     <OIcon
                       name="drag-indicator"
                       size="xs"
                       class="drag-handle tw:cursor-move"
                     />
-                  </q-item-section>
-                </q-item>
+                  </template>
+                </ODropdownItem>
               </div>
             </ODropdown>
           </div>
@@ -247,6 +242,7 @@ import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="index-table tw:h-[calc(100%-2.725rem)]!"
       data-test="log-search-index-list-fields-table"
     >
-      <FieldList
+      <GroupedFieldList
         ref="fieldListRef"
         :fields="normalizedFieldList"
         :search="searchObj.data.stream.filterField"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #after-list="bottomProps">
-          <FieldListPagination
+          <GroupedFieldListPagination
             data-test-prefix="traces-page"
             :current-page="bottomProps.currentPage"
             :pages-number="bottomProps.totalPages"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </FieldList>
+      </GroupedFieldList>
     </div>
   </div>
 </template>
@@ -194,8 +194,8 @@ export default defineComponent({
     OInput,
     OSpinner,
     OIcon,
-    FieldList: defineAsyncComponent(
-      () => import("@/components/common/FieldList.vue"),
+    GroupedFieldList: defineAsyncComponent(
+      () => import("@/components/common/GroupedFieldList.vue"),
     ),
     FieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
@@ -619,15 +619,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-  }
-}
 .index-menu {
   width: 100%;
 
@@ -749,31 +740,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  // color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -801,28 +767,6 @@ export default defineComponent({
     table-layout: fixed;
 
     .q-expansion-item {
-      .q-item {
-        display: flex;
-        align-items: center;
-        padding: 0;
-        height: 25px !important;
-        min-height: 25px !important;
-      }
-      .q-item__section--avatar {
-        min-width: 12px;
-        max-width: 12px;
-        margin-right: 8px;
-      }
-
-      .filter-values-container {
-        .q-item {
-          padding-left: 4px;
-
-          .q-focus-helper {
-            background: none !important;
-          }
-        }
-      }
       .q-item-type {
         &:hover {
           .field_overlay {

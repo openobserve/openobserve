@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import FieldList from "./FieldList.vue";
+import FieldList from "./LogsPluginFieldList.vue";
 
 vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),

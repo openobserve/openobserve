@@ -15,25 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton
-    id="date-time-button"
-    ref="datetimeBtn"
-    data-cy="date-time-button"
-    variant="outline"
-    class="date-time-button"
-    icon-left="schedule"
-  >
-    <span class="date-time-label">{{ displayValue }}</span>
-    <template #icon-right
-      ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
-    /></template>
-    <q-menu
-      no-route-dismiss
-      id="date-time-menu"
-      class="date-time-dialog"
-      anchor="bottom left"
-      self="top left"
-    >
+  <ODropdown v-model:open="menuOpen" side="bottom" align="start">
+    <template #trigger>
+      <OButton
+        id="date-time-button"
+        ref="datetimeBtn"
+        data-cy="date-time-button"
+        variant="outline"
+        class="date-time-button"
+        icon-left="schedule"
+      >
+        <span class="date-time-label">{{ displayValue }}</span>
+        <template #icon-right
+          ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow"
+        /></template>
+      </OButton>
+    </template>
+    <div id="date-time-menu" class="date-time-dialog">
       <div class="flex justify-evenly q-py-sm">
         <OButton
           class="tab-button"
@@ -150,8 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OTabPanel>
       </OTabPanels>
-    </q-menu>
-  </OButton>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
@@ -165,6 +163,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { ref, defineComponent, reactive, watch, computed } from "vue";
 import { getImageURL } from "../utils/zincutils";
 import { isEqual } from "lodash-es";
@@ -182,6 +181,7 @@ export default defineComponent({
     OSelect,
     OTime,
     ODateRangeCalendar,
+    ODropdown,
   },
   props: {
     modelValue: {
@@ -207,6 +207,7 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const datetimeBtn = ref();
+    const menuOpen = ref(false);
     const { t } = useI18n();
 
     // v-model computed value which is used for the getvalue and setvalue for the props
@@ -254,7 +255,7 @@ export default defineComponent({
       data.selectedDate.tab = "relative";
       data.selectedDate.relative.period = period;
       data.selectedDate.relative.value = value;
-      datetimeBtn.value.click();
+      menuOpen.value = false;
     };
 
     const onCustomPeriodSelect = () => {
@@ -357,6 +358,7 @@ export default defineComponent({
       setRelativeDate,
       onCustomPeriodSelect,
       datetimeBtn,
+      menuOpen,
       displayValue,
       calculateMaxValue,
       getImageURL,

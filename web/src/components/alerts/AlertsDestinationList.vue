@@ -15,62 +15,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
 
-    <div v-if="!showDestinationEditor && !showImportDestination" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-      >
-        <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
+    <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
+      <div class="tw:flex-shrink-0">
+        <div
+          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+          style="position: sticky; top: 0; z-index: 1000;"
+        >
+          <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
             {{ t("alert_destinations.header") }}
           </div>
           <div class="tw:flex tw:justify-end tw:gap-2">
             <OInput
               v-model="filterQuery"
               data-test="destination-list-search-input"
-              class="q-ml-auto no-border o2-search-input"
+              class="tw:h-[36px] tw:w-[200px] no-border o2-search-input"
               :placeholder="t('alert_destinations.search')"
             >
-              <template #prepend>
+              <template #icon-left>
                 <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
-          <OButton
-            variant="outline"
-            size="sm"
-            @click="importDestination"
-            data-test="destination-import"
-          >{{ t(`dashboard.import`) }}</OButton>
-          <OButton
-            data-test="alert-destination-list-add-alert-btn"
-            variant="primary"
-            size="sm"
-            :disabled="!templates.length"
-            @click="editDestination(null)"
-          >{{ t(`alert_destinations.add`) }}</OButton>
+            <OButton
+              variant="outline"
+              size="sm"
+              @click="importDestination"
+              data-test="destination-import"
+            >{{ t(`dashboard.import`) }}</OButton>
+            <OButton
+              data-test="alert-destination-list-add-alert-btn"
+              variant="primary"
+              size="sm"
+              :disabled="!templates.length"
+              @click="editDestination(null)"
+            >{{ t(`alert_destinations.add`) }}</OButton>
           </div>
+        </div>
       </div>
-      <OTable
-        data-test="alert-destinations-list-table"
-        :data="visibleRows"
-        :columns="columns"
-        row-key="name"
-        :selected-ids="selectedDestinationIds"
-        selection="multiple"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[5, 10, 20, 50, 100]"
-        sorting="client"
-        :default-columns="false"
-        :show-global-filter="false"
-        @update:selected-ids="handleSelectedIdsUpdate"
-      >
-        <template #empty>
-          <div
-            v-if="!templates.length"
-            class="full-width flex column justify-center items-center text-center"
-          >
-            <div style="width: 600px" class="q-mt-xl">
-              <template v-if="!templates.length">
+      <div class="tw:flex-1 tw:min-h-0">
+        <OTable
+          data-test="alert-destinations-list-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="name"
+          :selected-ids="selectedDestinationIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          :footer-title="t('alert_destinations.header')"
+          sorting="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #actions>
+            <OButton
+              v-if="selectedDestinations.length > 0"
+              data-test="destination-list-delete-destinations-btn"
+              variant="outline"
+              size="sm"
+              @click="openBulkDeleteDialog"
+            >
+              <OIcon name="delete" size="sm" />
+              <span class="tw:ml-2">Delete</span>
+            </OButton>
+          </template>
+
+          <template #empty>
+            <div
+              v-if="!templates.length"
+              class="full-width flex column justify-center items-center text-center"
+            >
+              <div style="width: 600px" class="q-mt-xl">
                 <div class="text-subtitle1">
                   It looks like you haven't created any Templates yet. To create
                   an Alert, you'll need to have at least one Destination and one
@@ -82,101 +100,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="q-mt-md"
                   @click="routeTo('alertTemplates')"
                 >Create Template</OButton>
+              </div>
+            </div>
+            <template v-else>
+              <NoData />
+            </template>
+          </template>
+
+          <template #cell-type="{ row }">
+            <div class="tw:flex tw:items-center tw:gap-2">
+              <template v-if="getPrebuiltTypeName(row)">
+                <OBadge
+                  :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
+                  variant="primary"
+                  class="tw:text-xs"
+                >{{ getPrebuiltTypeName(row) }}</OBadge>
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
+                  :title="'Prebuilt ' + getPrebuiltTypeName(row) + ' destination'"
+                />
+              </template>
+              <template v-else>
+                <OBadge
+                  data-test="destination-type-badge-custom"
+                  variant="default"
+                  class="tw:text-xs"
+                >{{ getCustomDestinationLabel(row) }}</OBadge>
+                <OIcon
+                  name="settings"
+                  size="sm"
+                  :title="getCustomDestinationLabel(row)"
+                />
               </template>
             </div>
-          </div>
-          <template v-else>
-            <NoData />
           </template>
-        </template>
 
-        <template #cell-type="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <template v-if="getPrebuiltTypeName(row)">
-              <OBadge
-                :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
-                variant="primary"
-                class="tw:text-xs"
-              >{{ getPrebuiltTypeName(row) }}</OBadge>
-              <OIcon
-                name="auto-awesome"
-                size="sm"
-                :title="'Prebuilt ' + getPrebuiltTypeName(row) + ' destination'"
-              />
-            </template>
-            <template v-else>
-              <OBadge
-                data-test="destination-type-badge-custom"
-                variant="default"
-                class="tw:text-xs"
-              >{{ getCustomDestinationLabel(row) }}</OBadge>
-              <OIcon
-                name="settings"
-                size="sm"
-                :title="getCustomDestinationLabel(row)"
-              />
-            </template>
-          </div>
-        </template>
-
-        <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-            <OButton
-              data-test="destination-export"
-              variant="ghost"
-              size="icon-circle-sm"
-              title="Export Destination"
-              @click.stop="exportDestination(row)"
-            >
-              <OIcon name="download" size="sm" />
-            </OButton>
-            <OButton
-              :data-test="`alert-destination-list-${row.name}-update-destination`"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('alert_destinations.edit')"
-              @click="editDestination(row)"
-            >
-              <OIcon name="edit" size="sm" />
-            </OButton>
-            <OButton
-              :data-test="`alert-destination-list-${row.name}-delete-destination`"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('alert_destinations.delete')"
-              @click="conformDeleteDestination(row)"
-            >
-              <OIcon name="delete" size="sm" />
-            </OButton>
-          </div>
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[300px] tw:mr-sm">
-                  {{ resultTotal }} {{ t('alert_destinations.header') }}
-                </div>
-            <OButton
-              v-if="selectedDestinations.length > 0"
-              data-test="destination-list-delete-destinations-btn"
-              variant="outline"
-              size="sm"
-              class="q-mr-sm"
-              @click="openBulkDeleteDialog"
-            >
-              <OIcon name="delete" size="sm" />
-              <span class="tw:ml-2">Delete</span>
-            </OButton>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-          </div>
-        </template>
-      </OTable>
+          <template #cell-actions="{ row }">
+            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+              <OButton
+                data-test="destination-export"
+                variant="ghost"
+                size="icon-circle-sm"
+                title="Export Destination"
+                @click.stop="exportDestination(row)"
+              >
+                <OIcon name="download" size="sm" />
+              </OButton>
+              <OButton
+                :data-test="`alert-destination-list-${row.name}-update-destination`"
+                variant="ghost"
+                size="icon-circle-sm"
+                :title="t('alert_destinations.edit')"
+                @click="editDestination(row)"
+              >
+                <OIcon name="edit" size="sm" />
+              </OButton>
+              <OButton
+                :data-test="`alert-destination-list-${row.name}-delete-destination`"
+                variant="ghost"
+                size="icon-circle-sm"
+                :title="t('alert_destinations.delete')"
+                @click="conformDeleteDestination(row)"
+              >
+                <OIcon name="delete" size="sm" />
+              </OButton>
+            </div>
+          </template>
+        </OTable>
+      </div>
     </div>
     <div v-else-if="showDestinationEditor && !showImportDestination">
       <AddDestination
@@ -318,6 +310,7 @@ export default defineComponent({
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
+        size: 100,
         meta: { align: "center" },
       },
     ];

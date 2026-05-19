@@ -20,9 +20,15 @@ export interface OCollapsibleProps {
   modelValue?: boolean;
   /**
    * Accordion group name. All OCollapsible items with the same `group` string
-   * will behave as an accordion ΓÇö only one can be open at a time.
+   * will behave as an accordion — only one can be open at a time.
    */
   group?: string;
+  /**
+   * Visual layout variant.
+   * - `'default'` — chevron on the right, rounded trigger (general content sections)
+   * - `'sidebar'` — chevron on the left, flush trigger (sidebar/config panel sections)
+   */
+  variant?: "default" | "sidebar";
 }
 
 export interface OCollapsibleEmits {

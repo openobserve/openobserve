@@ -1392,14 +1392,16 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should emit apply-filter-immediately with the raw NS-string start_time, not the display string", async () => {
-      // The stub renders the slot for every key. Find the q-item under the start_time field.
+      // The stub renders the slot for every key. Find the filter action under the start_time field.
       const startTimeSlot = filterWrapper.find(
         '[data-test="json-preview-field-start_time"]',
       );
       expect(startTimeSlot.exists()).toBe(true);
 
-      // Click the first q-item in the slot (the "=" filter action)
-      const items = startTimeSlot.findAll(".q-item");
+      // Click the first filter action (the "=" operator) within the slot
+      const items = startTimeSlot.findAll(
+        '[data-test^="trace-details-sidebar-json-filter-action-"]',
+      );
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1418,7 +1420,9 @@ describe("TraceDetailsSidebar", async () => {
       );
       expect(endTimeSlot.exists()).toBe(true);
 
-      const items = endTimeSlot.findAll(".q-item");
+      const items = endTimeSlot.findAll(
+        '[data-test^="trace-details-sidebar-json-filter-action-"]',
+      );
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1437,7 +1441,9 @@ describe("TraceDetailsSidebar", async () => {
       );
       expect(spanIdSlot.exists()).toBe(true);
 
-      const items = spanIdSlot.findAll(".q-item");
+      const items = spanIdSlot.findAll(
+        '[data-test^="trace-details-sidebar-json-filter-action-"]',
+      );
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 

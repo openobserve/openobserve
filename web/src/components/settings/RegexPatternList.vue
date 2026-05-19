@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
-    <div v-if="!showImportRegexPatternDialog" class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+    <template v-if="!showImportRegexPatternDialog">
+    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0">
       <div class="q-table__title tw:font-[600]" data-test="regex-pattern-list-title">
         {{ t("regex_patterns.title") }}
       </div>
@@ -44,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="createRegexPattern"
       >{{ t("regex_patterns.create_pattern") }}</OButton>
     </div>
+    <div class="tw:flex-1 tw:min-h-0">
     <OTable
-      v-if="!showImportRegexPatternDialog"
       data-test="regex-pattern-list-table"
       :data="visibleRows"
       :columns="columns"
@@ -114,6 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OTable>
+    </div>
+    </template>
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
       @cancel:hideform="showImportRegexPatternDialog = false"

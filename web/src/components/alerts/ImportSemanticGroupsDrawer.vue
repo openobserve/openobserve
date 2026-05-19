@@ -104,28 +104,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 diffData.additions.length
               }})
             </div>
-            <q-list bordered separator>
-              <q-item
+            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <li
                 v-for="group in diffData.additions"
                 :key="group.id"
-                clickable
+                data-test="semantic-groups-drawer-addition-item"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
                 @click="toggleAddition(group.id)"
               >
-                <q-item-section side>
+                <div class="tw:flex tw:items-center tw:shrink-0">
                   <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
                   />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{
+                </div>
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-medium">{{
                     group.display
-                  }}</q-item-label>
-                  <q-item-label caption>
+                  }}</span>
+                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
                     {{ group.id }} • {{ group.fields.length }} fields
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
+                  </span>
+                </div>
+                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
@@ -133,9 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon name="visibility" size="sm" />
                   </OButton>
-                </q-item-section>
-              </q-item>
-            </q-list>
+                </div>
+              </li>
+            </ul>
           </div>
 
           <!-- Modifications -->
@@ -146,31 +147,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 diffData.modifications.length
               }})
             </div>
-            <q-list bordered separator>
-              <q-item
+            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
-                clickable
+                data-test="semantic-groups-drawer-modification-item"
+                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
                 @click="toggleModification(mod.proposed.id)"
               >
-                <q-item-section side>
+                <div class="tw:flex tw:items-center tw:shrink-0">
                   <OCheckbox
                     :model-value="
                       selectedModifications.includes(mod.proposed.id)
                     "
                     @update:model-value="toggleModification(mod.proposed.id)"
                   />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{
+                </div>
+                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-medium">{{
                     mod.proposed.display
-                  }}</q-item-label>
-                  <q-item-label caption>
+                  }}</span>
+                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
                     {{ mod.proposed.fields.length }} fields
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
+                  </span>
+                </div>
+                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
@@ -178,30 +180,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <OIcon name="compare" size="sm" />
                   </OButton>
-                </q-item-section>
-              </q-item>
-            </q-list>
+                </div>
+              </li>
+            </ul>
           </div>
 
           <!-- Unchanged (Collapsed) -->
           <div v-if="diffData.unchanged.length > 0">
-            <q-expansion-item
+            <OCollapsible
+              v-model="unchangedOpen"
               :label="`Unchanged (${diffData.unchanged.length})`"
               icon="check_circle"
-              header-class="text-grey-7"
             >
-              <q-list bordered separator>
-                <q-item v-for="group in diffData.unchanged" :key="group.id">
-                  <q-item-section>
-                    <q-item-label>{{ group.display }}</q-item-label>
-                    <q-item-label caption
+              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+                <li
+                  v-for="group in diffData.unchanged"
+                  :key="group.id"
+                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                >
+                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                    <span class="tw:text-sm">{{ group.display }}</span>
+                    <span class="tw:block tw:text-xs tw:text-muted-foreground"
                       >{{ group.id }} •
-                      {{ group.fields.length }} fields</q-item-label
+                      {{ group.fields.length }} fields</span
                     >
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-expansion-item>
+                  </div>
+                </li>
+              </ul>
+            </OCollapsible>
           </div>
         </div>
       </div>
@@ -335,6 +341,7 @@ import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -373,6 +380,7 @@ const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
+const unchangedOpen = ref(false);
 const isLoading = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);

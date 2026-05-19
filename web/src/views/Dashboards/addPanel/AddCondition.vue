@@ -9,17 +9,20 @@
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field" radius="sm">
-      <OButton
-        variant="primary"
-        size="chip-12"
-        :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
-        icon-right="arrow-drop-down"
+      <ODropdown
+        @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
       >
-        {{ computedLabel(condition) }}
-        <q-menu
-          class="q-pa-md"
-          @show="(e: any) => loadFilterItem(condition.column)"
-        >
+        <template #trigger>
+          <OButton
+            variant="primary"
+            size="chip-12"
+            :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
+            icon-right="arrow-drop-down"
+          >
+            {{ computedLabel(condition) }}
+          </OButton>
+        </template>
+        <div class="add-condition-dropdown tw:p-4">
           <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
               class="tw:w-full"
@@ -114,18 +117,21 @@
                             toggleOption,
                           }"
                         >
-                          <q-item v-bind="itemProps">
-                            <q-item-section side>
+                          <div
+                            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
+                            @click="toggleOption(opt)"
+                          >
+                            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                               <OCheckbox
                                 :model-value="selected"
                                 @update:model-value="toggleOption(opt)"
                                 data-test="dashboard-add-condition-list-item"
                               />
-                            </q-item-section>
-                            <q-item-section>
+                            </div>
+                            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                               <SanitizedHtmlRenderer :html-content="opt" />
-                            </q-item-section>
-                          </q-item>
+                            </div>
+                          </div>
                         </template>
                       </OSelect>
                     </OTabPanel>
@@ -134,8 +140,8 @@
               </div>
             </div>
           </div>
-        </q-menu>
-      </OButton>
+        </div>
+      </ODropdown>
       <OButton
         variant="outline"
         size="icon-chip"
@@ -151,6 +157,7 @@
 <script lang="ts">
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -174,6 +181,7 @@ export default defineComponent({
     OSeparator,
     OButtonGroup,
     OButton,
+    ODropdown,
     OTabs,
     OTab,
     OTabPanels,
@@ -323,12 +331,12 @@ export default defineComponent({
   gap: 8px;
 }
 
-.q-menu {
+.add-condition-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;
 
-  .q-virtual-scroll__content {
+  :deep(.q-virtual-scroll__content) {
     padding: 0.5rem;
   }
 }

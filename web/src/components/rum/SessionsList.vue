@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       vertical
     >
       <template #before>
-        <FieldList></FieldList>
+        <SearchFieldList></SearchFieldList>
       </template>
       <template #after>
         <OTable
@@ -58,7 +58,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { formatDuration } from "@/utils/zincutils";
 import SearchBar from "./SearchBar.vue";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useRouter } from "vue-router";
 
 interface SessionColumn {
@@ -157,10 +157,6 @@ const handleCellClick = (payload: any) => {
 
   .q-splitter__after {
     overflow: hidden;
-  }
-
-  .q-item__label span {
-    /* text-transform: capitalize; */
   }
 
   .index-table :hover::-webkit-scrollbar,

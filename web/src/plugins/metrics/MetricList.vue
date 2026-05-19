@@ -42,34 +42,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template v-slot:option="scope">
-        <q-item
+        <div
+          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer hover:tw:bg-muted/50"
           :class="
             store.state.theme === 'dark' &&
             selectedMetric?.value !== scope.opt.value
               ? 'text-white'
               : ''
           "
-          v-bind="scope.itemProps"
+          @click="scope.toggleOption(scope.opt)"
         >
-          <q-item-section
+          <div
             :title="scope?.opt?.type"
-            class="metric-explore-metric-icon"
-            avatar
+            class="metric-explore-metric-icon tw:flex tw:items-center tw:shrink-0"
           >
             <OIcon
               size="xs"
               :name="metricsIconMapping[scope?.opt?.type] || ''"
             />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>{{ scope.opt.label }}</q-item-label>
-          </q-item-section>
-        </q-item>
+          </div>
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+            <span class="tw:text-sm">{{ scope.opt.label }}</span>
+          </div>
+        </div>
       </template>
       <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
+        <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
+          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0"> {{ t("search.noResult") }}</div>
+        </li>
       </template>
     </OSelect>
     <div class="metric-list">
@@ -98,18 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template v-else>
-                <q-expansion-item
-                  dense
-                  switch-toggle-side
-                  :label="row.name"
-                  expand-icon-class="field-expansion-icon"
-                  expand-icon="expand_more"
-                  expanded-icon="expand_less"
-                  @before-show="
-                    (event: any) => openFilterCreator(event, row)
-                  "
+                <OCollapsible
+                  variant="sidebar"
+                  class="metric-expansion-item"
+                  :model-value="openMetricRows[row.name] === true"
+                  @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
-                  <template v-slot:header>
+                  <template #trigger>
                     <div
                       class="flex content-center ellipsis"
                       :title="row.name"
@@ -129,8 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </template>
-                  <q-card>
-                    <q-card-section class="q-pl-md q-pr-xs q-py-xs">
+                  <div class="q-pl-md q-pr-xs q-py-xs">
                       <div class="filter-values-container">
                         <div
                           v-show="
@@ -162,8 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ?.values || []"
                           :key="value.key + value.count"
                         >
-                          <q-list dense>
-                            <q-item tag="label" class="q-pr-none">
+                          <ul>
+                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50 q-pr-none">
                               <div
                                 class="flex row wrap justify-between"
                                 style="width: calc(100% - 46px)"
@@ -227,13 +221,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   <NotEqualIcon class="tw:size-3" />
                                 </OButton>
                               </div>
-                            </q-item>
-                          </q-list>
+                            </label>
+                          </ul>
                         </div>
                       </div>
-                    </q-card-section>
-                  </q-card>
-                </q-expansion-item>
+                  </div>
+                </OCollapsible>
               </template>
             </div>
           </template>
@@ -266,6 +259,7 @@ import {
   onMounted,
   computed,
   nextTick,
+  reactive,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -285,13 +279,14 @@ import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MetricsList",
   emits: ["update:change-metric", "select-label", "update:modelValue"],
   components: { EqualIcon, NotEqualIcon, OButton, OInput, OInnerLoading,
-    OIcon, OTable,
+    OIcon, OTable, OCollapsible,
 },
   props: ["modelValue", "metricsList"],
   setup(props, { emit }) {
@@ -477,6 +472,7 @@ export default defineComponent({
         });
     };
 
+    const openMetricRows = reactive<Record<string, boolean>>({});
     const openFilterCreator = (event: any, { name }: any) => {
       metricLabelValues.value[name] = {
         isLoading: true,
@@ -528,6 +524,7 @@ export default defineComponent({
       visibleMetricLabels,
       filterMetricLabels,
       openFilterCreator,
+      openMetricRows,
       metricLabelValues,
       onMetricChange,
       metricsIconMapping,
@@ -547,15 +544,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-  }
-}
 .index-menu {
   width: 100%;
 
@@ -578,31 +566,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -624,16 +587,6 @@ export default defineComponent({
 </style>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 0px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-  }
-}
-
 .index-menu {
   width: 100%;
 
@@ -751,32 +704,6 @@ export default defineComponent({
   }
 }
 
-.q-item {
-  color: $dark-page;
-  min-height: 1.3rem;
-  padding: 5px 10px;
-
-  &__label {
-    font-size: 0.75rem;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper {
-    background: none !important;
-    opacity: 0.3 !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &--active {
-    background-color: $selected-list-bg !important;
-  }
-
-  &.q-manual-focusable--focused > .q-focus-helper,
-  &:hover,
-  &--active {
-    color: $primary;
-  }
-}
-
 .q-field--dense .q-field__before,
 .q-field--dense .q-field__prepend {
   padding: 0px 0px 0px 0px;
@@ -805,49 +732,17 @@ export default defineComponent({
     width: 100%;
     table-layout: fixed;
 
-    .q-expansion-item {
-      .q-item {
-        display: flex;
-        align-items: center;
-        padding: 0;
-        height: 25px !important;
-        min-height: 25px !important;
-      }
+    .metric-expansion-item {
+      &:hover {
+        .field_overlay {
+          visibility: visible;
 
-      .q-item__section--avatar {
-        min-width: 12px;
-        max-width: 12px;
-        margin-right: 8px;
-      }
-
-      .filter-values-container {
-        .q-item {
-          padding-left: 4px;
-
-          .q-focus-helper {
-            background: none !important;
+          .OIcon {
+            opacity: 1;
           }
         }
       }
 
-      .q-item-type {
-        &:hover {
-          .field_overlay {
-            visibility: visible;
-
-            .OIcon {
-              opacity: 1;
-            }
-          }
-        }
-      }
-
-      .field-expansion-icon {
-        img {
-          width: 12px;
-          height: 12px;
-        }
-      }
     }
 
     .field-container {
@@ -864,7 +759,7 @@ export default defineComponent({
 
     .field_list {
       &.selected {
-        .q-expansion-item {
+        .metric-expansion-item {
           background-color: rgba(89, 96, 178, 0.3);
         }
 

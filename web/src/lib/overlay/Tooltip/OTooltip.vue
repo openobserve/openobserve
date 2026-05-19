@@ -95,6 +95,7 @@ const contentClasses = computed(() => [
       </TooltipTrigger>
       <TooltipPortal>
         <TooltipContent
+          data-test="o-tooltip-content"
           :side="side"
           :align="align"
           :side-offset="effectiveSideOffset"

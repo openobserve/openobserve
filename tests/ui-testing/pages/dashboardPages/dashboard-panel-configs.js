@@ -354,19 +354,25 @@ export default class DashboardPanelConfigs {
     await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
     await fieldSelect.click();
 
+    // OSelect forwards parent data-test to ListboxItem (`*-option`).
+    const columnOptions = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-column-0-option"]');
     if (columnName) {
-      await this.page.getByRole("option", { name: columnName }).first().waitFor({ state: "visible", timeout: 5000 });
-      await this.page.getByRole("option", { name: columnName }).first().click();
+      const columnOption = columnOptions.filter({ hasText: columnName }).first();
+      await columnOption.waitFor({ state: "visible", timeout: 5000 });
+      await columnOption.click();
     } else {
       // Pick first available column when column name is unknown
-      await this.page.locator('.q-menu [role="option"]').first().waitFor({ state: "visible", timeout: 5000 });
-      await this.page.locator('.q-menu [role="option"]').first().click();
+      await columnOptions.first().waitFor({ state: "visible", timeout: 5000 });
+      await columnOptions.first().click();
     }
 
     const unitSelect = this.page.locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0"]');
     await unitSelect.waitFor({ state: "visible", timeout: 5000 });
     await unitSelect.click();
-    await this.page.getByRole("option", { name: unitName, exact: true }).click();
+    const unitOption = this.page
+      .locator('[data-test="dashboard-addpanel-config-unit-config-select-unit-0-option"]', { hasText: unitName })
+      .first();
+    await unitOption.click();
 
     // OverrideConfigPopup is now an ODialog — Save is the primary button inside the scoped panel
     await this.page

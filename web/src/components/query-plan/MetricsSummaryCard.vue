@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card flat bordered class="metrics-summary-card">
-    <q-card-section class="q-pa-md">
+  <OCard class="metrics-summary-card">
+    <OCardSection role="body">
       <div class="text-subtitle2 text-weight-bold q-mb-md">{{ t("search.executionSummary") }}</div>
       <div class="metrics-grid">
         <div class="metric-item">
@@ -49,13 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-card-section>
-  </q-card>
+    </OCardSection>
+  </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
 import { useI18n } from "vue-i18n";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { SummaryMetrics } from "@/utils/queryPlanParser";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -63,6 +65,8 @@ export default defineComponent({
   name: "MetricsSummaryCard",
   components: {
     OIcon,
+    OCard,
+    OCardSection,
   },
   props: {
     metrics: {

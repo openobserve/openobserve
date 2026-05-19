@@ -118,30 +118,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field values list -->
-      <div v-for="value in displayValues" :key="value.key">
-        <div class="value-row">
-          <!-- Checkbox for multi-select -->
-          <OCheckbox
-            v-if="showMultiSelect"
-            :model-value="selectedValues"
-            :value="value.key"
-            @update:model-value="handleUserCheckboxChange"
-            @click.stop
-            size="xs"
-            class="value-row-checkbox"
-          />
+      <ul
+        class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
+        data-test="field-values-panel-values-list"
+      >
+        <li v-for="value in displayValues" :key="value.key">
+          <label
+            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
+          >
+            <!-- Checkbox for multi-select — uses :model-value + @update to
+                 separate user-initiated changes from parent-sync updates,
+                 preventing re-emit loops when the parent reflects query state. -->
+            <OCheckbox
+              v-if="showMultiSelect"
+              :model-value="selectedValues"
+              :value="value.key"
+              class="tw:shrink-0"
+              @update:model-value="handleUserCheckboxChange"
+              @click.stop
+            />
 
-          <div class="value-row-name">
-            <template v-if="value.key === null || value.key === undefined || value.key === '' || value.key.toLowerCase() === 'null'">
-              <span class="value-row-null">(empty)</span>
-            </template>
-            <template v-else>
-              {{ value.label ?? value.key }}
-            </template>
-          </div>
-          <span class="value-row-count">{{ formatLargeNumber(value.count) }}</span>
-        </div>
-      </div>
+            <div
+              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0"
+              :style="
+                showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
+              "
+            >
+              <div
+                :title="value.key"
+                class="ellipsis q-pr-xs"
+                style="width: calc(100% - 3.125rem)"
+              >
+                {{ value.label ?? value.key }}
+              </div>
+              <div
+                :title="String(value.count)"
+                class="ellipsis text-right q-pr-sm"
+                style="display: contents"
+                :style="showMultiSelect ? 'width: 3.125rem' : ''"
+              >
+                {{ formatLargeNumber(value.count) }}
+              </div>
+            </div>
+          </label>
+        </li>
+      </ul>
     </div>
 
     <!-- View more values / loading more indicator -->

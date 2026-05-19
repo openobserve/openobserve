@@ -17,8 +17,8 @@ export default class DashboardFilter {
     // Use pressSequentially to properly trigger Vue reactive filtering
     await streamFieldSelect.pressSequentially(fieldName, { delay: 50 });
 
-    // Wait for the dropdown menu to appear - use .last() to get the most recent menu
-    const dropdownMenu = this.page.locator('[role="listbox"]').last();
+    // Wait for the dropdown menu to appear — OSelect popover uses data-test="stream-field-select-popover".
+    const dropdownMenu = this.page.locator('[data-test="stream-field-select-popover"]').last();
     await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for options to be filtered
@@ -112,14 +112,12 @@ export default class DashboardFilter {
 
       await operatorLocator.click();
       await this.page
-        .getByRole("option", { name: operator, exact: true })
+        .locator('[data-test="dashboard-add-condition-operator-option"]', { hasText: operator })
         .first()
         .click();
       // Wait for the operator dropdown portal to fully close before step 5.
-      // The Quasar q-select portal animates out and intercepts pointer events
-      // during the animation — wait for the listbox to be hidden first.
       await this.page
-        .locator('[role="listbox"]')
+        .locator('[data-test="dashboard-add-condition-operator-popover"]')
         .waitFor({ state: "hidden", timeout: 5000 })
         .catch(() => {});
     }
@@ -297,9 +295,9 @@ export default class DashboardFilter {
       await this.page.waitForTimeout(500); // Wait for any animations to complete
       await operatorLocator.click();
 
-      // Wait for the specific option to appear in any visible menu
+      // Wait for the specific option to appear (OSelect forwards parent data-test)
       const optionLocator = this.page
-        .getByRole("option", { name: operator, exact: true })
+        .locator('[data-test="dashboard-add-condition-operator-option"]', { hasText: operator })
         .last();
 
       // Wait until option is visible with increased timeout
@@ -307,7 +305,7 @@ export default class DashboardFilter {
       await optionLocator.click();
       // Wait for the operator dropdown portal to fully close before step 5.
       await this.page
-        .locator('[role="listbox"]')
+        .locator('[data-test="dashboard-add-condition-operator-popover"]')
         .waitFor({ state: "hidden", timeout: 5000 })
         .catch(() => {});
     }
@@ -388,16 +386,16 @@ export default class DashboardFilter {
       await operatorLocator.waitFor({ state: "attached", timeout: 5000 });
       await operatorLocator.click();
 
-      // Wait for operator option to be available and click it
+      // Wait for operator option to be available and click it (OSelect forwards parent data-test)
       const operatorOption = this.page
-        .getByRole("option", { name: operator, exact: true })
+        .locator('[data-test="dashboard-add-condition-operator-option"]', { hasText: operator })
         .last();
 
       await operatorOption.waitFor({ state: "visible", timeout: 10000 });
       await operatorOption.click();
       // Wait for the operator dropdown portal to fully close before step 6.
       await this.page
-        .locator('[role="listbox"]')
+        .locator('[data-test="dashboard-add-condition-operator-popover"]')
         .waitFor({ state: "hidden", timeout: 5000 })
         .catch(() => {});
     }

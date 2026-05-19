@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="ghost" size="icon" @click="toggleAllSections">
           <template #icon-left
             ><OIcon
-              :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'" size="sm"
+              :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
+              size="sm"
           /></template>
         </OButton>
         <ConfigPanelSearch v-model="searchQuery" />
@@ -53,20 +54,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Section: General -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('general')"
       :model-value="isExpanded('general')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.general = v;
         }
       "
       :label="t('dashboard.configSectionGeneral')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <div
@@ -117,8 +115,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               @change="onToggleDefaultTime"
             />
-            <OButton variant="ghost" size="icon" class="tw:mt-1" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="250px" />
+            <OButton
+              variant="ghost"
+              size="icon"
+              class="tw:mt-1"
+              @click.stop
+              icon-left="info-outline"
+            >
+              <OTooltip
+                :content="t('dashboard.useDefaultTimeTooltip')"
+                max-width="250px"
+              />
             </OButton>
           </div>
 
@@ -176,24 +183,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-config-option-visible="isConfigOptionVisible"
         />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: PromQL Table Configuration -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="promqlMode && dashboardPanelData.data.type === 'table'"
       v-show="isSectionVisible('promqlTable')"
       :model-value="isExpanded('promqlTable')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.promqlTable = v;
         }
       "
       :label="t('dashboard.configSectionPromqlTable')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <PromQLChartConfig
@@ -201,10 +205,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-config-option-visible="isConfigOptionVisible"
         />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Geographic Configuration -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="
         promqlMode &&
         (dashboardPanelData.data.type === 'geomap' ||
@@ -212,38 +217,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('geographic')"
       :model-value="isExpanded('geographic')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.geographic = v;
         }
       "
       :label="t('dashboard.configSectionGeographic')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Legend -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('legend')"
       :model-value="isExpanded('legend')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.legend = v;
         }
       "
       :label="t('dashboard.configSectionLegend')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body o2-input">
         <OSwitch
@@ -468,23 +466,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </CommonAutoComplete>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Data -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('data')"
       :model-value="isExpanded('data')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.data = v;
         }
       "
       :label="t('dashboard.configSectionData')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body o2-input">
         <OSelect
@@ -596,7 +591,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="250px" />
+            <OTooltip
+              :content="t('dashboard.addOthersSeriesTooltip')"
+              max-width="250px"
+            />
           </template>
         </OSwitch>
 
@@ -609,7 +607,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="250px" />
+            <OTooltip
+              :content="t('dashboard.connectNullValuesTooltip')"
+              max-width="250px"
+            />
           </template>
         </OSwitch>
 
@@ -626,23 +627,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Axis -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('axis')"
       :model-value="isExpanded('axis')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.axis = v;
         }
       "
       :label="t('dashboard.configSectionAxis')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <OInput
@@ -731,23 +729,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Labels -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('labels')"
       :model-value="isExpanded('labels')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.labels = v;
         }
       "
       :label="t('dashboard.configSectionLabels')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <OSelect
@@ -826,7 +821,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :side-offset="8">
                 <template #content>
                   <div>
-                    <span>{{ t("dashboard.axisLabelTruncateTooltipText") }}</span>
+                    <span>{{
+                      t("dashboard.axisLabelTruncateTooltipText")
+                    }}</span>
                     <br /><br />
                     <b>{{ t("dashboard.axisLabelTooltipNotePrefix") }}</b>
                     <span>{{ t("dashboard.axisLabelTooltipNoteText") }}</span>
@@ -837,23 +834,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OInput>
         </div>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Line Style -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('lineStyle')"
       :model-value="isExpanded('lineStyle')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.lineStyle = v;
         }
       "
       :label="t('dashboard.configSectionLineStyle')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body o2-input">
         <OSelect
@@ -894,24 +888,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-line_thickness"
         />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Table -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('table')"
       :model-value="isExpanded('table')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.table = v;
         }
       "
       :label="t('dashboard.configSectionTable')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <OSwitch
@@ -963,27 +954,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-rows-per-page"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="250px" />
+            <OTooltip
+              :content="t('dashboard.rowsPerPageTooltip')"
+              max-width="250px"
+            />
           </template>
         </OInput>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Pivot Table -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-show="isSectionVisible('pivotTable')"
       :model-value="isExpanded('pivotTable')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.pivotTable = v;
         }
       "
       :label="t('dashboard.configSectionPivotTable')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <OSwitch
@@ -994,9 +985,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            {{ t('dashboard.pivotShowRowTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="250px" />
+            {{ t("dashboard.pivotShowRowTotals") }}
+            <OButton
+              variant="ghost"
+              size="icon"
+              @click.stop
+              icon-left="info-outline"
+            >
+              <OTooltip
+                :content="t('dashboard.pivotShowRowTotalsTooltip')"
+                max-width="250px"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1015,9 +1014,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            {{ t('dashboard.pivotStickyColTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotStickyColTotalsTooltip')" max-width="250px" />
+            {{ t("dashboard.pivotStickyColTotals") }}
+            <OButton
+              variant="ghost"
+              size="icon"
+              @click.stop
+              icon-left="info-outline"
+            >
+              <OTooltip
+                :content="t('dashboard.pivotStickyColTotalsTooltip')"
+                max-width="250px"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1030,9 +1037,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            {{ t('dashboard.pivotShowColTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="250px" />
+            {{ t("dashboard.pivotShowColTotals") }}
+            <OButton
+              variant="ghost"
+              size="icon"
+              @click.stop
+              icon-left="info-outline"
+            >
+              <OTooltip
+                :content="t('dashboard.pivotShowColTotalsTooltip')"
+                max-width="250px"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1051,67 +1066,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            {{ t('dashboard.pivotStickyRowTotals') }}
-            <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotStickyRowTotalsTooltip')" max-width="250px" />
+            {{ t("dashboard.pivotStickyRowTotals") }}
+            <OButton
+              variant="ghost"
+              size="icon"
+              @click.stop
+              icon-left="info-outline"
+            >
+              <OTooltip
+                :content="t('dashboard.pivotStickyRowTotalsTooltip')"
+                max-width="250px"
+              />
             </OButton>
           </template>
         </OSwitch>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Value Transformations -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.valueTransformations = v;
         }
       "
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <template #header>
-        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
-          {{ t("dashboard.configSectionValueTransformations") }}
-          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-            <OTooltip :content="t('dashboard.configSectionValueTransformationsTooltip')" max-width="250px" />
-          </OButton>
-        </div>
+      <template #trigger>
+        <span class="tw:text-sm tw:font-medium">{{
+          t("dashboard.configSectionValueTransformations")
+        }}</span>
+        <OIcon name="info-outline" size="sm" />
+          <OTooltip
+            :content="t('dashboard.configSectionValueTransformationsTooltip')"
+            max-width="250px"
+          />
       </template>
       <div class="config-section-body">
         <ValueMapping />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Field Overrides -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('fieldOverrides')"
       :model-value="isExpanded('fieldOverrides')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.fieldOverrides = v;
         }
       "
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <template #header>
-        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
-          {{ t("dashboard.configSectionFieldOverrides") }}
-          <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-            <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
-          </OButton>
-        </div>
+      <template #trigger>
+        <span class="tw:text-sm tw:font-medium">{{
+          t("dashboard.configSectionFieldOverrides")
+        }}</span>
+        <OIcon name="info-outline" size="sm" />
+          <OTooltip
+            :content="t('dashboard.configSectionFieldOverridesTooltip')"
+            max-width="250px"
+          />
       </template>
       <div class="config-section-body hide-child-title">
         <OverrideConfig
@@ -1119,32 +1140,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :panelData="panelData"
         />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Map -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="
         dashboardPanelData.data.type == 'geomap' ||
         dashboardPanelData.data.type == 'maps'
       "
       v-show="isSectionVisible('map')"
       :model-value="isExpanded('map')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.map = v;
         }
       "
       :label="t('dashboard.configSectionMap')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body o2-input">
-        <div
-          v-if="dashboardPanelData.data.type == 'maps'"
-        >
+        <div v-if="dashboardPanelData.data.type == 'maps'">
           <OSelect
             v-model="dashboardPanelData.data.config.map_type.type"
             :options="mapTypeOptions"
@@ -1154,7 +1170,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-map-type"
           >
             <template #tooltip>
-              <OTooltip :content="t('dashboard.mapsMapTypeTooltip')" max-width="250px" />
+              <OTooltip
+                :content="t('dashboard.mapsMapTypeTooltip')"
+                max-width="250px"
+              />
             </template>
           </OSelect>
         </div>
@@ -1313,24 +1332,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Gauge -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="dashboardPanelData.data.type === 'gauge'"
       v-show="isSectionVisible('gauge')"
       :model-value="isExpanded('gauge')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.gauge = v;
         }
       "
       :label="t('dashboard.configSectionGauge')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <OInput
@@ -1369,24 +1385,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-gauge-max"
         />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Layout -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="showTrellisConfig"
       v-show="isSectionVisible('layout')"
       :model-value="isExpanded('layout')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.layout = v;
         }
       "
       :label="t('dashboard.configSectionLayout')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
@@ -1467,21 +1480,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip>
                 <template #content>
                   <div>
-                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipTitle") }}</b>
+                    <b>{{
+                      t("dashboard.groupMultiYAxisTrellisTooltipTitle")
+                    }}</b>
                     <br /><br />
-                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDescription") }}
+                    {{
+                      t("dashboard.groupMultiYAxisTrellisTooltipDescription")
+                    }}
                     <br /><br />
-                    <b>{{ t("dashboard.groupMultiYAxisTrellisTooltipEnabled") }}</b>
+                    <b>{{
+                      t("dashboard.groupMultiYAxisTrellisTooltipEnabled")
+                    }}</b>
                     <br /><br />
                     <b>{{
                       t("dashboard.groupMultiYAxisTrellisTooltipDisabled")
                     }}</b>
                     <br /><br />
-                    <i>{{ t("dashboard.groupMultiYAxisTrellisTooltipExample") }}</i>
+                    <i>{{
+                      t("dashboard.groupMultiYAxisTrellisTooltipExample")
+                    }}</i>
                     <br />
-                    {{ t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult") }}
+                    {{
+                      t("dashboard.groupMultiYAxisTrellisTooltipEnabledResult")
+                    }}
                     <br />
-                    {{ t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult") }}
+                    {{
+                      t("dashboard.groupMultiYAxisTrellisTooltipDisabledResult")
+                    }}
                   </div>
                 </template>
               </OTooltip>
@@ -1489,68 +1514,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSwitch>
         </div>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Colors -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="showColorPalette"
       v-show="isSectionVisible('colors')"
       :model-value="isExpanded('colors')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.colors = v;
         }
       "
       :label="t('dashboard.configSectionColors')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <ColorPaletteDropDown />
         <ColorBySeries :colorBySeriesData="panelData" />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Drilldown -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)"
       v-show="isSectionVisible('drilldown')"
       :model-value="isExpanded('drilldown')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.drilldown = v;
         }
       "
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <template #header>
-        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
-          {{ t("dashboard.drilldown") }}
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="dashboard-addpanel-config-drilldown-info"
-            @click.stop
-            icon-left="info-outline"
-          >
-            <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="250px" />
-          </OButton>
-        </div>
+      <template #trigger>
+        <span class="tw:text-sm tw:font-medium">{{
+          t("dashboard.drilldown")
+        }}</span>
+        <OIcon
+          name="info-outline"
+          size="sm"
+          data-test="dashboard-addpanel-config-drilldown-info"
+         />
+          <OTooltip
+            :content="t('dashboard.drilldownTooltip')"
+            max-width="250px"
+          />
       </template>
       <div class="config-section-body">
         <Drilldown :variablesData="variablesData" />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Comparison -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="
         shouldShowTimeShift(
           dashboardPanelData,
@@ -1560,30 +1580,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('comparison')"
       :model-value="isExpanded('comparison')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.comparison = v;
         }
       "
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <template #header>
-        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
-          {{ t("dashboard.comparisonAgainst") }}
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="dashboard-addpanel-config-time-shift-info"
-            @click.stop
-            icon-left="info-outline"
-          >
-            <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="250px" />
-          </OButton>
-        </div>
+      <template #trigger>
+        <span class="tw:text-sm tw:font-medium">{{
+          t("dashboard.comparisonAgainst")
+        }}</span>
+        <OIcon
+          name="info-outline"
+          size="sm"
+          data-test="dashboard-addpanel-config-time-shift-info"
+         />
+          <OTooltip
+            :content="t('dashboard.comparisonAgainstTooltip')"
+            max-width="250px"
+          />
       </template>
       <div class="config-section-body">
         <CustomDateTimePicker
@@ -1623,64 +1639,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Mark Lines -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       v-show="isSectionVisible('markLines')"
       :model-value="isExpanded('markLines')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.markLines = v;
         }
       "
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <template #header>
-        <div style="display: flex; align-items: center; flex: 1; min-width: 0">
-          {{ t("dashboard.markLines") }}
-          <OButton
-            variant="ghost"
-            size="icon"
-            data-test="dashboard-addpanel-config-markline-info"
-            @click.stop
-            icon-left="info-outline"
-          >
-            <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="250px" />
-          </OButton>
-        </div>
+      <template #trigger>
+        <span class="tw:text-sm tw:font-medium">{{
+          t("dashboard.markLines")
+        }}</span>
+        <OIcon
+          name="info-outline"
+          size="sm"
+          data-test="dashboard-addpanel-config-markline-info"
+         />
+          <OTooltip
+            :content="t('dashboard.markLinesTooltip')"
+            max-width="250px"
+          />
       </template>
       <div class="config-section-body">
         <MarkLineConfig />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <!-- Section: Background -->
-    <q-expansion-item
+    <OCollapsible
+      variant="sidebar"
       v-if="dashboardPanelData.data.type == 'metric'"
       v-show="isSectionVisible('background')"
       :model-value="isExpanded('background')"
-      @update:model-value="
+      @update:modelValue="
         (v) => {
           expandedSections.background = v;
         }
       "
       :label="t('dashboard.configSectionBackground')"
-      header-class="tw:font-semibold tw:text-[13px] tw:min-h-[36px] tw:px-3 tw:bg-[var(--o2-section-header-bg)] tw:hover:opacity-80 tw:transition-opacity tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
-      switch-toggle-side
-      expand-icon="chevron_right"
-      expanded-icon="keyboard_arrow_down"
-      expand-icon-class="text-grey-6"
+      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div class="config-section-body">
         <BackGroundColorConfig />
       </div>
-    </q-expansion-item>
+    </OCollapsible>
   </div>
 </template>
 
@@ -1717,6 +1727,7 @@ import PromQLChartConfig from "./PromQLChartConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { useStore } from "vuex";
 
 import { markRaw, watchEffect, watch } from "vue";
@@ -1774,7 +1785,8 @@ export default defineComponent({
     OButton,
     OTooltip,
     OIcon,
-},
+    OCollapsible,
+  },
   props: ["dashboardPanelData", "variablesData", "panelData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
@@ -2719,14 +2731,6 @@ export default defineComponent({
   z-index: 10;
   background-color: var(--o2-card-bg-solid);
   border-bottom: 1px solid var(--o2-border-color);
-}
-
-:deep(.q-expansion-item--collapsed),
-:deep(.q-expansion-item--expanded) {
-  .q-item__section--side {
-    padding-right: 8px !important;
-    min-width: 32px !important;
-  }
 }
 
 .config-section-body {

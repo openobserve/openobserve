@@ -99,9 +99,11 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info(`Pre-selected stream: "${streamValue}"`);
 
     // 2. Open dropdown and verify metrics listed
+    // FieldList stream picker is OSelect post-migration; popover/options use
+    // forwarded data-test attributes.
     await streamSelector.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-    const menuItems = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    await page.locator('[data-test="index-dropdown-stream-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    const menuItems = page.locator('[data-test="index-dropdown-stream-option"]');
     const menuCount = await menuItems.count();
     expect(menuCount).toBeGreaterThan(0);
     testLogger.info(`Dropdown shows ${menuCount} metrics`);
@@ -109,18 +111,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 3. Search and filter metrics
     await streamSelector.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="index-dropdown-stream-popover"]').waitFor({ state: 'visible', timeout: 5000 });
     await streamSelector.clear();
     await streamSelector.fill('cpu');
     await page.waitForTimeout(1000);
-    const filtered = page.locator('.q-menu .q-item, .q-virtual-scroll__content .q-item');
+    const filtered = page.locator('[data-test="index-dropdown-stream-option"]');
     const filteredCount = await filtered.count();
     expect(filteredCount).toBeGreaterThan(0);
     testLogger.info(`Filtered to ${filteredCount} metrics matching "cpu"`);
 
     // Select first filtered item
     await filtered.first().click();
-    await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await page.locator('[data-test="index-dropdown-stream-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
     // 4. Run query and verify visualization
     await builder.clickRunQuery();
@@ -167,11 +169,13 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Value dropdown disabled before label selection');
 
     // 5. Verify operator dropdown has all 4 operators
+    // Operator dropdown is OSelect (Reka Select) post-migration; popover/items
+    // use forwarded data-test attributes.
     const operatorDropdown = page.locator(builder.operatorSelect).last();
     await operatorDropdown.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="promql-operator-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
     const operators = ['=', '!=', '=~', '!~'];
-    const opMenuItems = page.locator('.q-menu .q-item');
+    const opMenuItems = page.locator('[data-test="promql-operator-select-option"]');
     expect(await opMenuItems.count()).toBeGreaterThanOrEqual(4);
     for (const op of operators) {
       expect(await opMenuItems.filter({ hasText: op }).count()).toBeGreaterThan(0);
@@ -182,15 +186,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // 6. Select a label and verify chip text updates
     const labelDropdown = page.locator(builder.labelSelect).last();
     await labelDropdown.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-    const labelOptions = page.locator('.q-menu .q-item');
+    await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+    const labelOptions = page.locator('[data-test="promql-label-select-option"]');
     const labelCount = await labelOptions.count();
     testLogger.info(`Available labels: ${labelCount}`);
 
     if (labelCount > 0) {
       const firstLabelText = await labelOptions.first().textContent();
       await labelOptions.first().click();
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Selected label: ${firstLabelText}`);
 
       // Default operator should be "="
@@ -247,7 +251,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const searchInput = dialog.locator('input').first();
     await searchInput.fill('histogram');
     await page.waitForTimeout(1000);
-    const histogramItems = dialog.locator('.q-expansion-item .q-list .q-item');
+    const histogramItems = dialog.locator('[data-test^="promql-operation-option-"]');
     const histogramCount = await histogramItems.count();
     expect(histogramCount).toBeGreaterThan(0);
     testLogger.info(`"histogram" search found ${histogramCount} items`);
@@ -255,13 +259,13 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // 3. Verify empty search returns 0
     await searchInput.fill('zzz_nonexistent_operation');
     await page.waitForTimeout(1000);
-    expect(await dialog.locator('.q-expansion-item .q-list .q-item').count()).toBe(0);
+    expect(await dialog.locator('[data-test^="promql-operation-option-"]').count()).toBe(0);
     testLogger.info('Non-existent search returns 0 results');
 
     // 4. Clear search, restore all
     await searchInput.clear();
     await page.waitForTimeout(1000);
-    expect(await dialog.locator('.q-expansion-item .q-list .q-item').count()).toBeGreaterThan(0);
+    expect(await dialog.locator('[data-test^="promql-operation-option-"]').count()).toBeGreaterThan(0);
     testLogger.info('Clearing search restores all operations');
 
     // 5. Close dialog via Close button
@@ -300,10 +304,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     expect(rateText.toLowerCase()).toContain('rate');
     testLogger.info(`Rate operation added: ${rateText}`);
 
-    // 8. Configure Rate parameter
+    // 8. Configure Rate parameter — operation chip menu is ODropdown post-migration
     const opBtn = page.locator('[data-test="promql-operation-0"]');
     await opBtn.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'visible', timeout: 5000 });
     const paramInput = page.locator('[data-test="promql-operation-param-0"]').last();
     const paramVisible = await paramInput.isVisible({ timeout: 3000 }).catch(() => false);
     if (paramVisible) {
@@ -793,12 +797,12 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     // Open filter menu to configure it
     await builder.openLabelFilterMenu(0);
 
-    // Select a label
+    // Select a label — OSelect post-migration, options use forwarded data-test
     const labelDropdown = page.locator(builder.labelSelect).last();
     await labelDropdown.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-    const labelOptions = page.locator('.q-menu .q-item');
+    const labelOptions = page.locator('[data-test="promql-label-select-option"]');
     const labelCount = await labelOptions.count();
     let selectedLabel = '';
     let selectedOperator = '=';
@@ -807,7 +811,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     if (labelCount > 0) {
       selectedLabel = (await labelOptions.first().textContent()).trim();
       await labelOptions.first().click();
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Selected label: ${selectedLabel}`);
 
       // Verify default operator is "="
@@ -821,21 +825,21 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const isDisabled = await builder.isValueSelectDisabled();
       if (!isDisabled) {
         await valueDropdown.click();
-        await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await page.locator('[data-test="promql-value-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-        const valueOptions = page.locator('.q-menu .q-item');
+        const valueOptions = page.locator('[data-test="promql-value-select-option"]');
         const valueCount = await valueOptions.count();
         if (valueCount > 0) {
           selectedValue = (await valueOptions.first().textContent()).trim();
           await valueOptions.first().click();
-          await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          await page.locator('[data-test="promql-value-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           testLogger.info(`Selected value: ${selectedValue}`);
         }
       }
 
-      // Close the filter menu
+      // Close the filter menu — LabelFilterEditor chip menu is ODropdown post-migration
       await page.keyboard.press('Escape');
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      await page.locator('[data-test="promql-label-filter-0-menu"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
       // Assert: chip text shows "label = value" pattern (e.g. "environment = development")
       const chipText = await builder.getLabelFilterText(0);
@@ -857,28 +861,30 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 5. Configure Sum operation's label parameter (select the same label for "by" clause)
     if (selectedLabel) {
+      // OperationsList chip menu = ODropdown post-migration
       const opBtn = page.locator('[data-test="promql-operation-0"]');
       await opBtn.click();
-      await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+      await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'visible', timeout: 5000 });
 
       // Find the multi-select param for labels (type="select" in the operation menu)
+      // Inside the chip menu the param is OSelect (Reka Listbox)
       const labelParam = page.locator('[data-test="promql-operation-param-0"]').last();
       if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
         await labelParam.click();
-        await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        await page.locator('[data-test="promql-operation-param-0-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
         // Select the label from the dropdown
-        const paramOption = page.locator('.q-menu .q-item').filter({ hasText: selectedLabel }).first();
+        const paramOption = page.locator('[data-test="promql-operation-param-0-option"]').filter({ hasText: selectedLabel }).first();
         if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await paramOption.click();
-          await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          await page.locator('[data-test="promql-operation-param-0-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           testLogger.info(`Sum operation: selected label "${selectedLabel}" for by clause`);
         }
       }
 
       // Close the operation menu
       await page.keyboard.press('Escape');
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // 6. Set options: legend and step
@@ -1003,9 +1009,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await builder.openLabelFilterMenu(0);
     const labelDropdown = page.locator(builder.labelSelect).last();
     await labelDropdown.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    // OSelect post-migration; popover/options use forwarded data-test
+    await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-    const labelOptions = page.locator('.q-menu .q-item');
+    const labelOptions = page.locator('[data-test="promql-label-select-option"]');
     const labelCount = await labelOptions.count();
     let selectedLabel = '';
     let selectedValue = '';
@@ -1013,7 +1020,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     if (labelCount > 0) {
       selectedLabel = (await labelOptions.first().textContent()).trim();
       await labelOptions.first().click();
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Label: ${selectedLabel}`);
 
       // Operator defaults to "="
@@ -1025,18 +1032,19 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const isDisabled = await builder.isValueSelectDisabled();
       if (!isDisabled) {
         await valueDropdown.click();
-        await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-        const valueOptions = page.locator('.q-menu .q-item');
+        await page.locator('[data-test="promql-value-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+        const valueOptions = page.locator('[data-test="promql-value-select-option"]');
         if (await valueOptions.count() > 0) {
           selectedValue = (await valueOptions.first().textContent()).trim();
           await valueOptions.first().click();
-          await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          await page.locator('[data-test="promql-value-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           testLogger.info(`Value: ${selectedValue}`);
         }
       }
 
       await page.keyboard.press('Escape');
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      // LabelFilterEditor chip menu = ODropdown post-migration
+      await page.locator('[data-test="promql-label-filter-0-menu"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
       // Assert chip shows label = value
       const chipText = await builder.getLabelFilterText(0);
@@ -1057,24 +1065,26 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 5. Configure Sum's "by" label parameter
     if (selectedLabel) {
+      // OperationsList chip menu = ODropdown post-migration
       const opBtn = page.locator('[data-test="promql-operation-0"]');
       await opBtn.click();
-      await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+      await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'visible', timeout: 5000 });
 
       const labelParam = page.locator('[data-test="promql-operation-param-0"]').last();
       if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
         await labelParam.click();
-        await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+        // Inside the chip menu the param is an OSelect (Reka Listbox)
+        await page.locator('[data-test="promql-operation-param-0-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-        const paramOption = page.locator('.q-menu .q-item').filter({ hasText: selectedLabel }).first();
+        const paramOption = page.locator('[data-test="promql-operation-param-0-option"]').filter({ hasText: selectedLabel }).first();
         if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await paramOption.click();
-          await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          await page.locator('[data-test="promql-operation-param-0-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           testLogger.info(`Sum by: ${selectedLabel}`);
         }
       }
       await page.keyboard.press('Escape');
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // 6. Verify builder state — all assertions in Builder mode
@@ -1191,9 +1201,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await builder.openLabelFilterMenu(0);
     const labelDropdown = page.locator(builder.labelSelect).last();
     await labelDropdown.click();
-    await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+    // OSelect post-migration; popover/options use forwarded data-test
+    await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
 
-    const labelOptions = page.locator('.q-menu .q-item');
+    const labelOptions = page.locator('[data-test="promql-label-select-option"]');
     const labelCount = await labelOptions.count();
     let selectedLabel = '';
     let selectedValue = '';
@@ -1201,7 +1212,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     if (labelCount > 0) {
       selectedLabel = (await labelOptions.first().textContent()).trim();
       await labelOptions.first().click();
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      await page.locator('[data-test="promql-label-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Label: ${selectedLabel}`);
 
       // Select value
@@ -1209,17 +1220,18 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const isDisabled = await builder.isValueSelectDisabled();
       if (!isDisabled) {
         await valueDropdown.click();
-        await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-        const valueOptions = page.locator('.q-menu .q-item');
+        await page.locator('[data-test="promql-value-select-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+        const valueOptions = page.locator('[data-test="promql-value-select-option"]');
         if (await valueOptions.count() > 0) {
           selectedValue = (await valueOptions.first().textContent()).trim();
           await valueOptions.first().click();
-          await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          await page.locator('[data-test="promql-value-select-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           testLogger.info(`Value: ${selectedValue}`);
         }
       }
       await page.keyboard.press('Escape');
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      // LabelFilterEditor chip menu = ODropdown post-migration
+      await page.locator('[data-test="promql-label-filter-0-menu"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
       // Assert chip text
       const chipText = await builder.getLabelFilterText(0);
@@ -1236,22 +1248,24 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
 
     // 5. Configure Sum's "by" label parameter
     if (selectedLabel) {
+      // OperationsList chip menu = ODropdown post-migration
       const opBtn = page.locator('[data-test="promql-operation-0"]');
       await opBtn.click();
-      await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
+      await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'visible', timeout: 5000 });
       const labelParam = page.locator('[data-test="promql-operation-param-0"]').last();
       if (await labelParam.isVisible({ timeout: 3000 }).catch(() => false)) {
         await labelParam.click();
-        await page.locator('.q-menu').last().waitFor({ state: 'visible', timeout: 5000 });
-        const paramOption = page.locator('.q-menu .q-item').filter({ hasText: selectedLabel }).first();
+        // Param OSelect (Reka Listbox)
+        await page.locator('[data-test="promql-operation-param-0-popover"]').waitFor({ state: 'visible', timeout: 5000 });
+        const paramOption = page.locator('[data-test="promql-operation-param-0-option"]').filter({ hasText: selectedLabel }).first();
         if (await paramOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await paramOption.click();
-          await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+          await page.locator('[data-test="promql-operation-param-0-popover"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           testLogger.info(`Sum by: ${selectedLabel}`);
         }
       }
       await page.keyboard.press('Escape');
-      await page.locator('.q-menu').last().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      await page.locator('[data-test="promql-operation-0-menu"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     }
 
     // 6. Set options

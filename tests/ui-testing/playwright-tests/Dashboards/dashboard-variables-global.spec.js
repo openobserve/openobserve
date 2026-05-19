@@ -287,7 +287,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await firstOption.click();
 
     // Wait for dropdown to close and selection to be applied
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Verify selection - check the displayed value in the select component
     const variableSelector = page.locator(getVariableSelector(variableName));
@@ -454,7 +454,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     // Close dropdown
     await page.keyboard.press("Escape");
     // Wait for dropdown to close
-    await safeWaitForHidden(page, '.q-menu', { timeout: 3000 });
+    await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Change time range
     await page.locator(SELECTORS.DATE_TIME_BTN).click();

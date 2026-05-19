@@ -173,25 +173,4 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 8px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-
-    .q-item {
-      text-transform: capitalize;
-      border-radius: 0.25rem;
-      margin-bottom: 0.25rem;
-      font-weight: 600;
-
-      &--active {
-        background-color: $selected-list-bg;
-        color: $primary;
-      }
-    }
-  }
-}
 </style>

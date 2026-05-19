@@ -1,16 +1,16 @@
 <template>
   <div class="promql-query-builder tw:px-[0.625rem]">
-    <q-card>
-      <q-card-section>
-        <div class="text-h5 q-mb-md">PromQL Query Builder</div>
+    <OCard>
+      <OCardSection role="header">
+        <div class="text-h5">PromQL Query Builder</div>
         <div class="text-subtitle2 text-grey-7">
           Build and test PromQL queries visually
         </div>
-      </q-card-section>
+      </OCardSection>
 
       <OSeparator />
 
-      <q-card-section>
+      <OCardSection role="body">
         <!-- Query Builder Section -->
         <div class="query-builder-container">
           <!-- Metric Selector -->
@@ -30,18 +30,18 @@
             v-model:operations="visualQuery.operations"
           />
         </div>
-      </q-card-section>
+      </OCardSection>
 
       <OSeparator />
 
       <!-- Generated Query Display -->
-      <q-card-section>
+      <OCardSection>
         <div class="text-subtitle1 q-mb-sm">Generated PromQL Query:</div>
-        <q-card flat bordered class="bg-grey-1">
-          <q-card-section>
+        <OCard class="bg-grey-1">
+          <OCardSection>
             <pre class="query-output">{{ generatedQuery || "No query built yet" }}</pre>
-          </q-card-section>
-        </q-card>
+          </OCardSection>
+        </OCard>
 
         <div class="q-mt-md row q-gutter-sm">
           <OButton
@@ -71,18 +71,18 @@
             Test Query
           </OButton>
         </div>
-      </q-card-section>
+      </OCardSection>
 
       <!-- Query Result Preview -->
-      <q-card-section v-if="queryResult">
+      <OCardSection v-if="queryResult">
         <div class="text-subtitle1 q-mb-sm">Query Result Preview:</div>
-        <q-card flat bordered class="bg-grey-1">
-          <q-card-section>
+        <OCard class="bg-grey-1">
+          <OCardSection>
             <pre class="result-output">{{ queryResult }}</pre>
-          </q-card-section>
-        </q-card>
-      </q-card-section>
-    </q-card>
+          </OCardSection>
+        </OCard>
+      </OCardSection>
+    </OCard>
   </div>
 </template>
 
@@ -96,6 +96,8 @@ import OperationsList from "@/components/promql/components/OperationsList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 

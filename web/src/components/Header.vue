@@ -237,63 +237,50 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
-      <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
-        <OIcon name="help-outline" size="md" class="header-icon tw:opacity-70" />
-        <OTooltip side="top" align="center" :content="t('menu.help')" />
-
-        <q-menu
-          fit
-          anchor="bottom right"
-          self="top right"
-          transition-show="jump-down"
-          transition-hide="jump-up"
-          class="header-menu-bar"
-        >
-          <q-list style="min-width: 250px">
-            <!-- OpenAPI link (only for non-cloud deployments) -->
-            <div
-              v-if="
-                config.isCloud !== 'true' &&
-                !store.state.zoConfig?.custom_hide_menus
-                  ?.split(',')
-                  ?.includes('openapi')
-              "
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton variant="ghost" size="icon-circle-sm" data-test="menu-link-help-item">
+            <OIcon name="help-outline" size="md" class="header-icon tw:opacity-70" />
+            <OTooltip side="top" align="center" :content="t('menu.help')" />
+          </OButton>
+        </template>
+        <div class="header-menu-bar tw:min-w-[250px]">
+          <!-- OpenAPI link (only for non-cloud deployments) -->
+          <template
+            v-if="
+              config.isCloud !== 'true' &&
+              !store.state.zoConfig?.custom_hide_menus
+                ?.split(',')
+                ?.includes('openapi')
+            "
+          >
+            <ODropdownItem
+              data-test="menu-link-openapi-item"
+              @select="navigateToOpenAPI(zoBackendUrl)"
             >
-              <q-item clickable @click="navigateToOpenAPI(zoBackendUrl)">
-                <q-item-section>
-                  <q-item-label>
-                    {{ t(`menu.openapi`) }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-              <OSeparator />
-            </div>
+              {{ t(`menu.openapi`) }}
+            </ODropdownItem>
+            <ODropdownSeparator />
+          </template>
 
-            <!-- Documentation link -->
-            <q-item clickable @click="navigateToDocs()">
-              <q-item-section>
-                <q-item-label>
-                  {{ t(`menu.docs`) }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-            <OSeparator />
+          <!-- Documentation link -->
+          <ODropdownItem
+            data-test="menu-link-docs-item"
+            @select="navigateToDocs()"
+          >
+            {{ t(`menu.docs`) }}
+          </ODropdownItem>
+          <ODropdownSeparator />
 
-            <!-- About page link -->
-            <q-item
-              clickable
-              @click="goToAbout"
-              data-test="menu-link-about-item"
-            >
-              <q-item-section>
-                <q-item-label>
-                  {{ t(`menu.about`) }}
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </OButton>
+          <!-- About page link -->
+          <ODropdownItem
+            data-test="menu-link-about-item"
+            @select="goToAbout"
+          >
+            {{ t(`menu.about`) }}
+          </ODropdownItem>
+        </div>
+      </ODropdown>
 
       <!-- SETTINGS BUTTON -->
       <OButton
@@ -307,150 +294,126 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
-      <OButton
-        variant="ghost"
-        size="icon-circle-sm"
-        data-test="header-my-account-profile-icon"
+      <ODropdown
+        side="bottom"
+        align="end"
+        @update:open="(open) => { if (!open) showLanguageSubmenu = false; }"
       >
-        <OIcon
-          :name="user.picture ? user.picture : 'person'"
-          size="20px"
-          class="header-icon tw:opacity-70"
-        />
-        <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
+        <template #trigger>
+          <OButton
+            variant="ghost"
+            size="icon-circle-sm"
+            data-test="header-my-account-profile-icon"
+          >
+            <OIcon
+              :name="user.picture ? user.picture : 'person'"
+              size="20px"
+              class="header-icon tw:opacity-70"
+            />
+            <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
+          </OButton>
+        </template>
+        <div class="header-menu-bar tw:min-w-[250px]">
+          <!-- User information (non-clickable info row) -->
+          <div class="tw:flex tw:items-center tw:gap-3 tw:px-3 tw:py-2">
+            <OIcon
+              :name="user.picture ? user.picture : 'person'"
+              size="xs"
+            />
+            <span class="tw:text-sm tw:truncate">{{
+              user.given_name
+                ? user.given_name + " " + user.family_name
+                : user.email
+            }}</span>
+          </div>
+          <ODropdownSeparator />
 
-        <q-menu
-          fit
-          anchor="bottom right"
-          self="top right"
-          transition-show="jump-down"
-          transition-hide="jump-up"
-          class="header-menu-bar"
-        >
-          <q-list style="min-width: 250px">
-            <!-- User information -->
-            <q-item>
-              <q-item-section avatar>
-                <OIcon
-                  :name="user.picture ? user.picture : 'person'"
-                  size="xs"
-                ></OIcon>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{
-                  user.given_name
-                    ? user.given_name + " " + user.family_name
-                    : user.email
-                }}</q-item-label>
-              </q-item-section>
-            </q-item>
-            <OSeparator />
+          <!-- Language selector — nested sub-dropdown (click to open) -->
+          <div
+            data-test="header-language-submenu-trigger"
+            class="header-language-item"
+            @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
+          >
+            <OIcon size="xs" name="language" class="padding-none" />
+            <span class="header-language-label">{{ t("menu.language") }}</span>
+            <span class="header-language-current">
+              <img
+                v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
+                :src="selectedLanguage.icon.slice(4)"
+                :alt="selectedLanguage.label"
+                class="header-language-flag"
+              />
+              <OIcon
+                v-else-if="selectedLanguage.icon"
+                size="xs"
+                :name="selectedLanguage.icon"
+                class="padding-none"
+              />
+              <span>{{ selectedLanguage.label }}</span>
+            </span>
+            <OIcon size="xs" name="chevron-right" />
 
-            <!-- Language selector -->
-            <q-item clickable>
-              <q-item-section avatar>
-                <OIcon size="xs"
-name="language" class="padding-none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="tw:w-[180px]">{{
-                  t("menu.language")
-                }}</q-item-label>
-              </q-item-section>
-              <q-item-section></q-item-section>
-              <q-item-section side>
-                <div class="q-gutter-xs">
-                  <OIcon
-                    size="xs"
-                    :name="selectedLanguage.icon"
-                    class="padding-none"
-                  />
-                  <span
-                    class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label"
-                    >{{ selectedLanguage.label }}</span
-                  >
-                </div>
-              </q-item-section>
-              <q-item-section side style="padding-left: 0px">
-                <OIcon
-                  class="icon-ley-arrow-right"
-                  name="keyboard-arrow-right" size="sm"
-                />
-              </q-item-section>
-
-              <!-- Language selection submenu -->
-              <q-menu
-                auto-close
-                anchor="top end"
-                self="top start"
-                data-test="language-dropdown-item"
-                class="header-menu-bar"
+            <!-- Submenu — absolutely positioned to the left of parent dropdown -->
+            <div
+              v-if="showLanguageSubmenu"
+              class="language-submenu"
+              data-test="language-dropdown-item"
+              @click.stop
+            >
+              <button
+                v-for="lang in langList"
+                :key="lang.code"
+                type="button"
+                :data-test="`language-dropdown-item-${lang.code}`"
+                class="language-submenu-item"
+                :class="{
+                  'is-selected': selectedLanguage.code === lang.code,
+                }"
+                @click="changeLanguage(lang); showLanguageSubmenu = false"
               >
-                <q-list>
-                  <q-item
-                    v-for="lang in langList"
-                    :key="lang.code"
-                    v-bind="lang"
-                    dense
-                    clickable
-                    @click="changeLanguage(lang)"
-                  >
-                    <q-item-section avatar>
-                      <OIcon
-                        size="xs"
-                        :name="lang.icon"
-                        class="padding-none"
-                      />
-                    </q-item-section>
+                <img
+                  v-if="lang.icon && lang.icon.startsWith('img:')"
+                  :src="lang.icon.slice(4)"
+                  :alt="lang.label"
+                  class="header-language-flag"
+                />
+                <OIcon v-else size="xs" :name="lang.icon" />
+                <span class="tw:flex-1">{{ lang.label }}</span>
+                <OIcon
+                  v-if="selectedLanguage.code === lang.code"
+                  size="xs"
+                  name="check"
+                />
+              </button>
+            </div>
+          </div>
+          <ODropdownSeparator />
 
-                    <q-item-section
-                      :data-test="`language-dropdown-item-${lang.code}`"
-                    >
-                      <q-item-label>{{ lang.label }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-item>
-            <OSeparator />
+          <!-- Theme management -->
+          <ODropdownItem
+            data-test="menu-link-predefined-themes-item"
+            @select="openPredefinedThemes"
+          >
+            <template #icon-left>
+              <OIcon size="xs" name="color-lens" class="padding-none" />
+            </template>
+            {{ t("common.manageTheme") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
 
-            <!-- Theme management -->
-            <q-item
-              data-test="menu-link-predefined-themes-item"
-              v-ripple="true"
-              v-close-popup="true"
-              clickable
-              @click="openPredefinedThemes"
-            >
-              <q-item-section avatar>
-                <OIcon size="xs"
-name="color-lens" class="padding-none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ t("common.manageTheme") }}</q-item-label>
-              </q-item-section>
-            </q-item>
-            <OSeparator />
-
-            <!-- Logout -->
-            <q-item
-              data-test="menu-link-logout-item"
-              v-ripple="true"
-              v-close-popup="true"
-              clickable
-              @click="signout"
-            >
-              <q-item-section avatar>
-                <OIcon size="xs"
-name="exit-to-app" class="padding-none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ t("menu.signOut") }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </OButton>
+          <!-- Logout -->
+          <ODropdownItem
+            data-test="menu-link-logout-item"
+            variant="destructive"
+            @select="signout"
+          >
+            <template #icon-left>
+              <OIcon size="xs" name="exit-to-app" class="padding-none" />
+            </template>
+            {{ t("menu.signOut") }}
+          </ODropdownItem>
+        </div>
+      </ODropdown>
     </div>
     </div><!-- end right side -->
 
@@ -469,7 +432,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -482,6 +449,10 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OSelect,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    ODropdownGroup,
   },
   props: {
     // Store instance
@@ -569,6 +540,9 @@ export default defineComponent({
 
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
+
+    // Language sub-menu state (nested submenu pattern matching original UX)
+    const showLanguageSubmenu = ref(false);
 
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
@@ -683,6 +657,7 @@ export default defineComponent({
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
+      showLanguageSubmenu,
       updateOrganization,
       goToHome,
       goToAbout,
@@ -708,6 +683,101 @@ export default defineComponent({
   width: auto;
   max-width: none;
   white-space: nowrap;
+}
+
+/* Language sub-menu trigger row inside the user-profile dropdown */
+.header-language-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+}
+
+.header-language-label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.header-language-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.header-language-flag {
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* The nested popover */
+.language-submenu {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: 4px;
+  min-width: 200px;
+  background-color: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  z-index: 9999;
+
+  body.body--dark & {
+    background-color: #1f2937;
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.language-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+
+  &.is-selected {
+    font-weight: 600;
+  }
+
+  body.body--dark & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+  }
 }
 
 .logo-container {

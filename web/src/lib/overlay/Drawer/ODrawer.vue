@@ -90,8 +90,7 @@ function handleInteractOutside(e: Event) {
   ).detail?.originalEvent;
   const target = originalEvent?.target as Element | null;
   if (
-    target?.closest("[data-reka-popper-content-wrapper]") || // reka-ui portals (ODropdown, OSelect, …)
-    target?.closest(".q-menu") // Quasar portals (q-select, q-btn-dropdown, …)
+    target?.closest("[data-reka-popper-content-wrapper]") // reka-ui portals (ODropdown, OSelect, …)
   ) {
     e.preventDefault();
     return;
@@ -241,8 +240,8 @@ function handleOpenAutoFocus(event: Event) {
 // ── Focus-trap workaround for portaled elements ─────────────────────────────
 // reka-ui's modal DialogContent wraps content in a FocusScope that listens for
 // both `focusin` AND `focusout` on `document` (bubble phase) and pulls focus
-// back whenever it moves outside the DrawerContent DOM.  Quasar portals
-// (q-menu, q-select dropdown) are teleported to <body> and therefore sit
+// back whenever it moves outside the DrawerContent DOM. reka-ui portals
+// (ODropdown, OSelect listbox, …) are teleported to <body> and therefore sit
 // outside the FocusScope container.
 //
 // The `focusout` handler fires FIRST (when focus leaves the dialog) and checks
@@ -257,10 +256,7 @@ watchEffect((cleanup) => {
   if (!internalOpen.value) return;
 
   function isPortalElement(el: Element | null): boolean {
-    return !!(
-      el?.closest("[data-reka-popper-content-wrapper]") ||
-      el?.closest(".q-menu")
-    );
+    return !!el?.closest("[data-reka-popper-content-wrapper]");
   }
 
   const handleFocusIn = (e: FocusEvent) => {

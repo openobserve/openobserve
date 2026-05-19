@@ -32,7 +32,8 @@ export class PipelinesPage {
         this.savePipelineButton = page.locator(
           '[data-test="add-pipeline-save-btn"]'
         );
-        // Target the form field error inside q-field__bottom, not the notification
+        // Target the form field error inside q-field__bottom, not the notification.
+        // role="alert" is the standard ARIA role for q-field error messages — keeping per task guidelines.
         this.pipelineNameRequiredMessage = page.locator('.q-field__bottom [role="alert"]').getByText(
           "Pipeline name is required"
         );
@@ -358,7 +359,9 @@ export class PipelinesPage {
      * Log all available menu options (for debugging)
      */
     async logMenuOptions() {
-        const options = await this.page.locator('[role="option"]').allTextContents();
+        // OSelect now forwards parent data-test to ListboxItem (`*-option`); we
+        // grab any option-like node with a data-test ending in `-option`.
+        const options = await this.page.locator('[data-test$="-option"]').allTextContents();
         testLogger.debug('[logMenuOptions] Available options', { options });
     }
 
@@ -985,8 +988,12 @@ export class PipelinesPage {
         await moreOptionsButton.waitFor({ state: "visible" });
         await moreOptionsButton.click();
         await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
+        // Click delete option in the menu — PipelinesList row uses ODropdown with
+        // data-test on each row's delete action.
+        await this.page
+            .locator(`[data-test="pipeline-list-${pipelineName}-delete-action"]`)
+            .first()
+            .click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1129,8 +1136,12 @@ export class PipelinesPage {
         await moreOptionsButton.waitFor({ state: "visible" });
         await moreOptionsButton.click();
         await this.page.waitForTimeout(500);
-        // Click delete option in the menu (Quasar q-item)
-        await this.page.locator('.q-menu .q-item').filter({ hasText: 'Delete' }).click();
+        // Click delete option in the menu — PipelinesList row uses ODropdown with
+        // data-test on each row's delete action.
+        await this.page
+            .locator(`[data-test="pipeline-list-${pipelineName}-delete-action"]`)
+            .first()
+            .click();
         await this.confirmDeletePipeline();
         await this.verifyPipelineDeleted();
     }
@@ -1776,12 +1787,15 @@ export class PipelinesPage {
      */
     async selectStreamOption(streamName) {
         await this.page.waitForTimeout(2000);
-        // Wait for the option to be enabled (not disabled) before clicking
-        const option = this.page.getByRole("option", { name: streamName, exact: true }).first();
+        // OSelect now forwards parent data-test to ListboxItems (`*-option`); we
+        // pick the matching option by its data-test container.
+        const option = this.page
+            .locator('[data-test$="-option"]', { hasText: streamName })
+            .first();
         // Wait for the option to not have disabled class
         await this.page.waitForFunction(
             (name) => {
-                const options = document.querySelectorAll('[role="option"]');
+                const options = document.querySelectorAll('[data-test$="-option"]');
                 for (const opt of options) {
                     if (opt.textContent?.includes(name) && !opt.classList.contains('disabled')) {
                         return true;
@@ -2131,12 +2145,15 @@ export class PipelinesPage {
     async selectStreamType(type) {
         testLogger.info(`Selecting stream type: ${type}`);
         await this.streamTypeLabel.click();
-        // Wait for dropdown to open
+        // Wait for dropdown to open (OSelect forwards parent data-test to options as `*-option`)
         await this.page.waitForFunction(() => {
-            const options = document.querySelectorAll('[role="option"]');
+            const options = document.querySelectorAll('[data-test$="-option"]');
             return options.length > 0;
         }, { timeout: 3000 });
-        await this.page.getByRole("option", { name: type, exact: true }).click();
+        await this.page
+            .locator('[data-test$="-option"]', { hasText: type })
+            .first()
+            .click();
         testLogger.info(`Stream type '${type}' selected`);
     }
 
@@ -2848,7 +2865,10 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if any table is visible
      */
     async isGenericTableVisible() {
-        const tableLocator = this.page.locator('table, .q-table, [role="table"]').first();
+        // TODO(data-test): backfill/jobs/generic tables don't yet expose a data-test
+        // root in their source components — keeping native <table>/.q-table fallback
+        // until added in web/src/components/pipeline/ and shared table components.
+        const tableLocator = this.page.locator('table, .q-table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -2876,7 +2896,7 @@ export class PipelinesPage {
             await pipelineFilter.click();
             await this.page.waitForTimeout(500);
             // Select first available option
-            const option = this.page.locator('.q-item, [role="option"]').first();
+            const option = this.page.locator('.q-item').first();
             if (await option.isVisible().catch(() => false)) {
                 await option.click();
             }
@@ -2956,7 +2976,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if dialog is visible
      */
     async isErrorDialogVisible() {
-        const dialog = this.page.locator('.q-dialog, [role="dialog"], [data-test*="error-dialog"]').first();
+        const dialog = this.page.locator('.q-dialog, [data-test*="error-dialog"]').first();
         return await dialog.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3079,7 +3099,7 @@ export class PipelinesPage {
      * Select first option in dropdown
      */
     async selectFirstOption() {
-        const option = this.page.locator('.q-item, [role="option"], .q-menu .q-item').first();
+        const option = this.page.locator('.q-item, .q-menu .q-item').first();
         if (await option.isVisible().catch(() => false)) {
             await option.click();
             await this.page.waitForTimeout(300);
@@ -3254,7 +3274,8 @@ export class PipelinesPage {
         await this.page.waitForTimeout(2000);
         const urlAfter = this.page.url();
         // Check for any error toasts/alerts on the page
-        const errorToast = await this.page.locator('.q-notification, [role="alert"], .q-banner').allTextContents().catch(() => []);
+        // TODO(data-test): q-notification toasts and q-banner have no data-test; expose data-test on notify-plugin/notify component to drop these fallbacks.
+        const errorToast = await this.page.locator('.q-notification, .q-banner').allTextContents().catch(() => []);
         testLogger.info(`Pipeline saved: ${pipelineName}`, { urlBefore, urlAfter, redirected: urlBefore !== urlAfter, toasts: errorToast });
         return pipelineName;
     }

@@ -42,7 +42,7 @@
             name="info-outline"
             size="md"
             class="q-ml-xs cursor-pointer"
-          >
+           />
             <OTooltip
               side="right"
               align="center"
@@ -50,7 +50,6 @@
               :side-offset="2"
               :content="isValidMethodName() !== true ? String(isValidMethodName()) : ''"
             />
-          </OIcon>
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="tw:flex tw:items-center tw:gap-4">
@@ -70,14 +69,13 @@
             name="info-outline"
             size="xs"
             class="tw:cursor-pointer"
-          >
+           />
             <OTooltip>
               <template #content>
                 <div class="tw:font-semibold tw:mb-1">{{ selectedTransType === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
                 <div>{{ selectedTransType === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
               </template>
             </OTooltip>
-          </OIcon>
         </div>
       </div>
     </div>

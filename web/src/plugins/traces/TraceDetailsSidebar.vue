@@ -386,10 +386,10 @@ class="tw:h-full tw:overflow-y-auto">
                 <div class="llm-content-box">
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="tw:mb-3">
-                    <q-expansion-item
+                    <OCollapsible
+                      v-model="sysInstrOpen"
                       icon="settings"
                       label="System Instructions"
-                      header-class="tw:text-xs tw:font-medium"
                     >
                       <div class="tw:p-2 tw:bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
@@ -399,7 +399,7 @@ class="tw:h-full tw:overflow-y-auto">
                           view-mode="formatted"
                         />
                       </div>
-                    </q-expansion-item>
+                    </OCollapsible>
                   </div>
                   <div
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
@@ -471,15 +471,16 @@ class="tw:h-full tw:overflow-y-auto">
             </div>
 
             <!-- Model Parameters (collapsible) -->
-            <q-expansion-item
+            <OCollapsible
               v-if="span.llm_request_parameters"
+              v-model="modelParamsOpen"
               label="Model Parameters"
               class="q-mt-md"
             >
               <pre class="model-params-json q-pa-sm">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
-            </q-expansion-item>
+            </OCollapsible>
           </div>
         </OTabPanel>
 
@@ -519,37 +520,35 @@ class="tw:h-5! tw:text-[0.75rem]!">
               data-test="trace-details-sidebar-attributes-table"
             >
               <template #field-dropdown="{ field, value: fieldValue }">
-                <q-item
-                  v-for="action in filterActions"
-                  :key="action.operator"
-                  clickable
-                  v-close-popup
-                  @click.stop="
-                    $emit('apply-filter-immediately', {
-                      field,
-                      value: getFilterValue(field, fieldValue),
-                      operator: action.operator,
-                    })
-                  "
-                >
-                  <q-item-section>
-                    <q-item-label>
-                      <span class="tw:mr-1 tw:inline-flex">
-                        <OButton variant="ghost" size="icon-xs-circle">
-                          <OIcon
-                            color="currentColor"
-                            class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                          >
-                            <component :is="action.iconComponent" />
-                          </OIcon>
-                        </OButton>
-                      </span>
-                      <span class="tw:text-[0.85rem]!">{{
-                        $t("traces.applyAndSearch")
-                      }}</span>
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
+                <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                  <li
+                    v-for="action in filterActions"
+                    :key="action.operator"
+                    :data-test="`trace-details-sidebar-json-filter-action-${action.operator}`"
+                    class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                    @click.stop="
+                      $emit('apply-filter-immediately', {
+                        field,
+                        value: getFilterValue(field, fieldValue),
+                        operator: action.operator,
+                      })
+                    "
+                  >
+                    <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                      <OButton variant="ghost" size="icon-xs-circle">
+                        <OIcon
+                          color="currentColor"
+                          class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                        >
+                          <component :is="action.iconComponent" />
+                        </OIcon>
+                      </OButton>
+                    </span>
+                    <span class="tw:text-[0.85rem]!">{{
+                      $t("traces.applyAndSearch")
+                    }}</span>
+                  </li>
+                </ul>
               </template>
             </json-preview>
           </div>
@@ -578,37 +577,35 @@ class="tw:h-5! tw:text-[0.75rem]!">
               <template #cell-value="{ item }">
                 <AttributeValueCell :field="item.field" :value="item.value">
                   <template #dropdown="{ field, value: fieldValue }">
-                    <q-item
-                      v-for="action in filterActions"
-                      :key="action.operator"
-                      clickable
-                      v-close-popup
-                      @click.stop="
-                        $emit('apply-filter-immediately', {
-                          field,
-                          value: getFilterValue(field, fieldValue),
-                          operator: action.operator,
-                        })
-                      "
-                    >
-                      <q-item-section>
-                        <q-item-label>
-                          <span class="tw:mr-1 tw:inline-flex">
-                            <OButton variant="ghost" size="icon-xs-circle">
-                              <OIcon
-                                color="currentColor"
-                                class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
-                              >
-                                <component :is="action.iconComponent" />
-                              </OIcon>
-                            </OButton>
-                          </span>
-                          <span class="tw:text-[0.85rem]!">{{
-                            $t("traces.applyAndSearch")
-                          }}</span>
-                        </q-item-label>
-                      </q-item-section>
-                    </q-item>
+                    <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+                      <li
+                        v-for="action in filterActions"
+                        :key="action.operator"
+                        :data-test="`trace-details-sidebar-attr-filter-action-${action.operator}`"
+                        class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer hover:tw:bg-muted/50"
+                        @click.stop="
+                          $emit('apply-filter-immediately', {
+                            field,
+                            value: getFilterValue(field, fieldValue),
+                            operator: action.operator,
+                          })
+                        "
+                      >
+                        <span class="tw:mr-1 tw:inline-flex tw:shrink-0">
+                          <OButton variant="ghost" size="icon-xs-circle">
+                            <OIcon
+                              color="currentColor"
+                              class="tw:w-[0.7rem]! tw:h-[0.7rem]! tw:pb-[0.185rem]!"
+                            >
+                              <component :is="action.iconComponent" />
+                            </OIcon>
+                          </OButton>
+                        </span>
+                        <span class="tw:text-[0.85rem]!">{{
+                          $t("traces.applyAndSearch")
+                        }}</span>
+                      </li>
+                    </ul>
                   </template>
                 </AttributeValueCell>
               </template>
@@ -874,6 +871,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { date, type QTableProps, copyToClipboard, useQuasar } from "quasar";
 import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
@@ -970,6 +968,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OCollapsible,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1037,6 +1036,8 @@ export default defineComponent({
 
     // Track fullscreen state
     const isFullscreen = ref(false);
+    const sysInstrOpen = ref(false);
+    const modelParamsOpen = ref(false);
 
     const showPendingFilter = false;
 
@@ -2049,6 +2050,8 @@ export default defineComponent({
         return map[color] || "default";
       },
       hasContent,
+      sysInstrOpen,
+      modelParamsOpen,
       parsedSystemInstructions,
       ioContainerRef,
       isFullscreen,

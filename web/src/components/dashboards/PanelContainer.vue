@@ -48,11 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="info-outline" size="sm"
           style="cursor: pointer"
           data-test="dashboard-panel-description-info"
-        >
+         />
           <OTooltip side="bottom" align="end" max-width="220px">
             <template #content><div style="white-space: pre-wrap">{{ props.data.description }}</div></template>
           </OTooltip>
-        </OIcon>
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
           variant="ghost"
@@ -1013,15 +1012,4 @@ export default defineComponent({
   color: var(--q-warning);
 }
 
-.panel-dropdown-list {
-  :deep(.q-item) {
-    align-items: center;
-  }
-  :deep(.q-item__section--side) {
-    padding-right: 6px;
-  }
-  :deep(.q-item__label) {
-    line-height: 1.1;
-  }
-}
 </style>

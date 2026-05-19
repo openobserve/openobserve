@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         :show-global-filter="false"
+        :footer-title="t('iam.basicUsers')"
         dense
       >
         <template #cell-select="{ row }">
@@ -115,14 +116,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               class="q-ml-xs cursor-pointer"
               :data-test="`iam-external-user-warning-icon-${row.email}`"
-            >
+             />
               <OTooltip side="right">
                 <div style="font-size: 12px; line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
                   <div class="q-mt-xs">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
               </OTooltip>
-            </OIcon>
           </div>
         </template>
         <template #empty>
@@ -234,7 +234,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.userName"),
       accessorKey: "email",
       sortable: true,
-      meta: { align: "left" },
+      meta: { align: "left" , autoWidth: true},
     },
   ];
 

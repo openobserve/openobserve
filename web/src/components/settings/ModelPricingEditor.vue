@@ -77,13 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="
                     store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
                   "
-                >
+                 />
                   <OTooltip
                     side="right"
                     max-width="300px"
                     :content="t('modelPricing.modelNameTooltip')"
                   />
-                </OIcon>
               </div>
               <OInput
                 v-model="model.name"
@@ -110,13 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'text-grey-5'
                         : 'text-grey-7'
                     "
-                  >
+                   />
                     <OTooltip
                       side="right"
                       max-width="300px"
                       :content="t('modelPricing.matchPatternTooltip')"
                     />
-                  </OIcon>
                 </div>
                 <OInput
                   v-model="model.match_pattern"

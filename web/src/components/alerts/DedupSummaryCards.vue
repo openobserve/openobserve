@@ -17,31 +17,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="dedup-summary-cards" class="dedup-summary-cards tw:grid tw:grid-cols-4 tw:gap-4 tw:mb-4">
     <!-- Card 1: Total Alerts -->
-    <q-card data-test="total-alerts-card" class="summary-card">
-      <q-card-section class="tw:p-4">
+    <OCard data-test="total-alerts-card" class="summary-card">
+      <OCardSection class="tw:p-4">
         <div data-test="total-alerts-value" class="tw:text-2xl tw:font-semibold">{{ summary.total_alerts }}</div>
         <div data-test="total-alerts-label" class="tw:text-sm tw:text-gray-600">Total Alerts</div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
     <!-- Card 2: Alerts with Dedup -->
-    <q-card data-test="alerts-with-dedup-card" class="summary-card">
-      <q-card-section class="tw:p-4">
+    <OCard data-test="alerts-with-dedup-card" class="summary-card">
+      <OCardSection class="tw:p-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <div data-test="alerts-with-dedup-value" class="tw:text-2xl tw:font-semibold">{{ summary.alerts_with_dedup }}</div>
           <OIcon data-test="dedup-filter-icon" name="filter-alt" size="sm" />
         </div>
         <div data-test="alerts-with-dedup-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Using Deduplication
-          <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer">
+          <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer" />
             <OTooltip data-test="dedup-info-tooltip" content="Alerts with deduplication configured" />
-          </OIcon>
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
     <!-- Card 3: Suppression Rate -->
-    <q-card
+    <OCard
       data-test="suppression-rate-card"
       class="summary-card"
       :class="{
@@ -49,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'tw:bg-yellow-50': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
       }"
     >
-      <q-card-section class="tw:p-4">
+      <OCardSection class="tw:p-4">
         <div data-test="suppression-rate-value" class="tw:text-2xl tw:font-semibold" :class="{
           'tw:text-green-700': summary.suppression_rate > 0.5,
           'tw:text-yellow-700': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
@@ -58,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div data-test="suppression-rate-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Suppression Rate (24h)
-          <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer">
+          <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer" />
             <OTooltip data-test="suppression-info-tooltip">
               <template #content>
                 {{ summary.suppressions_total }} suppressed /
@@ -68,26 +67,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OTooltip>
-          </OIcon>
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
 
     <!-- Card 4: Pending Batches -->
-    <q-card data-test="pending-batches-card" class="summary-card">
-      <q-card-section class="tw:p-4">
+    <OCard data-test="pending-batches-card" class="summary-card">
+      <OCardSection class="tw:p-4">
         <div class="tw:flex tw:items-center tw:gap-2">
           <div data-test="pending-batches-value" class="tw:text-2xl tw:font-semibold">{{ summary.pending_batches }}</div>
           <OIcon data-test="pending-batches-icon" name="group-work" size="sm" />
         </div>
         <div data-test="pending-batches-label" class="tw:text-sm tw:text-gray-600 tw:flex tw:items-center tw:gap-1">
           Pending Batches
-          <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer">
+          <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="tw:cursor-pointer" />
             <OTooltip data-test="pending-batches-info-tooltip" content="Alerts waiting to be grouped together" />
-          </OIcon>
         </div>
-      </q-card-section>
-    </q-card>
+      </OCardSection>
+    </OCard>
   </div>
 </template>
 
@@ -97,6 +94,8 @@ import { useStore } from 'vuex';
 import alertsService from '@/services/alerts';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 const store = useStore();
 

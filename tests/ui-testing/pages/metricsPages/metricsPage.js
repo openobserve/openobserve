@@ -269,9 +269,10 @@ export class MetricsPage {
                 await this.page.waitForTimeout(500);
             }
 
-            // Look for the metric in the dropdown options
-            const metricOption = this.page.locator('.q-item, [role="option"]')
-                .filter({ hasText: new RegExp(metricName, 'i') }).first();
+            // Look for the metric in the dropdown options (OSelect forwards parent data-test as `*-option`).
+            const metricOption = this.page
+                .locator('[data-test$="-option"]', { hasText: new RegExp(metricName, 'i') })
+                .first();
 
             if (await metricOption.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await metricOption.click();
@@ -304,7 +305,7 @@ export class MetricsPage {
         await streamSelector.click();
         await this.page.waitForTimeout(500);
 
-        const options = await this.page.locator('.q-item, [role="option"]').allTextContents();
+        const options = await this.page.locator('[data-test$="-option"]').allTextContents();
 
         // Close dropdown
         await this.page.keyboard.press('Escape');
@@ -766,8 +767,8 @@ export class MetricsPage {
 
     async selectLast15Minutes() {
         await this.openDatePicker();
-        const last15Min = this.page.locator('.q-item__label, .q-item, [role="option"]')
-          .filter({ hasText: /Last 15 minutes|15m/i }).first();
+        // Date-picker relative buttons have data-test="date-time-relative-15-m-btn"
+        const last15Min = this.page.locator('[data-test="date-time-relative-15-m-btn"]').first();
         if (await last15Min.isVisible({ timeout: 3000 }).catch(() => false)) {
           await last15Min.click();
         } else {
@@ -797,7 +798,8 @@ export class MetricsPage {
     }
 
     async getTableRowCount() {
-        return await this.page.locator('table tbody tr, .data-table tr, [role="row"]').count();
+        // TODO(data-test): metrics chart/table containers don't yet expose a data-test on rows; using native <table>/.data-table fallback.
+        return await this.page.locator('table tbody tr, .data-table tr').count();
     }
 
     async hasTableData() {
@@ -907,7 +909,8 @@ export class MetricsPage {
     }
 
     async getSidebarTabs() {
-        return this.page.locator('[role="tab"], .sidebar-tab').locator('visible');
+        // TODO(data-test): metrics sidebar tabs (Reka Tabs / .sidebar-tab) don't yet expose a data-test root in source; add data-test on each tab in web/src/views/Metrics/* before removing class fallback.
+        return this.page.locator('.sidebar-tab').locator('visible');
     }
 
     async getSidebarTabCount() {
@@ -916,7 +919,8 @@ export class MetricsPage {
     }
 
     async clickTabByText(tabText) {
-        const tab = this.page.locator('[role="tab"]').filter({ hasText: new RegExp(tabText, 'i') }).first();
+        // TODO(data-test): metrics sidebar tabs (Reka Tabs) don't yet expose a data-test; add data-test on each tab in source to remove this text-only fallback.
+        const tab = this.page.locator('.sidebar-tab').filter({ hasText: new RegExp(tabText, 'i') }).first();
         if (await tab.isVisible({ timeout: 3000 }).catch(() => false)) {
             await tab.click();
             await this.page.waitForTimeout(500);
@@ -926,7 +930,8 @@ export class MetricsPage {
     }
 
     async getActiveTabPanel() {
-        return this.page.locator('[role="tabpanel"], .tab-content').locator('visible').first();
+        // TODO(data-test): tab panel containers (Reka TabsContent / .tab-content) don't yet expose a data-test root.
+        return this.page.locator('.tab-content').locator('visible').first();
     }
 
     async isTabPanelVisible() {
@@ -947,7 +952,8 @@ export class MetricsPage {
     }
 
     async getStreamOption() {
-        return this.page.locator('.q-item, [role="option"]').first();
+        // OSelect forwards parent data-test to ListboxItems (`*-option`).
+        return this.page.locator('[data-test$="-option"]').first();
     }
 
     async isStreamOptionVisible() {

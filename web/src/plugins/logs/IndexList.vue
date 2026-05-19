@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div v-else class="index-table q-mt-xs">
-      <FieldList
+      <GroupedFieldList
         ref="fieldListRef"
         :fields="streamFieldsRows"
         :search="searchObj.data.stream.filterField"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #after-list="bottomProps">
-          <FieldListPagination
+          <GroupedFieldListPagination
             data-test-prefix="logs-page"
             :show-schema-toggle="showUserDefinedSchemaToggle"
             :show-quick-mode="searchObj.meta.quickMode"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </FieldList>
+      </GroupedFieldList>
     </div>
   </div>
 </template>
@@ -227,8 +227,8 @@ export default defineComponent({
   components: {
     EqualIcon,
     NotEqualIcon,
-    FieldList: defineAsyncComponent(
-      () => import("@/components/common/FieldList.vue"),
+    GroupedFieldList: defineAsyncComponent(
+      () => import("@/components/common/GroupedFieldList.vue"),
     ),
     FieldRow: defineAsyncComponent(
       () => import("@/components/common/FieldRow.vue"),

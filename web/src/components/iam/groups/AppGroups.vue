@@ -28,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="iam-groups-search-input">
             <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+              class="tw:h-[36px] tw:w-[200px]"
               :placeholder="t('iam.searchGroup')"
             >
-              <template #prepend>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
+              <template #icon-left>
+                <OIcon name="search" size="sm" />
               </template>
             </OInput>
           </div>
@@ -57,6 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :global-filter="filterQuery"
           pagination="client"
           :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('iam.groups')"
           sorting="client"
           selection="multiple"
           filter-mode="client"
@@ -89,9 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <NoData />
           </template>
-          <template #bottom>
+          <template v-if="selectedGroups.length > 0" #bottom>
             <OButton
-              v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
               variant="outline"
               size="sm"

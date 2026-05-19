@@ -103,7 +103,8 @@ export class AlertsPage {
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
             advancedTabBtn: 'button:has-text("Advanced")',
-            visibleDropdownMenu: '[role="listbox"]:visible, [role="menu"]:visible',
+            // ODropdown content carries data-test="o-dropdown-content"
+            visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
 
             // Query Editor Dialog selectors
             // The alerts dialog has TWO editors: SQL/PromQL (top) and VRL (bottom)
@@ -1835,8 +1836,10 @@ export class AlertsPage {
     async clickIncidentDetailTab(tabName) {
         testLogger.info(`Clicking incident detail tab: ${tabName}`);
         const dataTest = AlertsPage.TAB_DATA_TESTS[tabName];
-        const selector = dataTest ? `[data-test="${dataTest}"]` : `[role="tab"]:has-text("${tabName}")`;
-        const tab = this.page.locator(selector);
+        if (!dataTest) {
+            throw new Error(`No data-test mapping for incident detail tab: ${tabName}. Add it to AlertsPage.TAB_DATA_TESTS and ensure the source tab has a matching data-test.`);
+        }
+        const tab = this.page.locator(`[data-test="${dataTest}"]`);
         await tab.first().waitFor({ state: 'visible', timeout: 10000 });
         await tab.first().click();
         await this.page.waitForTimeout(1500);
@@ -2301,7 +2304,8 @@ export class AlertsPage {
             await this.page.waitForTimeout(1000);
         }
 
-        // Final fallback: try first available option
+        // Final fallback: try first available option (stream picker is OSelect
+        // post-migration, q-select pre-migration)
         const streamDropdown = this.page.locator(this.locators.streamNameDropdown);
         await streamDropdown.click();
         await this.page.waitForTimeout(500);
@@ -2339,7 +2343,7 @@ export class AlertsPage {
                 testLogger.info('Selected logs stream on retry', { stream: streamName });
                 return true;
             } else {
-                // Use first available logs stream from dropdown
+                // Use first available logs stream from dropdown (OSelect post-migration)
                 const anyStreamOption = this.page.locator('.q-menu .q-item').first();
                 if (await anyStreamOption.isVisible({ timeout: 3000 }).catch(() => false)) {
                     await anyStreamOption.click();
@@ -3177,7 +3181,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
-        return this.page.locator('.q-menu .q-item, [role="listbox"] .q-item, .autocomplete-dropdown .q-item');
+        return this.page.locator('.q-menu .q-item .q-item, .autocomplete-dropdown .q-item');
     }
 
     /**
@@ -3214,8 +3218,12 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        // Select 'count' from the dropdown to enable aggregation (count is field-based COUNT(field))
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'count' }).first().click();
+        // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
+        await this.page
+            .locator('.q-menu:visible .q-item')
+            .filter({ hasText: 'count' })
+            .first()
+            .click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Aggregation enabled via count function');
     }
@@ -3229,8 +3237,12 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        // Select 'total events' from the dropdown to disable aggregation (COUNT(*) mode)
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: 'total events' }).first().click();
+        // Function dropdown is OSelect (Reka Listbox) post-migration, q-select pre.
+        await this.page
+            .locator('.q-menu:visible .q-item')
+            .filter({ hasText: 'total events' })
+            .first()
+            .click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Aggregation disabled via total_events function');
     }
@@ -3247,7 +3259,11 @@ export class AlertsPage {
         await toggle.waitFor({ state: 'visible', timeout: 5000 });
         await toggle.click();
         await this.page.waitForTimeout(500);
-        await this.page.locator('.q-menu:visible .q-item').filter({ hasText: functionName }).first().click();
+        await this.page
+            .locator('.q-menu:visible .q-item')
+            .filter({ hasText: functionName })
+            .first()
+            .click();
         await this.page.waitForTimeout(1000);
         testLogger.info('Selected aggregation function', { functionName });
     }
@@ -3275,7 +3291,7 @@ export class AlertsPage {
         await fieldSelect.click();
         await this.page.waitForTimeout(500);
 
-        const menuItems = this.page.locator('.q-menu:visible .q-item, [role="listbox"]:visible [role="option"]');
+        const menuItems = this.page.locator('.q-menu:visible .q-item, ');
         const count = await menuItems.count();
         const fields = [];
         for (let i = 0; i < count; i++) {
@@ -3401,7 +3417,7 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getConditionTab() {
-        return this.page.locator('[data-test*="condition"], [role="tab"]:has-text("Condition")');
+        return this.page.locator('[data-test*="condition"]');
     }
 
     /**
