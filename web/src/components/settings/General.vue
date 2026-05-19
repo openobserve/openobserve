@@ -190,11 +190,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="btn-group tw:flex tw:h-[28px]">
               <OButton
                 type="button"
-                variant="ghost-destructive"
+                variant="outline-destructive"
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="editingText = !editingText"
                 icon-left="close"
+              />
+              <OButton
+                data-test="settings_ent_logo_custom_text_save_btn"
+                :loading="onSubmit.isLoading.value"
+                variant="outline"
+                size="icon-xs-sq"
+                class="q-mr-sm"
+                type="submit"
+                @click="updateCustomText"
+                icon-left="check"
               />
             </div>
           </div>
@@ -215,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
               :loading="onSubmit.isLoading.value"
-              variant="ghost"
+              variant="outline"
               size="icon-xs-sq"
               class="q-ml-sm"
               type="submit"
@@ -272,10 +282,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+            <div class="btn-group tw:flex tw:mt-3">
               <OButton
                 type="button"
-                variant="ghost-destructive"
+                variant="outline-destructive"
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="filesLight = null"
@@ -284,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
                 :loading="onSubmit.isLoading.value"
-                variant="primary"
+                variant="outline"
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 type="submit"
@@ -293,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mb-5">
+          <div class="tw:flex tw:flex-col tw:mt-3">
             <span class="individual-setting-description">
               {{ t("settings.customLogoLightDescription") }}
             </span>
@@ -346,10 +356,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="btn-group tw:flex tw:h-[28px] tw:mb-5">
+            <div class="btn-group tw:flex tw:mt-3">
               <OButton
                 type="button"
-                variant="ghost-destructive"
+                variant="outline-destructive"
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 @click="filesDark = null"
@@ -358,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
                 :loading="onSubmit.isLoading.value"
-                variant="primary"
+                variant="outline"
                 size="icon-xs-sq"
                 class="q-mr-sm"
                 type="submit"
@@ -367,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div class="tw:flex tw:flex-col tw:mb-5">
+          <div class="tw:flex tw:flex-col tw:mt-3">
             <span class="individual-setting-description">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
