@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
       <div class="tw:mb-6">
         <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
-        <div class="text-body2 text-grey-7">
+        <div class="tw:text-sm tw:text-gray-400">
           {{ t('alerts.correlation.description') }}
         </div>
-        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
+        <div class="tw:text-sm tw:text-gray-400 tw:mt-2 tw:italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
         <OButton
@@ -67,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="info"
             size="sm"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            class="tw:ml-1 cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
            />
             <OTooltip
               side="right"
@@ -104,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="info"
             size="sm"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+            class="tw:ml-1 cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
            />
             <OTooltip
               side="right"

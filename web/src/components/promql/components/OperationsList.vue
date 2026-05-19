@@ -1,9 +1,9 @@
 <template>
   <div class="tw:py-[0.25rem]">
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">{{ t("panel.operations") }}</div>
       <span class="layout-separator">:</span>
-      <div class="axis-container scroll row">
+      <div class="axis-container scroll tw:flex">
         <!-- Operations with Drag and Drop -->
         <draggable
           v-if="props.operations.length"
@@ -50,7 +50,7 @@
                       <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-caption text-grey-7">
+                      <div class="tw:text-xs tw:text-gray-400">
                         {{ getOperationDef(element.id)?.documentation }}
                       </div>
 
@@ -67,7 +67,7 @@
                           v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
-                          class="showLabelOnTop q-mb-sm"
+                          class="showLabelOnTop tw:mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -77,7 +77,7 @@
                           v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
-                          class="showLabelOnTop q-mb-sm"
+                          class="showLabelOnTop tw:mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -89,7 +89,7 @@
                           :label="param.name"
                           multiple
                           searchable
-                          class="operation-label-selector showLabelOnTop no-case q-mb-sm"
+                          class="operation-label-selector showLabelOnTop no-case tw:mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         >
                           <template #empty>

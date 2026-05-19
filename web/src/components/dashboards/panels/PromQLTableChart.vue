@@ -38,8 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
-          <div class="row items-center full-width" data-test="dashboard-table-pagination">
-            <div class="row items-center q-gutter-xs">
+          <div class="tw:flex tw:items-center tw:w-full" data-test="dashboard-table-pagination">
+            <div class="tw:flex tw:items-center tw:gap-1">
               <OSelect
                 v-model="selectedLegend"
                 :options="legendOptions"
@@ -314,13 +314,13 @@ export default defineComponent({
   // Support for multiple sticky columns - each subsequent column should be offset
   :deep(thead tr th.sticky-column:nth-child(2)),
   :deep(tbody tr td.sticky-column:nth-child(2)) {
-    left: var(--sticky-col-1-width, 150px) !important;
+    left: var(--sticky-tw:w-1/12-width, 150px) !important;
   }
 
   :deep(thead tr th.sticky-column:nth-child(3)),
   :deep(tbody tr td.sticky-column:nth-child(3)) {
     left: calc(
-      var(--sticky-col-1-width, 150px) + var(--sticky-col-2-width, 150px)
+      var(--sticky-tw:w-1/12-width, 150px) + var(--sticky-tw:w-1/6-width, 150px)
     ) !important;
   }
 }

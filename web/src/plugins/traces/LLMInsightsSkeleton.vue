@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Row 4: full-width recent errors table -->
+    <!-- Row 4: tw:w-full recent errors table -->
     <div
       class="panel-tile"
       :class="

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="width: 100%; height: 100%; display: flex; flex-direction: column"
     >
       <div
-        class="col"
+        class="tw:flex tw:flex-col"
         style="height: 100%; display: flex; flex-direction: column"
       >
         <QueryEditor

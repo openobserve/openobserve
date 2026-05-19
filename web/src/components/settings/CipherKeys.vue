@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showAddDialog" class="tw:flex tw:flex-col tw:h-full">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
       >
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="col-auto flex">
               <OInput
                 v-model="filterQuery"
-                class="q-ml-auto no-border o2-search-input"
+                class="tw:ml-auto no-border o2-search-input"
                 :placeholder="t('cipherKey.search')"
               >
                 <template #icon-left>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="primary"
                 size="sm-action"
-                class="q-ml-sm"
+                class="tw:ml-2"
                 @click="addCipherKey"
               >
                 {{ t(`cipherKey.add`) }}
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`cipherkey-list-${row.name}-update`"
             variant="ghost"
             size="icon-sm"
-            class="q-ml-xs"
+            class="tw:ml-1"
             :title="t('common.edit')"
             @click="editCipherKey(row)"
             icon-left="edit"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`cipherkey-list-${row.name}-delete`"
             variant="ghost-destructive"
             size="icon-sm"
-            class="q-ml-xs"
+            class="tw:ml-1"
             :title="t('common.delete')"
             @click="confirmDeleteCipherKey(row)"
             icon-left="delete"

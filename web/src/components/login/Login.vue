@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="card-container tw:w-[100vw] tw:h-[100vh]">
-    <div style="max-width: 400px; padding-top: 100px" class="q-mx-auto q-pa-md">
+    <div style="max-width: 400px; padding-top: 100px" class="tw:mx-auto tw:p-3">
       <div
-        class="flex justify-center text-center"
+        class="flex tw:justify-center tw:text-center"
         v-if="
           (config.isEnterprise == 'true' &&
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
+          class="tw:text-xl tw:font-semibold tw:font-bold tw:p-0 cursor-pointer tw:mr-2 tw:w-full"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="full-width flex justify-center">
+        <span class="tw:w-full flex tw:justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </div>
-      <div class="flex justify-center q-mb-lg" v-else>
+      <div class="flex tw:justify-center tw:mb-4" v-else>
         <img
           class="appLogo"
           style="height: auto"
@@ -87,11 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="full-width text-center q-pb-md">
+        <div style="font-size: 22px" class="tw:w-full tw:text-center tw:pb-3">
           Login
         </div>
 
-        <div v-if="showSSO" class="flex justify-center">
+        <div v-if="showSSO" class="flex tw:justify-center">
           <OButton
             data-test="sso-login-btn"
             variant="primary"
@@ -100,21 +100,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="loginWithSSo"
           >
             <div
-              class="flex items-center justify-center full-width text-center relative"
+              class="flex tw:items-center tw:justify-center tw:w-full tw:text-center relative"
             >
               <img
                 class="absolute"
                 style="width: 30px; left: 16px"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="text-center"> Login with SSO</span>
+              <span class="tw:text-center"> Login with SSO</span>
             </div>
           </OButton>
         </div>
 
-        <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
+        <div v-if="showSSO && showInternalLogin" class="tw:py-3 tw:text-center">
           <a
-            class="cursor-pointer login-internal-link q-py-md"
+            class="cursor-pointer login-internal-link tw:py-3"
             style="text-decoration: underline"
             @click="loginAsInternalUser = !loginAsInternalUser"
             >Login as internal user</a

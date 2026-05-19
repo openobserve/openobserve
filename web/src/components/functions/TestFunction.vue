@@ -1,7 +1,7 @@
 <template>
   <div
     data-test="test-function-section"
-    class="tw:flex tw:items-center tw:flex-wrap q-pb-sm"
+    class="tw:flex tw:items-center tw:flex-wrap tw:pb-2"
   >
     <div
       data-test="test-function-query-section"
@@ -40,14 +40,14 @@
           </template>
         </FullViewContainer>
         <div
-          class="tw:flex tw:items-center tw:flex-wrap q-px-md q-py-sm tw:w-[100%]"
+          class="tw:flex tw:items-center tw:flex-wrap tw:px-3 tw:py-2 tw:w-[100%]"
           :class="
             store.state.theme === 'dark' ? 'tw:bg-gray-950' : ' tw:bg-white'
           "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input tw:w-[120px] q-pr-md">
+          <div class="function-stream-select-input tw:w-[120px] tw:pr-3">
             <div
               class="tw:text-[12px]"
               :class="
@@ -103,7 +103,7 @@
 
             <DateTime
               label="Start Time"
-              class="q-py-xs tw:w-full"
+              class="tw:py-1 tw:w-full"
               auto-apply
               :default-type="dateTime.type"
               :default-absolute-time="{
@@ -117,7 +117,7 @@
           </div>
 
           <div
-            class="tw:text-[12px] tw:w-[100%] q-mt-xs"
+            class="tw:text-[12px] tw:w-[100%] tw:mt-1"
             :class="
               store.state.theme === 'dark'
                 ? 'tw:text-gray-200'
@@ -138,7 +138,7 @@
               language="sql"
             />
             <div
-              class="text-negative q-pa-xs invalid-sql-error tw:min-h-[22px]"
+              class="tw:text-red-500 tw:p-1 invalid-sql-error tw:min-h-[22px]"
             >
               <span v-show="!!sqlQueryErrorMsg" class="tw:text-[13px]">
                 Error: {{ sqlQueryErrorMsg }}</span
@@ -206,7 +206,7 @@
         />
       </div>
     </div>
-    <div class="q-mt-sm">
+    <div class="tw:mt-2">
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.output"
@@ -216,7 +216,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-subtitle2 text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
           >
             <OSpinner size="xs" />
             <div class="tw:relative tw:top-[2px]">

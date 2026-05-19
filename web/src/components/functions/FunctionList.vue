@@ -25,10 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="q-table__title tw:font-[600]">
                 {{ t("function.header") }}
               </div>
-              <div class="q-ml-auto" data-test="functions-list-search-input">
+              <div class="tw:ml-auto" data-test="functions-list-search-input">
                 <OInput
                   v-model="filterQuery"
-                  class="q-ml-auto no-border o2-search-input"
+                  class="tw:ml-auto no-border o2-search-input"
                   :placeholder="t('function.search')"
                 >
                   <template #icon-left>
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OInput>
               </div>
               <OButton
-                class="q-ml-sm"
+                class="tw:ml-2"
                 variant="primary"
                 size="sm-action"
                 data-test="function-list-add-function-btn"
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
-        class="q-pa-sm"
+        class="tw:p-2"
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @sendToAiChat="sendToAiChat"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
       </div>
       <div v-else>
-        <div class="text-h6 text-center">
+        <div class="tw:text-xl tw:font-semibold tw:text-center">
           No pipelines associated with this function
         </div>
       </div>

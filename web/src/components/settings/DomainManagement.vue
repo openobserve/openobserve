@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="domain_management tw:flex tw:flex-col tw:h-full">
-  <div class="q-px-md q-py-md tw:flex-1 tw:overflow-y-auto tw:pb-4">
+  <div class="tw:px-3 tw:py-3 tw:flex-1 tw:overflow-y-auto tw:pb-4">
     <!-- Claim Parser Function Selection -->
-    <div class="q-mb-xl">
-      <div class="text-h6 text-bold q-mb-xs">
+    <div class="tw:mb-6">
+      <div class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1">
         {{ t("settings.claimParserFunction") }}
       </div>
-      <div class="text-body2 text-grey-7 q-mb-md">
+      <div class="tw:text-sm tw:text-gray-400 tw:mb-3">
         {{ t("settings.claimParserFunctionDescription") }}
       </div>
 
-      <div class="row q-gutter-md items-end">
+      <div class="tw:flex tw:gap-3 tw:items-end">
         <div class="col-auto claim-parser-select">
           <OSelect
             v-model="claimParserFunction"
@@ -164,20 +164,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Divider -->
     <OSeparator class="tw:mb-8" />
 
-    <div class="text-h6 text-bold q-mb-xs">
+    <div class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1">
       {{ t("settings.domainRestrictionsSubsection") }}
     </div>
-    <div class="text-body2 text-grey-7 q-mb-lg">
+    <div class="tw:text-sm tw:text-gray-400 tw:mb-4">
       {{ t("settings.domainRestrictionsSubsectionDescription") }}
     </div>
 
     <!-- Domain Input Section -->
-    <div class="q-mb-xs">
-      <div class="text-body1 text-bold q-mb-md">
+    <div class="tw:mb-1">
+      <div class="tw:text-base tw:font-bold tw:mb-3">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
       
-      <div class="row q-gutter-md items-center q-mb-md">
+      <div class="tw:flex tw:gap-3 tw:items-center tw:mb-3">
         <div class="col-auto">
           <OInput
             v-model="newDomain"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="domainError = ''"
           />
         </div>
-        <div class="col-auto q-my-none">
+        <div class="col-auto tw:my-0">
           <OButton
             variant="primary"
             size="sm-action"
@@ -199,20 +199,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="text-caption text-grey-6 q-mb-md" v-if="domains.length > 0">
+      <div class="tw:text-xs tw:text-gray-400 tw:mb-3" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
 
     <!-- Domain List -->
-    <div v-if="domains.length > 0" class="q-mb-lg">
+    <div v-if="domains.length > 0" class="tw:mb-4">
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div 
           v-if="domain && domain.name"
-          class="domain-card q-mb-xs"
+          class="domain-card tw:mb-1"
         >
-          <div class="domain-header row items-center justify-between q-px-md q-py-sm">
-          <div class="text-body1 text-bold">{{ domain.name }}</div>
+          <div class="domain-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+          <div class="tw:text-base tw:font-bold">{{ domain.name }}</div>
           <OButton
             icon-left="close"
             variant="ghost-destructive"
@@ -222,16 +222,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="q-pa-md">
+        <div class="tw:p-3">
           <!-- Radio Button Options -->
           <ORadioGroup v-model="domain.allowAllUsers" orientation="vertical">
-            <div class="q-mb-xs">
+            <div class="tw:mb-1">
               <ORadio
                 :val="true"
                 :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
               />
             </div>
-            <div class="q-mb-md">
+            <div class="tw:mb-3">
               <ORadio
                 :val="false"
                 :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
@@ -242,15 +242,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for all users -->
           <div 
             v-if="domain.allowAllUsers"
-            class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
+            class="tw:p-2 bg-blue-1 text-blue-8 tw:rounded tw:mb-3"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
           <!-- Specific users section -->
           <div v-if="!domain.allowAllUsers" class="specific-users-section">
-            <div class="row q-gutter-md items-center q-mb-md">
-              <div class="col">
+            <div class="tw:flex tw:gap-3 tw:items-center tw:mb-3">
+              <div class="tw:flex tw:flex-col">
                 <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @keydown.enter="addEmail(domain)"
                 />
               </div>
-              <div class="col-auto q-my-none">
+              <div class="col-auto tw:my-0">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -273,9 +273,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div 
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="email-item row items-center justify-between q-pa-sm q-mb-xs"
+                class="email-item tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1"
               >
-                <div class="text-body2">{{ email }}</div>
+                <div class="tw:text-sm">{{ email }}</div>
                 <OButton
                   icon-left="close"
                   variant="ghost-destructive"
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </template>
     </div>
-    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw:w-full text-center q-pa-lg domain-card">
+    <div v-else class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 domain-card">
       {{ t("settings.noDomainMessage") }}
     </div>
 

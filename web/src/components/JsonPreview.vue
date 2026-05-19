@@ -11,7 +11,7 @@
       <OIcon name="content-copy" size="sm" />
       <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
-    <div class="q-pb-xs flex justify-start items-center q-px-md copy-log-btn">
+    <div class="tw:pb-1 flex tw:justify-start tw:items-center tw:px-3 copy-log-btn">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
     </div>
@@ -33,7 +33,7 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="q-ml-sm log-json-field-dropdown-btn"
+            class="tw:ml-2 log-json-field-dropdown-btn"
             aria-label="Add icon"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />

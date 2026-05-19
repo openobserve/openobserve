@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
+          <div class="tw:flex tw:flex-col" style="height: 100%; display: flex; flex-direction: column;">
             <CodeQueryEditor
               language="markdown"
               v-model:query="markdownContent"

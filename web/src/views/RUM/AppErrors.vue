@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
       <div class="card-container">
         <div
-          class="text-right tw:p-[0.375rem] flex align-center justify-between"
+          class="tw:text-right tw:p-[0.375rem] flex align-center tw:justify-between"
         >
           <syntax-guide />
-          <div class="flex align-center justify-end metrics-date-time">
+          <div class="flex align-center tw:justify-end metrics-date-time">
             <date-time
               auto-apply
               :default-type="errorTrackingState.data.datetime?.valueType"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 errorTrackingState.data.datetime.relativeTimePeriod
               "
               data-test="logs-search-bar-date-time-dropdown"
-              class="q-mr-sm"
+              class="tw:mr-2"
               @on:date-change="updateDateChange"
             />
             <OButton
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="card-container tw:h-full">
             <template v-if="isLoading.length">
               <div
-                class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
+                class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-18.75rem)]"
               >
                 <div>
                   <OSpinner
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:mx-auto tw:block"
                     data-test="app-errors-loading-indicator"
                   />
-                  <div class="text-center full-width">
+                  <div class="tw:text-center tw:w-full">
                     {{ t("rum.loadingApplicationErrors") }}
                   </div>
                 </div>

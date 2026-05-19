@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
+      <!-- Tabs (only in dialog mode, tw:hidden in embedded-tabs mode) -->
       <div class="tw:px-4">
       <OTabs
         v-if="!isEmbeddedTabs"
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
           <q-splitter
             v-model="splitterModel"
-            class="tw:flex-1 full-height full-width"
+            class="tw:flex-1 full-height tw:w-full"
           >
             <!-- -- Left sidebar -- -->
             <template #before>
@@ -625,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
         <q-splitter
           v-model="splitterModel"
-          class="tw:flex-1 full-height full-width"
+          class="tw:flex-1 full-height tw:w-full"
         >
           <!-- -- Left sidebar -- -->
           <template #before>
@@ -1040,7 +1040,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="group in groupedFilteredMetricStreams.groups"
           :key="group.id"
         >
-          <!-- Group section — hidden when no streams match -->
+          <!-- Group section — tw:hidden when no streams match -->
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
             <div class="metric-group-header">
@@ -1381,7 +1381,7 @@ const activeTab = computed({
 const internalActiveTab = ref("logs");
 
 // Active dimensions that can be modified
-// - matchedDimensions (stable): use actual values from current row
+// - matchedDimensions (stable): use actual values from current "row"
 // - additionalDimensions (unstable): use actual values from current row (user can change to "All" if desired)
 // Applied dimensions - these are used to generate queries
 const activeDimensions = ref<Record<string, string>>({
@@ -2837,7 +2837,7 @@ watch(
       Object.keys(newAdditionalDims).length > 0 &&
       semanticGroups.value.length > 0
     ) {
-      // Update pendingDimensions with new unstable dimension values from current row
+      // Update pendingDimensions with new unstable dimension values from current "row"
       pendingDimensions.value = {
         ...props.matchedDimensions,
         ...newAdditionalDims,
@@ -2864,7 +2864,7 @@ watch(
       return;
     }
 
-    // Update pendingDimensions with new matched dimension values from current row
+    // Update pendingDimensions with new matched dimension values from current "row"
     pendingDimensions.value = {
       ...newMatchedDims,
       ...(props.additionalDimensions || {}),

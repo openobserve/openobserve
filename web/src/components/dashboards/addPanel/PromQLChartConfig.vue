@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="getTableAggregationsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events">
+            <div class="tw:flex tw:items-center all-pointer-events">
               {{ t("dashboard.tableAggregations") }}
-              <OIcon class="q-ml-xs" size="md" name="info-outline" />
+              <OIcon class="tw:ml-1" size="md" name="info-outline" />
               <OTooltip max-width="350px">
                 <template #content>
                   <b>Table Aggregations - </b>
@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'visible-columns') ||
             isConfigOptionVisible('promqlTable', 'hidden-columns')
           "
-          class="q-mb-sm text-subtitle2 q-mt-md"
+          class="tw:mb-2 tw:text-sm tw:font-medium tw:mt-3"
         >
           Column Filters
         </div>
@@ -233,9 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="getVisibleColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events tw:mb-[-5px]">
+            <div class="tw:flex tw:items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.visibleColumns") }}
-              <OIcon class="q-ml-xs" size="sm" name="info-outline" />
+              <OIcon class="tw:ml-1" size="sm" name="info-outline" />
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Visible Columns</b>
@@ -259,13 +259,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-height: auto; padding: 0px 4px"
               @click="toggleOption(opt)"
             >
-              <div class="q-pa-none tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+              <div class="tw:p-0 tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                 <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </div>
-              <div class="q-pa-none tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+              <div class="tw:p-0 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                 <span class="tw:text-sm">{{ opt }}</span>
               </div>
             </div>
@@ -288,9 +288,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="getHiddenColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events tw:mb-[-5px]">
+            <div class="tw:flex tw:items-center all-pointer-events tw:mb-[-5px]">
               {{ t("dashboard.hiddenColumns") }}
-              <OIcon class="q-ml-xs" size="sm" name="info-outline" />
+              <OIcon class="tw:ml-1" size="sm" name="info-outline" />
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Hidden Columns</b>
@@ -314,13 +314,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-height: auto; padding: 0px 4px"
               @click="toggleOption(opt)"
             >
-              <div class="q-pa-none tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+              <div class="tw:p-0 tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                 <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </div>
-              <div class="q-pa-none tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+              <div class="tw:p-0 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                 <span class="tw:text-sm">{{ opt }}</span>
               </div>
             </div>
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
             isConfigOptionVisible('promqlTable', 'sticky-columns')
           "
-          class="q-mb-sm text-subtitle2 q-mt-md"
+          class="tw:mb-2 tw:text-sm tw:font-medium tw:mt-3"
         >
           Sticky Columns
         </div>
@@ -381,9 +381,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :display-value="getStickyColumnsDisplay"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events">
+            <div class="tw:flex tw:items-center all-pointer-events">
               {{ t("dashboard.stickyColumns") }}
-              <OIcon class="q-ml-xs" size="sm" name="info-outline" />
+              <OIcon class="tw:ml-1" size="sm" name="info-outline" />
                 <OTooltip max-width="400px">
                   <template #content>
                     <b>Sticky Columns</b>
@@ -407,13 +407,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-height: auto; padding: 0px 4px"
               @click="toggleOption(opt)"
             >
-              <div class="q-pa-none tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+              <div class="tw:p-0 tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
                 <OCheckbox
                   :model-value="selected"
                   @update:model-value="toggleOption(opt)"
                 />
               </div>
-              <div class="q-pa-none tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+              <div class="tw:p-0 tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
                 <span class="tw:text-sm">{{ opt }}</span>
               </div>
             </div>
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('promqlTable', 'configure-column-order')
           "
-          class="q-mb-sm q-mt-md"
+          class="tw:mb-2 tw:mt-3"
           style="font-weight: 600"
         ></div>
         <OButton

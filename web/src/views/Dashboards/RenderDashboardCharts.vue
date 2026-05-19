@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab List -->
       <TabList
         v-if="showTabs && selectedTabId !== null"
-        class="q-mt-sm"
+        class="tw:mt-2"
         :dashboardData="dashboardData"
         :viewOnly="viewOnly"
         @refresh="refreshDashboard"
@@ -202,13 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
                     <div
-                      class="panel-variables-container q-px-xs q-py-xs"
+                      class="panel-variables-container tw:px-1 tw:py-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
                       <!-- Panel Time Picker (NEW) -->
                       <div
                         v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper q-mb-sm"
+                        class="panel-time-picker-wrapper tw:mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
@@ -1144,7 +1144,7 @@ export default defineComponent({
           // Mark new tab as visible - variables will load if ready
           variablesManager.setTabVisibility(newTabId, true);
 
-          // Mark old tab as hidden (optional - for cleanup)
+          // Mark old tab as tw:hidden (optional - for cleanup)
           if (oldTabId && oldTabId !== newTabId) {
             variablesManager.setTabVisibility(oldTabId, false);
           }

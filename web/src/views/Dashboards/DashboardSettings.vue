@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
   <div
-    class="q-pa-none"
+    class="tw:p-0"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-sm q-my-sm scroll">
+        <div class="tw:mx-2 tw:my-2 scroll">
           <OTabPanels
             v-model="activeTab"
             animated

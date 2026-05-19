@@ -103,7 +103,7 @@
                   </ODropdownItem>
                   <div
                     v-if="filteredChatHistory.length === 0"
-                    class="text-center text-grey tw:p-2"
+                    class="tw:text-center tw:text-gray-500 tw:p-2"
                   >
                     No matching chats found
                   </div>
@@ -1235,7 +1235,7 @@
 
       <div
         v-if="!(centeredStart && chatMessages.length === 0)"
-        class="chat-input-container q-ma-md"
+        class="chat-input-container tw:m-3"
       >
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog

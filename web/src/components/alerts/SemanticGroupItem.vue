@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item q-pa-md q-mb-sm">
+  <div class="semantic-group-item tw:p-3 tw:mb-2">
     <div class="group-layout">
       <!-- Left Column: Display Name only (ID is internal/read-only) -->
       <div class="left-column">
@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Show ID as read-only caption for existing groups -->
-        <div v-if="localGroup.id" class="text-caption text-grey-6">
+        <div v-if="localGroup.id" class="tw:text-xs tw:text-gray-400">
           {{ t("common.id") }}: {{ localGroup.id }}
         </div>
         <OSwitch
           v-model="localGroup.is_workload_type"
           :label="t('correlation.isWorkloadType')"
-          class="q-mt-xs"
+          class="tw:mt-1"
           @update:model-value="emitUpdate"
         >
           <OTooltip :content="t('correlation.isWorkloadTypeTooltip')" />
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Actions Column: Delete -->
       <div class="actions-column">
-        <div class="flex justify-end">
+        <div class="flex tw:justify-end">
           <OButton
             data-test="semantic-group-remove-group-btn"
             :variant="isProtected ? 'ghost-muted' : 'ghost-destructive'"

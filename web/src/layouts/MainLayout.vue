@@ -999,7 +999,7 @@ export default defineComponent({
         return;
       }
       if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
+        // Closed → Open tw:inline sidebar
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
@@ -1007,7 +1007,7 @@ export default defineComponent({
         store.dispatch("setIsAiChatEnabled", false);
         store.dispatch("setIsAiChatExpanded", false);
       } else {
-        // Expanded overlay → Back to inline sidebar
+        // Expanded overlay → Back to tw:inline sidebar
         store.dispatch("setIsAiChatExpanded", false);
       }
       window.dispatchEvent(new Event("resize"));

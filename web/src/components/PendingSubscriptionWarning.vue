@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row col-11 justify-center q-mt-xl">
+  <div class="tw:flex tw:w-11/12 tw:justify-center tw:mt-6">
     <OIcon
       name="warning" style="width: 80px; height: 80px;" /><br />
     <h5>

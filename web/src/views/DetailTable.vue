@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OCard class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap searchdetaildialog">
     <OCardSection role="header">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold text-dark">
+      <div class="tw:flex tw:items-center tw:flex-nowrap">
+        <div class="tw:flex tw:flex-col">
+          <div class="tw:text-base tw:font-bold tw:text-gray-800">
             {{ t("search.rowDetail") }}
           </div>
         </div>
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OCardSection>
     <OSeparator />
-    <OTabs v-model="tab" dense class="text-grey" align="justify">
+    <OTabs v-model="tab" dense class="tw:text-gray-500" align="justify">
       <OTab name="table" :label="t('common.table')" />
       <OTab name="json" :label="t('common.json')" />
     </OTabs>
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection class="tw:p-0 tw:mb-6">
           <div
             v-if="rowData.length == 0"
-            class="q-pt-md"
+            class="tw:pt-3"
             style="max-width: 350px"
           >
             No data available.
@@ -49,13 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="indexDetailsContainer">
             <ul
               style="height: calc(100vh - 220px); width: 70vw"
-              class="detail-list q-px-none q-py-none tw:flex tw:flex-col tw:divide-y tw:divide-border"
+              class="detail-list tw:px-0 tw:py-0 tw:flex tw:flex-col tw:divide-y tw:divide-border"
             >
               <li class="detail-item list-head tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-                <div class="detail-section text-bold col-3 tw:break-all">
+                <div class="detail-section tw:font-bold tw:w-1/4 tw:break-all">
                   {{ t("search.sourceName") }}
                 </div>
-                <div class="detail-section text-bold col-9 tw:break-all">
+                <div class="detail-section tw:font-bold tw:w-3/4 tw:break-all">
                   {{ t("search.sourceValue") }}
                 </div>
               </li>
@@ -65,8 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="value"
                 class="detail-item list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
               >
-                <div class="detail-section col-3 tw:break-all">{{ value }}</div>
-                <div class="detail-section col-9 tw:break-all">{{ key }}</div>
+                <div class="detail-section tw:w-1/4 tw:break-all">{{ value }}</div>
+                <div class="detail-section tw:w-3/4 tw:break-all">{{ key }}</div>
               </li>
               <li class="detail-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"></li>
             </ul>

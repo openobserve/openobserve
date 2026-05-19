@@ -18,22 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div style="overflow-y: auto" class="scroll">
     <!-- Header Section -->
     <div
-      class="row tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs"
+      class="tw:flex tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1"
       style="height: 48px; overflow-y: auto"
     >
       <div class="card-container tw:w-full tw:h-full tw:flex">
-        <div class="flex items-center col">
+        <div class="flex tw:items-center tw:flex tw:flex-col">
           <div
-            class="flex items-center q-table__title q-mx-md tw:font-semibold tw:text-xl"
+            class="flex tw:items-center q-table__title tw:mx-3 tw:font-semibold tw:text-xl"
           >
             <span>
               {{ t("search.metrics") }}
             </span>
           </div>
-          <syntax-guide-metrics class="q-mr-sm" />
-          <MetricLegends class="q-mr-sm" />
+          <syntax-guide-metrics class="tw:mr-2" />
+          <MetricLegends class="tw:mr-2" />
         </div>
-        <div class="text-right col flex justify-end items-center">
+        <div class="tw:text-right tw:flex tw:flex-col flex tw:justify-end tw:items-center">
           <DateTimePickerDashboard
             v-if="
               !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state?.zoConfig?.min_auto_refresh_interval || 5
             "
             @trigger="runQuery"
-            class="q-px-none dashboards-icon dashboards-auto-refresh-interval"
+            class="tw:px-0 dashboards-icon dashboards-auto-refresh-interval"
             data-test="metrics-auto-refresh"
           />
           <div

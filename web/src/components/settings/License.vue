@@ -1,11 +1,11 @@
 <template>
-  <div class="q-pa-md">
+  <div class="tw:p-3">
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
-    <div class="text-h6 q-mb-md">{{ t("about.license_management") }}</div>
+    <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_management") }}</div>
 
-    <div v-if="loading" class="q-pa-md text-center">
+    <div v-if="loading" class="tw:p-3 tw:text-center">
       <OSpinner size="md" />
-      <div class="q-mt-md">{{ t("about.loading_license_info") }}</div>
+      <div class="tw:mt-3">{{ t("about.loading_license_info") }}</div>
     </div>
     <div
       v-else
@@ -15,20 +15,20 @@
         <div v-if="licenseData.license === null || !licenseData.license">
           <OCard class="tw:mb-4">
             <OCardSection role="body">
-              <div class="text-h6">{{ t("about.no_license_found") }}</div>
-              <div class="q-mt-sm text-body2">
+              <div class="tw:text-xl tw:font-semibold">{{ t("about.no_license_found") }}</div>
+              <div class="tw:mt-2 tw:text-sm">
                 {{ t("about.installation_id") }}:
                 <strong>{{ licenseData.installation_id || "N/A" }}</strong>
               </div>
               <div
-                class="q-mt-md text-body2"
+                class="tw:mt-3 tw:text-sm"
                 v-html="DOMPurify.sanitize(t('about.contact_admin_license'))"
               ></div>
               <OButton
                 data-test="no-license-get-license-btn"
                 variant="primary"
                 size="sm-action"
-                class="q-ml-sm q-mt-sm"
+                class="tw:ml-2 tw:mt-2"
                 @click="redirectToGetLicense"
               >
                 {{ t("about.get_license") }}
@@ -38,7 +38,7 @@
 
           <OCard>
             <OCardSection role="body">
-              <div class="text-subtitle1 q-mb-md">
+              <div class="tw:text-base tw:font-medium tw:mb-3">
                 {{ t("about.enter_license_key") }}
               </div>
               <OTextarea
@@ -48,14 +48,14 @@
                 :placeholder="t('about.paste_license_placeholder')"
                 style="height: 200px"
               />
-              <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
+              <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
                 <div class="modern-info-banner">
                   <OIcon
                     name="check-circle"
-                    class="text-green-6 q-mr-sm"
+                    class="text-green-6 tw:mr-2"
                     size="md"
                   />
-                  <span class="text-body2">{{
+                  <span class="tw:text-sm">{{
                     t("about.license_auto_filled")
                   }}</span>
                 </div>
@@ -77,7 +77,7 @@
         <div v-else>
           <OCard>
             <OCardSection role="body">
-              <div class="text-h6 q-mb-md">{{ t("about.license_info") }}</div>
+              <div class="tw:text-xl tw:font-semibold tw:mb-3">{{ t("about.license_info") }}</div>
               <q-markup-table flat bordered dense class="compact-table">
                 <tbody>
                   <tr>
@@ -127,12 +127,12 @@
                       {{ t("about.license_key") }}
                     </td>
                     <td>
-                      <div class="row items-center q-gutter-sm">
+                      <div class="tw:flex tw:items-center tw:gap-2">
                         <span>{{ getMaskedLicenseKey() }}</span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="q-ml-sm"
+                          class="tw:ml-2"
                           data-test="show-license-key-btn"
                           @click="showLicenseKeyModal = true"
                         >
@@ -184,7 +184,7 @@
 
           <OCard v-show="showUpdateForm" class="tw:mt-4">
             <OCardSection role="body">
-              <div class="text-subtitle1 q-mb-sm">
+              <div class="tw:text-base tw:font-medium tw:mb-2">
                 {{ t("about.update_license_key") }}
               </div>
               <OTextarea
@@ -194,19 +194,19 @@
                 :placeholder="t('about.paste_new_license_placeholder')"
                 style="min-height: 150px"
               />
-              <div v-if="isLicenseKeyAutoFilled" class="q-mt-sm q-mb-md">
+              <div v-if="isLicenseKeyAutoFilled" class="tw:mt-2 tw:mb-3">
                 <div class="modern-info-banner">
                   <OIcon
                     name="check-circle"
-                    class="text-green-6 q-mr-sm"
+                    class="text-green-6 tw:mr-2"
                     size="md"
                   />
-                  <span class="text-body2">{{
+                  <span class="tw:text-sm">{{
                     t("about.license_auto_filled")
                   }}</span>
                 </div>
               </div>
-              <div class="row q-gutter-sm">
+              <div class="tw:flex tw:gap-2">
                 <OButton
                   data-test="cancel-update-license-btn"
                   variant="outline"
@@ -239,7 +239,7 @@
           <OCardSection class="tw:p-3">
             <div class="futuristic-header">
               <div class="header-glow"></div>
-              <div class="text-h6 tw:relative tw:z-10">
+              <div class="tw:text-xl tw:font-semibold tw:relative tw:z-10">
                 {{ t("about.usage_information") }}
               </div>
             </div>
@@ -247,7 +247,7 @@
             <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-3">
               <!-- Summary Message -->
               <div class="ingestion-summary-compact">
-                <div class="summary-text-compact text-body2">
+                <div class="summary-text-compact tw:text-sm">
                   <!-- Line 1: License Info -->
                   <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
                     <OIcon name="info" size="sm" class="tw:flex-shrink-0" />
@@ -283,7 +283,7 @@
                       "
                       name="warning"
                       size="18px"
-                      class="text-negative tw:flex-shrink-0"
+                      class="tw:text-red-500 tw:flex-shrink-0"
                     />
                     <OIcon
                       v-else-if="
@@ -292,13 +292,13 @@
                       "
                       name="check_circle"
                       size="18px"
-                      class="text-warning tw:flex-shrink-0"
+                      class="tw:text-amber-500 tw:flex-shrink-0"
                     />
                     <OIcon
                       v-else
                       name="check-circle"
                       size="sm"
-                      class="text-positive tw:flex-shrink-0"
+                      class="tw:text-green-500 tw:flex-shrink-0"
                     />
                     <span>
                       <span
@@ -313,8 +313,8 @@
                               t('about.limit_exceeded_days', {
                                 colorClass:
                                   licenseData?.ingestion_exceeded > 30
-                                    ? 'text-negative'
-                                    : 'text-warning',
+                                    ? 'tw:text-red-500'
+                                    : 'tw:text-amber-500',
                                 days: licenseData?.ingestion_exceeded,
                                 plural:
                                   licenseData?.ingestion_exceeded > 1
@@ -389,7 +389,7 @@
                   </div>
                   <div
                     v-if="isIngestionUnlimited"
-                    class="text-caption text-grey-6 tw:mt-1 tw:text-center"
+                    class="tw:text-xs tw:text-gray-400 tw:mt-1 tw:text-center"
                     style="font-size: 10px"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}
@@ -414,7 +414,7 @@
       @click:secondary="showLicenseKeyModal = false"
       @click:primary="copyLicenseKey"
     >
-      <div class="text-body2 q-mb-md">
+      <div class="tw:text-sm tw:mb-3">
         {{ t('about.your_complete_license_key') }}
       </div>
       <OTextarea

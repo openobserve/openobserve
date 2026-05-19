@@ -1,8 +1,8 @@
 <template>
-  <div class="row items-center">
-    <!-- <div class="q-mb-sm title" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+  <div class="tw:flex tw:items-center">
+    <!-- <div class="tw:mb-2 title" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
-      class="row no-wrap items-center q-mb-xs tw:gap-x-1"
+      class="tw:flex tw:flex-nowrap tw:items-center tw:mb-1 tw:gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -36,12 +36,12 @@
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="q-ml-sm and-border" :class="store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-grey-4'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="tw:ml-2 and-border" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'">AND</div> -->
     </div>
     <OButton
       variant="ghost"
       size="sm"
-      class="q-ml-xs q-mb-sm hideOnPrintMode"
+      class="tw:ml-1 tw:mb-2 hideOnPrintMode"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >

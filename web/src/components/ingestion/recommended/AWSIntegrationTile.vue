@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       secondary-button-label="Cancel"
       @click:secondary="showTemplateDialog = false"
     >
-      <div class="text-subtitle2 q-mb-md">
+      <div class="tw:text-sm tw:font-medium tw:mb-3">
         Select how you want to integrate {{ integration.displayName }}:
       </div>
       <ul class="aws-integration-options-list tw:flex tw:flex-col">

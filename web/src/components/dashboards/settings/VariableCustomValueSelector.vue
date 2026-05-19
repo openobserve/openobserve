@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="variableItem?.options || []"
       labelKey="label"
       valueKey="value"
-      class="textbox col no-case o2-custom-select-dashboard"
+      class="textbox tw:flex tw:flex-col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       data-test="dashboard-variable-custom-value-selector"
       :multiple="variableItem.multiSelect"

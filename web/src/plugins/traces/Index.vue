@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -189,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="card-container tw:h-full"
                   >
-                    <div class="text-center tw:pt-[2rem]">
+                    <div class="tw:text-center tw:pt-[2rem]">
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
-                        class="tw:text-[1.3rem] q-pt-lg"
+                        class="tw:text-[1.3rem] tw:pt-4"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
                         <OButton
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
-                      <div class="text-center">
+                      <div class="tw:text-center">
                         <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       data-test="logs-search-no-stream-selected-text"
-                      class="text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
+                      class="tw:text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
                     >
                       <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                       {{ t("search.noStreamSelectedMessage") }}
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.searchApplied &&
                       !searchObj.data.queryResults?.hits?.length
                     "
-                    class="text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
+                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
                     <OIcon name="info" size="md" />
                     {{ t("search.applySearch") }}
@@ -1214,7 +1214,7 @@ async function getQueryData(
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
+            errorMsg += ` <br><span class='tw:text-base tw:font-medium'>TraceID: ${trace_id}</span>`;
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";

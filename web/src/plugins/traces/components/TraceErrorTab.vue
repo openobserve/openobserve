@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="!hasSpanError"
-    class="full-width tw:flex tw:items-center tw:justify-center text-center q-pt-lg text-bold tab-content-dynamic-height tw:h-full"
+    class="tw:w-full tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-4 tw:font-bold tab-content-dynamic-height tw:h-full"
     data-test="trace-details-sidebar-no-error"
   >
     {{ t("traces.noErrorPresent") }}
@@ -151,13 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-@timestamp="{ row }">
         <div
           :data-test="`trace-event-detail-${row[timestampColumn]}`"
-          class="flex row items-center no-wrap cursor-pointer"
+          class="flex tw:flex tw:items-center tw:flex-nowrap cursor-pointer"
           @click="expandEvent(row._index)"
         >
           <OButton
             variant="ghost"
             size="icon-xs-sq"
-            class="q-mr-xs"
+            class="tw:mr-1"
             :data-test="`trace-details-sidebar-exceptions-table-expand-btn-${row._index}`"
             @click.capture.stop="expandEvent(row._index)"
           >
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></pre>
               </div>
               <div v-else class="stacktrace-empty">
-                <OIcon name="info" size="sm" class="q-mr-xs" />
+                <OIcon name="info" size="sm" class="tw:mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>
             </div>

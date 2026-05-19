@@ -1,7 +1,7 @@
 <template>
     <div data-test="alerts-container">
       <div data-test="alerts-container-header" class="tw:flex tw:justify-between cursor-pointer" @click="expanded = !expanded">
-        <div class="tw:flex tw:items-start tw:justify-between full-width ">
+        <div class="tw:flex tw:items-start tw:justify-between tw:w-full ">
 
           <div
             class="tw:text-[16px] tw:flex tw:items-start"

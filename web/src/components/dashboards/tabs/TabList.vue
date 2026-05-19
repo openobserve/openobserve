@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
-        <div class="full-width row justify-between no-wrap">
+        <div class="tw:w-full tw:flex tw:justify-between tw:flex-nowrap">
           <span
             style="
               white-space: nowrap;

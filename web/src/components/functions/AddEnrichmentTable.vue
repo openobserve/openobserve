@@ -16,23 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-    <div class="q-px-md q-py-md card-container tw:h-[calc(100vh-50px)]">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div v-if="isUpdating" class="text-h6">
+    <div class="tw:px-3 tw:py-3 card-container tw:h-[calc(100vh-50px)]">
+      <div class="tw:flex tw:items-center tw:flex-nowrap">
+        <div class="tw:flex tw:flex-col">
+          <div v-if="isUpdating" class="tw:text-xl tw:font-semibold">
             {{ t("function.updateEnrichmentTable") }}
           </div>
-          <div v-else class="text-h6">{{ t("function.addEnrichmentTable") }}</div>
+          <div v-else class="tw:text-xl tw:font-semibold">{{ t("function.addEnrichmentTable") }}</div>
         </div>
       </div>
 
       <OSeparator />
       <div>
-          <div class="row">
+          <div class="tw:flex">
             <OInput
               v-model="formData.name"
               :label="t('function.name')"
-              class="col-12 q-py-md"
+              class="tw:w-full tw:py-3"
               :readonly="isUpdating"
               :disabled="isUpdating"
               :error="!!nameError"
@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Data Source Selection (only for new tables) -->
-            <div v-if="!isUpdating" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold tw:mb-2">{{ t('function.dataSource') }}</div>
+            <div v-if="!isUpdating" class="tw:w-full tw:py-3">
+              <div class="tw:text-gray-500 tw:font-bold tw:mb-2">{{ t('function.dataSource') }}</div>
               <OOptionGroup
                 v-model="formData.source"
                 :options="sourceOptions"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isUpdating && formData.source === 'file'"
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
-              class="col-12 q-py-md"
+              class="tw:w-full tw:py-3"
               accept=".csv"
               :error="!!fileError"
               :error-message="fileError"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isUpdating && formData.source === 'file'"
               v-model="formData.file"
               :label="t('function.uploadCSVFile')"
-              class="col-12 q-py-md"
+              class="tw:w-full tw:py-3"
               accept=".csv"
               :error="!!fileError"
               :error-message="fileError"
@@ -75,17 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Append Toggle for File Upload (only when updating file-based tables) -->
-            <div v-if="isUpdating && formData.source === 'file'" class="col-12">
+            <div v-if="isUpdating && formData.source === 'file'" class="tw:w-full">
               <OSwitch
-                class="q-py-md lookup-table-append-toggle"
+                class="tw:py-3 lookup-table-append-toggle"
                 v-model="formData.append"
                 :label="t('function.appendData')"
               />
             </div>
 
             <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url'" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold tw:mb-2">Update Mode</div>
+            <div v-if="isUpdating && formData.source === 'url'" class="tw:w-full tw:py-3">
+              <div class="tw:text-gray-500 tw:font-bold tw:mb-2">Update Mode</div>
               <OOptionGroup
                 v-model="formData.updateMode"
                 :options="updateModeOptions"
@@ -94,13 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Show existing URLs (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="col-12 q-py-md">
-              <div class="text-grey-8 text-bold q-mb-sm" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
+            <div v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0" class="tw:w-full tw:py-3">
+              <div class="tw:text-gray-500 tw:font-bold tw:mb-2" style="font-size: 13px;">Existing URLs ({{ formData.urlJobs.length }})</div>
               <OCard class="tw:p-2" style="background-color: #fafafa;">
-                <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="q-mb-xs">
-                  <div class="row items-center q-gutter-x-xs">
+                <div v-for="(job, index) in formData.urlJobs" :key="job.id" class="tw:mb-1">
+                  <div class="tw:flex tw:items-center q-gutter-x-xs">
                     <div class="col-auto">
-                      <span class="text-weight-medium text-grey-7" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
+                      <span class="text-weight-medium tw:text-gray-400" style="font-size: 12px;">{{ Number(index) + 1 }}.</span>
                     </div>
                     <div class="col-auto">
                       <OIcon
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="{'rotate-animation': job.status === 'processing'}"
                       />
                     </div>
-                    <div class="col text-grey-8" style="font-size: 13px; word-break: break-all;">
+                    <div class="tw:flex tw:flex-col tw:text-gray-500" style="font-size: 13px; word-break: break-all;">
                       {{ job.url }}
                     </div>
                   </div>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
-            <div v-if="isUpdating && formData.source === 'url'" class="col-12">
+            <div v-if="isUpdating && formData.source === 'url'" class="tw:w-full">
               <div class="tw:text-sm tw:text-gray-600 tw:mb-4 tw:p-3 tw:rounded-lg" :class="{
                 'tw:bg-blue-50': formData.updateMode === 'reload',
                 'tw:bg-green-50': formData.updateMode === 'append',
@@ -146,11 +146,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- URL input field for append, replace_failed, or replace mode (only when updating URL-based tables) -->
-            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')" class="col-12">
+            <div v-if="isUpdating && formData.source === 'url' && (formData.updateMode === 'append' || formData.updateMode === 'replace_failed' || formData.updateMode === 'replace')" class="tw:w-full">
               <OInput
                 v-model="formData.url"
                 :label="formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'"
-                class="q-py-md"
+                class="tw:py-3"
                 placeholder="https://example.com/data.csv"
                 :error="!!urlError"
                 :error-message="urlError"
@@ -170,11 +170,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- From URL Option (only for new tables) -->
-            <div v-if="!isUpdating && formData.source === 'url'" class="col-12">
+            <div v-if="!isUpdating && formData.source === 'url'" class="tw:w-full">
               <OInput
                 v-model="formData.url"
                 label="CSV File URL"
-                class="q-py-md"
+                class="tw:py-3"
                 placeholder="https://example.com/data.csv"
                 :error="!!urlError"
                 :error-message="urlError"
@@ -189,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <pre v-if="compilationErr" class="q-py-md showLabelOnTop text-bold text-h7">{{
+          <pre v-if="compilationErr" class="tw:py-3 showLabelOnTop tw:font-bold text-h7">{{
             compilationErr
           }}</pre>
 
-          <div class="flex justify-start q-mt-md tw:gap-2">
+          <div class="flex tw:justify-start tw:mt-3 tw:gap-2">
             <OButton
               variant="outline"
               size="sm-action"

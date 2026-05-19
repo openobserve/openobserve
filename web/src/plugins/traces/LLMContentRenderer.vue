@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="hasValidContent" class="llm-content-renderer tw:h-full">
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content">
-      <div v-if="toolMetadata" class="tool-metadata q-mb-sm">
+      <div v-if="toolMetadata" class="tool-metadata tw:mb-2">
         <OBadge
           v-if="toolMetadata.name"
           variant="warning"
-          class="q-mr-sm"
+          class="tw:mr-2"
         >{{ `Tool: ${toolMetadata.name}` }}</OBadge>
         <OBadge
           v-if="toolMetadata.callId"
@@ -73,14 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
-              class="message-item q-mb-sm tw:h-full"
+              class="message-item tw:mb-2 tw:h-full"
               :style="{
                 border: '1px solid var(--o2-border)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role text-caption text-bold q-pa-sm tw:capitalize"
+                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--o2-border)',
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json q-pa-sm tw:h-full"
+                class="message-content-json tw:p-2 tw:h-full"
                 style="background-color: var(--o2-code-bg)"
               >
                 <CodeQueryEditor
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body q-pa-sm tw:overflow-x-auto"
+                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
                 style="background-color: var(--o2-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="expand-indicator q-mt-sm">
+        <div class="expand-indicator tw:mt-2">
           <OButton
             variant="ghost-primary"
             size="sm"
@@ -173,14 +173,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
-              class="message-item q-mb-sm tw:h-full"
+              class="message-item tw:mb-2 tw:h-full"
               :style="{
                 border: '1px solid var(--o2-border)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role text-caption text-bold q-pa-sm tw:capitalize"
+                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--o2-border)',
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json q-pa-sm tw:h-full"
+                class="message-content-json tw:p-2 tw:h-full"
                 style="background-color: var(--o2-code-bg)"
               >
                 <CodeQueryEditor
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body q-pa-sm tw:overflow-x-auto"
+                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
                 style="background-color: var(--o2-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div v-if="contentStats.shouldTruncate" class="collapse-btn q-mt-sm">
+        <div v-if="contentStats.shouldTruncate" class="collapse-btn tw:mt-2">
           <OButton
             variant="ghost-primary"
             size="sm"

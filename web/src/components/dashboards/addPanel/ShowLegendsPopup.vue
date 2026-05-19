@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-show-legends-dialog"
   >
     <template #header-right>
-      <div class="flex items-center">
-        <span class="legend-count q-mr-md" style="font-size: 14px" data-test="dashboard-show-legends-count">
+      <div class="flex tw:items-center">
+        <span class="legend-count tw:mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
@@ -47,17 +47,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-show-legends-popup"
     >
       <div class="legends-content scroll">
-        <div v-if="legends.length === 0" class="no-legends q-pa-md text-center">
+        <div v-if="legends.length === 0" class="no-legends tw:p-3 tw:text-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
         <div v-else class="legends-list">
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item q-px-sm q-py-xs"
+            class="legend-item tw:px-2 tw:py-1"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="flex items-center legend-row">
+            <div class="flex tw:items-center legend-row">
               <div
                 class="legend-color-box"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"

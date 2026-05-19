@@ -14,29 +14,29 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md q-pa-none o2-custom-bg"
+  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <div
-      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
+      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
     >
-      <div class="flex items-center tw:h-[60px]">
+      <div class="flex tw:items-center tw:h-[60px]">
         <div
           no-caps
             padding="xs"
             outline
             icon="arrow_back_ios_new"
-            class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+            class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col" data-test="add-template-title">
-          <div v-if="isUpdatingTemplate" class="text-h6">
+        <div class="tw:flex tw:flex-col" data-test="add-template-title">
+          <div v-if="isUpdatingTemplate" class="tw:text-xl tw:font-semibold">
             {{ t("alert_templates.updateTitle") }}
           </div>
-          <div v-else class="text-h6">
+          <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("alert_templates.addTitle") }}
           </div>
         </div>
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="card-container tw:h-full tw:flex tw:flex-col">
-          <div class="q-pa-md tw:overflow-auto">
-            <div class="col-12 q-pb-sm q-pt-sm o2-input">
+          <div class="tw:p-3 tw:overflow-auto">
+            <div class="tw:w-full tw:pb-2 tw:pt-2 o2-input">
             <OInput
               data-test="add-template-name-input"
               v-model="formData.name"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="nameError = ''"
             />
           </div>
-          <div class="col-12 q-pb-md">
+          <div class="tw:w-full tw:pb-3">
             <div class="app-tabs-container tw:w-fit">
               <app-tabs
                 class="tabs-selection-container"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div v-if="formData.type === 'email'" class="col-12 q-pt-xs o2-input">
+          <div v-if="formData.type === 'email'" class="tw:w-full tw:pt-1 o2-input">
             <OInput
               data-test="add-template-email-title-input"
               v-model="formData.title"
@@ -84,9 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="titleError = ''"
             />
           </div>
-          <div class="col-12 q-pb-md">
+          <div class="tw:w-full tw:pb-3">
             <div
-              class="q-pb-sm text-bold"
+              class="tw:pb-2 tw:font-bold"
               data-test="add-template-body-input-title"
             >
               {{ t("alert_templates.body") + " *" }}
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor q-mb-md"
+                class="monaco-editor tw:mb-3"
                 language="markdown"
                 v-model:query="formData.body"
               />
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="template-body-editor"
                 ref="queryEditorRef"
                 editor-id="template-body-editor"
-                class="monaco-editor q-mb-md"
+                class="monaco-editor tw:mb-3"
                 language="json"
                 v-model:query="formData.body"
               />
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end tw:gap-2 q-px-lg q-py-lg full-width tw:bg-[var(--q-card-background)]"
+            class="flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)]"
           >
             <OButton
               v-close-popup
@@ -134,13 +134,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="q-px-sm q-pt-sm tw:h-full tw:overflow-auto card-container"
+          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container"
         >
-          <div class="text-bold q-py-sm q-px-xs text-subtitle2">
+          <div class="tw:font-bold tw:py-2 tw:px-1 tw:text-sm tw:font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
           <OSeparator class="tw:w-full" />
-          <div class="q-py-md q-px-xs">
+          <div class="tw:py-3 tw:px-1">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
@@ -154,18 +154,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div><b>All of the stream fields are variables.</b></div>
             <div>{rows:N} {var:N} used to limit rows or string length.</div>
           </div>
-          <div class="q-pb-md q-px-xs">
-            <div class="text-bold text-body-1 q-pb-sm">
+          <div class="tw:pb-3 tw:px-1">
+            <div class="tw:font-bold text-body-1 tw:pb-2">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
             <div
               v-for="(template, index) in sampleTemplates"
-              class="q-pb-md"
+              class="tw:pb-3"
               :key="template.name"
               :data-test="`add-template-sample-template-${index}`"
             >
-              <div class="flex justify-between items-center">
-                <div class="q-pb-xs">{{ template.name }}</div>
+              <div class="flex tw:justify-between tw:items-center">
+                <div class="tw:pb-1">{{ template.name }}</div>
                 <OIcon
                   data-test="add-template-sample-template-copy-btn"
                   class="cursor-pointer"
@@ -176,9 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="add-template q-px-sm rounded-borders"
+                class="add-template tw:px-2 tw:rounded"
               >
-                <pre class="example-template-body q-my-0">
+                <pre class="example-template-body tw:my-0">
                     {{ template.body }}
                   </pre
                 >

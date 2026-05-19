@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="row no-wrap tw:h-[0.85rem] tw:rounded tw:overflow-hidden tw:w-full tw:bg-[var(--o2-border-color)]"
+    class="tw:flex tw:flex-nowrap tw:h-[0.85rem] tw:rounded tw:overflow-hidden tw:w-full tw:bg-[var(--o2-border-color)]"
   >
     <div
       v-for="[service, svc] in serviceEntries"

@@ -19,19 +19,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - var(--navbar-height));">
     <div>
       <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
       >
 
         <div
-            class="q-table__title full-width tw:font-[600]"
+            class="q-table__title tw:w-full tw:font-[600]"
             data-test="service-accounts-title-text"
           >
             {{ t("serviceAccounts.header") }}
           </div>
-          <div class="full-width tw:flex tw:justify-end tw:gap-3">
+          <div class="tw:w-full tw:flex tw:justify-end tw:gap-3">
             <OInput
                 v-model="filterQuery"
                 class="tw:h-[36px] tw:w-[200px]"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span class="text-weight-medium">AI SRE Agent</span>
-                <OBadge variant="primary-soft" size="sm" class="q-ml-sm">system</OBadge>
+                <OBadge variant="primary-soft" size="sm" class="tw:ml-2">system</OBadge>
               </template>
               <template v-else>{{ row.email }}</template>
             </template>
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
         <!-- Token section taking 75% of the width -->
         <div
-          class="text-h6 text-center tw:truncate el-border"
+          class="tw:text-xl tw:font-semibold tw:text-center tw:truncate el-border"
           style="flex: 3; padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
         >
           {{ serviceToken }}
@@ -222,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="q-pt-md flex items-center warning-text">
-        <OIcon name="info" class="q-mr-xs" size="sm" />
+      <div class="tw:pt-3 flex tw:items-center warning-text">
+        <OIcon name="info" class="tw:mr-1" size="sm" />
         <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
       </div>
     </ODialog>

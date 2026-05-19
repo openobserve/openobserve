@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="full-width column flex-center q-gutter-sm justify-center"
+    class="tw:w-full column flex-center tw:gap-2 tw:justify-center"
     style="font-size: 1.5rem; margin: 20vh auto 2rem"
   >
     <svg width="238" height="231" viewBox="0 0 238 231" fill="none" xmlns="http://www.w3.org/2000/svg" class="no-data-image">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </defs>
     </svg>
 	
-    <div class="q-ma-none">{{ t("ticket.noDataErrorMsg") }}</div>
+    <div class="tw:m-0">{{ t("ticket.noDataErrorMsg") }}</div>
   </div>
 </template>
 

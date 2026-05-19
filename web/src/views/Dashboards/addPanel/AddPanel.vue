@@ -18,14 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div style="overflow-y: auto" class="scroll">
     <!-- Header Section -->
-    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
+    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1">
       <div
-        class="flex items-center q-pa-sm card-container"
+        class="flex tw:items-center tw:p-2 card-container"
         :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
       >
         <div
-          class="flex items-center"
-          :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+          class="flex tw:items-center"
+          :class="!store.state.isAiChatEnabled ? 'tw:mr-3' : 'tw:mr-2'"
         >
           <span class="q-table__title">
             {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
@@ -35,12 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-name"
               v-model="dashboardPanelData.data.title"
               :label="t('panel.name') + '*'"
-              class="q-ml-xl dynamic-input"
+              class="tw:ml-6 dynamic-input"
               :style="inputStyle"
             />
           </div>
         </div>
-        <div class="flex q-gutter-sm">
+        <div class="flex tw:gap-2">
           <OButton
             variant="outline"
             size="sm"

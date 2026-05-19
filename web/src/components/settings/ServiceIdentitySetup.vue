@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:w-full service-identity-setup q-mt-sm"
+    class="tw:w-full service-identity-setup tw:mt-2"
     :class="{ 'sis-dark': store.state.theme === 'dark' }"
   >
     <!-- Loading skeleton while fetching recommendations -->
@@ -105,16 +105,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:rounded-lg tw:p-2.5"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-grey-9/60'
-                    : 'tw:bg-grey-1'
+                    ? 'tw:bg-gray-700/60'
+                    : 'tw:bg-gray-50'
                 "
               >
                 <div
                   class="tw:text-xs tw:font-medium tw:mb-2"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-grey-4'
-                      : 'tw:text-grey-7'
+                      ? 'tw:text-gray-300'
+                      : 'tw:text-gray-400'
                   "
                 >
                   {{ t("settings.correlation.serviceNameExpandedHelp") }}
@@ -130,8 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px solid var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-grey-8 tw:text-grey-2'
-                        : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                        ? 'tw:bg-gray-600 tw:text-gray-100'
+                        : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
                     "
                   >
                     <div class="tw:flex tw:items-center tw:gap-0.5 tw:mr-0.5">
@@ -158,8 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px dashed var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-6'
-                        : 'tw:text-grey-5'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                     :title="
                       t('settings.correlation.serviceNameConfiguredNotSeen')
@@ -177,8 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:flex tw:flex-wrap tw:items-center tw:gap-3 tw:text-[10px]"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                   >
                     <div class="tw:flex tw:items-center tw:gap-1">
@@ -257,8 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-6'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               {{ t("settings.correlation.serviceOptionalHelp") }}
@@ -277,8 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:text-xs tw:mb-3"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-6'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               {{ t("settings.correlation.distinguishByHelp") }}
@@ -290,17 +290,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-3 tw:px-4 tw:rounded-md tw:border tw:border-dashed"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:border-grey-7 tw:bg-grey-9/40'
-                  : 'tw:border-grey-4 tw:bg-grey-1'
+                  ? 'tw:border-grey-7 tw:bg-gray-700/40'
+                  : 'tw:border-grey-4 tw:bg-gray-50'
               "
             >
-              <OIcon name="tune" size="lg" class="tw:text-grey-5 tw:mb-1" />
+              <OIcon name="tune" size="lg" class="tw:text-gray-400 tw:mb-1" />
               <span
                 class="tw:text-sm tw:font-medium"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-grey-4'
-                    : 'tw:text-grey-7'
+                    ? 'tw:text-gray-300'
+                    : 'tw:text-gray-400'
                 "
               >
                 No fields configured yet
@@ -352,8 +352,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-[10px] tw:font-bold"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                   >
                     {{ getIdentitySetLabel(envKey) }}
@@ -371,8 +371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="border: 1px solid var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
-                        : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                        ? 'tw:bg-gray-700 tw:text-gray-100 tw:shadow-sm'
+                        : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
                     "
                   >
                     <span>{{
@@ -609,16 +609,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:rounded-lg tw:p-2.5"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:bg-grey-9/60'
-                  : 'tw:bg-grey-1'
+                  ? 'tw:bg-gray-700/60'
+                  : 'tw:bg-gray-50'
               "
             >
               <div
                 class="tw:text-xs tw:mb-3"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-grey-5'
-                    : 'tw:text-grey-6'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-400'
                 "
               >
                 Only these field alias groups are used for workload detection
@@ -640,8 +640,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="border: 1px solid var(--o2-border-color)"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-grey-9 tw:text-grey-2 tw:shadow-sm'
-                      : 'tw:bg-white tw:text-grey-8 tw:shadow-sm'
+                      ? 'tw:bg-gray-700 tw:text-gray-100 tw:shadow-sm'
+                      : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
                   "
                 >
                   <span>{{ alias.label }}</span>
@@ -739,7 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="tw:text-xs"
             :class="
-              store.state.theme === 'dark' ? 'tw:text-grey-5' : 'tw:text-grey-6'
+              store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
             "
           >
             We discovered these deployment patterns in your streams. Use them to
@@ -765,11 +765,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               activeEnvironment === env.key
                 ? store.state.theme === 'dark'
-                  ? 'tw:text-grey-1'
-                  : 'tw:text-grey-9'
+                  ? 'tw:text-gray-500-1'
+                  : 'tw:text-gray-600'
                 : store.state.theme === 'dark'
-                  ? 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-3'
-                  : 'tw:bg-transparent tw:text-grey-5 tw:border-transparent hover:tw:text-grey-7'
+                  ? 'tw:bg-transparent tw:text-gray-400 tw:border-transparent hover:tw:text-gray-200'
+                  : 'tw:bg-transparent tw:text-gray-400 tw:border-transparent hover:tw:text-gray-400'
             "
             :style="
               activeEnvironment === env.key
@@ -783,7 +783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
               "
-              class="tw:absolute tw:top-1 tw:right-1 tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-positive"
+              class="tw:absolute tw:top-1 tw:right-1 tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-green-500"
               :title="`${(setDistinguishBy[env.key] ?? []).filter(Boolean).length} field(s) configured`"
             />
           </div>
@@ -799,7 +799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
               <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-                <OIcon name="add" size="sm" class="tw:text-grey-5" />
+                <OIcon name="add" size="sm" class="tw:text-gray-400" />
               </div>
 
               <!-- Dim card -->
@@ -821,8 +821,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-[11px] tw:font-medium"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-4'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-300'
+                        : 'tw:text-gray-400'
                     "
                     >{{ card.label }}</span
                   >
@@ -872,8 +872,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="dim-stat-pill tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer hover:tw:opacity-70 tw:transition-opacity"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'tw:text-grey-4'
-                            : 'tw:text-grey-6'
+                            ? 'tw:text-gray-300'
+                            : 'tw:text-gray-400'
                         "
                         >+{{ card.values.length - 5 }}</span
                       >
@@ -881,7 +881,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
                       :class="
-                        store.state.theme === 'dark' ? 'tw:bg-grey-10' : ''
+                        store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''
                       "
                     >
                       <span
@@ -925,8 +925,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               <span
@@ -938,8 +938,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               <span
@@ -951,8 +951,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               <span
@@ -973,21 +973,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2.5"
           :class="
-            store.state.theme === 'dark' ? 'tw:bg-grey-9/30' : 'tw:bg-grey-1/30'
+            store.state.theme === 'dark' ? 'tw:bg-gray-700/30' : 'tw:bg-gray-50/30'
           "
         >
           <div
             class="tw:flex-1 tw:min-w-0 tw:text-xs tw:truncate"
             :class="
-              store.state.theme === 'dark' ? 'tw:text-grey-4' : 'tw:text-grey-7'
+              store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-400'
             "
           >
             <span
               class="tw:font-bold"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-2'
-                  : 'tw:text-grey-8'
+                  ? 'tw:text-gray-100'
+                  : 'tw:text-gray-500'
               "
               >Recommended:</span
             >
@@ -1020,8 +1020,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:open="insightDialogOpen"
           :width="insightPanelWidthPct"
         >
-          <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
-               containing the title + tooltip; second line is a conditional coverage row with icon.
+          <!-- #header kept: first line combines plain subtitle text with an tw:inline theme-colored badge
+               containing the title + tooltip; second line is a conditional coverage tw:flex with icon.
                Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
             <div class="tw:flex-1 tw:min-w-0">
@@ -1051,11 +1051,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-grey-4'
-                    : 'tw:text-grey-6'
+                    ? 'tw:text-gray-300'
+                    : 'tw:text-gray-400'
                 "
               >
-                <OIcon name="verified" size="xs" class="tw:text-positive" />
+                <OIcon name="verified" size="xs" class="tw:text-green-500" />
                 <span
                   >{{ insightData.coverage }}% of services
                   <span
@@ -1080,8 +1080,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-grey-5'
-                    : 'tw:text-grey-5'
+                    ? 'tw:text-gray-400'
+                    : 'tw:text-gray-400'
                 "
               >
                 Stream Sources
@@ -1099,8 +1099,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-grey-4'
-                      : 'tw:text-grey-6'
+                      ? 'tw:text-gray-300'
+                      : 'tw:text-gray-400'
                   "
                 >
                   <span
@@ -1133,8 +1133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:text-[11px] tw:font-medium tw:mb-3"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-grey-5'
-                  : 'tw:text-grey-5'
+                  ? 'tw:text-gray-400'
+                  : 'tw:text-gray-400'
               "
             >
               All values ({{ insightData.children.length }})
@@ -1155,8 +1155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-4'
-                        : 'tw:text-grey-6'
+                        ? 'tw:text-gray-300'
+                        : 'tw:text-gray-400'
                     "
                     >{{ child.count }} {{ insightData.childCountLabel }}</span
                   >
@@ -1165,8 +1165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-grey-8'
-                      : 'tw:bg-grey-2'
+                      ? 'tw:bg-gray-600'
+                      : 'tw:bg-gray-100'
                   "
                 >
                   <div
@@ -1199,8 +1199,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:bg-grey-9 tw:text-grey-5'
-                  : 'tw:bg-blue-1/40 tw:text-grey-6'
+                  ? 'tw:bg-gray-700 tw:text-gray-400'
+                  : 'tw:bg-blue-1/40 tw:text-gray-400'
               "
             >
               <OIcon name="info" size="xs" />
@@ -1231,8 +1231,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tw:text-[13px] tw:font-bold tw:mb-2"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-grey-3'
-                      : 'tw:text-grey-8'
+                      ? 'tw:text-gray-200'
+                      : 'tw:text-gray-500'
                   "
                 >
                   {{ dim.label }}
@@ -1240,8 +1240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:font-normal"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-5'
-                        : 'tw:text-grey-5'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                     >({{ dim.values.length }})</span
                   >
@@ -1275,8 +1275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw:text-xs tw:italic"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-grey-6'
-                        : 'tw:text-grey-5'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                     >No values</span
                   >
@@ -1358,11 +1358,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Left Pane: Streams List -->
             <div
-              class="tw:w-1/3 tw:border-r tw:bg-grey-1 dark:tw:bg-dark tw:flex tw:flex-col"
+              class="tw:w-1/3 tw:border-r tw:bg-gray-50 dark:tw:bg-dark tw:flex tw:flex-col"
             >
               <!-- Static column header — never scrolls, never gets covered -->
               <div
-                class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
+                class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-gray-400 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
                 :style="{
                   backgroundColor:
                     store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
@@ -1374,7 +1374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (t) => selectedFieldAnalytics.sample_values[t],
                   )
                 }}</span>
-                <span class="tw:text-grey-5">Streams</span>
+                <span class="tw:text-gray-400">Streams</span>
               </div>
 
               <!-- Scrollable content -->
@@ -1414,7 +1414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-grey-5 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
+                      class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-gray-400 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
                       :style="{
                         backgroundColor:
                           store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
@@ -1460,7 +1460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{ 'tw:border-l': colIdx > 0 }"
               >
                 <div
-                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-grey-7 tw:sticky tw:top-0 tw:z-10 tw:border-b"
+                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-gray-400 tw:sticky tw:top-0 tw:z-10 tw:border-b"
                   :style="{
                     backgroundColor:
                       store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
@@ -1496,7 +1496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="getPopupColumnValues(colIdx).length === 0"
-                    class="tw:text-grey-5 tw:text-xs tw:italic tw:p-2"
+                    class="tw:text-gray-400 tw:text-xs tw:italic tw:p-2"
                   >
                     No values
                   </div>
@@ -1505,14 +1505,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Fallback when no ranked dims beyond the selected field -->
               <div
                 v-if="popupColumns.length === 0"
-                class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-grey-5 tw:text-sm tw:italic"
+                class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-gray-400 tw:text-sm tw:italic"
               >
                 No additional dimensions detected.
               </div>
             </div>
           </div>
 
-          <div v-else class="text-grey tw:italic tw:p-4 tw:text-center">
+          <div v-else class="tw:text-gray-500 tw:italic tw:p-4 tw:text-center">
             No sample data available for this field.
           </div>
         </OCardSection>
@@ -2136,7 +2136,7 @@ function formatDimLabels(dims: any[]): string {
   return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
 }
 
-/** Returns inline style for selected dimension pill — subtle primary highlight */
+/** Returns tw:inline style for selected dimension pill — subtle primary highlight */
 function getDimSelectedStyle(_color: string): Record<string, string> {
   const isDark = store.state.theme === "dark";
   return {
@@ -3302,7 +3302,7 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
 
 /**
  * Whether the current fields are from auto-suggestion (no saved config existed).
- * We track this so we can show an inline hint only on first setup.
+ * We track this so we can show an tw:inline hint only on first setup.
  */
 const isAutoSuggested = computed(() => {
   return (
@@ -3311,7 +3311,7 @@ const isAutoSuggested = computed(() => {
   );
 });
 
-/** Options for the inline "add field" select for a specific env */
+/** Options for the tw:inline "add field" select for a specific env */
 function getAddFieldOptionsForEnv(envKey: string) {
   // Exclude fields already added in the current env AND all other envs
   const allUsedFields = Object.values(setDistinguishBy.value)
@@ -3335,7 +3335,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
     });
 }
 
-/** Called when user picks a field in the inline select for a specific env */
+/** Called when user picks a field in the tw:inline select for a specific env */
 function onAddFieldToEnv(envKey: string, val: string) {
   if (!val) return;
   const current = setDistinguishBy.value[envKey] ?? [];

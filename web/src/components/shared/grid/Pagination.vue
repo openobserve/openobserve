@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <div
-    :class="position === 'bottom' ? 'q-py-sm' : 'q-pt-sm'"
-    class="q-table__control full-width row justify-between"
+    :class="position === 'bottom' ? 'tw:py-2' : 'tw:pt-2'"
+    class="q-table__control tw:w-full tw:flex tw:justify-between"
   >
     <div
       v-if="position === 'bottom' && maxRecords"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="position === 'top' && pageTitle"
-      class="text-bold row items-center"
+      class="tw:font-bold tw:flex tw:items-center"
     >
       <OButton
         v-if="
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="q-mr-sm"
+        class="tw:mr-2"
         @click="toggleSidePanel"
       >
         <img
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         variant="ghost"
         size="icon"
-        class="q-mr-sm"
+        class="tw:mr-2"
         @click="toggleSidePanel"
       >
         <img
@@ -68,12 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           height="16"
         />
       </OButton>
-      <div class="q-ml-xs">
+      <div class="tw:ml-1">
         {{ resultTotal }}
         {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
       </div>
     </div>
-    <div class="q-table__control q-ml-auto">
+    <div class="q-table__control tw:ml-auto">
       <span class="q-table__bottom-item">
         {{ t("search.showing") }}
         {{
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         of {{ resultTotal }} -->
       </span>
 
-      <div v-if="position === 'bottom'" class="flex items-center">
+      <div v-if="position === 'bottom'" class="flex tw:items-center">
         <OSeparator vertical class="tw:my-2 tw:mr-4" />
 
         <span class="q-table__bottom-item">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="q-mr-md"
+          class="tw:mr-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />

@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
-    <div v-if="fieldsByType.fts.length > 0" class="q-mb-sm">
-      <div class="text-caption text-weight-medium q-mb-xs">
+    <div v-if="fieldsByType.fts.length > 0" class="tw:mb-2">
+      <div class="tw:text-xs text-weight-medium tw:mb-1">
         Full Text Search ({{ fieldsByType.fts.length }})
       </div>
       <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="field.name"
           variant="primary-soft"
           size="sm"
-          class="q-mr-xs q-mb-xs"
+          class="tw:mr-1 tw:mb-1"
         >
           {{ field.name }}
           <template #trailing>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
-      <div class="text-caption text-weight-medium q-mb-xs">
+      <div class="tw:text-xs text-weight-medium tw:mb-1">
         Secondary Index ({{ fieldsByType.secondaryIndex.length }})
       </div>
       <div class="performance-fields-container bordered-scroll-area" :class="store.state.theme === 'dark' ? 'bordered-scroll-area-dark' : 'bordered-scroll-area-light'">
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="field.name"
           variant="success-soft"
           size="sm"
-          class="q-mr-xs q-mb-xs"
+          class="tw:mr-1 tw:mb-1"
         >
           {{ field.name }}
           <template #trailing>

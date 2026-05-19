@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-sm add-dashboard-form-card-section">
+  <div class="tw:px-3 tw:py-2 add-dashboard-form-card-section">
       <OForm ref="addDashboardForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
         <OInput
           v-if="beingUpdated"

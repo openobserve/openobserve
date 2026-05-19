@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full q-pa-none" >
+  <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full tw:p-0" >
     <div
-      class="flex justify-start q-px-md q-py-sm card-container tw:flex-shrink-0"
+      class="flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     >
-      <div class="q-mr-md">
+      <div class="tw:mr-3">
         <div
           data-test="iam-roles-selection-show-toggle"
-          class="flex items-center"
+          class="flex tw:items-center"
         >
           <span
             data-test="iam-roles-selection-show-text"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Show
           </span>
           <div
-            class="q-ml-xs"
+            class="tw:ml-1"
             style="
               border: 1px solid #d7d7d7;
               width: fit-content;
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-roles-selection-search-input"
-        class="q-mr-md"
+        class="tw:mr-3"
         style="width: 400px"
       >
         <OInput

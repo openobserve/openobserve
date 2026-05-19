@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-global-filter="false"
   >
     <template #empty>
-      <div v-if="!loadingState" class="text-center full-width full-height">
+      <div v-if="!loadingState" class="tw:text-center tw:w-full full-height">
         <NoData />
       </div>
-      <div v-else class="text-center full-width full-height q-mt-lg">
+      <div v-else class="tw:text-center tw:w-full full-height tw:mt-4">
         <OSpinner size="md" />
       </div>
     </template>

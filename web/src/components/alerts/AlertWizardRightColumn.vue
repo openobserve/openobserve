@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               :name="evaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" size="sm"
               class="tw:text-xs tw:flex-shrink-0"
-              :class="evaluationStatus.wouldTrigger ? 'text-positive' : 'text-grey-6'"
+              :class="evaluationStatus.wouldTrigger ? 'tw:text-green-500' : 'tw:text-gray-400'"
             />
             <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}

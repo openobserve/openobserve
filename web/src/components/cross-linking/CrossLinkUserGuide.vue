@@ -3,7 +3,7 @@
     <OButton
       variant="ghost"
       size="icon-sm"
-      class="q-ml-sm"
+      class="tw:ml-2"
       @click="onUserGuideClick"
       data-test="cross-link-help-btn"
     >

@@ -40,7 +40,7 @@ export default {
         variant="ghost"
         size="md"
         :class="`o2vf_node_${node.io_type}`"
-        class="q-pa-none btn-fixed-width node-draggable"
+        class="tw:p-0 btn-fixed-width node-draggable"
         style="width: 170px; justify-content: flex-start"
         :draggable="true"
         @dragstart="onDragStart($event, node)"
@@ -75,7 +75,7 @@ export default {
         </div>
       </OButton>
       <div v-else>
-        <div class="q-mb-xs text-subtitle1">
+        <div class="tw:mb-1 tw:text-base tw:font-medium">
           <div>{{ node.label }}</div>
           <OSeparator />
         </div>

@@ -2,8 +2,8 @@
   <div class="promql-query-builder tw:px-[0.625rem]">
     <OCard>
       <OCardSection role="header">
-        <div class="text-h5">PromQL Query Builder</div>
-        <div class="text-subtitle2 text-grey-7">
+        <div class="tw:text-2xl tw:font-semibold">PromQL Query Builder</div>
+        <div class="tw:text-sm tw:font-medium tw:text-gray-400">
           Build and test PromQL queries visually
         </div>
       </OCardSection>
@@ -36,21 +36,21 @@
 
       <!-- Generated Query Display -->
       <OCardSection>
-        <div class="text-subtitle1 q-mb-sm">Generated PromQL Query:</div>
-        <OCard class="bg-grey-1">
+        <div class="tw:text-base tw:font-medium tw:mb-2">Generated PromQL Query:</div>
+        <OCard class="tw:bg-gray-50">
           <OCardSection>
             <pre class="query-output">{{ generatedQuery || "No query built yet" }}</pre>
           </OCardSection>
         </OCard>
 
-        <div class="q-mt-md row q-gutter-sm">
+        <div class="tw:mt-3 tw:flex tw:gap-2">
           <OButton
             variant="primary"
             size="sm-action"
             @click="copyQuery"
             :disabled="!generatedQuery"
           >
-            <OIcon name="content-copy" size="xs" class="q-mr-xs" />
+            <OIcon name="content-copy" size="xs" class="tw:mr-1" />
             Copy Query
           </OButton>
           <OButton
@@ -58,7 +58,7 @@
             size="sm-action"
             @click="clearQuery"
           >
-            <OIcon name="close" size="xs" class="q-mr-xs" />
+            <OIcon name="close" size="xs" class="tw:mr-1" />
             Clear All
           </OButton>
           <OButton
@@ -67,7 +67,7 @@
             @click="testQuery"
             :disabled="!generatedQuery"
           >
-            <OIcon name="play-arrow" size="xs" class="q-mr-xs" />
+            <OIcon name="play-arrow" size="xs" class="tw:mr-1" />
             Test Query
           </OButton>
         </div>
@@ -75,8 +75,8 @@
 
       <!-- Query Result Preview -->
       <OCardSection v-if="queryResult">
-        <div class="text-subtitle1 q-mb-sm">Query Result Preview:</div>
-        <OCard class="bg-grey-1">
+        <div class="tw:text-base tw:font-medium tw:mb-2">Query Result Preview:</div>
+        <OCard class="tw:bg-gray-50">
           <OCardSection>
             <pre class="result-output">{{ queryResult }}</pre>
           </OCardSection>

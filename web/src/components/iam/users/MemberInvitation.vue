@@ -15,31 +15,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div
-      class="col-12 flex tw:ml-2"
+      class="tw:w-full flex tw:ml-2"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
 
 
       <div
-        class="row invite-user"
+        class="tw:flex invite-user"
         style="width: calc(100% - 110px); display: inline-flex"
       >
         <OInput
           v-model="userEmail"
           :placeholder="t('user.inviteByEmail')"
           style="width: calc(100% - 120px)"
-          class="q-pr-sm"
+          class="tw:pr-2"
         />
-        <div class="flex justify-center">
+        <div class="flex tw:justify-center">
           <OSelect
             v-model="selectedRole"
             :options="options"
             labelKey="label"
             valueKey="value"
             style="width: 120px"
-            class="q-pr-sm"
+            class="tw:pr-2"
           />
         </div>
       </div>

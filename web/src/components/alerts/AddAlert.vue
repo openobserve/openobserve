@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width q-mx-lg q-pt-xs">
+  <div class="tw:w-full tw:mx-4 tw:pt-1">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ anomalyConfig.name }}
                 <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
               </span>
-              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="text-caption">{{ anomalyConfig.status }}</OBadge>
+              <OBadge v-if="anomalyConfig.status" :variant="anomalyStatusVariant" class="tw:text-xs">{{ anomalyConfig.status }}</OBadge>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="tw:text-[11px] tw:whitespace-nowrap"

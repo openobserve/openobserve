@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row q-mt-lg q-ml-xs">
-    <div class="col-12">
-      <div class="tags-title text-bold q-mb-xs">{{ t("rum.errorStack") }}</div>
-      <div class="q-mb-sm">{{ error_stack[0] }}</div>
+  <div class="tw:flex tw:mt-4 tw:ml-1">
+    <div class="tw:w-full">
+      <div class="tags-title tw:font-bold tw:mb-1">{{ t("rum.errorStack") }}</div>
+      <div class="tw:mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
       <OTabs
         v-model="activeTab"
         dense
-        class="text-grey q-mb-xs"
+        class="tw:text-gray-500 tw:mb-1"
         align="left"
       >
         <OTab name="raw" label="Raw" />
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-for="(stack, index) in error_stack" :key="stack">
               <div
                 v-if="index"
-                class="error_stack q-px-sm"
+                class="error_stack tw:px-2"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
                   'border-radius':

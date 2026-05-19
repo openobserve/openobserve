@@ -15,26 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-none storage-settings-editor">
+  <div class="tw:p-0 storage-settings-editor">
     <!-- Header -->
-    <div class="row items-center no-wrap card-container  q-px-md tw:mb-[0.675rem]">
-      <div class="flex items-center tw:h-[60px]">
+    <div class="tw:flex tw:items-center tw:flex-nowrap card-container  tw:px-3 tw:mb-[0.675rem]">
+      <div class="flex tw:items-center tw:h-[60px]">
         <div
           data-test="storage-settings-editor-back-btn"
-          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           :title="t('storage_settings.goBack')"
           @click="emit('cancel')"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-h6" data-test="storage-settings-editor-title">
+        <div class="tw:text-xl tw:font-semibold" data-test="storage-settings-editor-title">
           {{ isEditMode ? t("storage_settings.updateStorage") : t("storage_settings.newStorageConfiguration") }}
         </div>
       </div>
     </div>
 
     <!-- Stepper -->
-    <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 q-px-md tw:overflow-auto">
+    <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 tw:px-3 tw:overflow-auto">
     <div style="max-width: 720px;">
       <OForm ref="storageForm" :default-values="{}" @submit="submitStorage">
         <OStepper
@@ -51,14 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 1"
             :navigable="step > 1 && !isEditMode"
           >
-            <div class="text-body2 text-grey q-mb-md">
+            <div class="tw:text-sm tw:text-gray-500 tw:mb-3">
               {{ t("storage_settings.selectProviderDesc") }}
               once configured, all new data for this org will be written to your
               own storage infrastructure.
             </div>
             <div
               v-if="!isEditMode"
-              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
               :class="store.state.theme === 'dark'
                 ? 'tw:bg-amber-950/20 tw:border-amber-400/30'
                 : 'tw:bg-amber-50 tw:border-amber-300'"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isEditMode"
-              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
               :class="store.state.theme === 'dark'
                 ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                 : 'tw:bg-blue-50 tw:border-blue-200'"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
-            <div class="text-subtitle2 q-mb-sm" style="font-weight: 500">
+            <div class="tw:text-sm tw:font-medium tw:mb-2" style="font-weight: 500">
               Select Storage Provider <span class="text-red">*</span>
             </div>
             <div class="destination-type-grid">
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 2"
             :navigable="step > 2"
           >
-            <div class="q-gutter-sm">
+            <div class="tw:gap-2">
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
                 <OInput
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <div
-                  class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+                  class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
                   :class="store.state.theme === 'dark'
                     ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                     : 'tw:bg-blue-50 tw:border-blue-200'"
@@ -314,12 +314,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OStepper>
 
         <!-- Form buttons -->
-        <div class="flex justify-start q-mb-md">
+        <div class="flex tw:justify-start tw:mb-3">
           <div v-if="step === 1">
             <OButton
               data-test="step1-cancel-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px] q-mr-sm"
+              class="o2-secondary-button tw:h-[36px] tw:mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isEditMode"
               data-test="step2-back-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px] q-mr-sm"
+              class="o2-secondary-button tw:h-[36px] tw:mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="storage-settings-submit-btn"
               variant="primary"
-              class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
+              class="no-border tw:ml-2 o2-primary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'

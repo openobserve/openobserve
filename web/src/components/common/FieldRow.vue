@@ -18,15 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Simple field without expansion (FTS keys or fields without values) -->
   <div
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
-    class="field-container flex content-center ellipsis full-width hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
+    class="field-container flex content-center tw:truncate tw:w-full hover:tw:bg-[var(--o2-hover-accent)] tw:rounded-[0.25rem]"
     :title="field.name"
   >
     <div
-      class="field_label full-width tw:flex! tw:items-center! tw:justify-between!"
+      class="field_label tw:w-full tw:flex! tw:items-center! tw:justify-between!"
       :data-test="`logs-field-list-item-${field.name}`"
     >
       <div
-        class="ellipsis tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem] tw:text-[0.875rem]"
+        class="tw:truncate tw:flex tw:items-center tw:max-w-[calc(100%-1.5rem)]! tw:pl-[1.5rem] tw:text-[0.875rem]"
         style="display: inline-block"
       >
         {{ field.label || field.name }}

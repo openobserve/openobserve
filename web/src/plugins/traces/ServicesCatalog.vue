@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- pagination controls -->
       <div
         v-if="services.length > 0"
-        class="row items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
+        class="tw:flex tw:items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
         data-test="services-catalog-pagination-bar"
       >
         <OSelect
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading banner: shown above rows while a next page is fetching -->
         <template #loading-banner>
           <div
-            class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
             <OSpinner size="xs" class="tw:mx-[0.25rem]" />
             <span
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #loading>
           <div
             data-test="services-catalog-loading"
-            class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
             <OSpinner size="xs" class="tw:mr-[0.25rem]" />
             <span

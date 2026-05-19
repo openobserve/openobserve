@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="trace-dag-container">
-    <div v-if="isLoading" class="flex items-center justify-center column q-pa-xl loading-container">
+    <div v-if="isLoading" class="flex tw:items-center tw:justify-center column tw:p-6 loading-container">
       <OSpinner size="lg" />
-      <div class="q-mt-md text-grey-7">Loading trace DAG...</div>
+      <div class="tw:mt-3 tw:text-gray-400">Loading trace DAG...</div>
     </div>
 
-    <div v-else-if="error" class="error-message q-pa-md">
+    <div v-else-if="error" class="error-message tw:p-3">
       <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex items-center justify-center column q-pa-xl empty-container">
+    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" class="flex tw:items-center tw:justify-center column tw:p-6 empty-container">
       <OIcon name="info" style="width: 48px; height: 48px;" />
-      <div class="q-mt-md text-grey-7">No DAG data available</div>
+      <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
     </div>
 
     <div v-else class="dag-wrapper">

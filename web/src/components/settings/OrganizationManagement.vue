@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div>
       <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
         <div class="q-table__title" data-test="org-management-list-title">
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           data-test="org-management-search-input"
           v-model="filterQuery"
-          class="q-ml-auto no-border o2-search-input"
+          class="tw:ml-auto no-border o2-search-input"
           :placeholder="t('settings.searchOrgs')"
         >
           <template #icon-left>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleExtendTrialDialog(row)"
             >
               <OIcon name="event" size="xs" />
-              <OTooltip :content="t('settings.extendTrial')" />
+              <q-tooltip>{{ t("settings.extendTrial") }}</q-tooltip>
             </OButton>
             <OButton
               v-if="row.billing_provider === '-'"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleContractDialog(row, 'create')"
             >
               <OIcon name="note-add" size="xs" />
-              <OTooltip content="Add Contract" />
+              <q-tooltip>Add Contract</q-tooltip>
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleContractDialog(row, 'extend')"
             >
               <OIcon name="event" size="xs" />
-              <OTooltip content="Extend Contract" />
+              <q-tooltip>Extend Contract</q-tooltip>
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -87,8 +87,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(row)"
             >
-              <OIcon name="block" size="xs" />
-              <OTooltip content="Revoke" />
+              <OIcon name="tw:block" size="xs" />
+              <q-tooltip>Revoke</q-tooltip>
             </OButton>
             <OButton
               v-if="!row.org_storage_enabled"
@@ -98,18 +98,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="toggleOrgStorage(row)"
             >
               <OIcon name="cloud-upload" size="xs" />
-              <OTooltip content="Enable Storage" />
+              <q-tooltip>Enable Storage</q-tooltip>
             </OButton>
             <OButton
               v-else
               variant="ghost"
               size="icon-xs-circle"
               disabled
-              class="text-positive"
+              class="tw:text-green-500"
               data-test="org-management-storage-enabled-btn"
             >
               <OIcon name="cloud-done" size="xs" />
-              <OTooltip content="Storage Enabled" />
+              <q-tooltip>Storage Enabled</q-tooltip>
             </OButton>
           </div>
         </template>
@@ -129,14 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
       <div>
-        <div class="float-left text-bold">Week(s)</div>
-        <div class="float-right q-gutter-xs">
+        <div class="float-left tw:font-bold">Week(s)</div>
+        <div class="float-right tw:gap-1">
           <span
             v-for="page in 4"
             :key="page"
             @click="extendedTrial = page"
             :class="[
-              'cursor-pointer q-px-sm q-py-xs page-border',
+              'cursor-pointer tw:px-2 tw:py-1 page-border',
               extendedTrial === page
                 ? 'bg-primary text-white'
                 : 'bg-white text-gray-700 border-gray-3',
@@ -159,8 +159,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="contractPrompt = false"
       @click:primary="submitContract"
     >
-      <div class="q-mb-md">
-        <div class="text-bold q-mb-xs">
+      <div class="tw:mb-3">
+        <div class="tw:font-bold tw:mb-1">
           {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
         </div>
         <OInput
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-        class="text-caption text-grey"
+        class="tw:text-xs tw:text-gray-500"
       >
         Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
       </div>
@@ -215,7 +215,6 @@ export default defineComponent({
     OTable,
   },
   setup() {
-    const $q = useQuasar();
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();

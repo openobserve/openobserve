@@ -163,20 +163,20 @@
             style="position: relative"
           >
             <div v-if="loading" class="flex flex-center tw:h-full">
-              <div class="text-center tw:flex tw:flex-col tw:items-center">
+              <div class="tw:text-center tw:flex tw:flex-col tw:items-center">
                 <OSpinner size="xl" />
-                <div class="text-subtitle1 q-mt-md text-grey-7">
+                <div class="tw:text-base tw:font-medium tw:mt-3 tw:text-gray-400">
                   Loading service graph...
                 </div>
               </div>
             </div>
             <div
               v-else-if="error"
-              class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
+              class="flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
-                <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
+                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
                 <OButton
@@ -192,14 +192,14 @@
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
+              class="flex flex-center tw:h-full tw:text-center tw:p-[0.675rem]"
             >
               <div>
                 <OIcon name="hub" style="width: 5em; height: 5em;" />
-                <div class="text-h6 q-mt-md text-grey-7">
+                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">
                   No Service Graph Data
                 </div>
-                <div class="text-body2 text-grey-6 q-mt-sm">
+                <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
                   Try querying a longer duration
                 </div>
               </div>
@@ -248,8 +248,8 @@
     @click:secondary="showSettings = false"
     @click:primary="resetSettings"
   >
-    <div class="q-gutter-md">
-      <div class="text-caption text-grey-7">
+    <div class="tw:gap-3">
+      <div class="tw:text-xs tw:text-gray-400">
         Stream-based topology - all data persisted to storage
         <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
       </div>
@@ -1717,7 +1717,7 @@ code {
 /*
  * Target dashed edge paths rendered by ECharts graph series.
  * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
- * an inline style depending on the version — we cover both.
+ * an tw:inline style depending on the version — we cover both.
  */
 .graph-container svg path[stroke-dasharray],
 .graph-container svg path[style*="stroke-dasharray"] {

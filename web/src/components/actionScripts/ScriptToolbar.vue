@@ -6,7 +6,7 @@
       <div class="tw:mr-2 add-script-back-btn">
         <div
           data-test="add-script-back-btn"
-          class="flex justify-center items-center cursor-pointer"
+          class="flex tw:justify-center tw:items-center cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -19,7 +19,7 @@
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full add-script-title q-mr-md">
+      <div class="tw:text-lg tw:w-full add-script-title tw:mr-3">
         Add Action
       </div>
       <div class="o2-input">
@@ -28,7 +28,7 @@
             data-test="add-script-name-input"
             v-model.trim="actionName"
             :label="t('actions.name')"
-            class="q-pa-none tw:w-full"
+            class="tw:p-0 tw:w-full"
             :readonly="disableName"
             :disabled="disableName"
             :error="!!scriptNameError"
@@ -42,7 +42,7 @@
             v-if="isValidMethodName() !== true && showInputError"
             name="info"
             size="md"
-            class="q-ml-xs cursor-pointer"
+            class="tw:ml-1 cursor-pointer"
             :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
           >
             <OTooltip side="right" :content="String(isValidMethodName())" />

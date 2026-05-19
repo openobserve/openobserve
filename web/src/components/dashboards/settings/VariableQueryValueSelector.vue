@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
-      class="textbox col no-case o2-custom-select-dashboard"
+      class="textbox tw:flex tw:flex-col no-case o2-custom-select-dashboard"
       :loading="variableItem.isLoading"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="text-grey-6 tw:text-xs tw:italic">(Custom)</span>
+          <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
         </div>
         <OSeparator v-if="currentSearchTerm" />
       </template>
@@ -64,9 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="text-grey-6 tw:text-xs tw:italic">(Custom)</span>
+          <span class="tw:text-gray-400 tw:text-xs tw:italic">(Custom)</span>
         </div>
-        <div v-else class="text-italic text-grey tw:px-3 tw:py-2">No Data Found</div>
+        <div v-else class="tw:italic tw:text-gray-500 tw:px-3 tw:py-2">No Data Found</div>
       </template>
     </OSelect>
   </div>

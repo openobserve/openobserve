@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="row items-center no-wrap q-mb-sm">
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mb-2">
       <div v-if="backButton" class="col-auto">
         <OButton
           variant="outline"
           size="icon-xs"
-          class="q-mr-sm"
+          class="tw:mr-2"
           @click="onBackClicked"
           icon-left="arrow-back-ios-new"
         >
         </OButton>
       </div>
-      <div class="col">
-        <div class="text-h6">
+      <div class="tw:flex tw:flex-col">
+        <div class="tw:text-xl tw:font-semibold">
           {{ title }}
         </div>
       </div>

@@ -42,7 +42,7 @@
           <div class="draggable-handle tw:self-center">
             <OIcon
               name="drag-indicator" size="sm"
-              class="q-mr-xs"
+              class="tw:mr-1"
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>

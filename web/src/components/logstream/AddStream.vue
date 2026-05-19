@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emits('update:open', false)"
     @click:primary="submitForm()"
   >
-    <div class="q-px-md q-py-md add-stream-inputs">
+    <div class="tw:px-3 tw:py-3 add-stream-inputs">
       <div>
         <div data-test="add-stream-name-input">
           <OInput
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
-  <div v-else class="q-px-md q-py-md add-stream-inputs">
+  <div v-else class="tw:px-3 tw:py-3 add-stream-inputs">
     <div>
       <div data-test="add-stream-name-input">
         <OInput
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @remove="removeField"
       />
 
-      <div class="tw:flex tw:gap-2 q-mt-sm">
+      <div class="tw:flex tw:gap-2 tw:mt-2">
         <OButton
           data-test="add-stream-cancel-btn"
           variant="outline"

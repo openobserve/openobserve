@@ -100,7 +100,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:focus-visible:ring-2 tw:focus-visible:ring-button-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
-  // Neutral ghost: inherits parent text color — used for compact inline action buttons
+  // Neutral ghost: inherits parent text color — used for compact tw:inline action buttons
   // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
   "ghost-neutral": [
     "tw:bg-transparent tw:text-inherit tw:border-0",
@@ -215,7 +215,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
     "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
-  // Compact labeled size for inline field chips (axis items) — ~28px, matches Quasar dense button
+  // Compact labeled size for tw:inline field chips (axis items) — ~28px, matches Quasar dense button
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "tw:h-6 tw:ps-2 tw:pe-1.5 tw:text-xs tw:gap-1 tw:rounded tw:leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
@@ -227,7 +227,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
   icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
   "icon-xs": "tw:h-[30px] tw:px-2 tw:text-[18px] tw:rounded-md tw:gap-x-0",
-  // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
+  // 24px round circle — for small tw:inline add/action icon buttons (e.g. + Joins, + Filters)
   "icon-xs-circle": "tw:size-6 tw:p-0 tw:rounded-full tw:gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
   "icon-xs-sq": "tw:h-7 tw:w-7 tw:p-0 tw:rounded-md tw:gap-x-0",

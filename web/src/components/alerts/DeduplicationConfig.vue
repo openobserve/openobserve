@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="deduplication-config q-pa-none q-ma-none">
+  <div class="deduplication-config tw:p-0 tw:m-0">
     <div class="tw:w-full">
       <div class="tw:w-full">
         <AlertsContainer
@@ -24,14 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.deduplication.title')"
           :subLabel="t('alerts.deduplication.subtitle')"
           icon="filter_alt"
-          class="tw:w-full col-12 tw:pl-4 tw:pr-2 tw:py-2"
+          class="tw:w-full tw:w-full tw:pl-4 tw:pr-2 tw:py-2"
           :iconClass="'tw:mt-[2px]'"
         />
       </div>
 
-      <div v-if="isExpanded" class="tw:w-full row alert-setup-container">
+      <div v-if="isExpanded" class="tw:w-full tw:flex alert-setup-container">
         <OSeparator class="tw:my-2"/>
-        <div class="q-mt-sm tw:w-full tw:pl-3">
+        <div class="tw:mt-2 tw:w-full tw:pl-3">
             <!-- Fingerprint Fields -->
             <div class="tw:mb-4">
               <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="info"
                   size="sm"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  class="tw:ml-1 cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                  />
                   <OTooltip
                     side="right"
@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="info"
                   size="sm"
-                  class="q-ml-xs cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+                  class="tw:ml-1 cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
                  />
                   <OTooltip
                     side="right"

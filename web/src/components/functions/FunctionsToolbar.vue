@@ -10,14 +10,14 @@
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="redirectToFunctions"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </div>
-      <div class="tw:text-lg tw:w-full add-function-title q-mr-sm">
+      <div class="tw:text-lg tw:w-full add-function-title tw:mr-2">
         {{ t('function.addFunction') }}
       </div>
       <div class="o2-input tw:flex tw:items-center tw:gap-6">
@@ -26,7 +26,7 @@
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
-            class="q-pa-none tw:w-full"
+            class="tw:p-0 tw:w-full"
             v-bind:readonly="disableName"
             v-bind:disabled="disableName"
             :error="showInputError && !!nameError"
@@ -41,7 +41,7 @@
             v-if="isValidMethodName() !== true && showInputError"
             name="info-outline"
             size="md"
-            class="q-ml-xs cursor-pointer"
+            class="tw:ml-1 cursor-pointer"
            />
             <OTooltip
               side="right"
@@ -79,7 +79,7 @@
         </div>
       </div>
     </div>
-    <div class="add-function-actions flex justify-center tw:gap-2">
+    <div class="add-function-actions flex tw:justify-center tw:gap-2">
       <OButton
             v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
             variant="ghost"

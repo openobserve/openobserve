@@ -28,18 +28,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Content -->
     <div>
-      <div class="text-caption text-grey-7 q-mb-md">
+      <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="text-center q-pa-xl text-grey-6"
+        class="tw:text-center tw:p-6 tw:text-gray-400"
       >
-        <OIcon name="view-column" class="q-mb-md" style="width: 48px; height: 48px;" />
-        <div class="text-body1">{{ t("dashboard.noColumnsOrdered") }}</div>
-        <div class="text-caption">
+        <OIcon name="view-column" class="tw:mb-3" style="width: 48px; height: 48px;" />
+        <div class="tw:text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
+        <div class="tw:text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
         </div>
       </div>

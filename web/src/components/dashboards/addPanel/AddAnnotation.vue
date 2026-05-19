@@ -23,7 +23,7 @@
             input-debounce="0"
             behavior="menu"
             use-input
-            class="textbox col no-case showLabelOnTop"
+            class="textbox tw:flex tw:flex-col no-case showLabelOnTop"
             popup-no-route-dismiss
             popup-content-style="z-index: 10001"
           >
@@ -51,7 +51,7 @@
               </div>
             </template>
           </OSelect>
-        <div class="text-caption q-mt-md">
+        <div class="tw:text-xs tw:mt-3">
           Timestamp: {{ annotationDateString }}
         </div>
     </div>

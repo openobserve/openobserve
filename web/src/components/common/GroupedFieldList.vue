@@ -20,7 +20,7 @@
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
           class="field-group-header tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded-[0.25rem]"
-          :class="[theme === 'dark' ? 'text-grey-5' : 'bg-grey-3']"
+          :class="[theme === 'dark' ? 'tw:text-gray-400' : 'tw:bg-gray-200']"
           @click="toggleGroup(row.group)"
         >
           <div class="tw:flex-1 tw:min-w-0">

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
       <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
-        <div style="width: calc(69%)" class="q-pr-sm">
+        <div style="width: calc(69%)" class="tw:pr-2">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
@@ -57,8 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
-        <div style="width: calc(69%)" class="q-pr-sm">
+      <div style="width: calc(100% - 10px)" class="tw:mb-1 flex">
+        <div style="width: calc(69%)" class="tw:pr-2">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -84,11 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #output-content>
       <div
         v-if="alertErrorsToDisplay.length > 0"
-        class="text-center text-h6 tw:py-2"
+        class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
       >
         Error Validations
       </div>
-      <div v-else class="text-center text-h6 tw:py-2">Output Messages</div>
+      <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
       <OSeparator class="tw:mx-4 tw:mt-4" />
       <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
         <!-- Alert Errors Section -->
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               :class="{
-                'error-item text-bold': true,
+                'error-item tw:font-bold': true,
                 'text-green ': val.success,
                 'text-red': !val.success,
               }"

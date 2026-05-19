@@ -15,46 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 tw:h-full tw:px-[0.625rem]">
-    <div class="col-12 row items-end tw:pb-[0.625rem]">
-      <div class="col-12 row card-container tw:px-[0.625rem] tw:py-[0.625rem]">
+  <div class="tw:flex qp-2 tw:h-full tw:px-[0.625rem]">
+    <div class="tw:w-full tw:flex tw:items-end tw:pb-[0.625rem]">
+      <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
+          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
           title="Go Back"
           @click="router.back()"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <OIcon name="language" size="xs" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
+          <OIcon name="language" size="xs" class="tw:pr-1" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <OIcon name="calendar-month" size="xs" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
+          <OIcon name="calendar-month" size="xs" class="tw:pr-1" />
           {{ sessionDetails.date }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <OIcon name="person" size="xs" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
+          <OIcon name="person" size="xs" class="tw:pr-1" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <OIcon name="location-on" size="xs" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
+          <OIcon name="location-on" size="xs" class="tw:pr-1" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <OIcon name="settings" size="xs" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:mr-3">
+          <OIcon name="settings" size="xs" class="tw:pr-1" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
           v-if="frustrationCount > 0"
-          class="text-caption ellipsis row items-center"
+          class="tw:text-xs tw:truncate tw:flex tw:items-center"
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
             name="sentiment-very-dissatisfied"
             size="sm"
-            class="q-pr-xs"
+            class="tw:pr-1"
             style="color: #fb923c"
             data-test="frustration-summary-icon"
           />
@@ -70,9 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="col-12 row card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
+      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
     >
-      <div class="col-9 full-height">
+      <div class="tw:w-3/4 full-height">
         <VideoPlayer
           ref="videoPlayerRef"
           :events="segmentEvents"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-loading="!!isLoading.length"
         />
       </div>
-      <div class="col-3 row">
+      <div class="tw:w-1/4 tw:flex">
         <OSeparator vertical class="tw:h-full" />
         <PlayerEventsSidebar
           :events="segmentEvents"

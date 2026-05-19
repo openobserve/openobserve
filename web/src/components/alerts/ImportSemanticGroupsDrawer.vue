@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="import-drawer-container">
     <!-- Content -->
-    <div class="drawer-content q-pa-md">
+    <div class="drawer-content tw:p-3">
       <!-- File Upload -->
-      <div class="q-mb-md">
+      <div class="tw:mb-3">
         <OFile
           v-model="jsonFile"
           label="Select JSON file"
@@ -43,16 +43,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center q-pa-lg">
+      <div v-if="isLoading" class="tw:text-center tw:p-4">
         <OSpinner variant="dots" size="lg" />
-        <div class="text-body2 text-grey-7 q-mt-md">Analyzing file...</div>
+        <div class="tw:text-sm tw:text-gray-400 tw:mt-3">Analyzing file...</div>
       </div>
 
       <!-- Diff Preview -->
       <div v-else-if="diffData" class="diff-preview">
         <!-- Summary -->
-        <div class="summary-bar q-mb-md">
-          <div class="row q-col-gutter-sm items-center">
+        <div class="summary-bar tw:mb-3">
+          <div class="tw:flex tw:gap-2 tw:items-center">
             <div class="col-auto">
               <OBadge variant="success">
                 <strong>{{ diffData.additions.length }}</strong
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Selection Actions -->
-        <div class="selection-actions q-mb-md">
+        <div class="selection-actions tw:mb-3">
           <OButtonGroup>
             <OButton
               variant="ghost-primary"
@@ -97,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Groups List -->
         <div class="groups-list">
           <!-- Additions -->
-          <div v-if="diffData.additions.length > 0" class="q-mb-md">
-            <div class="section-header text-positive q-pa-sm">
+          <div v-if="diffData.additions.length > 0" class="tw:mb-3">
+            <div class="section-header tw:text-green-500 tw:p-2">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
@@ -140,8 +140,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Modifications -->
-          <div v-if="diffData.modifications.length > 0" class="q-mb-md">
-            <div class="section-header text-warning q-pa-sm">
+          <div v-if="diffData.modifications.length > 0" class="tw:mb-3">
+            <div class="section-header tw:text-amber-500 tw:p-2">
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
@@ -213,19 +213,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state text-center q-pa-lg">
-        <OIcon name="cloud-upload" class="q-mb-md" style="width: 64px; height: 64px;" />
-        <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
-        <div class="text-body2 text-grey-6">
+      <div v-else class="empty-state tw:text-center tw:p-4">
+        <OIcon name="cloud-upload" class="tw:mb-3" style="width: 64px; height: 64px;" />
+        <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mb-2">Upload a JSON file</div>
+        <div class="tw:text-sm tw:text-gray-400">
           The system will analyze the file and show you what will change
         </div>
       </div>
     </div>
 
     <!-- Footer Actions -->
-    <div class="drawer-footer q-pa-md">
+    <div class="drawer-footer tw:p-3">
       <OSeparator class="tw:mb-4" />
-      <div class="row q-col-gutter-sm justify-end">
+      <div class="tw:flex tw:gap-2 tw:justify-end">
         <div class="col-auto">
           <OButton
             variant="outline"
@@ -261,14 +261,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-subtitle2 q-mb-sm">
+      <div class="tw:text-sm tw:font-medium tw:mb-2">
         Fields ({{ selectedGroup?.fields.length }})
       </div>
       <OBadge
         v-for="field in selectedGroup?.fields"
         :key="field"
         variant="primary"
-        class="q-ma-xs"
+        class="tw:m-1"
       >
         {{ field }}
       </OBadge>
@@ -285,10 +285,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     primary-button-label="Close"
     @click:primary="showModificationDialog = false"
   >
-    <div class="row q-col-gutter-md">
-      <div class="col-6">
-        <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-        <div class="text-caption q-mb-xs">
+    <div class="tw:flex tw:gap-3">
+      <div class="tw:w-1/2">
+        <div class="tw:text-sm tw:font-medium tw:text-red-500 tw:mb-2">Current</div>
+        <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.current.fields.length }} fields
         </div>
         <div class="field-chips-container">
@@ -297,15 +297,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="`current-${field}`"
             variant="default"
             size="sm"
-            class="q-ma-xs"
+            class="tw:m-1"
           >
             {{ field }}
           </OBadge>
         </div>
       </div>
-      <div class="col-6">
-        <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-        <div class="text-caption q-mb-xs">
+      <div class="tw:w-1/2">
+        <div class="tw:text-sm tw:font-medium tw:text-green-500 tw:mb-2">Proposed</div>
+        <div class="tw:text-xs tw:mb-1">
           {{ selectedModification?.proposed.fields.length }} fields
         </div>
         <div class="field-chips-container">
@@ -314,14 +314,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="`proposed-${field}`"
             :variant="isNewField(field) ? 'success' : 'default'"
             size="sm"
-            class="q-ma-xs"
+            class="tw:m-1"
           >
             {{ field }}
             <OIcon
               v-if="isNewField(field)"
               name="add"
               size="xs"
-              class="q-ml-xs"
+              class="tw:ml-1"
             />
           </OBadge>
         </div>

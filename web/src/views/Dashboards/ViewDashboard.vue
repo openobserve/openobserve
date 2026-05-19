@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? { height: 'calc(100vh - var(--navbar-height))' }
           : {}
       "
-      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden q-pt-xs"
+      class="tw:mx-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden tw:pt-1"
     >
       <div
         :class="`${
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:mb-[0.625rem]"
       >
         <div
-          class="tw:flex justify-between items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
+          class="tw:flex tw:justify-between tw:items-center tw:w-full tw:px-[0.626rem] tw:min-w-0 card-container tw:h-[48px]"
         >
           <div class="tw:flex tw:flex-1 tw:overflow-hidden">
             <OButton
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="chevron-right" size="sm"
              />
             <span
-              class="q-table__title q-mx-sm tw:truncate tw:flex-1"
+              class="q-table__title tw:mx-2 tw:truncate tw:flex-1"
               :title="currentDashboardData.data?.title"
             >
               {{ currentDashboardData.data?.title }}
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('panel.add')" />
             </OButton>
             <!-- <DateTimePicker 
-            class="q-ml-sm"
+            class="tw:ml-2"
             ref="refDateTime"
             v-model="selectedDate"
           /> -->

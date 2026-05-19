@@ -27,7 +27,7 @@
           <OTabPanel name="relative">
             <div class="date-time-table relative column">
               <div
-                class="relative-row q-px-md q-py-sm"
+                class="relative-row tw:px-3 tw:py-2"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
@@ -49,17 +49,17 @@
                   >
                 </div>
               </div>
-              <div class="relative-row q-px-md q-py-sm">
+              <div class="relative-row tw:px-3 tw:py-2">
                 <div class="relative-period-name">Custom</div>
-                <div class="row q-gutter-sm">
-                  <div class="col">
+                <div class="tw:flex tw:gap-2">
+                  <div class="tw:flex tw:flex-col">
                     <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
                       :min="1"
                     />
                   </div>
-                  <div class="col">
+                  <div class="tw:flex tw:flex-col">
                     <OSelect
                       v-model="picker.data.selectedDate.relative.period"
                       :options="relativePeriodsSelect"

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="source-maps-container tw:mx-[0.625rem] card-container">
     <!-- Filters Section -->
-    <div class="filters-section q-pa-md">
+    <div class="filters-section tw:p-3">
       <div class="tw:flex tw:justify-between tw:items-center">
       <div class="tw:flex tw:gap-4 tw:items-center">
           <!-- Version Filter -->
@@ -79,17 +79,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
 
     <!-- Source Maps List -->
-    <div class="source-maps-list q-pa-md">
+    <div class="source-maps-list tw:p-3">
       <!-- Loading State -->
       <template v-if="isLoading">
-        <div class="q-pa-lg flex items-center justify-center text-center">
+        <div class="tw:p-4 flex tw:items-center tw:justify-center tw:text-center">
           <div>
             <OSpinner
               size="md"
               class="tw:mx-auto tw:block"
               data-test="source-maps-loading-indicator"
             />
-            <div class="text-center full-width q-mt-md">
+            <div class="tw:text-center tw:w-full tw:mt-3">
               Loading source maps...
             </div>
           </div>
@@ -145,12 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tr>
             <q-tr v-show="expandedRow === getRowKey(props.row)" :props="props">
               <q-td colspan="100%">
-                <div class="expanded-details q-pa-md">
-                  <div class="text-subtitle2 text-weight-bold q-mb-sm">
+                <div class="expanded-details tw:p-3">
+                  <div class="tw:text-sm tw:font-medium text-weight-bold tw:mb-2">
                     Source Map Files ({{ props.row.files.length }})
                   </div>
                   <ul
-                    class="rounded-borders tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                    class="tw:rounded tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
                     style="max-height: 400px; overflow-y: auto;"
                   >
                     <li
@@ -191,10 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <div class="q-pa-xl text-center text-grey-7">
-              <OIcon name="code" size="xl" class="q-mb-md" />
-              <div class="text-h6 q-mb-sm">No Source Maps Found</div>
-              <div class="text-body2">
+            <div class="tw:p-6 tw:text-center tw:text-gray-400">
+              <OIcon name="code" size="xl" class="tw:mb-3" />
+              <div class="tw:text-xl tw:font-semibold tw:mb-2">No Source Maps Found</div>
+              <div class="tw:text-sm">
                 Upload source maps to enable stack trace translation
               </div>
             </div>

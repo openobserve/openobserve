@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="feature-card q-mb-md"
+    class="feature-card tw:mb-3"
     :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"
   >
-    <div class="row items-center">
-      <div class="col">
+    <div class="tw:flex tw:items-center">
+      <div class="tw:flex tw:flex-col">
         <span class="deprecation-message">
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Please migrate to PostgreSQL to ensure continued support.
         </span>
       </div>
-      <div class="col-auto q-ml-sm">
+      <div class="col-auto tw:ml-2">
         <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
       </div>
     </div>

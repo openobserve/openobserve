@@ -13,8 +13,8 @@
       "
     >
       <!-- Header -->
-      <div class="row justify-between items-center streams-header">
-        <div class="row tw:items-center tw:gap-2">
+      <div class="tw:flex tw:justify-between tw:items-center streams-header">
+        <div class="tw:flex tw:items-center tw:gap-2">
           <SkeletonBox variant="avatar" width="40px" height="40px" />
           <SkeletonBox variant="title" width="100px" />
         </div>
@@ -25,7 +25,7 @@
       <div class="tiles-grid">
         <div v-for="n in 5" :key="n" class="tile">
           <div
-            class="tile-content rounded-borders text-center column justify-between"
+            class="tile-content tw:rounded tw:text-center column tw:justify-between"
             :class="
               store.state.theme === 'dark'
                 ? 'dark-tile-content'
@@ -33,16 +33,16 @@
             "
           >
             <!-- Top Section (60%) -->
-            <div class="column justify-between">
+            <div class="column tw:justify-between">
               <!-- Title row -->
-              <div class="row justify-between">
+              <div class="tw:flex tw:justify-between">
                 <SkeletonBox variant="text" width="100px" height="20px" />
                 <SkeletonBox variant="avatar" width="40px" height="40px" />
               </div>
             </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display row items-end">
+            <div class="data-to-display tw:flex tw:items-end">
               <SkeletonBox variant="title" width="80px" height="32px" />
             </div>
           </div>
@@ -57,23 +57,23 @@
         <!-- Functions tile -->
         <div class="tile-wrapper">
           <div
-            class="feature-card rounded-borders text-center column justify-between"
+            class="feature-card tw:rounded tw:text-center column tw:justify-between"
             :class="
               store.state.theme === 'dark'
                 ? 'dark-tile-content'
                 : 'light-tile-content'
             "
           >
-            <div class="column justify-between">
+            <div class="column tw:justify-between">
               <div
-                class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width"
+                class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
               >
                 <SkeletonBox variant="avatar" width="40px" height="40px" />
                 <SkeletonBox variant="text" width="100px" height="20px" />
                 <SkeletonBox variant="button" width="40px" height="40px" />
               </div>
             </div>
-            <div class="data-to-display row items-end">
+            <div class="data-to-display tw:flex tw:items-end">
               <SkeletonBox variant="title" width="60px" height="32px" />
             </div>
           </div>
@@ -82,23 +82,23 @@
         <!-- Dashboards tile -->
         <div class="tile-wrapper">
           <div
-            class="feature-card rounded-borders text-center column justify-between"
+            class="feature-card tw:rounded tw:text-center column tw:justify-between"
             :class="
               store.state.theme === 'dark'
                 ? 'dark-tile-content'
                 : 'light-tile-content'
             "
           >
-            <div class="column justify-between">
+            <div class="column tw:justify-between">
               <div
-                class="row tw:items-center tw:gap-2 tw:flex-nowrap full-width"
+                class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
               >
                 <SkeletonBox variant="avatar" width="40px" height="40px" />
                 <SkeletonBox variant="text" width="100px" height="20px" />
                 <SkeletonBox variant="button" width="40px" height="40px" />
               </div>
             </div>
-            <div class="data-to-display row items-end">
+            <div class="data-to-display tw:flex tw:items-end">
               <SkeletonBox variant="title" width="60px" height="32px" />
             </div>
           </div>
@@ -107,7 +107,7 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container rounded-borders tw:p-4"
+        class="feature-card first-chart-container tw:rounded tw:p-4"
         :class="
           store.state.theme === 'dark'
             ? 'chart-container-dark'
@@ -116,7 +116,7 @@
       >
         <div class="details-container">
           <!-- Header -->
-          <div class="row justify-between items-center">
+          <div class="tw:flex tw:justify-between tw:items-center">
             <span class="text-title tw:flex tw:items-center tw:gap-2">
               <SkeletonBox variant="avatar" width="40px" height="40px" />
               <SkeletonBox variant="text" width="120px" height="20px" />
@@ -124,13 +124,13 @@
             <SkeletonBox variant="button" width="40px" height="40px" />
           </div>
           <!-- Stats row -->
-          <div class="row q-pt-sm" style="gap: 16px">
+          <div class="tw:flex tw:pt-2" style="gap: 16px">
             <div class="column">
               <SkeletonBox
                 variant="text"
                 width="100px"
                 height="14px"
-                class="q-mb-xs"
+                class="tw:mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
@@ -140,7 +140,7 @@
                 variant="text"
                 width="80px"
                 height="14px"
-                class="q-mb-xs"
+                class="tw:mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
@@ -159,7 +159,7 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container rounded-borders tw:p-4"
+        class="feature-card second-chart-container tw:rounded tw:p-4"
         :class="
           store.state.theme === 'dark'
             ? 'chart-container-dark'
@@ -168,7 +168,7 @@
       >
         <div class="details-container">
           <!-- Header -->
-          <div class="row justify-between items-center">
+          <div class="tw:flex tw:justify-between tw:items-center">
             <span class="text-title tw:flex tw:items-center tw:gap-2">
               <SkeletonBox variant="avatar" width="40px" height="40px" />
               <SkeletonBox variant="text" width="140px" height="20px" />
@@ -176,13 +176,13 @@
             <SkeletonBox variant="button" width="40px" height="40px" />
           </div>
           <!-- Stats row -->
-          <div class="row q-pt-sm" style="gap: 16px">
+          <div class="tw:flex tw:pt-2" style="gap: 16px">
             <div class="column">
               <SkeletonBox
                 variant="text"
                 width="120px"
                 height="14px"
-                class="q-mb-xs"
+                class="tw:mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
@@ -192,7 +192,7 @@
                 variant="text"
                 width="100px"
                 height="14px"
-                class="q-mb-xs"
+                class="tw:mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>

@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs tw:pb-[0.625rem]">
-    <div data-test="add-report-section" class="full-width create-report-page">
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:mt-1 tw:pb-[0.625rem]">
+    <div data-test="add-report-section" class="tw:w-full create-report-page">
       <div
-        class="row items-center no-wrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
+        class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
       >
-        <div class="flex items-center">
+        <div class="flex tw:items-center">
           <div
             data-test="add-report-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="isEditingReport"
-            class="text-h6"
+            class="tw:text-xl tw:font-semibold"
             data-test="add-report-title"
           >
             {{ t("reports.update") }}
           </div>
-          <div v-else class="text-h6" data-test="add-report-title">
+          <div v-else class="tw:text-xl tw:font-semibold" data-test="add-report-title">
             {{ t("reports.add") }}
           </div>
         </div>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           ref="addAlertFormRef"
-          class="q-px-lg q-my-md"
+          class="tw:px-4 tw:my-3"
           style="width: 1024px"
         >
           <form
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @submit.prevent="onSubmit"
           >
             <div
-              class="tw:flex tw:items-start tw:gap-4 q-px-sm"
+              class="tw:flex tw:items-start tw:gap-4 tw:px-2"
               style="padding-top: 12px"
             >
               <div data-test="add-report-name-input" class="o2-input">
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               data-test="add-report-description-input"
-              class="report-name-input o2-input q-px-sm"
+              class="report-name-input o2-input tw:px-2"
             >
               <OInput
                 v-model="formData.description"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OIcon
                 name="info-outline"
-                class="cursor-pointer q-ml-sm"
+                class="cursor-pointer tw:ml-2"
                 size="sm"
                />
                 <OTooltip
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               orientation="vertical"
               animated
               navigable
-              class="q-mt-md"
+              class="tw:mt-3"
             >
               <OStep
                 data-test="add-report-select-dashboard-step"
@@ -160,11 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div
                     :data-test="`add-report-dashboard-${index}`"
-                    class="q-my-sm q-px-sm flex items-center justify-start"
+                    class="tw:my-2 tw:px-2 flex tw:items-center tw:justify-start"
                   >
                     <div
                       data-test="add-report-folder-select"
-                      class="o2-input q-mr-sm"
+                      class="o2-input tw:mr-2"
                       style="padding-top: 0; width: 30%"
                     >
                       <OSelect
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :loading="isFetchingFolders"
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         use-input
                         hide-selected
                         fill-input
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       data-test="add-report-dashboard-select"
-                      class="o2-input q-mr-sm"
+                      class="o2-input tw:mr-2"
                       style="padding-top: 0; width: 30%"
                     >
                       <OSelect
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :loading="isFetchingDashboard || isFetchingFolders"
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
-                        class="q-py-sm showLabelOnTop no-case"
+                        class="tw:py-2 showLabelOnTop no-case"
                         use-input
                         hide-selected
                         fill-input
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :loading="isFetchingDashboard || isFetchingFolders"
                         :popup-content-style="{ textTransform: 'none' }"
                         color="input-border"
-                        class="q-py-sm showLabelOnTop"
+                        class="tw:py-2 showLabelOnTop"
                         use-input
                         hide-selected
                         fill-input
@@ -262,12 +262,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       data-test="add-report-timerange-select"
-                      class="full-width q-mt-sm"
+                      class="tw:w-full tw:mt-2"
                     >
-                      <div class="q-mb-sm">
+                      <div class="tw:mb-2">
                         <div
                           style="font-size: 14px"
-                          class="text-bold text-grey-8"
+                          class="tw:font-bold tw:text-gray-500"
                         >
                           Time Range*
                         </div>
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       data-test="add-report-variable-select"
-                      class="full-width q-mt-md o2-input"
+                      class="tw:w-full tw:mt-3 o2-input"
                     >
                       <VariablesInput
                         :variables="dashboard.variables"
@@ -302,16 +302,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Report Format -->
                     <div
-                      class="full-width q-mt-md"
+                      class="tw:w-full tw:mt-3"
                       data-test="add-report-format-section"
                     >
                       <div
                         style="font-size: 14px"
-                        class="text-bold text-grey-8 q-mb-sm"
+                        class="tw:font-bold tw:text-gray-500 tw:mb-2"
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
-                      <div class="row q-col-gutter-md">
+                      <div class="tw:flex tw:gap-3">
                         <!-- Report Type -->
                         <div
                           class="col-auto o2-input"
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   }}</span>
                                   <span
                                     v-if="scope.opt.disable"
-                                    class="tw:block tw:text-xs tw:text-muted-foreground text-negative"
+                                    class="tw:block tw:text-xs tw:text-muted-foreground tw:text-red-500"
                                   >
                                     Not supported for PDF
                                   </span>
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- PNG note -->
                       <div
                         v-if="dashboard.report_type === 'png'"
-                        class="q-mt-sm"
+                        class="tw:mt-2"
                         data-test="add-report-png-note"
                       >
                         <OBanner
@@ -386,11 +386,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Custom Dimensions (Advanced) -->
                       <div
                         v-if="dashboard.report_type !== 'csv'"
-                        class="q-mt-md"
+                        class="tw:mt-3"
                         data-test="add-report-custom-dimensions-section"
                       >
                         <div
-                          class="flex items-center cursor-pointer"
+                          class="flex tw:items-center cursor-pointer"
                           style="font-size: 14px; color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
@@ -401,15 +401,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 : 'expand-more'
                             "
                             size="sm"
-                            class="q-mr-xs"
+                            class="tw:mr-1"
                           />
-                          <span class="text-bold text-grey-8">{{
+                          <span class="tw:font-bold tw:text-gray-500">{{
                             t("reports.customDimensions")
                           }}</span>
                         </div>
                         <div
                           v-if="showCustomDimensions"
-                          class="row q-col-gutter-md q-pt-sm"
+                          class="tw:flex tw:gap-3 tw:pt-2"
                         >
                           <div class="col-auto o2-input">
                             <OInput
@@ -447,8 +447,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-report-dimension-height"
                             />
                           </div>
-                          <div class="col-auto flex items-end">
-                            <div class="text-caption text-grey-6 q-pb-xs">
+                          <div class="col-auto flex tw:items-end">
+                            <div class="tw:text-xs tw:text-gray-400 tw:pb-1">
                               Leave blank to use server defaults
                             </div>
                           </div>
@@ -475,11 +475,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Schedule"
                 icon="schedule"
                 :done="step > 2"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="q-my-sm q-px-sm">
-                  <!-- <div class="flex justify-start items-center q-py-sm">
-                <OIcon name="event" size="sm" class="q-mr-sm" />
+                <div class="tw:my-2 tw:px-2">
+                  <!-- <div class="flex tw:justify-start tw:items-center tw:py-2">
+                <OIcon name="event" size="sm" class="tw:mr-2" />
                 <div style="font-size: 14px">
                   The report will be sent immediately after it is saved and will
                   be sent every hour.
@@ -487,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div> -->
                   <div
                     style="font-size: 14px"
-                    class="text-bold text-grey-8 q-mb-sm"
+                    class="tw:font-bold tw:text-gray-500 tw:mb-2"
                   >
                     Frequency
                   </div>
@@ -508,22 +508,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OToggleGroup>
 
                   <template v-if="frequency.type === 'cron'">
-                    <div class="flex items-center justify-start q-mt-md">
+                    <div class="flex tw:items-center tw:justify-start tw:mt-3">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                         style="padding-top: 0; width: 320px"
                       >
-                        <div class="q-mb-xs text-bold text-grey-8">
+                        <div class="tw:mb-1 tw:font-bold tw:text-gray-500">
                           {{ t("reports.cronExpression") + " *" }}
                           <OIcon
                             name="info"
                             size="sm"
-                            class="q-ml-xs cursor-pointer"
+                            class="tw:ml-1 cursor-pointer"
                             :class="
                               store.state.theme === 'dark'
-                                ? 'text-grey-5'
-                                : 'text-grey-7'
+                                ? 'tw:text-gray-400'
+                                : 'tw:text-gray-400'
                             "
                            />
                             <OTooltip side="right" align="center">
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <template v-else>
                     <div
-                      class="q-mt-md tw:flex tw:justify-start tw:items-center"
+                      class="tw:mt-3 tw:flex tw:justify-start tw:items-center"
                     >
                       <OToggleGroup
                         :model-value="selectedTimeTab"
@@ -608,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OToggleGroup>
                       <OIcon
                         name="info-outline"
-                        class="cursor-pointer q-ml-sm"
+                        class="cursor-pointer tw:ml-2"
                         size="sm"
                        />
                         <OTooltip side="right" align="center">
@@ -621,11 +621,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       v-if="frequency.type === 'custom'"
-                      class="flex items-start justify-start q-mt-md"
+                      class="flex tw:items-start tw:justify-start tw:mt-3"
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                         style="padding-top: 0; width: 160px"
                       >
                         <OInput
@@ -650,7 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="'Frequency *'"
                           :popup-content-style="{ textTransform: 'capitalize' }"
                           color="input-border"
-                          class="q-pt-sm q-pb-none showLabelOnTop no-case"
+                          class="tw:pt-2 tw:pb-0 showLabelOnTop no-case"
                           behavior="menu"
                           :rules="[(val: any) => !!val || 'Field is required!']"
                           style="width: 100% !important"
@@ -661,11 +661,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
-                      class="flex items-center justify-start q-mt-md"
+                      class="flex tw:items-center tw:justify-start tw:mt-3"
                     >
                       <div
                         data-test="add-report-schedule-start-date-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                       >
                         <ODate
                           v-model="scheduling.date"
@@ -675,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div
                         data-test="add-report-schedule-start-time-input"
-                        class="o2-input q-mr-sm"
+                        class="o2-input tw:mr-2"
                       >
                         <OTime
                           v-model="scheduling.time"
@@ -737,9 +737,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Share"
                 icon="mail"
                 :done="step > 3"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="q-my-sm q-px-sm">
+                <div class="tw:my-2 tw:px-2">
                   <div
                     data-test="add-report-share-title-input"
                     class="report-name-input o2-input"
@@ -778,7 +778,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div data-test="add-report-share-message-section">
-                    <div style="font-size: 14px" class="text-bold text-grey-8">
+                    <div style="font-size: 14px" class="tw:font-bold tw:text-gray-500">
                       Message
                     </div>
 
@@ -804,12 +804,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <OIcon
                       name="info-outline"
-                      class="cursor-pointer q-ml-sm"
+                      class="cursor-pointer tw:ml-2"
                       size="sm"
                      />
                       <OTooltip max-width="320px">
                         <template #content>Captures a PNG screenshot of the dashboard and embeds it
-                        inline in the email body alongside the PDF attachment
+                        tw:inline in the email body alongside the PDF attachment
                         for a quick visual preview.</template>
                       </OTooltip>
                   </div>
@@ -831,7 +831,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end q-px-md full-width tw:py-3 card-container"
+      class="flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container"
       style="position: sticky; bottom: 0.375rem; z-index: 2"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{
@@ -845,7 +845,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-report-cancel-btn"
         variant="outline"
         size="sm-action"
-        class="q-mr-sm"
+        class="tw:mr-2"
         @click="openCancelDialog"
       >
         {{ t("alerts.cancel") }}

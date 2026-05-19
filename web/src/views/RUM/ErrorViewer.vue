@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-if="isLoading.length">
       <div
-        class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-12.5rem)]"
+        class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-12.5rem)]"
       >
         <div>
           <OSpinner
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:mx-auto tw:block"
             data-test="error-viewer-loading-indicator"
           />
-          <div class="text-center full-width">
+          <div class="tw:text-center tw:w-full">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>

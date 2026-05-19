@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md azure-config-page">
+  <div class="tw:m-3 azure-config-page">
     <!-- Header -->
     <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
       <OIcon
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="enabledCategories.length === 0"
-              class="tw:text-sm text-negative tw:mb-3"
+              class="tw:text-sm tw:text-red-500 tw:mb-3"
             >
               Select at least one log category above.
             </div>

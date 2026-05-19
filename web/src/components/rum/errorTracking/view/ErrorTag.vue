@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
-    <div class="q-px-md">{{ tag.key }}</div>
+  <div class="tag-block tw:flex tw:items-center tw:flex-nowrap tw:mr-2 tw:mt-2">
+    <div class="tw:px-3">{{ tag.key }}</div>
     <OSeparator data-test="separator" vertical />
-    <div class="q-px-md tw:bg-[var(--o2-table-header-bg)] tw:break-all">
+    <div class="tw:px-3 tw:bg-[var(--o2-table-header-bg)] tw:break-all">
       {{ tag.value }}
     </div>
   </div>

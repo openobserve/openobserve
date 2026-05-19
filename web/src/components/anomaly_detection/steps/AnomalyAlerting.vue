@@ -21,18 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="step-content tw:px-3 tw:py-4">
       <!-- Enable Notifications toggle -->
-      <div class="flex items-start alert-settings-row">
+      <div class="flex tw:items-start alert-settings-row">
         <div
-          class="tw:font-semibold flex items-center"
+          class="tw:font-semibold flex tw:items-center"
           style="width: 190px; height: 36px"
         >
           {{ t('alerts.anomaly.notifications') }}
           <OIcon
             name="info"
             size="sm"
-            class="q-ml-xs cursor-pointer"
+            class="tw:ml-1 cursor-pointer"
             :class="
-              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+              store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
             "
            />
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
@@ -49,14 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Destination picker (shown when alert_enabled) -->
       <div
         v-if="config.alert_enabled"
-        class="flex items-start alert-settings-row"
+        class="flex tw:items-start alert-settings-row"
       >
         <div
-          class="tw:font-semibold flex items-center"
+          class="tw:font-semibold flex tw:items-center"
           style="width: 190px; height: 36px"
         >
           {{ t("alerts.destination") }}
-          <span class="text-negative tw:ml-1">*</span>
+          <span class="tw:text-red-500 tw:ml-1">*</span>
         </div>
         <div class="tw:flex tw:flex-col">
           <div class="tw:flex tw:items-center">
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-sm"
-              class="q-ml-xs"
+              class="tw:ml-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              class="q-ml-sm"
+              class="tw:ml-2"
               @click="openAddDestination"
             >
               {{ t('alerts.anomaly.addNewDestination') }}
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               config.alert_enabled && config.alert_destination_ids.length === 0
             "
-            class="text-red-8 q-pt-xs"
+            class="text-red-8 tw:pt-1"
             style="font-size: 11px; line-height: 12px"
             data-test="anomaly-destination-error"
           >
@@ -136,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Info note when notifications disabled -->
       <div
         v-if="!config.alert_enabled"
-        class="tw:flex tw:items-start tw:gap-2 text-caption tw:mt-2"
-        :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
+        class="tw:flex tw:items-start tw:gap-2 tw:text-xs tw:mt-2"
+        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
       >
         <OIcon name="info" size="sm"
 class="tw:mt-px tw:flex-shrink-0" />

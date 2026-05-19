@@ -147,14 +147,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :title="value.key"
-                class="ellipsis q-pr-xs"
+                class="tw:truncate tw:pr-1"
                 style="width: calc(100% - 3.125rem)"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 :title="String(value.count)"
-                class="ellipsis text-right q-pr-sm"
+                class="tw:truncate tw:text-right tw:pr-2"
                 style="display: contents"
                 :style="showMultiSelect ? 'width: 3.125rem' : ''"
               >

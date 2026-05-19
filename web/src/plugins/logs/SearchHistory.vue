@@ -1,13 +1,13 @@
 ﻿<template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
     <div class="">
       <div
         class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]"
       >
-        <div class="flex items-center q-py-sm q-pl-md">
+        <div class="flex tw:items-center tw:py-2 tw:pl-3">
           <div
             data-test="search-history-alert-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer tw:font-[600]"
+            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer tw:font-[600]"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -19,23 +19,23 @@
           >
             <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
-          <div class="text-h6 tw:font-[600]" data-test="add-alert-title">
+          <div class="tw:text-xl tw:font-semibold tw:font-[600]" data-test="add-alert-title">
             {{ t("search_history.title") }}
           </div>
         </div>
-        <div class="tw:flex tw:items-center q-pr-md">
+        <div class="tw:flex tw:items-center tw:pr-3">
           <div>
             <OSwitch
               v-model="wrapText"
               :label="t('search_history.wrapText')"
               size="sm"
-              class="q-mr-md"
+              class="tw:mr-3"
             />
           </div>
           <div
-            class="warning-text flex items-center q-px-sm q-mr-md tw:h-[36px] tw:rounded-md"
+            class="warning-text flex tw:items-center tw:px-2 tw:mr-3 tw:h-[36px] tw:rounded-md"
           >
-            <OIcon name="info" class="q-mr-xs" size="sm" />
+            <OIcon name="info" class="tw:mr-1" size="sm" />
             <div>
               {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>
@@ -54,7 +54,7 @@
             <OButton
               variant="primary"
               size="sm"
-              class="q-ml-md"
+              class="tw:ml-3"
               @click="fetchSearchHistory"
               :disabled="isLoading"
             >
@@ -104,8 +104,8 @@
                 />
               </div>
               <div v-show="activeTab === 'query'">
-                <div class="text-left tw:px-2 q-mb-sm expanded-content">
-                  <div class="tw:flex tw:items-center q-py-sm tw:gap-2">
+                <div class="tw:text-left tw:px-2 tw:mb-2 expanded-content">
+                  <div class="tw:flex tw:items-center tw:py-2 tw:gap-2">
                     <strong
                       >SQL Query :
                       <span>
@@ -155,9 +155,9 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="text-left q-mb-sm tw:px-2 expanded-content"
+                  class="tw:text-left tw:mb-2 tw:px-2 expanded-content"
                 >
-                  <div class="tw:flex tw:items-center q-py-sm">
+                  <div class="tw:flex tw:items-center tw:py-2">
                     <strong
                       >Function Definition :
                       <span>
@@ -218,7 +218,7 @@
 
           <div
             v-if="isLoading"
-            class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
+            class="tw:text-center tw:w-full full-height tw:mt-4 tw:flex tw:justify-center"
           >
             <OSpinner size="md" />
           </div>
@@ -410,7 +410,7 @@ export default defineComponent({
         }
         columnsToBeRendered.value = generateColumns(filteredHits);
         filteredHits.forEach((hit: any) => {
-          //adding uuid to each which will be used to track the expanded row
+          //adding uuid to each which will be used to track the expanded "row"
           //why not trace_id ? because trace_id is not unique for each hit
           //and it can be same for multiple hits
           hit.uuid = getUUID();

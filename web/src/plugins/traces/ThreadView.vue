@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="showSystemFull = !showSystemFull"
         >
           <span class="thread-system__badge">
-            <OIcon name="settings" size="xs" class="q-mr-xs" />
+            <OIcon name="settings" size="xs" class="tw:mr-1" />
             System
           </span>
           <span

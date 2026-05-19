@@ -648,7 +648,7 @@ watch(defaultLogFields, (keyFields) => {
 
 // Generate table columns dynamically from visible fields in custom order
 const tableColumns = computed<ColumnDef<any>[]>(() => {
-  // Filter out hidden columns, respecting custom order
+  // Filter out tw:hidden columns, respecting custom order
   const visibleFields = orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
   );

@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         v-model="activeCategory"
         dense
-        class="text-grey-7"
+        class="tw:text-gray-400"
         data-test="azure-integration-category-tabs"
       >
         <OTab name="all" label="All Services" />
@@ -54,11 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:text-base">No integrations found matching your search</div>
     </div>
 
-    <div class="row q-col-gutter-md" v-else>
+    <div class="tw:flex tw:gap-3" v-else>
       <div
         v-for="integration in filteredIntegrations"
         :key="integration.id"
-        class="col-12 col-sm-6 col-md-4 col-lg-3"
+        class="tw:w-full col-sm-6 col-md-4 col-lg-3"
       >
         <AzureIntegrationTile :integration="integration" />
       </div>

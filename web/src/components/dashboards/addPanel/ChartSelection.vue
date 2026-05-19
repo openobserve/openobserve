@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: 100%">
-    <div class="q-pa-none" style="width: 100px">
+    <div class="tw:p-0" style="width: 100px">
       <ul class="chart-selection-list tw:flex tw:flex-wrap">
         <li
           v-for="(item, index) in ChartsArray"
@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'dashboard-chart-border',
             selectedChartType === item.id
               ? store.state.theme === 'dark'
-                ? 'bg-grey-5'
-                : 'bg-grey-3'
+                ? 'tw:bg-gray-400'
+                : 'tw:bg-gray-200'
               : '',
             isChartDisabled(item)
               ? 'tw:opacity-50 tw:cursor-not-allowed tw:pointer-events-none'
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="q-mx-auto q-my-sm"
+              class="tw:mx-auto tw:my-2"
               style="width: 24px; height: 24px;"
               data-test="dashboard-addpanel-chart-selection-icon"
             />

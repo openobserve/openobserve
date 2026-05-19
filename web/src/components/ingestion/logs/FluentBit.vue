@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-sm">
+  <div class="tw:p-2">
     <CopyContent class="copy-content-container-cls" :content="content" />
   </div>
   <div>
     <a
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
-      class="q-ml-lg text-bold"
+      class="tw:ml-4 tw:font-bold"
       style="padding-right: 2px"
       target="_blank"
       title="Harnessing the Power of FluentBit to Stream Kubernetes Logs to OpenObserve!"

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length"
-        class="w-full text-center q-mt-lg text-bold text-grey-9"
+        class="w-full tw:text-center tw:mt-4 tw:font-bold tw:text-gray-600"
         style="margin-top: 64px; font-size: 18px"
       >
         <span> No Permissions Selected </span>
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-loading-resources-loader"
         v-show="parent.expand && parent.is_loading"
-        class="flex items-center"
+        class="flex tw:items-center"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -52,12 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        <OSpinner size="xs" class="q-my-sm q-mx-none q-mr-sm" />
+        <OSpinner size="xs" class="tw:my-2 tw:mx-0 tw:mr-2" />
         <div>Loading Resources...</div>
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="q-py-sm text-left text-grey-10 bg-white relative-position"
+        class="tw:py-2 tw:text-left tw:text-gray-700 bg-white relative-position"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        Showing <span class="text-bold"> Top 50 </span> resources (Search to get
+        Showing <span class="tw:font-bold"> Top 50 </span> resources (Search to get
         specific resource)
       </div>
       <div

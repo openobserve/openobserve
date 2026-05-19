@@ -37,11 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:w-full" style="min-width: 400px;">
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
-          class="text-center text-h6 tw:py-2"
+          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
         >
           {{ t('modelPricing.errorValidations') }}
         </div>
-        <div v-else class="text-center text-h6 tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
+        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
         <OSeparator class="tw:mx-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Model Pricing Errors Section -->
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'error-item text-bold': true,
+                  'error-item tw:font-bold': true,
                   'text-green ': val.success,
                   'text-red': !val.success,
                 }"

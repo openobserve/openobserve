@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div class="flex justify-between items-center">
-        <div class="text-bold text-h6">Resource Details</div>
+      <div class="flex tw:justify-between tw:items-center">
+        <div class="tw:font-bold tw:text-xl tw:font-semibold">Resource Details</div>
         <OButton
           icon-left="close"
           variant="ghost"
@@ -36,30 +36,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:flex-1 tw:overflow-y-auto tw:p-[0.625rem]">
       <template v-if="resource">
         <!-- Resource Header -->
-        <div class="q-mb-md">
-          <div class="text-bold text-subtitle1 q-mb-sm">
+        <div class="tw:mb-3">
+          <div class="tw:font-bold tw:text-base tw:font-medium tw:mb-2">
             {{ resource.resource_method || "GET" }}
             {{ resource.resource_url }}
           </div>
-          <div class="row items-center q-gutter-sm text-grey-7">
-            <div class="row items-center">
-              <OIcon name="schedule" size="sm" class="q-mr-xs" />
+          <div class="tw:flex tw:items-center tw:gap-2 tw:text-gray-400">
+            <div class="tw:flex tw:items-center">
+              <OIcon name="schedule" size="sm" class="tw:mr-1" />
               <span>{{
                 formatTimestamp(resource[store.state.zoConfig.timestamp_column])
               }}</span>
             </div>
             <OSeparator vertical />
-            <div class="row items-center">
-              <OIcon name="access-time" size="sm" class="q-mr-xs" />
+            <div class="tw:flex tw:items-center">
+              <OIcon name="access-time" size="sm" class="tw:mr-1" />
               <span>{{ formatDuration(resource.resource_duration) }}</span>
             </div>
             <OSeparator vertical />
-            <div class="row items-center">
+            <div class="tw:flex tw:items-center">
               <OIcon
                 :name="getStatusIcon(resource.resource - status - code)"
                 :color="getStatusColor(resource.resource_status_code)"
                 size="sm"
-                class="q-mr-xs"
+                class="tw:mr-1"
               />
               <span>{{ resource.resource_status_code || "N/A" }}</span>
             </div>
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="tw:my-4" />
 
         <!-- Resource Details -->
-        <div class="q-mb-md">
-          <div class="tags-title text-bold q-ml-xs q-mb-sm">
+        <div class="tw:mb-3">
+          <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">
             Resource Information
           </div>
           <div class="resource-info-grid">
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="info-row" v-if="resource.view?.url">
               <div class="info-label">Page URL:</div>
-              <div class="info-value ellipsis" :title="resource.view.url">
+              <div class="info-value tw:truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
             </div>
@@ -124,25 +124,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Trace ID Notice -->
         <div
           v-else
-          class="q-pa-md text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
+          class="tw:p-3 tw:text-center tw:bg-[var(--o2-hover-accent)] tw:rounded"
         >
-          <OIcon name="info" size="md" class="q-mb-sm" />
-          <div class="text-grey-7">
+          <OIcon name="info" size="md" class="tw:mb-2" />
+          <div class="tw:text-gray-400">
             No trace information available for this resource.
           </div>
-          <div class="text-caption text-grey-6 q-mt-xs">
+          <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
             Trace correlation requires browser SDK v0.3.3+ with trace
             propagation enabled.
           </div>
         </div>
 
         <!-- Session Context -->
-        <div v-if="resource.session?.id" class="q-mt-md">
+        <div v-if="resource.session?.id" class="tw:mt-3">
           <OSeparator class="tw:my-4" />
-          <div class="tags-title text-bold q-ml-xs q-mb-sm">
+          <div class="tags-title tw:font-bold tw:ml-1 tw:mb-2">
             Session Context
           </div>
-          <div class="row q-gutter-sm">
+          <div class="tw:flex tw:gap-2">
             <OButton
               icon-left="play-circle"
               variant="outline"

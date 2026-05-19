@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Loaded State: Show actual data -->
               <template v-else>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="q-mr-xs" />
+                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="tw:mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data="chartData"
                     />
                   </div>
-                  <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                  <div v-if="isIngestionUnlimited" class="tw:text-xs" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
                     {{ t('about.usage_shows_zero_unlimited') }}
                   </div>
                 </div>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- License Limit Note (only for Enterprise without license) -->
             <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <OIcon name="info" size="xs" class="q-mr-xs" />
+              <OIcon name="info" size="xs" class="tw:mr-1" />
               <span>{{ dialogConfig.licenseNoteText }}</span>
             </div>
 

@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:p-4 tw:w-full">
         <OForm ref="updateUserForm" @submit.prevent="onSubmit">
-          <!-- <p class="q-pt-sm tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
+          <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
           </p>
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
-          <div class="flex justify-start tw:mt-6 tw:gap-2">
+          <div class="flex tw:justify-start tw:mt-6 tw:gap-2">
             <OButton
               variant="outline"
               size="sm-action"

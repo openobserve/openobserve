@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="tw:pb-8">
     <div class="tw:max-w-[300px] tw:mx-3">
-      <div class="q-mb-sm tw:font-semibold">
+      <div class="tw:mb-2 tw:font-semibold">
         {{ t("dashboard.description") }}
       </div>
       <OTextarea
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="tw:pb-8">
     <!-- Search bar -->
     <div class="config-search-wrapper tw:sticky">
-      <div class="row no-wrap items-center" style="gap: 4px">
+      <div class="tw:flex tw:flex-nowrap tw:items-center" style="gap: 4px">
         <OButton variant="ghost" size="icon" @click="toggleAllSections">
           <template #icon-left
             ><OIcon
@@ -45,10 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No results empty state -->
     <div
       v-if="searchQuery && !anySectionVisible"
-      class="config-no-results column items-center q-py-lg"
+      class="config-no-results column tw:items-center tw:py-4"
     >
-      <OIcon name="search-off" size="md" class="q-mb-xs text-grey-5" />
-      <div class="text-grey-6 text-caption">
+      <OIcon name="search-off" size="md" class="tw:mb-1 tw:text-gray-400" />
+      <div class="tw:text-gray-400 tw:text-xs">
         {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
     </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="isConfigOptionVisible('general', 'description')"
           class="tw:max-w-[300px]"
         >
-          <div class="q-mb-sm tw:font-semibold">
+          <div class="tw:mb-2 tw:font-semibold">
             {{ t("dashboard.description") }}
           </div>
           <OTextarea
@@ -105,9 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Panel Default Time Configuration -->
         <div
           v-show="isConfigOptionVisible('general', 'panel-default-time')"
-          class="q-mb-sm"
+          class="tw:mb-2"
         >
-          <div class="row items-center">
+          <div class="tw:flex tw:items-center">
             <OSwitch
               v-model="useDefaultTime"
               :label="t('dashboard.panelTimeEnabled')"
@@ -129,8 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
 
-          <div v-if="useDefaultTime" class="q-mt-sm">
-            <div class="text-bold q-mb-xs">
+          <div v-if="useDefaultTime" class="tw:mt-2">
+            <div class="tw:font-bold tw:mb-1">
               {{ t("dashboard.defaultDuration") }}
             </div>
             <div
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 showTimePicker ||
                 (panelTimeRange !== null && panelTimeRange !== undefined)
               "
-              class="flex items-center no-wrap panel-time-picker-container"
+              class="flex tw:items-center tw:flex-nowrap panel-time-picker-container"
             >
               <div class="panel-time-picker-btn">
                 <DateTimePickerDashboard
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
               <OIcon
-                class="q-mr-xs q-ml-sm flex-shrink-0"
+                class="tw:mr-1 tw:ml-2 flex-shrink-0"
                 size="sm"
                 name="close"
                 style="cursor: pointer; flex-shrink: 0"
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchRegex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
           color="input-border"
           bg-color="input-bg"
-          class="showLabelOnTop q-mt-sm"
+          class="showLabelOnTop tw:mt-2"
           stack-label
           borderless
           label-slot
@@ -451,11 +451,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value-replace-fn="selectPromQlNameOption"
         >
           <template v-slot:label>
-            <div class="row items-center all-pointer-events">
+            <div class="tw:flex tw:items-center all-pointer-events">
               {{ t("dashboard.legendLabel") }}
               <div>
                 <OIcon
-                  class="q-ml-xs"
+                  class="tw:ml-1"
                   size="md"
                   name="info-outline"
                   data-test="dashboard-config-promql-legend-info"
@@ -1190,7 +1190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="dashboardPanelData.data.type == 'geomap'">
           <span>{{ t("dashboard.initialView") }}</span>
-          <div class="row tw:gap-2">
+          <div class="tw:flex tw:gap-2">
             <OInput
               class="tw:flex-1 tw:min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lat"
@@ -1231,7 +1231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-symbol"
           />
 
-          <div class="row tw:gap-2">
+          <div class="tw:flex tw:gap-2">
             <OInput
               class="tw:flex-1 tw:min-w-0"
               v-if="
@@ -1468,7 +1468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !(isBreakdownFieldEmpty || hasTimeShifts)
           "
           v-show="isConfigOptionVisible('layout', 'trellis-group-by')"
-          class="row items-center"
+          class="tw:flex tw:items-center"
         >
           <OSwitch
             v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
@@ -1613,14 +1613,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.time_shift"
           :key="index"
         >
-          <div class="flex items-center">
+          <div class="flex tw:items-center">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
               :isFirstEntry="false"
             />
             <OIcon
-              class="q-mr-xs q-ml-sm"
+              class="tw:mr-1 tw:ml-2"
               size="sm"
               name="close"
               style="cursor: pointer"

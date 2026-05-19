@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md search-job-inspector q-pa-none">
+  <div class="tw:rounded-md search-job-inspector tw:p-0">
     <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem]">
-        <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center">
+        <div class="flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
           <div class="tw:flex tw:items-center tw:gap-3">
             <div class="q-table__title tw:font-[600]" data-test="inspector-title">
               Search Job Inspector
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-desc="{ row }">
-              <div class="text-caption">{{ row.desc || '-' }}</div>
+              <div class="tw:text-xs">{{ row.desc || '-' }}</div>
             </template>
 
             <template #empty>

@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           reverse
         >
           <template v-slot:before>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
-              <div class="add-function-name-input q-pb-sm o2-input">
+            <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max card-container tw:h-[calc(100vh-128px)]">
+              <div class="add-function-name-input tw:pb-2 o2-input">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-success="handleGenerationSuccess"
                     />
                   </div>
-                  <div class="text-subtitle2">
+                  <div class="tw:text-sm tw:font-medium">
                     <div v-if="vrlFunctionError">
                       <FullViewContainer
                         name="function"
@@ -95,14 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="expandState.functionError"
-                        class="q-px-sm q-pb-sm tw:border-l-4 tw:border-red-500"
+                        class="tw:px-2 tw:pb-2 tw:border-l-4 tw:border-red-500"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'bg-grey-10'
-                            : 'bg-grey-2'
+                            ? 'tw:bg-gray-800'
+                            : 'tw:bg-gray-100'
                         "
                       >
-                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="tw:my-0 tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container">
+            <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max tw:ml-2 card-container">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"

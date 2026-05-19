@@ -32,7 +32,7 @@ const props = defineProps<{
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
-  /** Per-cell inline style function */
+  /** Per-cell tw:inline style function */
   getCellStyle?: (params: {
     columnId: string;
     row: any;

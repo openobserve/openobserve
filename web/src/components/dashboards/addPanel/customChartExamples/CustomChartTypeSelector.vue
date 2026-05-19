@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection role="header">
       <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
         <OIcon name="bar-chart" size="sm" />
-        <span class="text-h6 tw:whitespace-nowrap">Example of custom charts</span>
+        <span class="tw:text-xl tw:font-semibold tw:whitespace-nowrap">Example of custom charts</span>
         <OInput
           v-model="searchQuery"
           placeholder="Search charts..."
@@ -61,13 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex"
       style="height: calc(100% - 60px); overflow: hidden; padding: 0"
     >
-      <div class="row no-wrap" style="height: 100%; width: 100%">
+      <div class="tw:flex tw:flex-nowrap" style="height: 100%; width: 100%">
         <!-- Left Sidebar -->
         <OCard
           class="sidebar tw:p-4"
           style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
         >
-          <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
+          <div class="tw:text-sm tw:font-medium tw:mb-3 text-weight-bold">Chart Types</div>
           <ul class="chart-category-list tw:flex tw:flex-col">
             <li
               v-for="(category, index) in chartCategories"
@@ -87,20 +87,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="content-area q-pa-md"
+          class="content-area tw:p-3"
           style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex justify-center items-center"
+            class="flex tw:justify-center tw:items-center"
             style="height: 100%"
           >
-            <div class="text-center">
+            <div class="tw:text-center">
               <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
-              <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
-              <div class="text-body2 text-grey-6 q-mt-sm">
+              <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3">No results found</div>
+              <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
                 Try searching with different keywords
               </div>
             </div>
@@ -110,13 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
-            class="chart-category-section q-mb-xl"
+            class="chart-category-section tw:mb-6"
             :data-category="category.chartLabel"
           >
-            <div class="text-h6 q-mb-md text-weight-medium">
+            <div class="tw:text-xl tw:font-semibold tw:mb-3 text-weight-medium">
               {{ category.chartLabel }}
             </div>
-            <div class="row q-col-gutter-md">
+            <div class="tw:flex tw:gap-3">
               <div
                 v-for="(chart, chartIndex) in category.type"
                 :key="chartIndex"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </OCardSection>
                   <OCardSection class="tw:pt-0 tw:px-2 tw:pb-2">
-                    <div class="text-caption text-center text-weight-medium">
+                    <div class="tw:text-xs tw:text-center text-weight-medium">
                       {{ chart.label }}
                     </div>
                   </OCardSection>

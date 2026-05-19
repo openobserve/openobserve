@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle q-mr-xs tw:p-0"
+        class="schema-field-toggle tw:mr-1 tw:p-0"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle q-mr-xs"
+        class="schema-field-toggle tw:mr-1"
       >
         <OToggleGroupItem
           v-for="opt in interestingFieldsToggleOptions"

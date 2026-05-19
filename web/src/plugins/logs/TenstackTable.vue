@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="tw:flex items-center"
+          class="tw:flex tw:items-center"
         >
           <th
             v-for="header in headerGroup.headers"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="!header.isPlaceholder"
               :class="[
-                'text-left',
+                'tw:text-left',
                 header.column.getCanSort() ? 'cursor-pointer select-none' : '',
               ]"
               @click="
@@ -127,9 +127,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                   name="cancel"
-                  class="q-ma-none close-icon cursor-pointer"
+                  class="tw:m-0 close-icon cursor-pointer"
                   :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'text-grey-7'
+                    store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
                   "
                   :title="t('common.close')"
                   size="sm"
@@ -143,14 +143,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tr v-if="loading" class="tw:w-full">
           <td
             :colspan="columnOrder.length"
-            class="text-bold"
+            class="tw:font-bold"
             :style="{
               background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
               opacity: 0.7,
             }"
           >
             <div
-              class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
+              class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center"
             >
               <OSpinner size="xs" />
               {{ t("confirmDialog.loading") }}
@@ -160,13 +160,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tr v-if="!loading && errMsg != ''" class="tw:w-full">
           <td
             :colspan="columnOrder.length"
-            class="text-bold"
+            class="tw:font-bold"
             style="opacity: 0.7"
           >
-            <div class="text-subtitle2 text-weight-bold bg-warning">
+            <div class="tw:text-sm tw:font-medium text-weight-bold tw:bg-amber-500">
               <OIcon size="xs"
 name="warning"
-class="q-mr-xs" />
+class="tw:mr-1" />
               {{ errMsg }}
             </div>
           </td>
@@ -177,11 +177,11 @@ class="q-mr-xs" />
         >
           <td
             :colspan="columnOrder.length"
-            class="text-bold"
+            class="tw:font-bold"
             style="opacity: 0.6"
           >
             <div
-              class="text-subtitle2 text-weight-bold q-pl-sm"
+              class="tw:text-sm tw:font-medium text-weight-bold tw:pl-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'tw:bg-yellow-600'
@@ -191,7 +191,7 @@ class="q-mr-xs" />
               <OButton
                 variant="ghost"
                 size="icon-xs"
-                class="q-mr-xs log-row-expand-btn"
+                class="tw:mr-1 log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
                 ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" /></OButton
@@ -206,7 +206,7 @@ class="q-mr-xs" />
           <td
             :colspan="columnOrder.length"
             style="opacity: 0.7"
-            class="q-px-sm"
+            class="tw:px-2"
             :class="
               store.state.theme === 'dark'
                 ? 'tw:bg-yellow-600'
@@ -334,7 +334,7 @@ class="q-mr-xs" />
                   v-if="cellIndex == 0"
                   variant="ghost"
                   size="icon-xs"
-                  class="q-mr-xs log-row-expand-btn"
+                  class="tw:mr-1 log-row-expand-btn"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
                   ><OIcon
@@ -910,14 +910,14 @@ const expandRow = async (index: number) => {
     // COLLAPSE OPERATION
     expandedRowIndices.value.delete(index);
 
-    // Clear cached height for collapsed row
+    // Clear cached height for collapsed "row"
     delete expandedRowHeights.value[index + 1];
 
     // Remove the expanded row from tableRows
     tableRows.value.splice(index + 1, 1);
     isCollapseOperation = true;
 
-    // Update all expanded indices that come after this collapsed row
+    // Update all expanded indices that come after this collapsed "row"
     const updatedIndices = new Set<number>();
     expandedRowIndices.value.forEach((i) => {
       updatedIndices.add(i > index ? i - 1 : i);
@@ -935,7 +935,7 @@ const expandRow = async (index: number) => {
     updatedIndices.add(index);
     expandedRowIndices.value = updatedIndices;
 
-    // Insert the expanded row
+    // Insert the expanded "row"
     tableRows.value.splice(index + 1, 0, {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
@@ -1059,14 +1059,14 @@ const sendToAiChat = (
   append: boolean = true,
 ) => {
   if (isEntireRow) {
-    //here we will get the original value of the row
+    //here we will get the original value of the "row"
     //and we need to filter the row if props.columns have any filtered cols that user applied
     //the format of the props.columns is like this:
     //if user have not applied any filter then the props.columns will be like this:
     //it contains _timestamp column and source column
     //else we get _timestamp column and other filter columns so if user have applied any filter then we need to filter the row based on the filter columns
     const row = JSON.parse(value);
-    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
+    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the "row"
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
       emits("sendToAiChat", JSON.stringify(row), append);

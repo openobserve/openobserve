@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="row"
+      class="tw:flex"
       :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
       style="overflow: hidden"
     >
-      <div class="col">
+      <div class="tw:flex tw:flex-col">
         <div data-test="dashboard-error">
           <ul class="tw:list-disc tw:list-inside tw:px-3">
             <li

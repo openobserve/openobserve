@@ -17,22 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="report-list-page"
-    class="tw:flex tw:flex-col"
-    :style="{ height: 'calc(100vh - var(--navbar-height))' }"
+    class="tw:p-0 flex flex-col"
   >
     <!-- Header bar -->
-    <div class="tw:shrink-0 tw:px-[0.625rem]">
-      <div class="card-container tw:mb-[0.625rem]">
+    <div class="tw:w-full tw:px-[0.625rem] tw:pt-1">
+      <div class="card-container">
         <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
+          class="flex tw:justify-between tw:w-full tw:py-3 tw:mb-[0.625rem] tw:px-4 tw:h-[68px] tw:items-center"
         >
           <div class="q-table__title tw:font-[600]" data-test="report-list-title">
             {{ t("reports.header") }}
           </div>
 
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+          <div class="flex tw:ml-auto tw:ps-2 tw:items-center">
             <!-- Scheduled / Cached tabs -->
-            <div class="app-tabs-container q-mr-sm">
+            <div class="app-tabs-container tw:mr-2">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="tabs"
@@ -45,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OInput
               data-test="report-list-search-input"
               v-model="dynamicQueryModel"
-              class="tw:ml-2 tw:w-[200px]"
+              class="tw:ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
               :placeholder="
                 searchAcrossFolders
                   ? t('dashboard.searchAcross')
@@ -55,28 +54,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @clear="clearSearch"
             >
               <template #icon-left>
-                <OIcon name="search" size="sm" />
+                <OIcon class="o2-search-input-icon" name="search" size="sm" />
               </template>
             </OInput>
 
             <!-- All Folders toggle -->
-            <OSwitch
-              data-test="report-list-search-across-folders-toggle"
-              v-model="searchAcrossFolders"
-              size="lg"
-              class="tw:ml-2 tw:flex tw:items-center tw:py-[0.45rem] tw:px-[0.375rem] tw:border tw:border-[var(--color-button-outline-border)] tw:rounded-md tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-[var(--o2-hover-accent)]"
-            >
-              <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
-              <template #tooltip>
-                <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
-              </template>
-            </OSwitch>
+            <div class="tw:ml-2">
+              <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
+                <OSwitch
+                  data-test="report-list-search-across-folders-toggle"
+                  v-model="searchAcrossFolders"
+                  :label="t('dashboard.allFolders') || 'All Folders'"
+                />
+              </OTooltip>
+            </div>
 
             <OButton
               data-test="report-list-add-report-btn"
               variant="primary"
-              size="sm"
-              class="q-ml-sm"
+              size="sm-action"
+              class="tw:ml-2"
               @click="createNewReport"
             >
               {{ t(`reports.add`) }}
@@ -86,35 +83,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Body: folder list left, table right -->
+    <!-- Splitter: folder list left, table right -->
     <div
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.625rem]"
+      class="tw:w-full report-list-table"
+      style="height: calc(100vh - 118px)"
     >
-      <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
-        <div class="tw:h-full">
-          <FolderList
-            type="reports"
-            @update:activeFolderId="updateActiveFolderId"
-          />
-        </div>
-      </div>
-      <!-- Right: Table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <q-splitter
+        v-model="splitterModel"
+        unit="px"
+        :limits="[200, 500]"
+        style="height: calc(100vh - 118px)"
+        data-test="report-list-splitter"
+      >
+        <!-- Left: folder list -->
+        <template #before>
+          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full">
+              <FolderList
+                type="reports"
+                @update:activeFolderId="updateActiveFolderId"
+              />
+            </div>
+          </div>
+        </template>
+
+        <!-- Right: report table -->
+        <template #after>
+          <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+            <div class="tw:h-full card-container">
               <OTable
                 data-test="report-list-table"
                 :data="visibleRows"
                 :columns="columns"
                 row-key="report_id"
                 pagination="client"
-                :page-size="pageSize"
-                :page-size-options="pageSizeOptions"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
-                width="100%"
-                :show-global-filter="false"
-                :default-columns="false"
+                style="width: 100%"
+                :style="
+                  hasVisibleRows
+                    ? 'width: 100%; height: calc(100vh - 124px)'
+                    : 'width: 100%'
+                "
               >
                 <template #empty>
                   <NoData />
@@ -126,14 +136,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     v-if="row.dashboards?.[0]?.report_type === 'png'"
                     variant="primary-outline"
-                    class="q-ml-xs"
+                    class="tw:ml-1"
                   >
                     PNG
                   </OBadge>
                   <OBadge
                     v-if="row.imagePreview"
                     variant="default-outline"
-                    class="q-ml-xs"
+                    class="tw:ml-1"
                   >
                     Preview
                   </OBadge>
@@ -151,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="reportsStateLoadingMap[row.report_id]"
                     data-test="report-list-toggle-report-state-loader"
                     style="display: inline-block; width: 33.14px; height: auto"
-                    class="flex justify-center items-center"
+                    class="flex tw:justify-center tw:items-center"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -228,8 +238,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
-        </div>
-      </div>
+            </div>
+          </div>
+        </template>
+      </q-splitter>
     </div>
 
     <!-- Single delete confirm -->
@@ -710,7 +722,7 @@ const bulkDeleteReports = async () => {
   confirmBulkDelete.value = false;
 };
 
-// Move to folder — single row
+// Move to folder — single "row"
 const openMoveDialog = (report: any) => {
   activeFolderToMove.value = report.folder_id || activeFolderId.value;
   reportIdsToMove.value = [report.report_id];

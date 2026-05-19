@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="full-width column flex-center q-gutter-sm"
+      class="tw:w-full column flex-center tw:gap-2"
       style="font-size: 1.5rem"
     >
       <img
@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 200px; height: 200px; margin-top: 20vh"
         alt=""
       />
-      <div class="q-ma-none no-org-selected" >{{ t("ticket.noOrganizationSelected") }}</div>
-      <div class="q-ma-none select-org-msg">{{ t("ticket.selectOrganizationForQuota") }}</div>
+      <div class="tw:m-0 no-org-selected" >{{ t("ticket.noOrganizationSelected") }}</div>
+      <div class="tw:m-0 select-org-msg">{{ t("ticket.selectOrganizationForQuota") }}</div>
     </div>
   </template>
   

@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- color by button group -->
     <div
-      class="q-pt-md"
+      class="tw:pt-3"
       v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
     >
       {{ t("dashboard.colorSeriesBy") }}

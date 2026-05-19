@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container full-height q-pa-sm">
+  <div class="player-container full-height tw:p-2">
     <div
       v-if="isLoading"
-      class="q-pb-lg flex items-center justify-center text-center full-width tw:h-[calc(100vh-12.5rem)]"
+      class="tw:pb-4 flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:h-[calc(100vh-12.5rem)]"
     >
       <div>
         <OSpinner
@@ -26,26 +26,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:mx-auto tw:block"
           data-test="video-player-loading-indicator"
         />
-        <div class="text-center full-width">
+        <div class="tw:text-center tw:w-full">
           {{ t("rum.loadingSessions") }}
         </div>
       </div>
     </div>
     <div
       ref="playerContainerRef"
-      class="flex items-center justify-center tw:h-[calc(100vh-12.375rem)]"
+      class="flex tw:items-center tw:justify-center tw:h-[calc(100vh-12.375rem)]"
     >
       <div
         ref="playerRef"
         id="player"
-        class="player flex items-center cursor-pointer"
+        class="player flex tw:items-center cursor-pointer"
         @click="togglePlay"
       />
     </div>
-    <div class="full-width q-pa-sm q-pt-md controls-container">
+    <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
       <div
         ref="playbackBarRef"
-        class="playback_bar q-mt-sm q-mb-md relative-position cursor-pointer"
+        class="playback_bar tw:mt-2 tw:mb-3 relative-position cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
@@ -91,13 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="getEventTooltip(event)"
         />
       </div>
-      <div class="controls flex justify-between items-center">
-        <div class="flex items-center">
+      <div class="controls flex tw:justify-between tw:items-center">
+        <div class="flex tw:items-center">
           <div>
             <OIcon
               name="replay-10"
               size="md"
-              class="q-mr-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:mr-2 cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -113,19 +113,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="forward-10"
               size="md"
-              class="q-ml-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+              class="tw:ml-2 cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="flex q-ml-lg items-center">
+          <div class="flex tw:ml-4 tw:items-center">
             <div>{{ playerState.time }}</div>
-            <div class="q-px-xs">/</div>
+            <div class="tw:px-1">/</div>
             <div>{{ playerState.duration }}</div>
           </div>
         </div>
-        <div class="flex items-center">
+        <div class="flex tw:items-center">
           <OSwitch
-            class="q-mr-md"
+            class="tw:mr-3"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             @update:model-value="toggleSkipInactive"

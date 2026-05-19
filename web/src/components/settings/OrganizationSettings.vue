@@ -1,20 +1,20 @@
 <template>
   <div>
-    <div class="q-px-md q-pt-md q-pb-md">
-      <div class="text-body1 text-bold">
+    <div class="tw:px-3 tw:pt-3 tw:pb-3">
+      <div class="tw:text-base tw:font-bold">
         {{ t("settings.logDetails") }}
       </div>
     </div>
 
-    <div class="q-mx-md q-mb-md">
+    <div class="tw:mx-3 tw:mb-3">
     <div
       data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input q-mb-sm"
+      class="trace-id-field-name o2-input tw:mb-2"
     >
       <OInput
         v-model.trim="traceIdFieldName"
         :label="t('settings.traceIdFieldName') + ' *'"
-        class="q-py-md showLabelOnTop"
+        class="tw:py-3 showLabelOnTop"
         :error="!!traceIdFieldNameError"
         :error-message="traceIdFieldNameError"
         help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
@@ -29,7 +29,7 @@
       <OInput
         v-model.trim="spanIdFieldName"
         :label="t('settings.spanIdFieldName') + ' *'"
-        class="q-py-md showLabelOnTop"
+        class="tw:py-3 showLabelOnTop"
         :error="!!spanIdFieldNameError"
         :error-message="spanIdFieldNameError"
         help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
@@ -42,7 +42,7 @@
         data-test="add-toggle-ingestion-btn"
         v-model="toggleIngestionLogs"
         :label="t('settings.toggleIngestionLogsLabel')"
-        class="q-mt-sm"
+        class="tw:mt-2"
       />
     </div>
 
@@ -51,7 +51,7 @@
         data-test="add-toggle-usage-stream-btn"
         v-model="usageStreamEnabled"
         :label="t('settings.usageStreamEnabledLabel')"
-        class="q-mt-sm"
+        class="tw:mt-2"
       />
     </div>
 
@@ -66,7 +66,7 @@
       />
     </template>
 
-    <div class="tw:flex tw:gap-2 q-mt-md">
+    <div class="tw:flex tw:gap-2 tw:mt-3">
       <OButton
         data-test="add-alert-cancel-btn"
         variant="outline"

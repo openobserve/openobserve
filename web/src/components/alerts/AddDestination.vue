@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none o2-custom-bg"
+  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
     style="
       height: calc(100vh - 48px);
       min-height: inherit;
@@ -24,26 +24,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
+      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
       style="flex-shrink: 0"
     >
-      <div class="flex items-center tw:h-[60px]">
+      <div class="flex tw:items-center tw:h-[60px]">
         <div
           no-caps
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel:hideform')"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col" data-test="add-destination-title">
-          <div v-if="destination" class="text-h6">
+        <div class="tw:flex tw:flex-col" data-test="add-destination-title">
+          <div v-if="destination" class="tw:text-xl tw:font-semibold">
             {{ t("alert_destinations.updateTitle") }}
           </div>
-          <div v-else class="text-h6">
+          <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("alert_destinations.addTitle") }}
           </div>
         </div>
@@ -54,10 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="flex: 1; overflow-y: auto; overflow-x: hidden"
     >
       <div>
-        <div class="row q-col-gutter-sm q-px-md q-mt-sm q-mb-xs">
+        <div class="tw:flex tw:gap-2 tw:px-3 tw:mt-2 tw:mb-1">
           <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
-          <div v-if="isAlerts && !destination" class="col-12 q-pb-md">
-            <div class="text-subtitle2 q-mb-sm">
+          <div v-if="isAlerts && !destination" class="tw:w-full tw:pb-3">
+            <div class="tw:text-sm tw:font-medium tw:mb-2">
               {{ t("alert_destinations.destination_type") }}
             </div>
             <PrebuiltDestinationSelector
@@ -72,36 +72,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destination Type and Name Display for Edit Mode -->
           <div
             v-if="isAlerts && destination && formData.destination_type"
-            class="col-12 q-pb-md"
+            class="tw:w-full tw:pb-3"
           >
-            <div class="row q-col-gutter-md">
+            <div class="tw:flex tw:gap-3">
               <!-- Destination Type (Read-only) -->
-              <div class="col-6">
-                <div class="text-subtitle2 q-mb-xs">
+              <div class="tw:w-1/2">
+                <div class="tw:text-sm tw:font-medium tw:mb-1">
                   {{ t("alert_destinations.destination_type") }}
                 </div>
                 <div
-                  class="flex items-center q-pa-sm el-border el-border-radius"
+                  class="flex tw:items-center tw:p-2 el-border el-border-radius"
                   data-test="destination-type-readonly"
                 >
                   <OIcon
                     :name="getDestinationTypeIcon(formData.destination-type)"
                     size="md"
-                    class="q-mr-sm"
+                    class="tw:mr-2"
                   />
-                  <span class="text-body2">{{
+                  <span class="tw:text-sm">{{
                     getDestinationTypeName(formData.destination_type)
                   }}</span>
                   <OBadge
                     size="sm"
                     variant="default"
-                    class="q-ml-sm"
+                    class="tw:ml-2"
                     >{{ t("alert_destinations.readonly") }}</OBadge
                   >
                 </div>
               </div>
               <!-- Destination Name (Read-only) -->
-              <div class="col-6">
+              <div class="tw:w-1/2">
                 <OInput
                   data-test="add-destination-name-input"
                   v-model="formData.name"
@@ -123,10 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (isUpdatingDestination &&
                   formData.destination_type !== 'custom'))
             "
-            class="col-12"
+            class="tw:w-full"
           >
             <!-- Name Field for Create Mode -->
-            <div v-if="!destination" class="col-12 q-pb-md">
+            <div v-if="!destination" class="tw:w-full tw:pb-3">
               <OInput
                 data-test="add-destination-name-input"
                 v-model="formData.name"
@@ -150,28 +150,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-actions="true"
               data-test="prebuilt-form"
             />
-            <div v-else-if="isUpdatingDestination" class="q-pa-md text-center">
+            <div v-else-if="isUpdatingDestination" class="tw:p-3 tw:text-center">
               <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="q-mt-sm text-grey-7">Loading destination data...</div>
+              <div class="tw:mt-2 tw:text-gray-400">Loading destination data...</div>
             </div>
 
             <!-- Additional Settings for Prebuilt Destinations -->
-            <div class="col-12 q-mt-md">
-              <div class="text-bold q-py-xs">
+            <div class="tw:w-full tw:mt-3">
+              <div class="tw:font-bold tw:py-1">
                 {{ t("alert_destinations.additional_settings") }}
               </div>
 
               <!-- Custom Headers (hidden for email destinations) -->
-              <div v-if="formData.destination_type !== 'email'" class="q-py-sm">
-                <div class="text-subtitle2 q-pb-xs">
+              <div v-if="formData.destination_type !== 'email'" class="tw:py-2">
+                <div class="tw:text-sm tw:font-medium tw:pb-1">
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
                 <div
                   v-for="(header, index) in apiHeaders"
                   :key="header.uuid"
-                  class="row q-col-gutter-sm q-pb-sm"
+                  class="tw:flex tw:gap-2 tw:pb-2"
                 >
-                  <div class="col-5 q-ml-none">
+                  <div class="tw:w-5/12 tw:ml-0">
                     <OInput
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       v-model="header.key"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="col-5 q-ml-none">
+                  <div class="tw:w-5/12 tw:ml-0">
                     <OInput
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       v-model="header.value"
@@ -187,10 +187,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="col-2 q-ml-none">
+                  <div class="tw:w-1/6 tw:ml-0">
                     <OButton
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                      class="q-ml-xs"
+                      class="tw:ml-1"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       data-test="add-destination-add-header-btn"
                       v-if="index === apiHeaders.length - 1"
-                      class="q-ml-xs"
+                      class="tw:ml-1"
                       variant="ghost"
                       size="icon-circle-sm"
                       :title="t('alert_templates.edit')"
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Skip TLS Verify Toggle -->
-              <div class="q-py-sm">
+              <div class="tw:py-2">
                 <OSwitch
                   data-test="add-destination-skip-tls-verify-toggle"
                   v-model="formData.skip_tls_verify"
@@ -238,9 +238,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               !isAlerts || (isAlerts && formData.destination_type === 'custom')
             "
-            class="col-12 q-pb-md"
+            class="tw:w-full tw:pb-3"
           >
-            <div class="app-tabs-container tw:h-[36px] q-mr-sm tw:w-fit">
+            <div class="app-tabs-container tw:h-[36px] tw:mr-2 tw:w-fit">
               <app-tabs
                 data-test="add-destination-tabs"
                 :tabs="tabs"
@@ -251,9 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="formData.type === 'email' && !getFormattedTemplates.length"
-            class="flex items-center col-12 q-mb-md"
+            class="flex tw:items-center tw:w-full tw:mb-3"
           >
-            <div class="text-subtitle2 q-mr-sm">
+            <div class="tw:text-sm tw:font-medium tw:mr-2">
               It looks like you haven't created any Email Templates yet.
             </div>
             <OButton variant="outline" size="sm" @click="createEmailTemplate"
@@ -265,8 +265,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               !isAlerts || (isAlerts && formData.destination_type === 'custom')
             "
-            class="q-py-xs"
-            :class="{ 'col-6': isAlerts, 'col-12': !isAlerts }"
+            class="tw:py-1"
+            :class="{ 'tw:w-1/2': isAlerts, 'tw:w-full': !isAlerts }"
           >
             <OInput
               data-test="add-destination-name-input"
@@ -281,9 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Template field only for custom alert destinations -->
           <div
             v-if="isAlerts && formData.destination_type === 'custom'"
-            class="col-6 row q-py-xs"
+            class="tw:w-1/2 tw:flex tw:py-1"
           >
-            <div class="col-12">
+            <div class="tw:w-full">
               <OSelect
                 data-test="add-destination-template-select"
                 v-model="formData.template"
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!isAlerts && formData.type === 'http')
             "
           >
-            <div class="col-6 q-py-xs">
+            <div class="tw:w-1/2 tw:py-1">
               <OInput
                 data-test="add-destination-url-input"
                 v-model="formData.url"
@@ -317,8 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div
-              class="q-py-xs destination-method-select"
-              :class="{ 'col-3': !isAlerts, 'col-6': isAlerts }"
+              class="tw:py-1 destination-method-select"
+              :class="{ 'tw:w-1/4': !isAlerts, 'tw:w-1/2': isAlerts }"
             >
               <OSelect
                 data-test="add-destination-method-select"
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!isAlerts"
-              class="col-3 q-py-xs destination-method-select"
+              class="tw:w-1/4 tw:py-1 destination-method-select"
             >
               <OSelect
                 data-test="add-destination-output-format-select"
@@ -346,14 +346,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="outputFormatError = ''"
               />
             </div>
-            <div class="col-12 q-py-sm">
-              <div class="text-bold q-py-xs">Headers</div>
+            <div class="tw:w-full tw:py-2">
+              <div class="tw:font-bold tw:py-1">Headers</div>
               <div
                 v-for="(header, index) in apiHeaders"
                 :key="header.uuid"
-                class="row q-col-gutter-sm q-pb-sm"
+                class="tw:flex tw:gap-2 tw:pb-2"
               >
-                <div class="col-5 q-ml-none">
+                <div class="tw:w-5/12 tw:ml-0">
                   <OInput
                     :data-test="`add-destination-header-${header['key']}-key-input`"
                     v-model="header.key"
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tabindex="0"
                   />
                 </div>
-                <div class="col-5 q-ml-none">
+                <div class="tw:w-5/12 tw:ml-0">
                   <OInput
                     :data-test="`add-destination-header-${header['key']}-value-input`"
                     v-model="header.value"
@@ -369,10 +369,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tabindex="0"
                   />
                 </div>
-                <div class="col-2 q-ml-none">
+                <div class="tw:w-1/6 tw:ml-0">
                   <OButton
                     :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                    class="q-ml-xs"
+                    class="tw:ml-1"
                     variant="ghost"
                     size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="add-destination-add-header-btn"
                     v-if="index === apiHeaders.length - 1"
-                    class="q-ml-xs"
+                    class="tw:ml-1"
                     variant="ghost"
                     size="icon-circle-sm"
                     :title="t('alert_templates.edit')"
@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="col-12 q-py-sm">
+            <div class="tw:w-full tw:py-2">
               <OSwitch
                 data-test="add-destination-skip-tls-verify-toggle"
                 v-model="formData.skip_tls_verify"
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!isAlerts || formData.destination_type === 'custom')
             "
           >
-            <div class="col-6 q-py-xs action-select">
+            <div class="tw:w-1/2 tw:py-1 action-select">
               <OSelect
                 data-test="add-destination-action-select"
                 v-model="formData.action_id"
@@ -445,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="flex justify-between q-px-lg q-py-lg full-width">
+      <div class="flex tw:justify-between tw:px-4 tw:py-4 tw:w-full">
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="
@@ -453,7 +453,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (isPrebuiltDestination ||
               (isUpdatingDestination && formData.destination_type !== 'custom'))
           "
-          class="flex items-center tw:gap-2"
+          class="flex tw:items-center tw:gap-2"
         >
           <OButton
             data-test="destination-preview-button"
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else></div>
 
         <!-- Right side: Cancel and Save buttons -->
-        <div class="flex items-center tw:gap-2">
+        <div class="flex tw:items-center tw:gap-2">
           <OButton
             data-test="add-destination-cancel-btn"
             v-close-popup="true"
@@ -1079,7 +1079,7 @@ const saveDestination = async () => {
 
   // Handle custom destinations (existing logic)
   if (!isValidDestination.value) {
-    // Set inline error states for each required field
+    // Set tw:inline error states for each required field
     const name = formData.value.name;
     nameError.value = !name ? t('common.nameRequired')
       : (!isValidResourceName(name) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : '');

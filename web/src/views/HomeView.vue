@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:px-[0.625rem] q-pt-xs home-page"
-    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''"
+    class="tw:rounded-md tw:px-[0.625rem] tw:pt-1 home-page"
+    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
   >
     <div
       class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto"

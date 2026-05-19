@@ -51,7 +51,7 @@
             <OIcon
               v-if="showIcon"
               :name="isAIMode ? 'auto-awesome' : 'search'" size="sm"
-              class="q-mr-xs"
+              class="tw:mr-1"
             />
             {{ isAIMode ? aiButtonLabel : normalButtonLabel }}
           </OButton>
@@ -234,7 +234,7 @@ const isAIMode = computed(() => nlpMode.value || isNaturalLanguageDetected.value
 // Computed: Button classes
 const buttonClasses = computed(() => {
   const classes = [
-    'q-pa-none',
+    'tw:p-0',
     `tw:h-[${props.height}]`,
     'element-box-shadow',
   ];

@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
+    <div class="tw:pb-1 flex tw:justify-start tw:px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="tw:mb-[0.375rem] logs-json-preview-tabs q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
+        class="tw:mb-[0.375rem] logs-json-preview-tabs tw:mr-2 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,14 +14,14 @@
         :label="t('common.copyToClipboard')"
         size="sm-action"
         variant="outline"
-        class="tw:mb-[0.375rem] q-mr-sm"
+        class="tw:mb-[0.375rem] tw:mr-2"
         @click="copyLogToClipboard"
       ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="sm-action"
         variant="outline"
-        class="log-preview-btn q-mr-sm"
+        class="log-preview-btn tw:mr-2"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
@@ -32,7 +32,7 @@
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
         "
-        class="o2-input flex items-center logs-trace-selector"
+        class="o2-input flex tw:items-center logs-trace-selector"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"
@@ -52,7 +52,7 @@
         ><OIcon name="account-tree" size="xs" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="q-pl-md">
+    <div v-show="activeTab === 'unflattened'" class="tw:pl-3">
       <OSpinner size="md" />
       <div v-if="!loading">
         <code-query-editor
@@ -65,7 +65,7 @@
         />
       </div>
     </div>
-    <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+    <div v-show="activeTab !== 'unflattened'" class="tw:pl-3">
       {
       <div
         class="log_json_content"
@@ -83,7 +83,7 @@
               data-test="log-details-include-exclude-field-btn"
               size="icon-xs"
               variant="ghost"
-              class="q-ml-sm log-json-field-dropdown-btn"
+              class="tw:ml-2 log-json-field-dropdown-btn"
               aria-label="Add icon"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -160,7 +160,7 @@
         </ODropdown>
 
         <span
-          class="q-pl-xs"
+          class="tw:pl-1"
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
@@ -197,13 +197,13 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <OIcon name="content-copy" size="xs" class="q-mr-sm" />
+          <OIcon name="content-copy" size="xs" class="tw:mr-2" />
           Copy
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
           <img
             :src="regexIconForContextMenu"
-            class="q-mr-sm"
+            class="tw:mr-2"
             style="width: 14px; height: 14px"
             alt=""
           />

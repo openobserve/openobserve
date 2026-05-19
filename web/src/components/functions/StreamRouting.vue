@@ -1,6 +1,6 @@
 <template>
   <div data-test="add-stream-routing-section" class="bg-white full-height">
-    <div class="q-py-sm q-px-md flex justify-between items-center">
+    <div class="tw:py-2 tw:px-3 flex tw:justify-between tw:items-center">
       <div class="stream-routing-title">Stream Routing</div>
       <OIcon
         data-test="stream-routing-close-dialog-btn"
@@ -11,7 +11,7 @@
       />
     </div>
     <OSeparator />
-    <div class="stream-routing-container q-px-md q-pt-md">
+    <div class="stream-routing-container tw:px-3 tw:pt-3">
       <div
         data-test="stream-routing-name-input"
         class="o2-input"
@@ -31,10 +31,10 @@
           @update:model-value="nameError = ''"
         />
       </div>
-      <div class="flex justify-start items-center" style="padding-top: 0px">
+      <div class="flex tw:justify-start tw:items-center" style="padding-top: 0px">
         <div
           data-test="add-alert-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm"
+          class="alert-stream-type o2-input tw:mr-2"
           style="padding-top: 0"
         >
           <OSelect
@@ -82,7 +82,7 @@
       />
 
       <div
-        class="flex justify-start q-mt-lg q-py-sm full-width tw:gap-2"
+        class="flex tw:justify-start tw:mt-4 tw:py-2 tw:w-full tw:gap-2"
         :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       >
         <OButton

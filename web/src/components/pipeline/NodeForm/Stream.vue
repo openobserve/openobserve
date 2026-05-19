@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <div class="stream-routing-container full-width q-py-md">
+    <div class="stream-routing-container tw:w-full tw:py-3">
       <OSwitch
         v-if="selectedNodeType == 'input'"
         data-test="create-stream-toggle"
@@ -38,11 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div>
-        <div v-if="!createNewStream" class="q-px-md">
-          <div class="flex justify-start items-center" style="padding-top: 0px">
+        <div v-if="!createNewStream" class="tw:px-3">
+          <div class="flex tw:justify-start tw:items-center" style="padding-top: 0px">
             <div
               data-test="input-node-stream-type-select"
-              class="alert-stream-type o2-input q-mr-sm full-width"
+              class="alert-stream-type o2-input tw:mr-2 tw:w-full"
               style="padding-top: 0"
             >
               <OSelect
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               data-test="input-node-stream-type-select"
-              class="alert-stream-type o2-input q-mr-sm full-width"
+              class="alert-stream-type o2-input tw:mr-2 tw:w-full"
               style="padding-top: 0"
             >
               <OSelect
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="isFetchingStreams"
                 :popup-content-style="{ textTransform: 'lowercase' }"
                 color="input-border"
-                class="q-py-sm showLabelOnTop no-case full-width"
+                class="tw:py-2 showLabelOnTop no-case tw:w-full"
                 use-input
                 hide-selected
                 fill-input
@@ -94,17 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="note-message"
             >
               <span class="tw:flex tw:items-center">
-                <OIcon name="info" size="sm" class="q-pr-xs" /> Select an existing stream
+                <OIcon name="info" size="sm" class="tw:pr-1" /> Select an existing stream
                 from the list or enter the name to create a new one</span
               >
               <span class="tw:flex tw:items-center">
-                <OIcon name="info" size="sm" class="q-pr-xs" /> Enrichment_tables as
+                <OIcon name="info" size="sm" class="tw:pr-1" /> Enrichment_tables as
                 destination stream is only available for scheduled
                 pipelines</span
               >
 
               <span class="tw:flex">
-                <OIcon name="info" size="sm" class="q-pr-xs q-pt-xs" /> Use curly braces
+                <OIcon name="info" size="sm" class="tw:pr-1 tw:pt-1" /> Use curly braces
                 '{}' to configure stream name dynamically. e.g.
                 static_text_{fieldname}_postfix. Static text before/after {} is
                 optional</span
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:flex tw:gap-2 q-mt-sm">
+          <div class="tw:flex tw:gap-2 tw:mt-2">
             <OButton
               v-if="pipelineObj.isEditNode"
               data-test="input-node-stream-delete-btn"

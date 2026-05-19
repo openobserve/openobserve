@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs">
+  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem] tw:mt-1">
     <!-- Top Header Bar -->
     <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div
           data-test="add-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div>
-          <div class="text-h6 text-weight-medium">Upload Source Maps</div>
+          <div class="tw:text-xl tw:font-semibold text-weight-medium">Upload Source Maps</div>
         </div>
       </div>
     </div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
           <!-- Service Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Service *</div>
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>
             <OInput
               v-model="formData.service"
               placeholder="Enter service name"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Version Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Version *</div>
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Version *</div>
             <OInput
               v-model="formData.version"
               placeholder="Enter version (e.g., 1.0.0)"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Environment Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Environment</div>
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Environment</div>
             <OInput
               v-model="formData.environment"
               placeholder="Enter environment (optional)"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- File Upload Area -->
         <div class="tw:mb-6">
-          <div class="text-subtitle2 text-weight-medium tw:mb-2">Source Map ZIP File *</div>
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
           <div
             class="upload-area"
             :class="{ 'drag-over': isDragging, 'has-file': formData.file }"
@@ -99,9 +99,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div v-if="!formData.file" class="upload-content">
               <OIcon name="backup" size="xl" class="tw:mb-3" />
-              <div class="text-h6 text-grey-8 tw:mb-2">Drop your file here</div>
-              <div class="text-body2 text-grey-6 tw:mb-3">or click to browse</div>
-              <div class="text-caption text-grey-5">.zip files only</div>
+              <div class="tw:text-xl tw:font-semibold tw:text-gray-500 tw:mb-2">Drop your file here</div>
+              <div class="tw:text-sm tw:text-gray-400 tw:mb-3">or click to browse</div>
+              <div class="tw:text-xs tw:text-gray-400">.zip files only</div>
             </div>
 
             <div v-else class="file-info">
@@ -109,8 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="tw:flex tw:items-center tw:gap-3">
                   <OIcon name="draft" size="lg" />
                   <div>
-                    <div class="text-subtitle2 text-weight-medium">{{ formData.file.name }}</div>
-                    <div class="text-caption text-grey-6">{{ formatFileSize(formData.file.size) }}</div>
+                    <div class="tw:text-sm tw:font-medium text-weight-medium">{{ formData.file.name }}</div>
+                    <div class="tw:text-xs tw:text-gray-400">{{ formatFileSize(formData.file.size) }}</div>
                   </div>
                 </div>
                 <OButton

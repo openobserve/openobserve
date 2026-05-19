@@ -758,14 +758,14 @@ size="sm"
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex column items-center justify-center"
+      class="flex column tw:items-center tw:justify-center"
       :style="{ height: '100%' }"
     >
       <OSpinner
         data-test="trace-details-loading-spinner"
         size="lg"
       />
-      <div data-test="trace-details-loading-text" class="q-pt-sm">
+      <div data-test="trace-details-loading-text" class="tw:pt-2">
         {{ t("traces.fetchingTrace") }}
       </div>
     </div>

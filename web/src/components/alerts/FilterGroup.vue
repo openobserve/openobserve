@@ -92,41 +92,41 @@
         </div>
         <!-- Action buttons -->
 
-        <div class="flex justify-start items-center tw:ml-4"
+        <div class="flex tw:justify-start tw:items-center tw:ml-4"
         >
         <OButton
             data-test="alert-conditions-add-condition-btn"
-            class="q-ml-md"
+            class="tw:ml-3"
             size="sm"
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <OIcon class="q-mr-xs text-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[0.75rem] text-bold">Condition</span>
+            <OIcon class="tw:mr-1 tw:font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <span class="tw:text-[0.75rem] tw:font-bold">Condition</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-add-condition-group-btn"
-            class="q-ml-xs"
+            class="tw:ml-1"
             size="sm"
             variant="ghost-primary"
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <OIcon class="q-mr-xs text-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="tw:text-[0.75rem] text-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
+            <OIcon class="tw:mr-1 tw:font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
+            <span class="tw:text-[0.75rem] tw:font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
         <OButton
             data-test="alert-conditions-reorder-btn"
-            class="q-ml-xs"
+            class="tw:ml-1"
             size="sm"
             variant="ghost-primary"
             @click="reorderItems()"
             >
-            <OIcon class="q-mr-xs text-bold" size="xs" name="swap-vert" />
-            <span class="tw:text-[0.75rem] text-bold">Reorder</span>
+            <OIcon class="tw:mr-1 tw:font-bold" size="xs" name="swap-vert" />
+            <span class="tw:text-[0.75rem] tw:font-bold">Reorder</span>
             <OTooltip :delay="300" content="Reorder items: Conditions first, then Groups" />
         </OButton>
      </div>

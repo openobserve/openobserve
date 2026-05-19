@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.searchApplied
         "
         data-test="traces-section-header"
-        class="row items-center tw:px-[0.5rem]! q-py-xs tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+        class="tw:flex tw:items-center tw:px-[0.5rem]! tw:py-1 tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
         <OBadge
           data-test="traces-count-badge"
           variant="default"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
         >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OBadge>
         <OBadge
           v-if="
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="traces-error-count-badge"
           variant="error"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
         >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
         <!-- Insights Button -->
         <OButton

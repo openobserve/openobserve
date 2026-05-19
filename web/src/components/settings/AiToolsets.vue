@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md q-pa-none" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit; height: calc(100vh - 88px);">
     <div v-if="!showAddDialog">
       <!-- Header bar -->
       <div
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="col-auto flex">
           <OInput
             v-model="filterQuery"
-            class="q-ml-auto no-border o2-search-input"
+            class="tw:ml-auto no-border o2-search-input"
             :placeholder="t('aiToolset.search')"
           >
             <template #icon-left>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
           <OButton
-            class="q-ml-sm"
+            class="tw:ml-2"
             data-test="ai-toolsets-add-btn"
             variant="primary"
             size="sm-action"
@@ -289,7 +289,7 @@ export default defineComponent({
     // Delete
     // -----------------------------------------------------------------------
     const confirmDeleteToolset = (row: any) => {
-      confirmDelete.value = { visible: true, data: row };
+      confirmDelete.value = { visible: true, data: tw:flex };
     };
 
     const cancelDelete = () => {

@@ -42,7 +42,7 @@
           {{ index + 1 }}. {{ data.name }}
         </div>
         <OIcon
-          class="q-mr-xs"
+          class="tw:mr-1"
           size="sm"
           name="close"
           style="cursor: pointer"

@@ -1,10 +1,10 @@
 <template>
   <div class="cross-link-manager">
     <!-- Header -->
-    <div class="tw:flex tw:justify-between tw:items-center q-mb-md">
+    <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
       <div>
-        <div class="text-body1 text-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-caption" style="color: var(--o2-text-muted)">
+        <div class="tw:text-base tw:font-bold">{{ title }}</div>
+        <div v-if="subtitle" class="tw:text-xs" style="color: var(--o2-text-muted)">
           {{ subtitle }}
         </div>
       </div>
@@ -25,35 +25,35 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item el-border tw:rounded-md q-mb-xs q-pa-sm"
+        class="cross-link-item el-border tw:rounded-md tw:mb-1 tw:p-2"
         :data-test="`cross-link-item-${idx}`"
       >
         <div class="tw:flex tw:justify-between tw:items-start">
           <div class="tw:flex-1 tw:min-w-0">
             <!-- Name -->
-            <div class="text-subtitle2 text-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
+            <div class="tw:text-sm tw:font-medium tw:font-bold tw:truncate" :title="link.name" style="color: var(--o2-text-primary)">
               {{ link.name }}
               <OBadge
                 v-if="link._source"
                 :variant="link._source === 'stream' ? 'primary' : 'default'"
-                class="q-ml-xs"
+                class="tw:ml-1"
               >
                 {{ link._source === 'stream' ? 'Stream' : 'Global' }}
               </OBadge>
             </div>
             <!-- URL -->
-            <div class="text-caption tw:truncate q-mt-xs" :title="link.url" style="color: var(--o2-text-muted)">
+            <div class="tw:text-xs tw:truncate tw:mt-1" :title="link.url" style="color: var(--o2-text-muted)">
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 q-mt-xs">
+            <div v-if="link.fields?.length" class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
               <OBadge
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 class="tw:max-w-[200px]"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
-                <span class="tw:truncate text-caption" :title="field.name">{{ field.name }}</span>
+                <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
               </OBadge>
             </div>
           </div>
@@ -81,7 +81,7 @@
     <!-- Empty State -->
     <div
       v-else
-      class="tw:text-center q-py-lg text-body2"
+      class="tw:text-center tw:py-4 tw:text-sm"
       style="color: var(--o2-text-muted)"
       data-test="cross-link-empty"
     >

@@ -26,11 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="submitForm()"
   >
     <div
-    class="q-pa-none tw:w-[300px]!"
+    class="tw:p-0 tw:w-[300px]!"
     :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
     style="min-height: inherit"
   >
-    <div class="q-mx-md">
+    <div class="tw:mx-3">
       <div
         data-test="panel-layout-settings-height"
         class="o2-input"
@@ -116,7 +116,7 @@ export default defineComponent({
 
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
-      // 28.5 is the height of each row
+      // 28.5 is the height of each "row"
       const count = Number(Math.ceil((updatedLayout.value.h * 30 - 24) / 28.5));
 
       if (count < 0) return 0;

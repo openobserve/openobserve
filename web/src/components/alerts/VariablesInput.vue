@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col-12 q-py-sm variables-input "
+  <div class="tw:w-full tw:py-2 variables-input "
   :class="{
-    'flex tw:gap-2 items-center tw:w-full': variables.length == 0,
+    'flex tw:gap-2 tw:items-center tw:w-full': variables.length == 0,
   }"
   >
-    <div class="q-pb-xs custom-input-label text-bold">
+    <div class="tw:pb-1 custom-input-label tw:font-bold">
       <span>
         Variable
       </span>
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
     <template v-if="!variables.length">
-      <div class="flex justify-between items-center tw:ml-auto">
+      <div class="flex tw:justify-between tw:items-center tw:ml-auto">
 
         <OButton
           data-test="alert-variables-add-btn"
@@ -50,10 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(variable, index) in variables as any"
         :key="variable.uuid"
-        class="q-col-gutter-sm q-pb-sm flex items-center"
+        class="tw:gap-2 tw:pb-2 flex tw:items-center"
         :data-test="`alert-variables-${index + 1}`"
       >
-        <div class="q-ml-none">
+        <div class="tw:ml-0">
           <OInput
             data-test="alert-variables-key-input"
             v-model="variable.key"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
         </div>
-        <div class="q-ml-none">
+        <div class="tw:ml-0">
           <OInput
             data-test="alert-variables-value-input"
             v-model="variable.value"
@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="min-width: 250px"
           />
         </div>
-        <div class="col-2 q-ml-none">
+        <div class="tw:w-1/6 tw:ml-0">
           <OButton
             data-test="alert-variables-delete-variable-btn"
-            class="q-ml-xs"
+            class="tw:ml-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="alert-variables-add-variable-btn"
             v-if="index === variables.length - 1"
-            class="q-ml-xs"
+            class="tw:ml-1"
             variant="ghost"
             size="icon-circle-sm"
             :title="t('alert_templates.edit')"

@@ -14,19 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="q-mx-sm q-pt-xs">
+  <div class="tw:mx-2 tw:pt-1">
     <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
-        <div class="col">
+      <div class="flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
+        <div class="tw:flex tw:flex-col">
           <div class="flex">
             <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
 
-            <div class="text-h6 q-ml-md">
+            <div class="tw:text-xl tw:font-semibold tw:ml-3">
               {{ t("dashboard.importDashboard") }}
             </div>
           </div>
         </div>
-        <div class="flex justify-center tw:gap-2">
+        <div class="flex tw:justify-center tw:gap-2">
           <OButton
             variant="outline"
             size="sm-action"
@@ -80,12 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab == 'import_json_url'"
                 class="editor-container-url card-container tw:py-1"
               >
-                <div class="tw:mx-2 q-mt-md tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="flex full-width">
+                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
+                  <div style="width: calc(100% - 10px)" class="flex tw:w-full">
                     <div
                       data-test="dashboard-import-url-input"
                       style="width: 69%"
-                      class="q-pr-sm"
+                      class="tw:pr-2"
                     >
                       <OInput
                         v-model="url"
@@ -120,12 +120,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="activeTab == 'import_json_file'"
                 class="dashboard-import-json-container card-container tw:py-1"
               >
-                <div class="tw:mx-2 q-mt-md tw:pb-2">
-                  <div style="width: calc(100% - 10px)" class="flex full-width">
+                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
+                  <div style="width: calc(100% - 10px)" class="flex tw:w-full">
                     <div
                       data-test="dashboard-import-file-input"
                       style="width: 69%"
-                      class="q-pr-sm"
+                      class="tw:pr-2"
                     >
                       <OFile
                         v-model="jsonFiles"
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :activeFolderId="selectedFolder.value"
                       />
                     </div>
-                    <div v-if="filesImportResults.length" class="q-py-sm">
+                    <div v-if="filesImportResults.length" class="tw:py-2">
                       <div v-for="importResult in filesImportResults">
                         <span
                           v-if="importResult.status == 'rejected'"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-import-error-container"
               class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
             >
-              <div class="text-center text-h6 tw:py-2">Error Validations</div>
+              <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Error Validations</div>
               <OSeparator class="tw:mt-4" />
               <div
                 class="error-section"

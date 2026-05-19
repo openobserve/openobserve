@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="tw:rounded-md">
       <div class="o2-input">
-        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
-          <div class="flex items-center tw:w-full">
+        <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pb-2 tw:pl-3 tw:pt-3">
+          <div class="flex tw:items-center tw:w-full">
             <div class="tw:w-full" data-test="add-destination-title">
               <div
                 class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
@@ -42,15 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <OSeparator />
-        <div class="row q-col-gutter-sm q-px-lg">
+        <div class="tw:flex tw:gap-2 tw:px-4">
           <OSwitch
             data-test="create-stream-toggle"
-            class="q-mb-sm tw:h-[36px] tw:mr-3 q-mt-md"
+            class="tw:mb-2 tw:h-[36px] tw:mr-3 tw:mt-3"
             :label="'Create new Destination'"
             v-model="createNewDestination"
           />
 
-          <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12">
+          <div v-if="createNewDestination" class="tw:mt-2 tw:mb-3 tw:w-full">
             <!-- Create New Destination Form -->
             <CreateDestinationForm
               @created="handleDestinationCreated"
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Select Existing Destination -->
-          <div v-else class="col-12">
-            <div class="col-12 q-py-xs destination-method-select">
+          <div v-else class="tw:w-full">
+            <div class="tw:w-full tw:py-1 destination-method-select">
               <OSelect
                 data-test="external-destination-select"
                 v-model="selectedDestination"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Action buttons for existing destination selection -->
-            <div class="tw:flex tw:gap-2 q-mt-md q-mb-md">
+            <div class="tw:flex tw:gap-2 tw:mt-3 tw:mb-3">
               <OButton
                 v-if="pipelineObj.isEditNode"
                 data-test="add-destination-delete-btn"

@@ -77,7 +77,7 @@
       <div>
         <label>{{ t("dashboard.selectLogsMode") }}</label>
         <OToggleGroup
-          class="q-ml-sm"
+          class="tw:ml-2"
           :model-value="drilldownData.data.logsMode"
           @update:model-value="drilldownData.data.logsMode = $event"
         >
@@ -214,7 +214,7 @@
               </CommonAutoComplete>
 
               <OIcon
-                class="q-mr-xs"
+                class="tw:mr-1"
                 size="md"
                 name="close"
                 style="cursor: pointer; height: 54px; display: flex !important"

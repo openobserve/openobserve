@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroup
               :model-value="activeTab"
               @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
-              class="q-mr-sm"
+              class="tw:mr-2"
             >
               <OToggleGroupItem value="all" size="sm" data-test="tab-all">
                 <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Import button -->
           <OButton
             :class="[
-              'q-ml-sm',
+              'tw:ml-2',
               isCompactToolbar
                 ? 'compact-icon-btn'
                 : '',
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
           <OButton
             data-test="alert-list-add-alert-btn"
-            class="q-ml-sm"
+            class="tw:ml-2"
             variant="primary"
             size="sm"
             :disabled="!destinations.length || !templates.length"
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       name="schedule"
                       size="sm"
-                      class="tw:text-grey-7 tw:shrink-0"
+                      class="tw:text-gray-400 tw:shrink-0"
                     />
                     <span>{{ computedName(row.name) }}</span>
                   </div>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         width: 33.14px;
                         height: auto;
                       "
-                      class="flex justify-center items-center q-ml-xs"
+                      class="flex tw:justify-center tw:items-center tw:ml-1"
                       :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
                     >
                       <OSpinner size="xs" />
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-else
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="q-ml-xs material-symbols-outlined"
+                      class="tw:ml-1 material-symbols-outlined"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                       size="icon-circle-sm"
                       :title="
@@ -399,12 +399,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>
                   <div
                     v-if="!templates.length || !destinations.length"
-                    class="full-width flex column justify-center items-center text-center"
+                    class="tw:w-full flex column tw:justify-center tw:items-center tw:text-center"
                   >
-                    <div style="width: 600px" class="q-mt-xl">
+                    <div style="width: 600px" class="tw:mt-6">
                       <template v-if="!templates.length">
                         <div
-                          class="text-subtitle1"
+                          class="tw:text-base tw:font-medium"
                           data-test="alert-list-create-template-text"
                         >
                           It looks like you haven't created any Templates yet.
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <OButton
                           data-test="alert-list-create-template-btn"
-                          class="q-mt-md"
+                          class="tw:mt-3"
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertTemplates')"
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
-                          class="text-subtitle1"
+                          class="tw:text-base tw:font-medium"
                           data-test="alert-list-create-destination-text"
                         >
                           It looks like you haven't created any Destinations
@@ -430,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <OButton
                           data-test="alert-list-create-destination-btn"
-                          class="q-mt-md"
+                          class="tw:mt-3"
                           variant="primary"
                           size="sm"
                           @click="routeTo('alertDestinations')"
@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-move-across-folders-btn"
                       variant="outline"
                       size="sm"
-                      class="q-mr-sm"
+                      class="tw:mr-2"
                       @click="moveMultipleAlerts"
                     >
                       <OIcon name="drive-file-move" size="sm" />
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-export-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="q-mr-sm"
+                      class="tw:mr-2"
                       @click="multipleExportAlert"
                     >
                       <OIcon name="download" size="sm" />
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-pause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="q-mr-sm"
+                      class="tw:mr-2"
                       @click="bulkToggleAlerts('pause')"
                     >
                       <OIcon name="pause" size="sm" />
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-unpause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="q-mr-sm"
+                      class="tw:mr-2"
                       @click="bulkToggleAlerts('resume')"
                     >
                       <OIcon name="play-arrow" size="sm" />
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-delete-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="q-mr-sm"
+                      class="tw:mr-2"
                       @click="openBulkDeleteDialog"
                     >
                       <OIcon name="delete" size="sm" />
@@ -571,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #header-left>
           <div
             data-test="add-alert-back-btn"
-            class="flex justify-center items-center cursor-pointer"
+            class="flex tw:justify-center tw:items-center cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -608,7 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="updateStreamName"
             class="tw:mt-1 tw:mb-2"
           />
-          <div class="q-mb-lg">
+          <div class="tw:mb-4">
             <SelectFolderDropDown
               :type="'alerts'"
               @folder-selected="updateFolderIdToBeCloned"

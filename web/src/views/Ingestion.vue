@@ -18,16 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="tw:rounded-md ingestionPage">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container">
-        <div class="q-px-md q-pt-md full-width">
-          <span class="text-h6 q-mr-auto"> {{ t("ingestion.header") }}</span>
+        <div class="tw:px-3 tw:pt-3 tw:w-full">
+          <span class="tw:text-xl tw:font-semibold tw:mr-auto"> {{ t("ingestion.header") }}</span>
           <span
             v-if="
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token != ''
             "
-            class="float-right q-ml-md q-mb-xs"
+            class="float-right tw:ml-3 tw:mb-1"
           >
             <OButton variant="primary" size="sm" @click="showRUMUpdateDialogFn">
               {{ t(`ingestion.resetRUMTokenLabel`) }}
@@ -38,13 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
               store.state.organizationData.rumToken.rum_token == ''
             "
-            class="float-right q-ml-md q-mb-xs"
+            class="float-right tw:ml-3 tw:mb-1"
           >
             <OButton variant="primary" size="sm" @click="generateRUMToken">
               {{ t(`ingestion.generateRUMTokenLabel`) }}
             </OButton>
           </span>
-          <span v-else class="float-right q-ml-md q-mb-xs">
+          <span v-else class="float-right tw:ml-3 tw:mb-1">
             <OButton variant="primary" size="sm" @click="showUpdateDialogFn">
               {{ t(`ingestion.resetTokenBtnLabel`) }}
             </OButton>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
             clearable
-            class="tw:max-w-sm q-ml-md q-mb-xs right float-right indexlist-search-input"
+            class="tw:max-w-sm tw:ml-3 tw:mb-1 right float-right indexlist-search-input"
             data-test="recommended-list-search-input"
           >
             <template #icon-left>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
           <span
-            class="text-subtitle bg-warning float-right q-pa-sm text-bold"
+            class="text-subtitle tw:bg-amber-500 float-right tw:p-2 tw:font-bold"
             v-if="
               store.state.zoConfig.hasOwnProperty(
                 'restricted_routes_on_empty_data',
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="confirmRUMUpdate"
           />
         </div>
-        <div class="q-ml-md">
+        <div class="tw:ml-3">
           <OTabs v-model="ingestTabType" horizontal align="left">
             <ORouteTab
               name="recommended"

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-mt-lg">
-    <div class="tags-title text-bold q-mb-sm q-ml-xs">{{ t("rum.events") }}</div>
+  <div class="tw:mt-4">
+    <div class="tags-title tw:font-bold tw:mb-2 tw:ml-1">{{ t("rum.events") }}</div>
     <OTable
       :data="error.events || []"
       :columns="columns || []"

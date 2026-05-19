@@ -15,35 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md q-pa-none o2-custom-bg"
+  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
   >
     <div
-      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
+      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
     >
-      <div class="flex items-center tw:h-[60px]">
+      <div class="flex tw:items-center tw:h-[60px]">
         <div
           no-caps
           padding="xs"
           outline
           icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 flex tw:items-center tw:justify-center cursor-pointer el-border-radius tw:mr-2"
           title="Go Back"
           @click="$emit('cancel')"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="col" data-test="pipeline-destination-editor-title">
-          <div v-if="destination" class="text-h6">
+        <div class="tw:flex tw:flex-col" data-test="pipeline-destination-editor-title">
+          <div v-if="destination" class="tw:text-xl tw:font-semibold">
             {{ t("alert_destinations.updateTitle") }} - {{ destination.name }}
           </div>
-          <div v-else class="text-h6">
+          <div v-else class="tw:text-xl tw:font-semibold">
             {{ t("alert_destinations.addTitle") }}
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card-container tw:py-2 q-px-md tw:overflow-auto">
+    <div class="card-container tw:py-2 tw:px-3 tw:overflow-auto">
       <div class="tw:w-[50vw]">
         <CreateDestinationForm
           :destination="destination"

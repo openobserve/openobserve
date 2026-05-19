@@ -80,7 +80,7 @@
           :name="getTypeIcon(row.type)"
           size="sm"
           color="grey-6"
-          class="q-mr-xs"
+          class="tw:mr-1"
         />
         <span class="tw:text-[0.825rem] tw:truncate">{{ row.name }}</span>
       </template>

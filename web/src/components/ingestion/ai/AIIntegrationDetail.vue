@@ -43,7 +43,7 @@ const displayName = computed(
 </script>
 
 <template>
-  <div v-if="integration" class="q-pa-sm">
+  <div v-if="integration" class="tw:p-2">
     <div class="tw:text-[16px]">
       <CopyContent :content="aiContent" />
       <div class="tw:pt-6">
@@ -58,7 +58,7 @@ const displayName = computed(
       </div>
     </div>
   </div>
-  <div v-else class="q-pa-sm">
+  <div v-else class="tw:p-2">
     <p>Select an integration to view details.</p>
   </div>
 </template>

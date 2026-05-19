@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div>
-    <div class="q-px-md q-py-md">
+    <div class="tw:px-3 tw:py-3">
       <div class="general-page-title">
         {{ t("settings.generalPageTitle") }}
       </div>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model.number="scrapeIntereval"
               type="number"
               min="0"
-              class="q-ml-sm"
+              class="tw:ml-2"
               :error="!!scrapeIntervalError"
               :error-message="scrapeIntervalError"
               @update:model-value="scrapeIntervalError = ''"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="q-ml-sm"
+              class="tw:ml-2"
               :error="!!maxSeriesError"
               :error-message="maxSeriesError"
               @update:model-value="maxSeriesError = ''"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <span>&nbsp;</span>
 
-          <div class="flex justify-start">
+          <div class="flex tw:justify-start">
             <OButton
               data-test="dashboard-add-submit"
               :loading="onSubmit.isLoading.value"
@@ -167,13 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="q-px-md q-py-sm">
+      <div class="tw:px-3 tw:py-2">
         <GroupHeader
           :title="t('settings.enterpriseFeatures')"
           :showIcon="false"
         />
       </div>
-      <div class="q-mx-md">
+      <div class="tw:mx-3">
         <div class="settings-grid-item no-border-bottom">
           <span class="individual-setting-title">
             {{ t("settings.customLogoText") }}
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 @click="editingText = !editingText"
                 icon-left="close"
               />
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div v-else class="flex items-center">
+          <div v-else class="flex tw:items-center">
             <span class="tw:w-[190px] tw:text-center tw:truncate"
               >{{
                 store.state.zoConfig.custom_logo_text ||
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="onSubmit.isLoading.value"
               variant="outline"
               size="icon-xs-sq"
-              class="q-ml-sm"
+              class="tw:ml-2"
               type="submit"
               @click="editingText = !editingText"
               icon-left="edit"
@@ -238,8 +238,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+        <div class="settings-grid-item tw:ml-1">
+          <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <div
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig.custom_logo_img != null
             "
-            class="full-width"
+            class="tw:w-full"
           >
             <img
               data-test="setting_ent_custom_logo_img"
@@ -256,13 +256,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
-              class="q-mx-md"
+              class="tw:mx-3"
             />
             <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
               variant="ghost-destructive"
               size="icon-xs-sq"
-              class="q-mx-md"
+              class="tw:mx-3"
               @click="confirmDeleteLogo('light')"
               icon-left="delete"
             />
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              class="q-mx-none o2-file-input tw:w-[250px]"
+              class="tw:mx-0 o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 @click="filesLight = null"
               icon-left="close"
             />
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="onSubmit.isLoading.value"
                 variant="outline"
                 size="icon-xs-sq"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 type="submit"
                 @click="uploadImage(filesLight, 'light')"
                 icon-left="check"
@@ -311,8 +311,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item q-ml-xs">
-          <div class="q-pt-sm individual-setting-title full-width tw:mb-5">
+        <div class="settings-grid-item tw:ml-1">
+          <div class="tw:pt-2 individual-setting-title tw:w-full tw:mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <div
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
               store.state.zoConfig.custom_logo_dark_img != null
             "
-            class="full-width"
+            class="tw:w-full"
           >
             <img
               data-test="setting_ent_custom_logo_dark_img"
@@ -330,13 +330,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
-              class="q-mx-md"
+              class="tw:mx-3"
             />
             <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
               variant="ghost-destructive"
               size="icon-xs-sq"
-              class="q-mx-md"
+              class="tw:mx-3"
               @click="confirmDeleteLogo('dark')"
               icon-left="delete"
             />
@@ -350,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :counter-label="counterLabelFn"
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
-              class="q-mx-none o2-file-input tw:w-[250px]"
+              class="tw:mx-0 o2-file-input tw:w-[250px]"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="button"
                 variant="outline-destructive"
                 size="icon-xs-sq"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 @click="filesDark = null"
               icon-left="close"
             />
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="onSubmit.isLoading.value"
                 variant="outline"
                 size="icon-xs-sq"
-                class="q-mr-sm"
+                class="tw:mr-2"
                 type="submit"
                 @click="uploadImage(filesDark, 'dark')"
                 icon-left="check"

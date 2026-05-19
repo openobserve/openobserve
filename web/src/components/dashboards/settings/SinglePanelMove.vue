@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div>
-      <p class="text-body2">{{ message }}</p>
+      <p class="tw:text-sm">{{ message }}</p>
       <div class="tw:flex tw:items-center tw:gap-2">
         <OSelect
           label="Select Tab"

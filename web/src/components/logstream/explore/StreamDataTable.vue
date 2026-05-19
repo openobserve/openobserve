@@ -14,7 +14,7 @@
     @virtual-scroll="onScroll"
   >
     <template v-slot:before>
-      <thead class="thead-sticky text-left">
+      <thead class="thead-sticky tw:text-left">
         <tr>
           <th
             v-for="(col, index) in (columns as any[])"
@@ -42,7 +42,7 @@
           style="cursor: pointer"
           :title="row[column.name] || 'null'"
         >
-          <div class="flex row items-center no-wrap">
+          <div class="flex tw:flex tw:items-center tw:flex-nowrap">
             {{
               !row[column.name]
                 ? "null"

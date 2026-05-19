@@ -5,20 +5,20 @@
     @click:secondary="show = false"
     @click:primary="applyFilter"
   >
-    <div class="q-pa-md filter-container">
+    <div class="tw:p-3 filter-container">
       <OCardSection class="tw:p-0">
         <OSelect
           v-model="selectedOperator"
           :options="operators"
           :label="t('filter.operator')"
-          class="q-py-sm"
+          class="tw:py-2"
           :error="!!selectedOperatorError"
           :error-message="selectedOperatorError"
           @update:model-value="selectedOperatorError = ''"
         />
       </OCardSection>
       <OCardSection class="tw:p-0">
-        <div class="text-bold q-pb-xs q-pt-sm">Values</div>
+        <div class="tw:font-bold tw:pb-1 tw:pt-2">Values</div>
         <div class="filter-values-container">
           <div v-show="!fieldValues?.length">No values present</div>
           <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
@@ -32,7 +32,7 @@
                   :value="value"
                   class="tw:shrink-0"
                 />
-                <span class="tw:text-sm tw:flex-1 tw:min-w-0 ellipsis">{{ value }}</span>
+                <span class="tw:text-sm tw:flex-1 tw:min-w-0 tw:truncate">{{ value }}</span>
               </label>
             </li>
           </ul>

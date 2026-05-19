@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <div class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md">
+    <div class="stream-routing-container tw:w-full tw:pt-1 tw:pb-3 tw:px-3">
       <div>
         <!-- Node Name -->
-        <div class="o2-input full-width q-py-sm">
+        <div class="o2-input tw:w-full tw:py-2">
           <OInput
             v-model="nodeName"
             :label="t('pipeline.nodeName') + ' *'"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- LLM Span Identifier -->
-        <div class="o2-input full-width q-py-sm">
+        <div class="o2-input tw:w-full tw:py-2">
           <OSelect
             v-model="llmSpanIdentifier"
             :options="streamFields"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Evaluation Template Selection -->
-        <div class="o2-input full-width q-py-sm flex items-center gap-2">
+        <div class="o2-input tw:w-full tw:py-2 flex tw:items-center gap-2">
           <OSelect
             v-model="selectedTemplate"
             :options="availableTemplates"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loadingTemplates"
             :title="t('common.refresh')"
             data-test="llm-evaluation-template-refresh-btn"
-            class="q-mt-md"
+            class="tw:mt-3"
             icon-left="refresh"
           />
         </div>
@@ -96,8 +96,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- Sampling Rate -->
-        <div v-if="enableSampling" class="q-px-xs q-mb-sm">
-          <div class="text-body2 q-mb-sm">
+        <div v-if="enableSampling" class="tw:px-1 tw:mb-2">
+          <div class="tw:text-sm tw:mb-2">
             {{ t("pipeline.samplingRate") }}:
             {{ (samplingRate * 100).toFixed(0) }}%
           </div>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Action Buttons -->
-        <div class="tw:flex tw:gap-2 q-mt-sm">
+        <div class="tw:flex tw:gap-2 tw:mt-2">
           <OButton
             v-if="pipelineObj.isEditNode"
             data-test="llm-evaluation-delete-btn"

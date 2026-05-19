@@ -42,7 +42,7 @@
           <div class="draggable-handle tw:self-center">
             <OIcon
               name="drag-indicator" size="sm"
-              class="q-mr-xs"
+              class="tw:mr-1"
               :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
             />
           </div>
@@ -71,7 +71,7 @@
                 :value-replace-fn="selectColorBySeriesOption"
               >
                 <template v-slot:label>
-                  <div class="row items-center all-pointer-events">
+                  <div class="tw:flex tw:items-center all-pointer-events">
                     Select series
                   </div>
                 </template>

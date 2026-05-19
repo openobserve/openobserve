@@ -1,11 +1,11 @@
 <template>
-  <div class="tw:rounded-md q-pa-md">
-    <div class="row q-col-gutter-md">
+  <div class="tw:rounded-md tw:p-3">
+    <div class="tw:flex tw:gap-3">
       <!-- Left: Simulated Log Viewer -->
-      <div class="col-8">
+      <div class="tw:w-2/3">
         <OCard>
           <OCardSection role="header">
-            <div class="text-h6">Sample Logs (Click to See Correlation)</div>
+            <div class="tw:text-xl tw:font-semibold">Sample Logs (Click to See Correlation)</div>
           </OCardSection>
 
           <OSeparator />
@@ -62,8 +62,8 @@
         <!-- Instructions -->
         <OCard class="tw:mt-4">
           <OCardSection role="body">
-            <div class="text-h6">How to Use</div>
-            <ol class="q-ma-sm">
+            <div class="tw:text-xl tw:font-semibold">How to Use</div>
+            <ol class="tw:m-2">
               <li>Click any log line above to see related telemetry</li>
               <li>The correlation panel will appear on the right</li>
               <li>View the extracted service dimensions</li>
@@ -73,7 +73,7 @@
 
             <OSeparator class="tw:my-4" />
 
-            <div class="text-subtitle2 q-mb-sm">Current Status:</div>
+            <div class="tw:text-sm tw:font-medium tw:mb-2">Current Status:</div>
             <div>
               <OBadge v-if="isServiceStreamsEnabled" variant="success">
                 Service Streams: Enabled
@@ -82,7 +82,7 @@
                 Service Streams: Disabled
               </OBadge>
             </div>
-            <div class="q-mt-xs text-caption text-grey-7">
+            <div class="tw:mt-1 tw:text-xs tw:text-gray-400">
               Note: This is a demo using simulated data. In production,
               correlation will use real service_streams data.
             </div>
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Right: Correlation Panel -->
-      <div class="col-4">
+      <div class="tw:w-1/3">
         <TelemetryCorrelationPanel
           :show="showCorrelation"
           :context="selectedContext"
@@ -104,7 +104,7 @@
         <OCard v-if="!showCorrelation">
           <OCardSection class="tw:text-center tw:p-6">
             <OIcon name="info" size="lg" />
-            <div class="text-grey-6 q-mt-md">
+            <div class="tw:text-gray-400 tw:mt-3">
               Click a log line to see related telemetry
             </div>
           </OCardSection>
@@ -122,7 +122,7 @@
       @click:primary="showQueryDialog = false"
     >
       <div>
-        <div class="text-caption text-grey-7 q-mb-sm">
+        <div class="tw:text-xs tw:text-gray-400 tw:mb-2">
           This query would be executed to fetch related
           {{ queryPreview.type }}:
         </div>

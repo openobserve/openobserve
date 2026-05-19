@@ -7,7 +7,7 @@
         size="sm-action"
         class="metric-legends-button"
       >
-        <OIcon name="category" size="sm" class="q-mr-sm" />
+        <OIcon name="category" size="sm" class="tw:mr-2" />
         <span>{{ t("search.legendLabel") }}</span>
       </OButton>
     </template>
@@ -23,7 +23,7 @@
             v-for="(icon, metric) in metricsIconMapping"
             :key="metric"
           >
-            <OIcon :name="icon" size="sm" class="q-mr-sm" />
+            <OIcon :name="icon" size="sm" class="tw:mr-2" />
             <span>{{ metric }}</span>
           </div>
         </div>

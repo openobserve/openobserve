@@ -1,6 +1,6 @@
 ﻿<!-- eslint-disable no-useless-escape -->
 <template>
-  <div class="q-pa-md kubernetes-config-section tw:pb-lg">
+  <div class="tw:p-3 kubernetes-config-section tw:pb-lg">
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
@@ -54,44 +54,44 @@
       data-test="kubernetes-advanced-install-toggle"
     >
       <div class="tw:mt-4">
-        <div class="text-subtitle1 q-pl-xs q-mt-md">Install cert-manager</div>
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Install cert-manager</div>
         <ContentCopy
-          class="q-mt-sm"
+          class="tw:mt-2"
           content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.0/cert-manager.yaml"
         />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
           Wait for 2 minutes after installing cert-manger for the webhook to be
           ready.
         </div>
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
-        <ContentCopy class="q-mt-sm" :content="helmUpdateCmd" />
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Update helm repo</div>
+        <ContentCopy class="tw:mt-2" :content="helmUpdateCmd" />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
           Install Prometheus operator CRDs(Required by Opentelemetry operator)
         </div>
-        <ContentCopy class="q-mt-sm" :content="crdCommand" />
+        <ContentCopy class="tw:mt-2" :content="crdCommand" />
 
-        <div class="text-subtitle1 q-pl-xs q:mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 q:mt-md">
           Install OpenTelemetry operator
         </div>
         <ContentCopy
-          class="q-mt-sm"
+          class="tw:mt-2"
           content="kubectl apply -f https://raw.githubusercontent.com/openobserve/openobserve-helm-chart/refs/heads/main/opentelemetry-operator.yaml"
         />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Create namespace</div>
         <ContentCopy
-          class="q-mt-sm"
+          class="tw:mt-2"
           content="kubectl create ns openobserve-collector"
         />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
           Install OpenObserve collector
         </div>
         <div v-if="config.isCloud == 'true'">
-          <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+          <ContentCopy class="tw:mt-2" :content="collectorCmd" />
         </div>
         <div v-else>
           <OTabs v-model="tab" horizontalalign="left">
@@ -118,7 +118,7 @@
             transition-next="jump-up"
           >
             <OTabPanel name="internal" data-test="kubernetes-tab-panels-this">
-              <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
+              <ContentCopy class="tw:mt-2" :content="collectorCmdThisCluster" />
               <pre>
 Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local
 Make changes accordingly to the above URL.
@@ -126,7 +126,7 @@ Make changes accordingly to the above URL.
             </OTabPanel>
 
             <OTabPanel name="external" data-test="kubernetes-tab-panels-default">
-              <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+              <ContentCopy class="tw:mt-2" :content="collectorCmd" />
             </OTabPanel>
           </OTabPanels>
         </div>
@@ -135,7 +135,7 @@ Make changes accordingly to the above URL.
 
     <br />
     <hr />
-    <div class="text-subtitle1 q-pl-xs q-mt-md q-mb-lg">
+    <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3 tw:mb-4">
       Once you have installed the OpenObserve collector, it will:
       <ul class="tw:list-disc tw:ml-5">
         <li>Collect metrics from your Kubernetes cluster</li>

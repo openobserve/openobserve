@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OCard class="metrics-summary-card">
     <OCardSection role="body">
-      <div class="text-subtitle2 text-weight-bold q-mb-md">{{ t("search.executionSummary") }}</div>
+      <div class="tw:text-sm tw:font-medium text-weight-bold tw:mb-3">{{ t("search.executionSummary") }}</div>
       <div class="metrics-grid">
         <div class="metric-item">
           <div class="metric-icon">

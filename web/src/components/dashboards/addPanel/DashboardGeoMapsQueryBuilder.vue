@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <!-- latitude container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ t("panel.latitude") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
           <OTooltip :content="Hint" />
       </div>
       <span class="layout-separator">:</span>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-latitude-layout"
       >
         <OButtonGroup
-          class="axis-field q-mr-sm q-my-xs"
+          class="axis-field tw:mr-2 tw:my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -125,23 +125,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.latitude == null
           "
         >
-          <div class="q-mt-xs">{{ Hint }}</div>
+          <div class="tw:mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- longitude container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ t("panel.longitude") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
           <OTooltip :content="Hint" />
       </div>
       <span class="layout-separator">:</span>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-longitude-layout"
       >
         <OButtonGroup
-          class="axis-field q-mr-sm q-my-xs"
+          class="axis-field tw:mr-2 tw:my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -246,23 +246,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.longitude == null
           "
         >
-          <div class="q-mt-xs">{{ Hint }}</div>
+          <div class="tw:mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- weight container -->
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-3">
       <div class="layout-name">
         {{ t("panel.weight") }}
-        <OIcon name="info-outline" size="sm" class="q-ml-xs" />
+        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
           <OTooltip :content="WeightHint" />
       </div>
       <span class="layout-separator">:</span>
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-weight-layout"
       >
         <OButtonGroup
-          class="axis-field q-mr-sm q-my-xs"
+          class="axis-field tw:mr-2 tw:my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -367,14 +367,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-caption text-weight-bold text-center q-py-xs"
+          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.weight == null
           "
         >
-          <div class="q-mt-xs">{{ WeightHint }}</div>
+          <div class="tw:mt-1">{{ WeightHint }}</div>
         </div>
       </div>
     </div>

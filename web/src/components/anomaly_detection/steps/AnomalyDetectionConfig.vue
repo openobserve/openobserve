@@ -44,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Filters mode -->
         <div
           v-if="config.query_mode === 'filters'"
-          class="flex items-start alert-settings-row"
+          class="flex tw:items-start alert-settings-row"
         >
           <div
-            class="tw:font-semibold flex items-center"
+            class="tw:font-semibold flex tw:items-center"
             style="width: 178px; min-height: 36px"
           >
             {{ t("alerts.anomaly.filters") }}
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              class="q-mt-sm"
+              class="tw:mt-2"
               @click="addFilter"
             >
               {{ t("alerts.anomaly.addFilter") }}
@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div
           v-if="config.query_mode === 'custom_sql'"
-          class="flex items-start alert-settings-row"
+          class="flex tw:items-start alert-settings-row"
         >
           <div
-            class="tw:font-semibold flex items-center"
+            class="tw:font-semibold flex tw:items-center"
             style="width: 190px; height: 36px"
           >
-            SQL <span class="text-negative tw:ml-1">*</span>
+            SQL <span class="tw:text-red-500 tw:ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
@@ -150,14 +150,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="!config.custom_sql"
-              class="text-red-8 q-pt-xs"
+              class="text-red-8 tw:pt-1"
               style="font-size: 11px; line-height: 12px"
             >
               {{ t("alerts.anomaly.sqlRequired") }}
             </div>
             <div
               v-if="hasTimestampAlias"
-              class="text-red-8 q-pt-xs"
+              class="text-red-8 tw:pt-1"
               data-test="anomaly-custom-sql-timestamp-alias-error"
               style="font-size: 11px; line-height: 12px"
             >
@@ -168,9 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <code>time_bucket</code> instead.
             </div>
             <div
-              class="text-caption tw:mt-1"
+              class="tw:text-xs tw:mt-1"
               :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
               "
             >
               Query must return two columns: <code>time_bucket</code> and
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.detectionFunction") }}
-              <span class="text-negative tw:ml-1">*</span>
+              <span class="tw:text-red-500 tw:ml-1">*</span>
             </div>
             <div class="tw:flex tw:items-center tw:gap-2">
               <OSelect
@@ -237,13 +237,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.detectionResolution") }}
-              <span class="text-negative tw:ml-1">*</span>
+              <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
+                class="tw:ml-1 cursor-pointer"
                 :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
                />
                 <OTooltip
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.histogram_interval_value ||
                   config.histogram_interval_value < 1
                 "
-                class="text-red-8 q-pt-xs"
+                class="text-red-8 tw:pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -288,18 +288,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="flex items-start alert-settings-row">
+        <div v-else class="flex tw:items-start alert-settings-row">
           <div
-            class="tw:font-semibold flex items-center"
+            class="tw:font-semibold flex tw:items-center"
             style="width: 190px; height: 36px"
           >
-            Detection Resolution <span class="text-negative tw:ml-1">*</span>
+            Detection Resolution <span class="tw:text-red-500 tw:ml-1">*</span>
             <OIcon
               name="info"
               size="sm"
-              class="q-ml-xs cursor-pointer"
+              class="tw:ml-1 cursor-pointer"
               :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
               "
              />
               <OTooltip
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !config.histogram_interval_value ||
                 config.histogram_interval_value < 1
               "
-              class="text-red-8 q-pt-xs"
+              class="text-red-8 tw:pt-1"
               style="font-size: 11px; line-height: 12px"
             >
               Field is required!
@@ -348,13 +348,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.checkEvery") }}
-              <span class="text-negative tw:ml-1">*</span>
+              <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
+                class="tw:ml-1 cursor-pointer"
                 :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
                />
                 <OTooltip
@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.schedule_interval_value ||
                   config.schedule_interval_value < 1
                 "
-                class="text-red-8 q-pt-xs"
+                class="text-red-8 tw:pt-1"
                 style="font-size: 11px; line-height: 12px"
               >
                 Field is required!
@@ -400,13 +400,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.anomaly.lookBackWindow") }}
-              <span class="text-negative tw:ml-1">*</span>
+              <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
+                class="tw:ml-1 cursor-pointer"
                 :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
                />
                 <OTooltip
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !config.detection_window_value ||
                   config.detection_window_value < 1
                 "
-                class="text-red-8 q-pt-xs"
+                class="text-red-8 tw:pt-1"
                 style="font-size: 11px; line-height: 12px"
                 data-test="anomaly-detection-window-error"
               >
@@ -457,13 +457,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="paired-col">
             <div class="paired-col-label tw:font-semibold">
               {{ t("alerts.trainingWindow") }}
-              <span class="text-negative tw:ml-1">*</span>
+              <span class="tw:text-red-500 tw:ml-1">*</span>
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
+                class="tw:ml-1 cursor-pointer"
                 :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
                />
                 <OTooltip side="right" align="center" max-width="300px">
@@ -485,9 +485,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 87px"
               />
               <span
-                class="static-text text-caption"
+                class="static-text tw:text-xs"
                 :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
               >
                 days (seasonality:
@@ -506,9 +506,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="q-ml-xs cursor-pointer"
+                class="tw:ml-1 cursor-pointer"
                 :class="
-                  store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
                 "
                />
                 <OTooltip
@@ -531,18 +531,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold / Sensitivity -->
-        <div class="flex items-start alert-settings-row">
+        <div class="flex tw:items-start alert-settings-row">
           <div
-            class="tw:font-semibold flex items-center"
+            class="tw:font-semibold flex tw:items-center"
             style="width: 190px; padding-top: 4px"
           >
             {{ t("alerts.sensitivity") }}
             <OIcon
               name="info"
               size="sm"
-              class="q-ml-xs cursor-pointer"
+              class="tw:ml-1 cursor-pointer"
               :class="
-                store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
               "
              />
                 <OTooltip
@@ -558,11 +558,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Header row: range labels + load button -->
               <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
                 <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="text-caption text-grey-6">{{
+                  <span class="tw:text-xs tw:text-gray-400">{{
                     t("alerts.anomaly.anomalyScoreRange")
                   }}</span>
                   <span
-                    class="tw:font-semibold text-caption"
+                    class="tw:font-semibold tw:text-xs"
                     data-test="anomaly-threshold-range-label"
                     >{{ config.threshold_min ?? 0 }} –
                     {{ config.threshold }}</span
@@ -596,8 +596,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="sensitivity-empty-state"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'text-grey-5'
-                        : 'text-grey-6'
+                        ? 'tw:text-gray-400'
+                        : 'tw:text-gray-400'
                     "
                     data-test="anomaly-sensitivity-empty"
                   >
@@ -606,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="lg"
                       class="tw:mb-2 tw:opacity-40"
                     />
-                    <span class="text-caption">{{
+                    <span class="tw:text-xs">{{
                       !config.stream_name
                         ? t("alerts.anomaly.selectStreamFirst")
                         : t("alerts.anomaly.clickLoadDataHint")

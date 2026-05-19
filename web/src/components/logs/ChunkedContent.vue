@@ -52,7 +52,7 @@ Usage:
         size="sm-action"
         @click="handleLoadMore"
       >
-        <OIcon name="expand-more" size="xs" class="q-mr-xs" />
+        <OIcon name="expand-more" size="xs" class="tw:mr-1" />
         Load more ({{ chunkInfo.loadedSizeKB }}KB / {{ chunkInfo.totalSizeKB }}KB)
       </OButton>
       <span class="tw-text-sm tw-font-medium" style="color: var(--q-primary)">

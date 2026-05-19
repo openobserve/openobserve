@@ -1,13 +1,13 @@
 ﻿<template>
   <div
-   class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+   class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
   >
     <div v-if="!showSearchResults" class="tw:h-full">
        <div class="flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
-        <div class="flex items-center q-py-sm q-pl-md">
+        <div class="flex tw:items-center tw:py-2 tw:pl-3">
           <div
             data-test="search-scheduler-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
             style="
               border: 1.5px solid;
               border-radius: 50%;
@@ -19,16 +19,16 @@
           >
             <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
-          <div class="text-h6 tw:font-[600]" data-test="search-scheduler-title">
+          <div class="tw:text-xl tw:font-semibold tw:font-[600]" data-test="search-scheduler-title">
             {{ t('search_scheduler_job.title') }}
           </div>
         </div>
-        <div class="flex items-center q-py-sm q-pr-md">
+        <div class="flex tw:items-center tw:py-2 tw:pr-3">
           <div>
             <OButton
               variant="primary"
               size="sm"
-              class="q-ml-md"
+              class="tw:ml-3"
               @click="fetchSearchHistory"
               :disabled="isLoading"
             >
@@ -58,7 +58,7 @@
                 <OIcon
                   :name="getStatusIcon(row.status)"
                   size="xs"
-                  class="q-mr-xs"
+                  class="tw:mr-1"
                   :class="getStatusColorClass(row.status)"
                 />
                 {{ getStatusText(row.status) }}
@@ -118,14 +118,14 @@
               <div class="app-tabs-schedule-list report-list-tabs">
                 <app-tabs
                   data-test="expanded-list-tabs"
-                  class="q-mr-md"
+                  class="tw:mr-3"
                   :tabs="tabs"
                   v-model:active-tab="activeTab"
                 />
               </div>
               <div v-if="activeTab == 'query'">
-                <div class="text-left tw:px-2 q-mb-sm expanded-content">
-                  <div class="tw:flex tw:items-center q-py-sm">
+                <div class="tw:text-left tw:px-2 tw:mb-2 expanded-content">
+                  <div class="tw:flex tw:items-center tw:py-2">
                     <strong
                       >{{ t('search_scheduler_job.sql_query') }} :
                       <span>
@@ -162,9 +162,9 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="text-left q-mb-sm tw:px-2 expanded-content"
+                  class="tw:text-left tw:mb-2 tw:px-2 expanded-content"
                 >
-                  <div class="tw:flex tw:items-center q-py-sm">
+                  <div class="tw:flex tw:items-center tw:py-2">
                     <strong
                       >{{ t('search_scheduler_job.function_definition') }} :
                       <span>
@@ -186,9 +186,9 @@
                   </div>
                 </div>
               </div>
-              <div class="q-py-md" v-else>
+              <div class="tw:py-3" v-else>
                 <div
-                  class="text-left tw:px-2 q-mb-sm expanded-content flex tw:flex-col"
+                  class="tw:text-left tw:px-2 tw:mb-2 expanded-content flex tw:flex-col"
                 >
                   <query-editor
                     style="height: 130px"
@@ -218,7 +218,7 @@
               </div>
               <div
                 v-if="isLoading"
-                class="text-center full-width full-height q-mt-lg tw:flex tw:justify-center"
+                class="tw:text-center tw:w-full full-height tw:mt-4 tw:flex tw:justify-center"
               >
                 <OSpinner size="md" />
               </div>

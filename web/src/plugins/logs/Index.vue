@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
           >
             <search-bar
               data-test="logs-search-bar"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection full-width"
+            class="tw:flex scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection tw:w-full"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-splitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height full-width logs-splitter-smooth"
+              class="full-height tw:w-full logs-splitter-smooth"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:justify-center"
                     >
-                      <h5 class="text-center">
+                      <h5 class="tw:text-center">
                         <OIcon
                           name="warning" style="width: 10rem; height: 10rem;" /><br />
                         <div
@@ -136,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="tw:justify-center"
                     >
-                      <h5 class="text-center q-ma-none tw:pt-[2rem]">
+                      <h5 class="tw:text-center tw:m-0 tw:pt-[2rem]">
                         <div
                           data-test="logs-search-result-not-found-text"
-                          class="q-pt-lg"
+                          class="tw:pt-4"
                           v-if="
                             searchObj.data.errorCode == 0 &&
                             searchObj.data.errorMsg == ''
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div
                           data-test="logs-search-error-message"
-                          class="q-pt-lg"
+                          class="tw:pt-4"
                           v-else
                         >
                           Error occurred while retrieving search events.
@@ -203,11 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.loading == false
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-no-stream-selected-text"
-                        class="text-center col-10 q-mx-none tw:mt-none! tw:pt-[2rem]"
+                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem]"
                       >
                         <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
                         {{ t("search.noStreamSelectedMessage") }}
@@ -221,11 +221,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
+                        class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
                       >
                         <OIcon name="info"
 size="md" />
@@ -251,11 +251,11 @@ size="md" />
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == false
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
+                        class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
                       >
                         <OIcon name="info"
 size="md" />
@@ -269,11 +269,11 @@ size="md" />
                         searchObj.meta.searchApplied == false &&
                         searchObj.loading == false
                       "
-                      class="row tw:justify-center"
+                      class="tw:flex tw:justify-center"
                     >
                       <h6
                         data-test="logs-search-error-message"
-                        class="text-center q-ma-none col-10 tw:pt-[2rem]"
+                        class="tw:text-center tw:m-0 tw:w-5/6 tw:pt-[2rem]"
                       >
                         <OIcon name="info"
 size="md" />
@@ -296,7 +296,7 @@ size="md" />
                         @run-query="searchData"
                       />
                     </div>
-                    <div class="text-center col-10 q-ma-none">
+                    <div class="tw:text-center tw:w-5/6 tw:m-0">
                       <h5 class="tw:my-none">
                         <span v-if="disableMoreErrorDetails">
                           <SanitizedHtmlRenderer
@@ -370,7 +370,7 @@ size="md" />
         class="search-history-empty"
       >
         <div
-          class="search-history-empty__content text-center q-pa-md flex flex-center"
+          class="search-history-empty__content tw:text-center tw:p-3 flex flex-center"
         >
           <div>
             <div>
@@ -378,22 +378,22 @@ size="md" />
                 name="history"
                 class="search-history-empty__icon" style="width: 100px; height: 100px;" />
             </div>
-            <div class="text-h4 search-history-empty__title">
+            <div class="tw:text-3xl tw:font-semibold search-history-empty__title">
               Search history is not enabled.
             </div>
             <div
-              class="search-history-empty__info q-mt-sm flex items-center justify-center"
+              class="search-history-empty__info tw:mt-2 flex tw:items-center tw:justify-center"
             >
-              <OIcon name="info" class="q-mr-xs"
+              <OIcon name="info" class="tw:mr-1"
 size="md" />
-              <span class="text-h6 text-center">
+              <span class="tw:text-xl tw:font-semibold tw:text-center">
                 Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
                 reporting.</span
               >
             </div>
 
             <OButton
-              class="q-mt-xl"
+              class="tw:mt-6"
               variant="outline"
               size="sm-action"
               @click="redirectBackToLogs"
@@ -2528,7 +2528,7 @@ export default defineComponent({
       }
 
       if (searchObj.meta.logsVisualizeToggle == "build") {
-        // Validate query before running - only block if in custom query mode with empty query.
+        // Validate query before running - only tw:block if in custom query mode with empty query.
         // In builder mode (non-custom), BuildQueryPage generates the query automatically.
         const isCustomQueryMode =
           buildDashboardPanelData.data.queries[0]?.customQuery === true;
@@ -3502,7 +3502,7 @@ export default defineComponent({
     box-sizing: border-box !important;
     height: 100% !important;
     overflow: visible !important;
-    /* Changed from hidden to visible for button */
+    /* Changed from tw:hidden to visible for button */
   }
 
   .logs-horizontal-splitter .q-splitter__before {

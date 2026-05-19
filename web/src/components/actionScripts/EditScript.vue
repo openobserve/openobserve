@@ -16,28 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="add-action-script-section">
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
       <div class="card-container">
         <div
           class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]"
         >
           <div
             data-test="add-action-script-back-btn"
-            class="flex justify-center items-center q-mr-md cursor-pointer"
+            class="flex tw:justify-center tw:items-center tw:mr-3 cursor-pointer"
             title="Go Back"
             @click="router.back()"
           >
             <OIcon name="arrow-back-ios-new" size="xs" />
             <div
               v-if="isEditingActionScript"
-              class="text-h6 q-pl-sm"
+              class="tw:text-xl tw:font-semibold tw:pl-2"
               data-test="add-action-script-title"
             >
               {{ t("actions.update") }}
             </div>
             <div
               v-else
-              class="text-h6 q-pl-sm"
+              class="tw:text-xl tw:font-semibold tw:pl-2"
               data-test="add-action-script-title"
             >
               {{ t("actions.add") }}
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           ref="addAlertFormRef"
-          class="q-px-lg q-pb-md"
+          class="tw:px-4 tw:pb-3"
           style="width: 1024px"
         >
           <div
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OInput>
             </div>
-            <div data-test="add-action-script-description-input" class="report-name-input q-pb-sm">
+            <div data-test="add-action-script-description-input" class="report-name-input tw:pb-2">
               <OInput
                 v-model="formData.description"
                 :label="t('reports.description')"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div data-test="add-action-script-type" class="report-name-input q-mb-md">
+            <div data-test="add-action-script-type" class="report-name-input tw:mb-3">
               <OSelect
                 data-test="add-action-script-type-select"
                 v-model="formData.type"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               orientation="vertical"
               animated
               navigable
-              class="q-mb-md"
+              class="tw:mb-3"
             >
               <OStep
                 data-test="add-action-script-step-1"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   data-test="add-action-script-file-input"
-                  class="flex items-center"
+                  class="flex tw:items-center"
                 >
                   <OFile
                     v-if="
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="
                       isEditingActionScript && formData.fileNameToShow == ''
                     "
-                    class="q-pt-md q-mt-xs q-pl-md"
+                    class="tw:pt-3 tw:mt-1 tw:pl-3"
                   >
                     <OButton
                       data-test="cancel-upload-new-btn-file"
@@ -193,17 +193,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Schedule"
                 icon="schedule"
                 :done="step > 2"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="q-my-sm q-px-sm">
+                <div class="tw:my-2 tw:px-2">
                   <div
                     style="font-size: 14px"
-                    class="text-bold text-grey-8 q-mb-sm"
+                    class="tw:font-bold tw:text-gray-500 tw:mb-2"
                     data-test="add-action-script-frequency-title"
                   >
                     {{ t("actions.frequency") }} *
                   </div>
-                  <div class="q-pa-xs el-border-radius el-border tw:w-fit">
+                  <div class="tw:p-1 el-border-radius el-border tw:w-fit">
                     <template
                       v-for="visual in frequencyTabs"
                       :key="visual.value"
@@ -222,10 +222,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     v-if="frequency.type === 'once'"
-                    class="flex justify-start items-center q-mt-md"
+                    class="flex tw:justify-start tw:items-center tw:mt-3"
                     data-test="add-action-script-frequency-info"
                   >
-                    <OIcon name="event" size="sm" class="q-mr-sm" />
+                    <OIcon name="event" size="sm" class="tw:mr-2" />
                     <div style="font-size: 14px">
                       The script will be triggered immediately after it is saved
                     </div>
@@ -235,11 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex">
                       <div
                         data-test="add-action-script-cron-input"
-                        class="q-mr-sm"
+                        class="tw:mr-2"
                         style="padding-top: 8px; width: 320px"
                       >
                         <div
-                          class="q-mb-xs text-bold text-grey-8"
+                          class="tw:mb-1 tw:font-bold tw:text-gray-500"
                           data-test="add-action-script-cron-expression-title"
                         >
                           {{ t("reports.cronExpression") + " *" }}
@@ -247,11 +247,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="add-action-script-cron-info"
                             name="info"
                             size="sm"
-                            class="q-ml-xs cursor-pointer"
+                            class="tw:ml-1 cursor-pointer"
                             :class="
                               store.state.theme === 'dark'
-                                ? 'text-grey-5'
-                                : 'text-grey-7'
+                                ? 'tw:text-gray-400'
+                                : 'tw:text-gray-400'
                             "
                            />
                             <OTooltip side="right" align="center">
@@ -328,23 +328,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Select Service Account"
                 icon="dashboard"
                 :done="step > 3"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
-                <div class="flex items-center">
+                <div class="flex tw:items-center">
                   <div class="service-account-selector">
                     <div
                       data-test="add-action-script-service-account-title"
-                      class="q-mb-xs text-bold text-grey-8"
+                      class="tw:mb-1 tw:font-bold tw:text-gray-500"
                     >
                       {{ t("actions.serviceAccount") + " *" }}
                       <OIcon
                         name="info"
                         size="sm"
-                        class="q-ml-xs cursor-pointer"
+                        class="tw:ml-1 cursor-pointer"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'text-grey-5'
-                            : 'text-grey-7'
+                            ? 'tw:text-gray-400'
+                            : 'tw:text-gray-400'
                         "
                        />
                         <OTooltip side="right" align="center">
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model="formData.service_account"
                       :options="filteredServiceAccounts"
                       :loading="isFetchingServiceAccounts"
-                      class="q-py-sm no-case"
+                      class="tw:py-2 no-case"
                       labelKey="label"
                       valueKey="value"
                       :error="!!serviceAccountError"
@@ -399,15 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 title="Environmental Variables"
                 icon="lock"
                 :done="step > 4"
-                class="q-mt-md"
+                class="tw:mt-3"
               >
                 <div
                   v-for="(header, index) in environmentalVariables"
                   :key="header.uuid"
-                  class="row q-col-gutter-sm"
+                  class="tw:flex tw:gap-2"
                   data-test="add-action-script-env-variable"
                 >
-                  <div class="col-5 q-ml-none">
+                  <div class="tw:w-5/12 tw:ml-0">
                     <OInput
                       :data-test="`add-action-script-header-${header['key']}-key-input`"
                       v-model="header.key"
@@ -415,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="col-5 q-ml-none q-mb-sm">
+                  <div class="tw:w-5/12 tw:ml-0 tw:mb-2">
                     <OInput
                       :data-test="`add-action-script-header-${header['key']}-value-input`"
                       v-model="header.value"
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="col-2 q-ml-none">
+                  <div class="tw:w-1/6 tw:ml-0">
                     <OButton
                       :data-test="`add-action-script-header-${header['key']}-delete-btn`"
                       variant="ghost"
@@ -461,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="tw:mx-2">
       <div
-        class="tw:flex tw:justify-end tw:gap-2 q-px-md full-width tw:py-[0.625rem] card-container"
+        class="tw:flex tw:justify-end tw:gap-2 tw:px-3 tw:w-full tw:py-[0.625rem] card-container"
         style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="action-scripts-list-page">
     <div
       v-if="!showAddActionScriptDialog"
-      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] q-pt-xs"
+      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
     >
       <div class="card-container tw:mb-[0.625rem]">
         <div
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OInput
               v-model="filterQuery"
-              class="q-ml-auto no-border o2-search-input"
+              class="tw:ml-auto no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             >
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
                 style="display: inline-block; width: 33.14px; height: auto"
-                class="flex justify-center items-center q-ml-xs"
+                class="flex tw:justify-center tw:items-center tw:ml-1"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="flex justify-center items-center cursor-pointer"
+          class="flex tw:justify-center tw:items-center cursor-pointer"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
           title="Go Back"
           @click="showForm = false"

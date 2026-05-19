@@ -93,11 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="tw:overflow-hidden tw:min-h-0">
             <div class="tw:mt-3">
-              <div class="row q-col-gutter-sm">
+              <div class="tw:flex tw:gap-2">
                 <div
                   v-for="service in QUICK_SETUP_SERVICES"
                   :key="service.flag"
-                  class="col-6 col-sm-4 col-md-3"
+                  class="tw:w-1/2 col-sm-4 col-md-3"
                 >
                   <OCheckbox
                     v-model="enabledServices"
@@ -188,11 +188,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="tw:overflow-hidden tw:min-h-0">
               <div class="tw:mt-3">
-                <div class="row q-col-gutter-sm">
+                <div class="tw:flex tw:gap-2">
                   <div
                     v-for="region in AWS_REGIONS"
                     :key="region.value"
-                    class="col-12 col-sm-6 col-md-4"
+                    class="tw:w-full col-sm-6 col-md-4"
                   >
                     <OCheckbox
                       v-model="targetRegions"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <span
           v-if="enabledServices.length === 0"
-          class="tw:text-sm text-negative"
+          class="tw:text-sm tw:text-red-500"
         >
           Select at least one service
         </span>
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             deploymentMode === 'stackset' && targetRegions.length === 0
           "
-          class="tw:text-sm text-negative"
+          class="tw:text-sm tw:text-red-500"
         >
           Select at least one target region
         </span>

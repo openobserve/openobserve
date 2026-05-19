@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSpinner
               v-if="row.status === 'training'"
               size="xs"
-              class="q-ml-xs"
+              class="tw:ml-1"
             />
           </OBadge>
           <OTooltip v-if="row.status === 'failed'" :content="row.last_error || t('alerts.anomalyStatus.failed')" />
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.detection_window_seconds">
           {{ formatSeconds(row.detection_window_seconds) }}
         </span>
-        <span v-else class="text-grey-5">—</span>
+        <span v-else class="tw:text-gray-400">—</span>
       </template>
 
       <!-- Last Triggered At column -->
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.last_detection_run && row.last_detection_run > 0">
           {{ formatTimestamp(row.last_detection_run) }}
         </span>
-        <span v-else class="text-grey-5">—</span>
+        <span v-else class="tw:text-gray-400">—</span>
       </template>
 
       <!-- Last Anomaly Detected At column -->
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.last_anomaly_detected_at">
           {{ formatTimestamp(row.last_anomaly_detected_at) }}
         </span>
-        <span v-else class="text-grey-5">—</span>
+        <span v-else class="tw:text-gray-400">—</span>
       </template>
 
       <!-- Last Trained At column -->
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="row.training_completed_at">
           {{ formatTimestamp(row.training_completed_at) }}
         </span>
-        <span v-else class="text-grey-5">—</span>
+        <span v-else class="tw:text-gray-400">—</span>
       </template>
 
       <!-- Actions column -->
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('alerts.edit')"
           @click="editConfig(row)"
           />
-          <!-- Pause / Resume — hidden while training or failed -->
+          <!-- Pause / Resume — tw:hidden while training or failed -->
           <OButton
             v-if="row.status !== 'training' && row.status !== 'failed'"
           :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty state -->
       <template #empty>
-        <div class="tw:w-full tw:text-center tw:py-12 text-grey-6">
+        <div class="tw:w-full tw:text-center tw:py-12 tw:text-gray-400">
           {{ t("alerts.noDestinations") }}
         </div>
       </template>
@@ -202,14 +202,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Error detail for failed state -->
       <template v-if="pendingRetrainRow?.status === 'failed' && pendingRetrainRow?.last_error">
-        <div class="text-body2 q-mb-sm">
+        <div class="tw:text-sm tw:mb-2">
           Training failed for <strong>{{ pendingRetrainRow?.name }}</strong> with the following error:
         </div>
         <pre
-          class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 q-mb-sm"
+          class="tw:text-xs tw:whitespace-pre-wrap tw:break-all tw:rounded tw:p-2 tw:mb-2"
           style="background: rgba(0,0,0,0.06); max-height: 120px; overflow-y: auto"
         >{{ pendingRetrainRow.last_error }}</pre>
-        <div class="text-body2">Fix the issue above, then retry training.</div>
+        <div class="tw:text-sm">Fix the issue above, then retry training.</div>
       </template>
       <template v-else-if="pendingRetrainRow?.status === 'failed'">
         <p>Training failed for <strong>{{ pendingRetrainRow?.name }}</strong>. Retry training now?</p>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <strong>{{ pendingRetrainRow?.name }}</strong>?
           The existing model will be replaced once training completes.
         </p>
-        <div v-if="pendingRetrainRow?.training_completed_at" class="text-caption text-grey-6">
+        <div v-if="pendingRetrainRow?.training_completed_at" class="tw:text-xs tw:text-gray-400">
           Last trained: {{ formatTimestamp(pendingRetrainRow.training_completed_at) }}
         </div>
       </template>

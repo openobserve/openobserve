@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <div id="date-time-menu" class="date-time-dialog">
-      <div class="flex justify-evenly q-py-sm">
+      <div class="flex tw:justify-evenly tw:py-2">
         <OButton
           class="tab-button"
           :variant="
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="relative">
           <div class="date-time-table relative column">
             <div
-              class="relative-row q-px-md q-py-sm"
+              class="relative-row tw:px-3 tw:py-2"
               v-for="(period, index) in relativePeriods"
               :key="'date_' + index"
             >
@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="relative-row q-px-md q-py-sm">
+            <div class="relative-row tw:px-3 tw:py-2">
               <div class="relative-period-name">Custom</div>
 
-              <div class="row q-gutter-sm">
-                <div class="col">
+              <div class="tw:flex tw:gap-2">
+                <div class="tw:flex tw:flex-col">
                   <OInput
                     v-model="data.selectedDate.relative.value"
                     type="number"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @change="calculateMaxValue"
                   />
                 </div>
-                <div class="col">
+                <div class="tw:flex tw:flex-col">
                   <OSelect
                     v-model="data.selectedDate.relative.period"
                     :options="relativePeriods"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="notePara">{{ t("common.datetimeMessage") }}</div>
             <OSeparator class="tw:my-2" />
 
-            <table class="q-px-md startEndTime">
+            <table class="tw:px-3 startEndTime">
               <tr>
                 <td class="label">{{ t("common.startTime") }}</td>
                 <td class="label">{{ t("common.endTime") }}</td>

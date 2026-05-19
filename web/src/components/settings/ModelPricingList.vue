@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full q-pa-none">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="row items-center no-wrap tree-node-content">
+          <div class="tw:flex tw:items-center tw:flex-nowrap tree-node-content">
             <span
               v-if="getSource(row) === 'built_in'"
               class="tw:shrink-0 tw:cursor-default tw:inline-flex tw:mr-1"
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
             <code
-              class="text-caption pattern-code o2-table-cell-content"
+              class="tw:text-xs pattern-code o2-table-cell-content"
               :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </template>
-            <span v-else class="text-grey-5">&mdash;</span>
+            <span v-else class="tw:text-gray-400">&mdash;</span>
           </div>
         </template>
         <template #cell-actions="{ row }">
@@ -327,21 +327,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <div
             v-if="loading"
-            class="full-width column flex-center q-mt-xs"
+            class="tw:w-full column flex-center tw:mt-1"
             style="font-size: 1.5rem"
           >
             <OSpinner size="lg" class="tw:mt-[20vh]" />
           </div>
           <div
             v-else
-            class="full-width column flex-center"
+            class="tw:w-full column flex-center"
             style="height: calc(100vh - 220px); gap: 8px"
           >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-grey-5" />
-            <div class="text-subtitle1 text-grey-7 q-mt-sm">
+            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="tw:text-gray-400" />
+            <div class="tw:text-base tw:font-medium tw:text-gray-400 tw:mt-2">
               {{ t("modelPricing.noModels") }}
             </div>
-            <div class="text-caption text-grey-7">
+            <div class="tw:text-xs tw:text-gray-400">
               {{ t("modelPricing.noModelsDesc") }}
             </div>
             <OButton
@@ -434,13 +434,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
       </template>
 
-      <div class="q-pa-md pricing-dialog-body">
+      <div class="tw:p-3 pricing-dialog-body">
         <div v-if="pricingDialogRow">
           <div class="tw:mb-4">
             <div class="pricing-section-label">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="text-caption pattern-code pattern-code-panel">{{
+            <code class="tw:text-xs pattern-code pattern-code-panel">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </tbody>
               </table>
             </div>
-            <span v-else class="text-grey-5">&mdash;</span>
+            <span v-else class="tw:text-gray-400">&mdash;</span>
           </div>
         </div>
       </div>
@@ -740,7 +740,7 @@ function sortedPriceEntries(
   });
 }
 
-/** Return the first N prices to display inline as chips. */
+/** Return the first N prices to display tw:inline as chips. */
 const MAX_VISIBLE_PRICES = 2;
 function getVisiblePrices(model: any): Record<string, number> {
   const tier = getDefaultTier(model);
@@ -750,7 +750,7 @@ function getVisiblePrices(model: any): Record<string, number> {
   );
 }
 
-/** How many prices are hidden behind the overflow "+N" chip. */
+/** How many prices are tw:hidden behind the overflow "+N" chip. */
 function getOverflowCount(model: any): number {
   const tier = getDefaultTier(model);
   if (!tier?.prices) return 0;
@@ -1000,7 +1000,7 @@ onActivated(() => {
   opacity: 0.6;
 }
 
-/* Add pattern code block styling */
+/* Add pattern code tw:block styling */
 .pattern-code {
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--o2-border-color);
